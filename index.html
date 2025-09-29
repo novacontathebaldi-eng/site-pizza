@@ -647,6 +647,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-functions-compat.js"></script>
 
     <script type="module">
         const firebaseConfig = {
@@ -663,6 +664,7 @@
                 this.firebaseApp = firebase.initializeApp(firebaseConfig);
                 this.db = firebase.firestore();
                 this.auth = firebase.auth();
+                this.functions = firebase.functions();
                 
                 this.menu = { categories: [], items: [] };
                 this.cart = [];
@@ -680,12 +682,13 @@
                 this.loadCartFromStorage();
                 this.auth.onAuthStateChanged(user => this.handleAuthChange(user));
                 window.addEventListener('hashchange', () => this.handleRouting());
+                this.handleRouting();
             }
 
             async handleAuthChange(user) {
                 this.user = user;
                 if (user) {
-                    const idTokenResult = await user.getIdTokenResult();
+                    const idTokenResult = await user.getIdTokenResult(true); // Force refresh
                     this.isAdmin = idTokenResult.claims.admin === true;
                 } else {
                     this.isAdmin = false;
