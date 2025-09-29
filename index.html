@@ -123,11 +123,10 @@
     <div id="app"><div style="display: flex; justify-content: center; align-items: center; height: 100vh;"><i class="fas fa-spinner fa-spin fa-3x" style="color: var(--color-primary);"></i></div></div>
     <div id="modals-container"></div>
     
-    <!-- SDK FIREBASE v9 (modular) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getFirestore, collection, doc, getDoc, onSnapshot, orderBy, query, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getFirestore, collection, doc, getDoc, onSnapshot, orderBy, query, addDoc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCTMHlUCGOpU7VRIdbP2VADzUF9n1lI88A",
@@ -143,19 +142,19 @@
             firebaseApp: initializeApp(firebaseConfig),
             auth: null,
             db: null,
-            user: undefined, // undefined: loading, null: logged out, object: logged in
+            user: undefined, 
             isAdmin: false,
             menu: { categories: [], items: [] },
             cart: [],
             activeCategory: null,
-            listeners: [],
+            listeners: {},
             activeAdminTab: 'cardapio',
         };
         state.auth = getAuth(state.firebaseApp);
         state.db = getFirestore(state.firebaseApp);
         
         // --- DOM ELEMENTS ---
-        const appRoot = document.getElementById('app');
+        const getAppRoot = () => document.getElementById('app');
         const modalsContainer = document.getElementById('modals-container');
 
         // --- UTILS & HELPERS ---
@@ -166,11 +165,6 @@
         // --- RENDER FUNCTIONS ---
         const render = () => {
             const hash = window.location.hash || '#';
-            // Clean up previous event listeners before re-rendering
-            const oldAppRoot = document.getElementById('app');
-            const newAppRoot = oldAppRoot.cloneNode(false);
-            oldAppRoot.parentNode.replaceChild(newAppRoot, oldAppRoot);
-
             if (hash.startsWith('#admin')) {
                 renderAdminPage();
             } else {
@@ -179,7 +173,7 @@
         };
 
         const renderHomePage = () => {
-            appRoot.innerHTML = `
+            getAppRoot().innerHTML = `
                 <header class="header" id="header"><div class="container header-content"><a href="#" class="logo"><i class="fas fa-pizza-slice"></i> Santa Sensação</a><nav class="nav-links"><a href="#inicio" class="nav-link active">Início</a><a href="#cardapio" class="nav-link">Cardápio</a><a href="#sobre" class="nav-link">Sobre</a></nav><div class="header-actions"><button class="cart-button" id="open-cart-btn"><i class="fas fa-shopping-cart"></i><span class="cart-count hidden">0</span></button><a href="#admin" class="btn btn--secondary">Admin</a></div></div></header>
                 <main>
                     <section id="inicio"><div class="container hero-content"><h1 class="hero-title">O Sabor Original de <span>Santa Leopoldina</span></h1><p class="hero-subtitle">Massa artesanal, ingredientes frescos e o calor do forno a lenha.</p><a href="#cardapio" class="btn btn--primary">Ver Cardápio</a></div></section>
@@ -195,6 +189,7 @@
         };
         
         const renderAdminPage = () => {
+            const appRoot = getAppRoot();
             if (state.user === undefined) {
                  appRoot.innerHTML = `<div style="display: flex; justify-content: center; align-items: center; height: 100vh;"><i class="fas fa-spinner fa-spin fa-3x" style="color: var(--color-primary);"></i></div>`;
                  return;
@@ -212,9 +207,29 @@
         const renderAdminLogin = () => `<div style="display: flex; justify-content: center; align-items: center; min-height: 100vh;"><div class="modal-content" style="max-width: 400px;"><div class="section-header"><h2 class="section-title">Acesso Restrito</h2><a href="#" style="position: absolute; top: 16px; right: 16px; font-size: 1.5rem; color: var(--color-text-light); text-decoration:none;">&times;</a></div><form id="admin-login-form"><div class="form-group"><label for="email">Email</label><input type="email" id="email" class="form-control" required></div><div class="form-group"><label for="password">Senha</label><input type="password" id="password" class="form-control" required></div><p id="login-error" class="hidden" style="color: var(--color-error);"></p><button type="submit" class="btn btn--primary" style="width: 100%;">Entrar</button></form></div></div>`;
         
         const renderAdminPanel = () => `<div class="container admin-page"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;"><h2 class="section-title">Painel Administrativo</h2><div><a href="#" class="btn btn--primary">Voltar ao Site</a><button id="logout-btn" class="btn btn--secondary">Sair</button></div></div>${!state.isAdmin ? '<p style="background: #fff3cd; color: #856404; padding: 1rem; border-radius: 8px; border: 1px solid #ffeeba;"><b>Atenção:</b> Você não tem permissão de administrador.</p>' : ''}<div class="admin-container"><nav class="admin-nav" id="admin-nav"><button class="admin-nav-btn ${state.activeAdminTab === 'cardapio' ? 'active' : ''}" data-tab="cardapio"><i class="fas fa-utensils"></i> Cardápio</button><button class="admin-nav-btn ${state.activeAdminTab === 'categorias' ? 'active' : ''}" data-tab="categorias"><i class="fas fa-tags"></i> Categorias</button><button class="admin-nav-btn ${state.activeAdminTab === 'seguranca' ? 'active' : ''}" data-tab="seguranca"><i class="fas fa-shield-alt"></i> Segurança</button></nav><div class="admin-content" id="admin-content"></div></div></div>`;
+        
+        const renderAdminTabContent = () => {
+             const container = document.getElementById('admin-content');
+             if (!container) return;
+             switch(state.activeAdminTab) {
+                case 'categorias':
+                    container.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><h3>Categorias</h3><button class="btn btn--primary" id="add-category-btn" ${!state.isAdmin ? 'disabled' : ''}><i class="fas fa-plus"></i> Nova</button></div><table class="admin-table"><thead><tr><th>Ordem</th><th>Nome</th><th>Ações</th></tr></thead><tbody id="category-table-body">${renderCategoriesTableRows()}</tbody></table>`;
+                    break;
+                case 'cardapio':
+                     container.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><h3>Itens do Cardápio</h3><button class="btn btn--primary" id="add-item-btn" ${!state.isAdmin ? 'disabled' : ''}><i class="fas fa-plus"></i> Novo</button></div><table class="admin-table"><thead><tr><th>Nome</th><th>Categoria</th><th>Preços</th><th>Ações</th></tr></thead><tbody id="item-table-body">${renderItemsTableRows()}</tbody></table>`;
+                    break;
+                case 'seguranca':
+                    container.innerHTML = `<h3>Alterar Senha</h3><form id="change-password-form"><div class="form-group"><label for="new-password">Nova Senha</label><input type="password" id="new-password" class="form-control" required minlength="6"></div><div class="form-group"><label for="confirm-password">Confirmar Nova Senha</label><input type="password" id="confirm-password" class="form-control" required></div><p id="password-error" class="hidden" style="color: var(--color-error);"></p><p id="password-success" class="hidden" style="color: var(--color-success);"></p><button type="submit" class="btn btn--primary" style="margin-top: 16px;" ${!state.isAdmin ? 'disabled' : ''}>Salvar Alterações</button></form>`;
+                    break;
+             }
+        }
+
+        const renderCategoriesTableRows = () => state.menu.categories.map(cat => `<tr><td>${cat.order}</td><td>${cat.name}</td><td class="admin-actions"><button class="btn-edit" data-id="${cat.id}" ${!state.isAdmin ? 'disabled' : ''}><i class="fas fa-edit"></i></button><button class="btn-delete" data-id="${cat.id}" ${!state.isAdmin ? 'disabled' : ''}><i class="fas fa-trash"></i></button></td></tr>`).join('');
+        const renderItemsTableRows = () => state.menu.items.map(item => `<tr><td>${item.name}</td><td>${state.menu.categories.find(c => c.id === item.categoryId)?.name || 'N/A'}</td><td>${Object.keys(item.prices).join(', ')}</td><td class="admin-actions"><button class="btn-edit" data-id="${item.id}" ${!state.isAdmin ? 'disabled' : ''}><i class="fas fa-edit"></i></button><button class="btn-delete" data-id="${item.id}" ${!state.isAdmin ? 'disabled' : ''}><i class="fas fa-trash"></i></button></td></tr>`).join('');
 
         // --- UI UPDATE FUNCTIONS ---
         const updateMenuUI = () => {
+            if (window.location.hash.startsWith('#admin')) return;
             const categoriesContainer = document.getElementById('menu-categories');
             const grid = document.getElementById('menu-grid');
             if (!categoriesContainer || !grid) return;
@@ -222,88 +237,37 @@
             categoriesContainer.innerHTML = state.menu.categories.map(cat => `<button class="category-tab ${state.activeCategory === cat.id ? 'active' : ''}" data-category-id="${cat.id}">${cat.name}</button>`).join('');
             
             const itemsToShow = state.menu.items.filter(item => item.categoryId === state.activeCategory);
-            if (itemsToShow.length === 0) {
-                grid.innerHTML = `<p style="text-align:center; padding: 2rem;">Nenhum item encontrado nesta categoria.</p>`;
-                return;
-            }
-            grid.innerHTML = itemsToShow.map(item => `
-                <div class="menu-card">
-                    <img src="${item.imageUrl || 'https://placehold.co/600x400/8B0000/FDF8F0?text=Pizza'}" alt="${item.name}" class="menu-card-image">
-                    <div class="menu-card-content">
-                        <h3 class="menu-card-title">${item.name}</h3>
-                        <p class="menu-card-description">${item.description}</p>
-                        <div class="menu-card-footer">
-                            <div class="size-options">${Object.entries(item.prices).map(([size, price]) => `
-                                <button class="size-btn" data-item-id="${item.id}" data-size="${size}" data-price="${price}">
-                                    <span class="size-name">${size}</span>
-                                    <span class="size-price">${formatPrice(price)}</span>
-                                </button>`).join('')}
-                            </div>
-                        </div>
-                    </div>
-                </div>`).join('');
+            grid.innerHTML = itemsToShow.length === 0 
+                ? `<p style="text-align:center; padding: 2rem;">Nenhum item encontrado nesta categoria.</p>`
+                : itemsToShow.map(item => `
+                <div class="menu-card"><img src="${item.imageUrl || 'https://placehold.co/600x400/8B0000/FDF8F0?text=Pizza'}" alt="${item.name}" class="menu-card-image"><div class="menu-card-content"><h3 class="menu-card-title">${item.name}</h3><p class="menu-card-description">${item.description}</p><div class="menu-card-footer"><div class="size-options">${Object.entries(item.prices).map(([size, price]) => `<button class="size-btn" data-item-id="${item.id}" data-size="${size}" data-price="${price}"><span class="size-name">${size}</span><span class="size-price">${formatPrice(price)}</span></button>`).join('')}</div></div></div></div>`).join('');
         };
         
         const updateCartUI = () => {
-            const cartBody = document.getElementById('cart-body');
-            const cartFooter = document.getElementById('cart-footer');
-            const cartCount = document.querySelector('.cart-count');
-            const cartTotalPrice = document.getElementById('cart-total-price');
+            const cartBody = document.getElementById('cart-body'), cartFooter = document.getElementById('cart-footer'), cartCount = document.querySelector('.cart-count'), cartTotalPrice = document.getElementById('cart-total-price');
             if (!cartBody || !cartCount) return;
 
-            const totalItems = state.cart.reduce((sum, item) => sum + item.quantity, 0);
+            const totalItems = state.cart.reduce((s, i) => s + i.quantity, 0);
             cartCount.textContent = totalItems;
             cartCount.classList.toggle('hidden', totalItems === 0);
-            cartFooter.classList.toggle('hidden', totalItems === 0);
+            cartFooter?.classList.toggle('hidden', totalItems === 0);
             
-            cartBody.innerHTML = state.cart.length === 0 
-                ? `<p style="text-align: center; color: var(--color-text-light);">Seu carrinho está vazio.</p>` 
-                : state.cart.map(item => `
-                    <div class="cart-item" data-cart-id="${item.cartId}">
-                        <div class="cart-item-info">
-                            <p class="cart-item-title">${item.name}</p>
-                            <p class="cart-item-details">${item.size} - ${formatPrice(item.price)}</p>
-                            <div class="cart-item-controls">
-                                <button class="quantity-btn" data-action="decrease">-</button>
-                                <span>${item.quantity}</span>
-                                <button class="quantity-btn" data-action="increase">+</button>
-                                <button class="cart-item-remove" data-action="remove"><i class="fas fa-trash"></i></button>
-                            </div>
-                        </div>
-                    </div>`).join('');
+            cartBody.innerHTML = state.cart.length === 0 ? `<p style="text-align: center; color: var(--color-text-light);">Seu carrinho está vazio.</p>` : state.cart.map(item => `<div class="cart-item" data-cart-id="${item.cartId}"><div class="cart-item-info"><p class="cart-item-title">${item.name}</p><p class="cart-item-details">${item.size} - ${formatPrice(item.price)}</p><div class="cart-item-controls"><button class="quantity-btn" data-action="decrease">-</button><span>${item.quantity}</span><button class="quantity-btn" data-action="increase">+</button><button class="cart-item-remove" data-action="remove"><i class="fas fa-trash"></i></button></div></div></div>`).join('');
 
-            const total = state.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-            cartTotalPrice.textContent = formatPrice(total);
+            const total = state.cart.reduce((s, i) => s + i.price * i.quantity, 0);
+            if(cartTotalPrice) cartTotalPrice.textContent = formatPrice(total);
         };
-
-        const renderAdminTabContent = () => {
-             const container = document.getElementById('admin-content');
-             if (!container) return;
-
-             // ... logic for rendering different tabs
-        }
 
         // --- EVENT HANDLERS & ACTIONS ---
         const handleAuthChange = async (user) => {
             state.user = user;
-            if (user) {
-                try {
-                    const adminDocRef = doc(state.db, 'admins', user.uid);
-                    const adminDoc = await getDoc(adminDocRef);
-                    state.isAdmin = adminDoc.exists();
-                } catch (e) {
-                    console.error("Erro ao verificar status de admin:", e);
-                    state.isAdmin = false;
-                }
-            } else {
-                state.isAdmin = false;
-            }
+            state.isAdmin = user ? (await getDoc(doc(state.db, 'admins', user.uid))).exists() : false;
             render();
         };
 
         const handleRouting = () => {
-            state.listeners.forEach(unsubscribe => unsubscribe());
-            state.listeners = [];
+            Object.values(state.listeners).forEach(unsubscribe => unsubscribe());
+            state.listeners = {};
             setupFirestoreListeners();
             render();
         };
@@ -313,87 +277,69 @@
             if(header) {
                 const scrollHandler = () => header.classList.toggle('scrolled', window.scrollY > 50);
                 window.addEventListener('scroll', scrollHandler);
-                state.listeners.push(() => window.removeEventListener('scroll', scrollHandler));
             }
 
-            appRoot.addEventListener('click', e => {
-                 // Category tabs
+            getAppRoot().addEventListener('click', e => {
                 const categoryTab = e.target.closest('.category-tab');
-                if (categoryTab) {
-                    state.activeCategory = categoryTab.dataset.categoryId;
-                    updateMenuUI();
-                    return;
-                }
+                if (categoryTab) { state.activeCategory = categoryTab.dataset.categoryId; updateMenuUI(); return; }
                 
-                // Add to cart buttons
                 const sizeBtn = e.target.closest('.size-btn');
-                if (sizeBtn) {
-                    const { itemId, size, price } = sizeBtn.dataset;
-                    addToCart(itemId, size, parseFloat(price));
-                    return;
-                }
+                if (sizeBtn) { const { itemId, size, price } = sizeBtn.dataset; addToCart(itemId, size, parseFloat(price)); return; }
                 
-                // Cart controls
-                const openCartBtn = e.target.closest('#open-cart-btn');
-                if(openCartBtn) {
-                    toggleCart(true);
-                    return;
-                }
-                const closeCartBtn = e.target.closest('#cart-close-btn');
-                const cartOverlay = e.target.closest('#cart-overlay');
-                if(closeCartBtn || cartOverlay) {
-                    toggleCart(false);
-                    return;
-                }
+                if(e.target.closest('#open-cart-btn')) { toggleCart(true); return; }
+                if(e.target.closest('#cart-close-btn') || e.target.closest('#cart-overlay')) { toggleCart(false); return; }
 
-                // Cart item actions
                 const cartActionBtn = e.target.closest('[data-action]');
-                if(cartActionBtn) {
-                    const cartItemEl = e.target.closest('.cart-item');
-                    if(cartItemEl) {
-                         handleCartAction(cartItemEl.dataset.cartId, cartActionBtn.dataset.action);
-                    }
-                    return;
-                }
+                if(cartActionBtn) { const cartItemEl = e.target.closest('.cart-item'); if(cartItemEl) { handleCartAction(cartItemEl.dataset.cartId, cartActionBtn.dataset.action); } return; }
 
-                // Finish order
-                const finishOrderBtn = e.target.closest('#finish-order-btn');
-                if (finishOrderBtn) {
-                    handleFinishOrder();
-                }
+                if (e.target.closest('#finish-order-btn')) { handleFinishOrder(); }
             });
         };
         
         const attachAdminLoginListeners = () => {
             const form = document.getElementById('admin-login-form');
-            if (form) {
-                form.addEventListener('submit', async e => {
-                    e.preventDefault();
-                    const email = document.getElementById('email').value;
-                    const password = document.getElementById('password').value;
-                    const errorEl = document.getElementById('login-error');
-                    try {
-                        await signInWithEmailAndPassword(state.auth, email, password);
-                    } catch (error) {
-                        errorEl.textContent = "Email ou senha incorretos.";
-                        errorEl.classList.remove('hidden');
-                    }
-                });
-            }
+            if (form) form.addEventListener('submit', async e => {
+                e.preventDefault();
+                const btn = e.target.querySelector('button[type="submit"]');
+                btn.disabled = true;
+                btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Entrando...`;
+                const email = form.email.value, password = form.password.value, errorEl = document.getElementById('login-error');
+                try {
+                    await signInWithEmailAndPassword(state.auth, email, password);
+                } catch (error) {
+                    errorEl.textContent = "Email ou senha incorretos.";
+                    errorEl.classList.remove('hidden');
+                    btn.disabled = false;
+                    btn.innerHTML = 'Entrar';
+                }
+            });
         };
 
         const attachAdminPanelListeners = () => {
-            const logoutBtn = document.getElementById('logout-btn');
-            if(logoutBtn) logoutBtn.addEventListener('click', () => signOut(state.auth));
-            
-            const adminNav = document.getElementById('admin-nav');
-            if(adminNav) adminNav.addEventListener('click', e => {
+            const app = getAppRoot();
+            app.addEventListener('click', e => {
+                if(e.target.closest('#logout-btn')) { signOut(state.auth); }
                 const navBtn = e.target.closest('.admin-nav-btn');
-                if (navBtn) {
-                    state.activeAdminTab = navBtn.dataset.tab;
-                    renderAdminPage(); // Re-render to update tab content
+                if (navBtn) { state.activeAdminTab = navBtn.dataset.tab; renderAdminPage(); }
+                
+                if (e.target.closest('#add-category-btn')) handleEditCategory();
+                if (e.target.closest('#add-item-btn')) handleEditItem();
+
+                const editBtn = e.target.closest('.btn-edit');
+                if (editBtn) {
+                    const id = editBtn.dataset.id;
+                    if (state.activeAdminTab === 'categorias') handleEditCategory(id);
+                    if (state.activeAdminTab === 'cardapio') handleEditItem(id);
+                }
+                const deleteBtn = e.target.closest('.btn-delete');
+                if (deleteBtn) {
+                    const id = deleteBtn.dataset.id;
+                    if (state.activeAdminTab === 'categorias') handleDeleteCategory(id);
+                    if (state.activeAdminTab === 'cardapio') handleDeleteItem(id);
                 }
             });
+            const passForm = document.getElementById('change-password-form');
+            if (passForm) passForm.addEventListener('submit', handleChangePassword);
         };
 
         const addToCart = (itemId, size, price) => {
@@ -401,12 +347,8 @@
             if (!itemDetails) return;
             const cartId = `${itemId}-${size}`;
             const existingItem = state.cart.find(item => item.cartId === cartId);
-
-            if (existingItem) {
-                existingItem.quantity++;
-            } else {
-                state.cart.push({ cartId, itemId, name: itemDetails.name, size, price, quantity: 1 });
-            }
+            if (existingItem) { existingItem.quantity++; } 
+            else { state.cart.push({ cartId, itemId, name: itemDetails.name, size, price, quantity: 1 }); }
             saveCartToStorage();
             updateCartUI();
             toggleCart(true);
@@ -415,13 +357,9 @@
         const handleCartAction = (cartId, action) => {
              const itemIndex = state.cart.findIndex(i => i.cartId === cartId);
              if (itemIndex === -1) return;
-             
              if (action === 'increase') state.cart[itemIndex].quantity++;
-             else if (action === 'decrease') {
-                 if (--state.cart[itemIndex].quantity <= 0) state.cart.splice(itemIndex, 1);
-             } else if (action === 'remove') {
-                 state.cart.splice(itemIndex, 1);
-             }
+             else if (action === 'decrease') { if (--state.cart[itemIndex].quantity <= 0) state.cart.splice(itemIndex, 1); } 
+             else if (action === 'remove') { state.cart.splice(itemIndex, 1); }
              saveCartToStorage();
              updateCartUI();
         };
@@ -433,92 +371,155 @@
 
         const handleFinishOrder = () => {
             if (state.cart.length === 0) {
-                 showModal({ title: 'Atenção', body: '<p>Seu carrinho está vazio.</p>', confirmText: 'OK'});
+                 showModal({ title: 'Atenção', body: '<p>Seu carrinho está vazio.</p>', confirmText: 'OK', showCancel: false});
                  return;
             }
-            // Logic for checkout modal will go here
-        }
-
-        // --- FIRESTORE ---
-        const setupFirestoreListeners = () => {
-            const categoriesQuery = query(collection(state.db, 'menu_categories'), orderBy('order'));
-            const catUnsubscribe = onSnapshot(categoriesQuery, (snapshot) => {
-                state.menu.categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                if (!state.activeCategory && state.menu.categories.length > 0) {
-                    state.activeCategory = state.menu.categories[0].id;
+            showFormModal({
+                title: 'Dados para Entrega',
+                body: `<div class="form-group"><label for="customer-name">Nome *</label><input type="text" id="customer-name" name="name" class="form-control" required></div><div class="form-group"><label for="customer-address">Endereço Completo *</label><input type="text" id="customer-address" name="address" class="form-control" required></div>`,
+                submitText: `<i class="fab fa-whatsapp"></i> Enviar Pedido`,
+                onSubmit: (formData) => {
+                    const name = formData.get('name').trim();
+                    const address = formData.get('address').trim();
+                    if (name && address) {
+                        sendWhatsAppMessage(name, address);
+                        state.cart = [];
+                        saveCartToStorage();
+                        updateCartUI();
+                    }
                 }
-                updateMenuUI();
+            });
+        }
+        
+        const sendWhatsAppMessage = (name, address) => {
+            const total = state.cart.reduce((s, i) => s + i.price * i.quantity, 0);
+            const itemsList = state.cart.map(i => `- ${i.quantity}x ${i.name} (${i.size})`).join('\n');
+            const message = `Olá, Santa Sensação! Gostaria de fazer o seguinte pedido:\n\n*MEU PEDIDO:*\n${itemsList}\n\n*Total: ${formatPrice(total)}*\n\n*NOME:* ${name}\n*ENDEREÇO DE ENTREGA:* ${address}`;
+            const whatsappUrl = `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+        };
+
+        const handleChangePassword = async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const btn = form.querySelector('button[type="submit"]');
+            btn.disabled = true;
+            const newPassword = form['new-password'].value, confirmPassword = form['confirm-password'].value;
+            const errorEl = document.getElementById('password-error'), successEl = document.getElementById('password-success');
+            errorEl.classList.add('hidden'); successEl.classList.add('hidden');
+
+            if (newPassword !== confirmPassword) {
+                errorEl.textContent = 'As senhas não coincidem.';
+                errorEl.classList.remove('hidden');
+                btn.disabled = false;
+                return;
+            }
+            try {
+                await updatePassword(state.user, newPassword);
+                successEl.textContent = 'Senha alterada com sucesso!';
+                successEl.classList.remove('hidden');
+                form.reset();
+            } catch (error) {
+                errorEl.textContent = 'Erro ao alterar a senha. Faça login novamente se o erro persistir.';
+                errorEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+            }
+        };
+
+        // --- FIRESTORE CRUD ---
+        const handleEditCategory = (id = null) => {
+            const cat = id ? state.menu.categories.find(c => c.id === id) : { name: '', order: state.menu.categories.length + 1 };
+            if(!cat) return;
+            showFormModal({
+                title: id ? 'Editar Categoria' : 'Nova Categoria',
+                body: `<div class="form-group"><label for="name">Nome</label><input type="text" name="name" class="form-control" value="${cat.name}" required></div><div class="form-group"><label for="order">Ordem</label><input type="number" name="order" class="form-control" value="${cat.order}" required></div>`,
+                onSubmit: async (formData) => {
+                    const data = { name: formData.get('name'), order: Number(formData.get('order')) };
+                    if (id) {
+                        await updateDoc(doc(state.db, 'menu_categories', id), data);
+                    } else {
+                        await addDoc(collection(state.db, 'menu_categories'), data);
+                    }
+                }
+            });
+        };
+
+        const handleEditItem = (id = null) => {
+            const item = id ? state.menu.items.find(i => i.id === id) : { name: '', description: '', categoryId: '', prices: {}, imageUrl: '', displayOrder: state.menu.items.length + 1 };
+            if(!item) return;
+            const catOptions = state.menu.categories.map(c => `<option value="${c.id}" ${c.id === item.categoryId ? 'selected' : ''}>${c.name}</option>`).join('');
+            
+            showFormModal({
+                title: id ? 'Editar Item' : 'Novo Item',
+                body: `<div class="form-group"><label>Nome</label><input type="text" name="name" value="${item.name}" required class="form-control"></div><div class="form-group"><label>Categoria</label><select name="categoryId" required class="form-control"><option value="">Selecione...</option>${catOptions}</select></div><div class="form-group"><label>Descrição</label><textarea name="description" class="form-control" rows="4">${item.description || ''}</textarea></div><div class="form-group"><label>Preços (P, M, G, Único)</label><div style="display:flex; gap:8px;"><input name="priceP" placeholder="P" value="${item.prices.P || ''}" class="form-control"><input name="priceM" placeholder="M" value="${item.prices.M || ''}" class="form-control"><input name="priceG" placeholder="G" value="${item.prices.G || ''}" class="form-control"><input name="priceUnica" placeholder="Único" value="${item.prices['Única'] || ''}" class="form-control"></div></div><div class="form-group"><label>Ordem de Exibição</label><input type="number" name="displayOrder" value="${item.displayOrder || ''}" class="form-control"></div><div class="form-group"><label>URL da Imagem</label><input type="url" name="imageUrl" value="${item.imageUrl || ''}" class="form-control"></div>`,
+                onSubmit: async (fd) => {
+                    const prices = {};
+                    if(fd.get('priceP')) prices.P = Number(fd.get('priceP'));
+                    if(fd.get('priceM')) prices.M = Number(fd.get('priceM'));
+                    if(fd.get('priceG')) prices.G = Number(fd.get('priceG'));
+                    if(fd.get('priceUnica')) prices['Única'] = Number(fd.get('priceUnica'));
+
+                    const data = { name: fd.get('name'), categoryId: fd.get('categoryId'), description: fd.get('description'), prices, displayOrder: Number(fd.get('displayOrder')), imageUrl: fd.get('imageUrl') };
+                    if (id) {
+                        await updateDoc(doc(state.db, 'menu_items', id), data);
+                    } else {
+                        await addDoc(collection(state.db, 'menu_items'), data);
+                    }
+                }
+            });
+        };
+        
+        const handleDeleteCategory = (id) => showModal({ title: 'Confirmar Exclusão', body: `<p>Tem certeza que deseja excluir esta categoria?</p>`, confirmText: 'Excluir', onConfirm: () => deleteDoc(doc(state.db, 'menu_categories', id)) });
+        const handleDeleteItem = (id) => showModal({ title: 'Confirmar Exclusão', body: `<p>Tem certeza que deseja excluir este item?</p>`, confirmText: 'Excluir', onConfirm: () => deleteDoc(doc(state.db, 'menu_items', id)) });
+
+        // --- FIRESTORE LISTENERS ---
+        const setupFirestoreListeners = () => {
+            const catQuery = query(collection(state.db, 'menu_categories'), orderBy('order'));
+            state.listeners.categories = onSnapshot(catQuery, (snapshot) => {
+                state.menu.categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                if (!state.activeCategory && state.menu.categories.length > 0) { state.activeCategory = state.menu.categories[0].id; }
+                window.location.hash.startsWith('#admin') ? renderAdminPage() : updateMenuUI();
             }, (err) => console.error("Erro ao carregar categorias:", err));
 
-            const itemsQuery = query(collection(state.db, 'menu_items'), orderBy('displayOrder'));
-            const itemUnsubscribe = onSnapshot(itemsQuery, (snapshot) => {
+            const itemQuery = query(collection(state.db, 'menu_items'), orderBy('displayOrder'));
+            state.listeners.items = onSnapshot(itemQuery, (snapshot) => {
                 state.menu.items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                updateMenuUI();
+                window.location.hash.startsWith('#admin') ? renderAdminPage() : updateMenuUI();
             }, (err) => console.error("Erro ao carregar itens:", err));
-            
-            state.listeners.push(catUnsubscribe, itemUnsubscribe);
         };
         
         // --- MODAL SYSTEM ---
         const showModal = ({ title, body, confirmText = 'Confirmar', cancelText = 'Cancelar', onConfirm, showCancel = true }) => {
             const modalId = `modal-${Date.now()}`;
-            const modalHTML = `
-                <div class="modal-overlay open" id="${modalId}">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h3 class="modal-title">${title}</h3>
-                            <button class="modal-close-btn">&times;</button>
-                        </div>
-                        <div class="modal-body">${body}</div>
-                        <div class="modal-footer">
-                             ${showCancel ? `<button class="btn btn--secondary">${cancelText}</button>` : ''}
-                             <button class="btn btn--primary">${confirmText}</button>
-                        </div>
-                    </div>
-                </div>`;
-            modalsContainer.innerHTML = modalHTML;
+            modalsContainer.innerHTML = `<div class="modal-overlay open" id="${modalId}"><div class="modal-content"><div class="modal-header"><h3 class="modal-title">${title}</h3><button class="modal-close-btn">&times;</button></div><div class="modal-body">${body}</div><div class="modal-footer">${showCancel ? `<button class="btn btn--secondary">${cancelText}</button>` : ''}<button class="btn btn--primary">${confirmText}</button></div></div></div>`;
             
             const overlay = document.getElementById(modalId);
-            const closeModal = () => {
-                overlay.classList.remove('open');
-                setTimeout(() => { 
-                    if(overlay.parentElement) {
-                       modalsContainer.innerHTML = '';
-                    }
-                }, 200);
-            };
+            const closeModal = () => { overlay.classList.remove('open'); setTimeout(() => { if(overlay.parentElement) { modalsContainer.innerHTML = ''; } }, 200); };
 
-            overlay.querySelector('.btn--primary').addEventListener('click', () => {
-                if(onConfirm) onConfirm();
-                closeModal();
-            });
-            overlay.addEventListener('click', e => {
-                const secondaryBtn = e.target.closest('.btn--secondary');
-                if (e.target === overlay || e.target.closest('.modal-close-btn') || (secondaryBtn && showCancel) ) {
-                    closeModal();
-                }
-            });
+            overlay.querySelector('.btn--primary').addEventListener('click', () => { if(onConfirm) onConfirm(); closeModal(); });
+            overlay.addEventListener('click', e => { if (e.target === overlay || e.target.closest('.modal-close-btn') || (e.target.closest('.btn--secondary') && showCancel) ) { closeModal(); } });
         };
         
-        const handleDeleteCategory = (id) => {
-            showModal({
-                title: 'Confirmar Exclusão',
-                body: `<p>Tem certeza que deseja excluir esta categoria? Todos os itens associados a ela ficarão sem categoria.</p>`,
-                confirmText: 'Excluir',
-                onConfirm: async () => {
-                    if (!state.isAdmin) return;
-                    await deleteDoc(doc(state.db, 'menu_categories', id));
-                }
-            });
-        };
+        const showFormModal = ({ title, body, submitText = 'Salvar', onSubmit }) => {
+            const modalId = `modal-${Date.now()}`;
+            const formId = `form-${modalId}`;
+            modalsContainer.innerHTML = `<div class="modal-overlay open" id="${modalId}"><div class="modal-content"><div class="modal-header"><h3 class="modal-title">${title}</h3><button class="modal-close-btn">&times;</button></div><form id="${formId}">${body}<div class="modal-footer"><button type="button" class="btn btn--secondary">Cancelar</button><button type="submit" class="btn btn--primary">${submitText}</button></div></form></div></div>`;
+            
+            const overlay = document.getElementById(modalId);
+            const form = document.getElementById(formId);
+            const closeModal = () => { overlay.classList.remove('open'); setTimeout(() => modalsContainer.innerHTML = '', 200); };
 
+            form.addEventListener('submit', e => { e.preventDefault(); if(onSubmit) onSubmit(new FormData(form)); closeModal(); });
+            overlay.addEventListener('click', e => { if (e.target === overlay || e.target.closest('.modal-close-btn') || e.target.closest('.btn--secondary')) { closeModal(); } });
+        };
 
         // --- INITIALIZATION ---
         const init = () => {
             state.cart = loadCartFromStorage();
             onAuthStateChanged(state.auth, handleAuthChange);
             window.addEventListener('hashchange', handleRouting);
-            handleRouting(); // Initial render based on current hash
+            handleRouting();
         };
 
         init();
