@@ -752,7 +752,9 @@
 
                     }, err => console.error("Error listening to categories:", err));
 
-                const itemsUnsubscribe = this.db.collection('menu_items').orderBy('displayOrder')
+                // FIX: Simplified query to avoid composite index requirement.
+                // The sorting by displayOrder will be done on the client side.
+                const itemsUnsubscribe = this.db.collection('menu_items').orderBy('name')
                     .onSnapshot(snapshot => {
                         this.menu.items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         this.updateMenuUI();
@@ -825,7 +827,12 @@
             updateMenuItemsUI() {
                 const grid = document.getElementById('menu-grid');
                 if (!grid) return;
-                const itemsToShow = this.menu.items.filter(item => item.categoryId === this.activeCategory);
+                
+                // Client-side sort
+                const itemsToShow = this.menu.items
+                    .filter(item => item.categoryId === this.activeCategory)
+                    .sort((a, b) => (a.displayOrder || 99) - (b.displayOrder || 99));
+
                 if (itemsToShow.length === 0) { grid.innerHTML = `<p style="text-align:center; padding: 2rem;">Nenhum item encontrado nesta categoria.</p>`; return; }
                 grid.innerHTML = itemsToShow.map((item, index) => `
                     <div class="menu-card" style="animation-delay: ${index * 100}ms">
@@ -1036,7 +1043,10 @@
             updateItemsTable() {
                 const tableBody = document.getElementById('item-table-body');
                 if(!tableBody) return;
-                tableBody.innerHTML = this.menu.items.map(item => {
+
+                const sortedItems = this.menu.items.sort((a,b) => (a.displayOrder || 99) - (b.displayOrder || 99));
+
+                tableBody.innerHTML = sortedItems.map(item => {
                     const category = this.menu.categories.find(c => c.id === item.categoryId);
                     const prices = Object.entries(item.prices).map(([size, price]) => `${size}: ${Number(price).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}`).join('<br>');
                     return `
