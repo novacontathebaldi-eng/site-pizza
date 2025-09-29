@@ -3,474 +3,1035 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pizzaria Santa Sensação - A pizza nº 1 do ES</title>
-    <meta name="description" content="Pizzaria Santa Sensação - Experiência que vai além do sabor. A pizza nº 1 do Espírito Santo.">
-    <link rel="stylesheet" href="style.css">
+    <title>Pizzaria Santa Sensação - O Sabor Original</title>
+    <meta name="description" content="Experimente a melhor pizza de Santa Leopoldina, feita com ingredientes frescos em forno a lenha. Peça agora!">
+    
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+
+    <style>
+        /* ==============================================
+        ROOT VARIABLES AND GLOBAL STYLES
+        ==============================================
+        */
+        :root {
+            /* Colors */
+            --color-primary: #8B0000; /* Dark Red */
+            --color-primary-dark: #6a0000;
+            --color-secondary: #D4AF37; /* Gold */
+            --color-background: #FDF8F0; /* Creamy White */
+            --color-surface: #FFFFFF;
+            --color-text: #333333;
+            --color-text-light: #666666;
+            --color-white: #FFFFFF;
+            --color-black: #000000;
+            --color-border: #EAE0D5;
+            --color-success: #28a745;
+            --color-error: #dc3545;
+
+            /* Typography */
+            --font-display: 'Playfair Display', serif;
+            --font-body: 'Montserrat', sans-serif;
+
+            /* Sizing & Spacing */
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 16px;
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 16px;
+            --spacing-lg: 32px;
+            --spacing-xl: 64px;
+
+            /* Shadows */
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 8px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 20px rgba(0,0,0,0.15);
+            
+            /* Transitions */
+            --transition-fast: 200ms ease-in-out;
+            --transition-normal: 400ms ease-in-out;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background-color: var(--color-background);
+            color: var(--color-text);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 var(--spacing-md);
+        }
+        
+        /* ==============================================
+        UTILITY & HELPER CLASSES
+        ==============================================
+        */
+        .hidden { display: none !important; }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-sm);
+            padding: 12px 24px;
+            border-radius: var(--radius-md);
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            border: 2px solid transparent;
+            font-size: 1rem;
+        }
+
+        .btn--primary {
+            background-color: var(--color-primary);
+            color: var(--color-white);
+        }
+        .btn--primary:hover {
+            background-color: var(--color-primary-dark);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn--secondary {
+            background-color: transparent;
+            color: var(--color-primary);
+            border-color: var(--color-primary);
+        }
+        .btn--secondary:hover {
+            background-color: var(--color-primary);
+            color: var(--color-white);
+        }
+        
+        /* ==============================================
+        PAGE STRUCTURE & MAIN COMPONENTS
+        ==============================================
+        */
+
+        /* Main App container */
+        #app {
+            transition: opacity var(--transition-normal);
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1000;
+            padding: var(--spacing-md) 0;
+            transition: all var(--transition-fast);
+        }
+        .header.scrolled {
+            background-color: rgba(255, 255, 255, 0.95);
+            box-shadow: var(--shadow-md);
+            backdrop-filter: blur(10px);
+        }
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo {
+            font-family: var(--font-display);
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--color-primary);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+        .nav-links {
+            display: flex;
+            gap: var(--spacing-lg);
+        }
+        .nav-link {
+            text-decoration: none;
+            color: var(--color-text);
+            font-weight: 600;
+            position: relative;
+            padding: var(--spacing-xs) 0;
+        }
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background-color: var(--color-secondary);
+            transition: width var(--transition-fast);
+        }
+        .nav-link:hover::after, .nav-link.active::after {
+            width: 100%;
+        }
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+        .cart-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.5rem;
+            color: var(--color-text);
+            position: relative;
+        }
+        .cart-count {
+            position: absolute;
+            top: -5px;
+            right: -10px;
+            background-color: var(--color-primary);
+            color: var(--color-white);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+        }
+
+        /* Section Base */
+        .section {
+            padding: var(--spacing-xl) 0;
+        }
+        .section-header {
+            text-align: center;
+            margin-bottom: var(--spacing-lg);
+        }
+        .section-title {
+            font-family: var(--font-display);
+            font-size: 2.8rem;
+            color: var(--color-primary);
+            margin-bottom: var(--spacing-sm);
+        }
+        .section-subtitle {
+            font-size: 1.1rem;
+            color: var(--color-text-light);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Hero Section */
+        #inicio {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            background: url('https://images.unsplash.com/photo-1564936662393-20a225139044?auto=format&fit=crop&w=1500&q=80') no-repeat center center/cover;
+            position: relative;
+        }
+        #inicio::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+            color: var(--color-white);
+        }
+        .hero-title {
+            font-family: var(--font-display);
+            font-size: clamp(3rem, 6vw, 5rem);
+            line-height: 1.1;
+            margin-bottom: var(--spacing-md);
+        }
+        .hero-subtitle {
+            font-size: 1.5rem;
+            margin-bottom: var(--spacing-lg);
+            font-weight: 400;
+        }
+        .hero-title span {
+            color: var(--color-secondary);
+        }
+
+        /* Menu Section */
+        #cardapio {
+            background-color: var(--color-surface);
+        }
+        .menu-categories {
+            display: flex;
+            justify-content: center;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+            flex-wrap: wrap;
+        }
+        .category-tab {
+            background-color: transparent;
+            border: 2px solid var(--color-border);
+            padding: 10px 20px;
+            border-radius: var(--radius-md);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        .category-tab:hover, .category-tab.active {
+            background-color: var(--color-primary);
+            color: var(--color-white);
+            border-color: var(--color-primary);
+        }
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: var(--spacing-lg);
+        }
+        .menu-card {
+            background-color: var(--color-surface);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+            transition: all var(--transition-fast);
+            display: flex;
+            flex-direction: column;
+        }
+        .menu-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+        }
+        .menu-card-image {
+            height: 220px;
+            width: 100%;
+            object-fit: cover;
+        }
+        .menu-card-content {
+            padding: var(--spacing-md);
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .menu-card-title {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            color: var(--color-primary);
+        }
+        .menu-card-description {
+            color: var(--color-text-light);
+            margin: var(--spacing-sm) 0 var(--spacing-md);
+            flex-grow: 1;
+        }
+        .menu-card-footer {
+            margin-top: auto;
+        }
+        .size-options {
+            display: flex;
+            gap: var(--spacing-sm);
+        }
+        .size-btn {
+            flex: 1;
+            background-color: var(--color-background);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-sm);
+            cursor: pointer;
+            text-align: center;
+        }
+        .size-btn:hover {
+            border-color: var(--color-primary);
+        }
+        .size-name { display: block; font-weight: 600; }
+        .size-price { display: block; font-size: 0.9rem; color: var(--color-primary); }
+
+        /* About & Contact Sections */
+        .about-content, .contact-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-xl);
+            align-items: center;
+        }
+        .about-image {
+            width: 100%;
+            height: 400px;
+            object-fit: cover;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+        }
+        .contact-info-item {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-md);
+            font-size: 1.1rem;
+        }
+        .contact-info-item i {
+            font-size: 1.5rem;
+            color: var(--color-primary);
+            width: 30px;
+        }
+
+        /* Footer */
+        .footer {
+            background-color: #2b2b2b;
+            color: var(--color-white);
+            padding: var(--spacing-lg) 0;
+            text-align: center;
+        }
+        .footer-content {
+            border-top: 1px solid var(--color-text-light);
+            padding-top: var(--spacing-lg);
+            margin-top: var(--spacing-lg);
+        }
+
+        /* ==============================================
+        CART SIDEBAR
+        ==============================================
+        */
+        .cart-sidebar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 100%;
+            max-width: 400px;
+            height: 100%;
+            background-color: var(--color-surface);
+            box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+            z-index: 2000;
+            transform: translateX(100%);
+            transition: transform var(--transition-normal);
+            display: flex;
+            flex-direction: column;
+        }
+        .cart-sidebar.open {
+            transform: translateX(0);
+        }
+        .cart-header {
+            padding: var(--spacing-md);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--color-border);
+        }
+        .cart-header h3 { font-family: var(--font-display); }
+        .cart-close-btn {
+            background: none; border: none; font-size: 1.5rem; cursor: pointer;
+        }
+        .cart-body {
+            flex-grow: 1;
+            padding: var(--spacing-md);
+            overflow-y: auto;
+        }
+        .cart-item {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-md);
+        }
+        .cart-item-info { flex-grow: 1; }
+        .cart-item-title { font-weight: 600; }
+        .cart-item-details { font-size: 0.9rem; color: var(--color-text-light); }
+        .cart-item-controls { display: flex; align-items: center; gap: var(--spacing-sm); margin-top: var(--spacing-xs); }
+        .quantity-btn {
+            background: var(--color-border);
+            border: none;
+            width: 25px; height: 25px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .cart-item-remove {
+            background: none; border: none; color: var(--color-error); cursor: pointer;
+        }
+        .cart-footer {
+            padding: var(--spacing-md);
+            border-top: 1px solid var(--color-border);
+        }
+        .cart-total { display: flex; justify-content: space-between; font-weight: bold; font-size: 1.2rem; margin-bottom: var(--spacing-md); }
+        
+        /* ==============================================
+        ADMIN PANEL STYLES
+        ==============================================
+        */
+        .admin-page {
+            padding: var(--spacing-xl) var(--spacing-md);
+        }
+        .admin-tabs {
+            border-bottom: 1px solid var(--color-border);
+            margin-bottom: var(--spacing-lg);
+        }
+        .admin-tab-btn {
+            padding: var(--spacing-md);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--color-text-light);
+            border-bottom: 3px solid transparent;
+        }
+        .admin-tab-btn.active {
+            color: var(--color-primary);
+            border-bottom-color: var(--color-primary);
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: var(--spacing-lg);
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-sm);
+        }
+        .form-group label {
+            font-weight: 600;
+        }
+        .form-control {
+            padding: 12px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 2px rgba(139,0,0,0.2);
+        }
+
+        /* General Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0,0,0,0.6);
+            z-index: 1999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: var(--color-surface);
+            padding: var(--spacing-lg);
+            border-radius: var(--radius-lg);
+            width: 90%;
+            max-width: 500px;
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 768px) {
+            .nav-links { display: none; } /* Simplificando para o exemplo */
+            .about-content, .contact-content { grid-template-columns: 1fr; }
+            .about-image { height: 300px; }
+            .section-title { font-size: 2.2rem; }
+        }
+
+    </style>
 </head>
 <body>
-    <!-- Navigation Header -->
-    <header class="header" id="header">
-        <div class="container">
-            <div class="header-content">
-                <div class="logo-section">
-                    <div class="logo">
-                        <i class="fas fa-pizza-slice"></i>
-                        <span class="logo-text">Santa Sensação</span>
-                    </div>
-                </div>
-                <nav class="nav" id="mainNav">
-                    <div class="nav-links">
-                        <a href="#inicio" class="nav-link active">Início</a>
-                        <a href="#cardapio" class="nav-link">Cardápio</a>
-                        <a href="#sobre" class="nav-link">Sobre</a>
-                        <a href="#contato" class="nav-link">Contato</a>
-                    </div>
-                    <div class="header-actions">
-                        <button class="btn btn--primary" id="verCardapioBtn">
-                            <i class="fas fa-utensils"></i>
-                            Ver Cardápio
-                        </button>
-                        <button class="admin-login-btn" id="adminBtn" title="Área Administrativa">
-                            <i class="fas fa-cog"></i>
-                        </button>
-                    </div>
-                </nav>
-                <button class="mobile-menu-toggle" id="mobileMenuToggle">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
-            </div>
-        </div>
-    </header>
 
-    <!-- Hero Section -->
-    <section id="inicio" class="hero">
-        <div class="hero-background"></div>
-        <div class="hero-content">
-            <div class="container">
-                <div class="hero-text">
-                    <div class="hero-badge">
-                        <i class="fas fa-award"></i>
-                        <span>A pizza nº 1 do ES</span>
-                    </div>
-                    <h1 class="hero-title">
-                        Pizzaria <span class="text-gradient">Santa Sensação</span>
-                    </h1>
-                    <p class="hero-subtitle">Experiência que vai além do sabor</p>
-                    <p class="hero-description">
-                        Ingredientes frescos, massa artesanal e o carinho de sempre. 
-                        Venha descobrir por que somos a pizzaria favorita de Santa Leopoldina!
-                    </p>
-                    <div class="hero-actions">
-                        <button class="btn btn--primary btn--large" id="heroCardapioBtn">
-                            <i class="fas fa-pizza-slice"></i>
-                            Ver Cardápio Completo
-                        </button>
-                        <a href="https://wa.me/5527996500341" target="_blank" class="btn btn--outline btn--large">
-                            <i class="fab fa-whatsapp"></i>
-                            Pedir no WhatsApp
-                        </a>
-                    </div>
-                </div>
-            </div>
+    <!-- App Root: All content will be rendered here by JavaScript -->
+    <div id="app">
+        <!-- Loading spinner -->
+        <div style="display: flex; justify-content: center; align-items: center; height: 100vh;">
+            <i class="fas fa-spinner fa-spin fa-3x" style="color: var(--color-primary);"></i>
         </div>
-        <div class="hero-scroll-indicator">
-            <div class="scroll-arrow"></div>
-        </div>
-    </section>
+    </div>
+    
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 
-    <!-- Menu Preview Section -->
-    <section id="cardapio" class="menu-preview">
-        <div class="container">
-            <div class="section-header">
-                <div class="section-badge">
-                    <i class="fas fa-star"></i>
-                    <span>Nossos Sabores</span>
-                </div>
-                <h2 class="section-title">Pizzas em Destaque</h2>
-                <p class="section-description">
-                    Conheça algumas de nossas pizzas mais pedidas, feitas com ingredientes frescos e muito amor
-                </p>
-            </div>
+    <!-- Main Application Logic -->
+    <script type="module">
+        // 1. FIREBASE CONFIGURATION
+        const firebaseConfig = {
+            apiKey: "AIzaSyCTMHlUCGOpU7VRIdbP2VADzUF9n1lI88A",
+            authDomain: "site-pizza-a2930.firebaseapp.com",
+            projectId: "site-pizza-a2930",
+            storageBucket: "site-pizza-a2930.appspot.com",
+            messagingSenderId: "914255031241",
+            appId: "1:914255031241:web:84ae273b22cb7d04499618"
+        };
+
+        // 2. MAIN PIZZARIA APP CLASS
+        class PizzariaApp {
+            constructor() {
+                // Firebase services
+                this.firebaseApp = firebase.initializeApp(firebaseConfig);
+                this.db = firebase.firestore();
+                this.auth = firebase.auth();
+                
+                // App state
+                this.menu = { categories: [], items: [] };
+                this.cart = [];
+                this.user = null;
+                
+                // DOM element
+                this.appRoot = document.getElementById('app');
+                
+                this.init();
+            }
             
-            <div class="menu-showcase">
-                <div class="menu-card" data-pizza="margherita">
-                    <div class="menu-card-image">
-                        <div class="image-placeholder">
-                            <i class="fas fa-pizza-slice"></i>
-                        </div>
-                        <div class="menu-card-badge">Popular</div>
-                    </div>
-                    <div class="menu-card-content">
-                        <h3 class="menu-card-title">Pizza Margherita</h3>
-                        <p class="menu-card-description">
-                            Molho de tomate, mozzarella de búfala, manjericão fresco e azeite extravirgem
-                        </p>
-                        <div class="menu-card-footer">
-                            <span class="menu-card-price">A partir de R$ 32,00</span>
-                            <button class="menu-card-button" onclick="openPizzaDetails('margherita')">
-                                <i class="fas fa-plus"></i>
+            async init() {
+                this.loadCartFromStorage();
+                
+                // Listen for authentication changes
+                this.auth.onAuthStateChanged(async (user) => {
+                    this.user = user;
+                    // Check URL for admin route
+                    if (window.location.hash === '#admin') {
+                        this.renderAdminPage();
+                    } else {
+                        await this.fetchMenu();
+                        this.renderHomePage();
+                    }
+                });
+            }
+
+            // 3. DATA FETCHING
+            async fetchMenu() {
+                try {
+                    const categoriesSnapshot = await this.db.collection('menu_categories').orderBy('order').get();
+                    this.menu.categories = categoriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                    const itemsSnapshot = await this.db.collection('menu_items').orderBy('displayOrder').get();
+                    this.menu.items = itemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                } catch (error) {
+                    console.error("Error fetching menu:", error);
+                    // Render an error message to the user
+                    this.appRoot.innerHTML = `<p>Ocorreu um erro ao carregar o cardápio. Tente novamente mais tarde.</p>`;
+                }
+            }
+
+            // 4. RENDERING LOGIC (HTML Templates)
+            renderHomePage() {
+                const homeHTML = `
+                    ${this.renderHeader()}
+                    <main>
+                        ${this.renderHero()}
+                        ${this.renderMenuSection()}
+                        ${this.renderAboutSection()}
+                        ${this.renderContactSection()}
+                    </main>
+                    ${this.renderFooter()}
+                    ${this.renderCartSidebar()}
+                `;
+                this.appRoot.innerHTML = homeHTML;
+                this.attachHomeEventListeners();
+                this.updateCartUI(); // Update UI after rendering
+            }
+            
+            renderHeader() {
+                return `
+                <header class="header" id="header">
+                    <div class="container header-content">
+                        <a href="#" class="logo"><i class="fas fa-pizza-slice"></i> Santa Sensação</a>
+                        <nav class="nav-links">
+                            <a href="#inicio" class="nav-link active">Início</a>
+                            <a href="#cardapio" class="nav-link">Cardápio</a>
+                            <a href="#sobre" class="nav-link">Sobre</a>
+                            <a href="#contato" class="nav-link">Contato</a>
+                        </nav>
+                        <div class="header-actions">
+                            <button class="cart-button" id="open-cart-btn">
+                                <i class="fas fa-shopping-cart"></i>
+                                <span class="cart-count hidden">0</span>
                             </button>
+                            <a href="#admin" class="btn btn--secondary">Admin</a>
                         </div>
+                    </div>
+                </header>`;
+            }
+            
+            renderHero() {
+                return `
+                <section id="inicio">
+                    <div class="container hero-content">
+                        <h1 class="hero-title">O Sabor Original de <span>Santa Leopoldina</span></h1>
+                        <p class="hero-subtitle">Massa artesanal, ingredientes frescos e o calor do forno a lenha.</p>
+                        <a href="#cardapio" class="btn btn--primary">Ver Cardápio</a>
+                    </div>
+                </section>`;
+            }
+
+            renderMenuSection() {
+                return `
+                <section id="cardapio" class="section">
+                    <div class="container">
+                        <div class="section-header">
+                            <h2 class="section-title">Nosso Cardápio</h2>
+                            <p class="section-subtitle">Pizzas preparadas com amor e tradição, para todos os gostos.</p>
+                        </div>
+                        <div class="menu-categories" id="menu-categories">
+                            ${this.menu.categories.map((cat, index) => `<button class="category-tab ${index === 0 ? 'active' : ''}" data-category-id="${cat.id}">${cat.name}</button>`).join('')}
+                        </div>
+                        <div class="menu-grid" id="menu-grid">
+                            <!-- Menu items will be rendered here by JS -->
+                        </div>
+                    </div>
+                </section>`;
+            }
+
+            renderAboutSection() {
+                return `
+                <section id="sobre" class="section">
+                    <div class="container about-content">
+                        <div>
+                            <div class="section-header" style="text-align: left;">
+                                <h2 class="section-title">Nossa História</h2>
+                                <p class="section-subtitle" style="margin: 0;">Tradição e sabor que passam de geração em geração.</p>
+                            </div>
+                            <p style="margin: 16px 0;">Na Pizzaria Santa Sensação, cada pizza é uma obra de arte. Usamos a receita de massa que nossa família aperfeiçoa há décadas, ingredientes selecionados dos produtores locais e um autêntico forno a lenha que garante uma borda crocante e um sabor inesquecível.</p>
+                        </div>
+                        <img src="https://images.unsplash.com/photo-1590947132387-155cc02f3212?auto=format&fit=crop&w=800&q=80" alt="Forno a lenha da pizzaria" class="about-image">
+                    </div>
+                </section>`;
+            }
+            
+            renderContactSection() {
+                return `
+                <section id="contato" class="section" style="background-color: var(--color-surface);">
+                    <div class="container contact-content">
+                        <div class="map-container">
+                           <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3748.240751147551!2d-40.53120152476906!3d-20.04018617637175!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xb840c4a457193b%3A0x6b53db7046a6f642!2sR.%20Porf%C3%ADrio%20Furtado%2C%20178%20-%20Centro%2C%20Santa%20Leopoldina%20-%20ES%2C%2029640-000!5e0!3m2!1spt-BR!2sbr!4v1696030990391!5m2!1spt-BR!2sbr" width="100%" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+                        </div>
+                        <div>
+                            <div class="section-header" style="text-align: left;">
+                                <h2 class="section-title">Faça seu Pedido</h2>
+                            </div>
+                            <div class="contact-info">
+                                <div class="contact-info-item"><i class="fas fa-map-marker-alt"></i><span>Porfilio Furtado, 178, Centro - Santa Leopoldina, ES</span></div>
+                                <div class="contact-info-item"><i class="fab fa-whatsapp"></i><span>(27) 99650-0341</span></div>
+                                <div class="contact-info-item"><i class="fas fa-clock"></i><span>Quarta a Domingo, das 19h às 23h</span></div>
+                            </div>
+                            <a href="https://wa.me/5527996500341" target="_blank" class="btn btn--primary" style="margin-top: 16px;"><i class="fab fa-whatsapp"></i> Pedir no WhatsApp</a>
+                        </div>
+                    </div>
+                </section>`;
+            }
+
+            renderFooter() {
+                return `
+                <footer class="footer">
+                    <div class="container">
+                        <div class="logo"><i class="fas fa-pizza-slice"></i> Santa Sensação</div>
+                        <p>&copy; ${new Date().getFullYear()} Pizzaria Santa Sensação. Todos os direitos reservados.</p>
+                    </div>
+                </footer>`;
+            }
+            
+            // 5. EVENT LISTENERS
+            attachHomeEventListeners() {
+                // Header scroll effect
+                const header = document.getElementById('header');
+                window.addEventListener('scroll', () => {
+                    header.classList.toggle('scrolled', window.scrollY > 50);
+                });
+                
+                // Category tabs
+                document.getElementById('menu-categories').addEventListener('click', (e) => {
+                    if (e.target.classList.contains('category-tab')) {
+                        const categoryId = e.target.dataset.categoryId;
+                        document.querySelectorAll('.category-tab').forEach(tab => tab.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.renderMenuItems(categoryId);
+                    }
+                });
+
+                // Render initial items
+                this.renderMenuItems(this.menu.categories[0]?.id);
+
+                // Cart buttons
+                document.getElementById('open-cart-btn').addEventListener('click', () => this.openCart());
+                document.getElementById('cart-close-btn').addEventListener('click', () => this.closeCart());
+                document.getElementById('cart-overlay').addEventListener('click', () => this.closeCart());
+                document.getElementById('finish-order-btn').addEventListener('click', () => this.finishOrder());
+            }
+
+            renderMenuItems(categoryId) {
+                const grid = document.getElementById('menu-grid');
+                if (!grid) return;
+                
+                const itemsToShow = this.menu.items.filter(item => item.categoryId === categoryId);
+                
+                if (itemsToShow.length === 0) {
+                    grid.innerHTML = `<p>Nenhum item nesta categoria.</p>`;
+                    return;
+                }
+                
+                grid.innerHTML = itemsToShow.map(item => `
+                    <div class="menu-card">
+                        <img src="${item.imageUrl || 'https://placehold.co/600x400/8B0000/FDF8F0?text=Pizza'}" alt="${item.name}" class="menu-card-image">
+                        <div class="menu-card-content">
+                            <h3 class="menu-card-title">${item.name}</h3>
+                            <p class="menu-card-description">${item.description}</p>
+                            <div class="menu-card-footer">
+                                <div class="size-options">
+                                    ${Object.entries(item.prices).map(([size, price]) => `
+                                        <button class="size-btn" data-item-id="${item.id}" data-size="${size}" data-price="${price}">
+                                            <span class="size-name">${size}</span>
+                                            <span class="size-price">R$ ${Number(price).toFixed(2)}</span>
+                                        </button>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Attach event listeners to the new buttons
+                grid.querySelectorAll('.size-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const { itemId, size, price } = e.currentTarget.dataset;
+                        this.addToCart(itemId, size, parseFloat(price));
+                    });
+                });
+            }
+
+            // 6. CART LOGIC
+            renderCartSidebar() {
+                return `
+                <div class="cart-overlay hidden" id="cart-overlay"></div>
+                <aside class="cart-sidebar" id="cart-sidebar">
+                    <div class="cart-header">
+                        <h3><i class="fas fa-shopping-cart"></i> Seu Pedido</h3>
+                        <button class="cart-close-btn" id="cart-close-btn"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="cart-body" id="cart-body">
+                        <!-- Cart items will be rendered here -->
+                    </div>
+                    <div class="cart-footer" id="cart-footer">
+                        <div class="cart-total">
+                            <span>Total:</span>
+                            <span id="cart-total-price">R$ 0,00</span>
+                        </div>
+                        <button class="btn btn--primary" id="finish-order-btn" style="width: 100%;">Finalizar no WhatsApp</button>
+                    </div>
+                </aside>`;
+            }
+
+            addToCart(itemId, size, price) {
+                const itemDetails = this.menu.items.find(i => i.id === itemId);
+                if (!itemDetails) return;
+
+                const cartId = `${itemId}-${size}`;
+                const existingItem = this.cart.find(item => item.cartId === cartId);
+
+                if (existingItem) {
+                    existingItem.quantity++;
+                } else {
+                    this.cart.push({
+                        cartId,
+                        itemId,
+                        name: itemDetails.name,
+                        size,
+                        price,
+                        quantity: 1
+                    });
+                }
+                this.saveCartToStorage();
+                this.updateCartUI();
+                this.openCart();
+            }
+            
+            updateCartUI() {
+                const cartBody = document.getElementById('cart-body');
+                const cartFooter = document.getElementById('cart-footer');
+                const cartCount = document.querySelector('.cart-count');
+                const cartTotalPrice = document.getElementById('cart-total-price');
+                
+                if (!cartBody) return; // Exit if cart is not in the DOM
+
+                const totalItems = this.cart.reduce((sum, item) => sum + item.quantity, 0);
+
+                if (totalItems > 0) {
+                    cartCount.textContent = totalItems;
+                    cartCount.classList.remove('hidden');
+                    cartFooter.classList.remove('hidden');
+                } else {
+                    cartCount.classList.add('hidden');
+                    cartFooter.classList.add('hidden');
+                }
+
+                if (this.cart.length === 0) {
+                    cartBody.innerHTML = `<p style="text-align: center; color: var(--color-text-light);">Seu carrinho está vazio.</p>`;
+                } else {
+                    cartBody.innerHTML = this.cart.map(item => `
+                        <div class="cart-item" data-cart-id="${item.cartId}">
+                            <div class="cart-item-info">
+                                <p class="cart-item-title">${item.name}</p>
+                                <p class="cart-item-details">${item.size} - R$ ${item.price.toFixed(2)}</p>
+                                <div class="cart-item-controls">
+                                    <button class="quantity-btn" data-action="decrease">-</button>
+                                    <span>${item.quantity}</span>
+                                    <button class="quantity-btn" data-action="increase">+</button>
+                                    <button class="cart-item-remove" data-action="remove"><i class="fas fa-trash"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                const total = this.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+                cartTotalPrice.textContent = `R$ ${total.toFixed(2)}`;
+
+                // Re-attach listeners for cart item controls
+                cartBody.querySelectorAll('.cart-item').forEach(el => {
+                    el.addEventListener('click', e => {
+                        const action = e.target.closest('[data-action]')?.dataset.action;
+                        if (action) {
+                            this.handleCartAction(el.dataset.cartId, action);
+                        }
+                    });
+                });
+            }
+
+            handleCartAction(cartId, action) {
+                const itemIndex = this.cart.findIndex(item => item.cartId === cartId);
+                if (itemIndex === -1) return;
+
+                switch(action) {
+                    case 'increase':
+                        this.cart[itemIndex].quantity++;
+                        break;
+                    case 'decrease':
+                        this.cart[itemIndex].quantity--;
+                        if (this.cart[itemIndex].quantity <= 0) {
+                            this.cart.splice(itemIndex, 1);
+                        }
+                        break;
+                    case 'remove':
+                        this.cart.splice(itemIndex, 1);
+                        break;
+                }
+                this.saveCartToStorage();
+                this.updateCartUI();
+            }
+
+            openCart() {
+                document.getElementById('cart-sidebar').classList.add('open');
+                document.getElementById('cart-overlay').classList.remove('hidden');
+            }
+            closeCart() {
+                document.getElementById('cart-sidebar').classList.remove('open');
+                document.getElementById('cart-overlay').classList.add('hidden');
+            }
+            
+            saveCartToStorage() {
+                localStorage.setItem('pizzariaCart', JSON.stringify(this.cart));
+            }
+
+            loadCartFromStorage() {
+                const savedCart = localStorage.getItem('pizzariaCart');
+                if (savedCart) {
+                    this.cart = JSON.parse(savedCart);
+                }
+            }
+
+            finishOrder() {
+                if (this.cart.length === 0) return;
+                const total = this.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+                const itemsList = this.cart.map(item =>
+                    `- ${item.quantity}x ${item.name} (${item.size})`
+                ).join('\n');
+                
+                const message = `Olá, Santa Sensação! 🍕\nGostaria de fazer o seguinte pedido:\n\n${itemsList}\n\n*Total: R$ ${total.toFixed(2)}*`;
+                
+                const whatsappUrl = `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
+                window.open(whatsappUrl, '_blank');
+            }
+
+            // 7. ADMIN PAGE LOGIC
+            renderAdminPage() {
+                if (this.user) {
+                    this.renderAdminPanel();
+                } else {
+                    this.renderAdminLogin();
+                }
+            }
+
+            renderAdminLogin() {
+                this.appRoot.innerHTML = `
+                <div style="display: flex; justify-content: center; align-items: center; min-height: 100vh;">
+                    <div class="modal-content" style="max-width: 400px;">
+                        <div class="section-header">
+                           <h2 class="section-title">Acesso Restrito</h2>
+                        </div>
+                        <form id="admin-login-form">
+                            <div class="form-group">
+                                <label for="email">Email</label>
+                                <input type="email" id="email" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="password">Senha</label>
+                                <input type="password" id="password" class="form-control" required>
+                            </div>
+                            <p id="login-error" class="hidden" style="color: var(--color-error);"></p>
+                            <button type="submit" class="btn btn--primary" style="width: 100%;">Entrar</button>
+                        </form>
                     </div>
                 </div>
+                `;
+                this.attachAdminLoginListeners();
+            }
 
-                <div class="menu-card" data-pizza="calabresa">
-                    <div class="menu-card-image">
-                        <div class="image-placeholder">
-                            <i class="fas fa-pizza-slice"></i>
-                        </div>
-                        <div class="menu-card-badge">Tradicional</div>
-                    </div>
-                    <div class="menu-card-content">
-                        <h3 class="menu-card-title">Calabresa Especial</h3>
-                        <p class="menu-card-description">
-                            Molho de tomate, calabresa artesanal, cebola roxa e azeitonas pretas
-                        </p>
-                        <div class="menu-card-footer">
-                            <span class="menu-card-price">A partir de R$ 35,00</span>
-                            <button class="menu-card-button" onclick="openPizzaDetails('calabresa')">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            attachAdminLoginListeners() {
+                document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const email = document.getElementById('email').value;
+                    const password = document.getElementById('password').value;
+                    const errorEl = document.getElementById('login-error');
 
-                <div class="menu-card" data-pizza="portuguesa">
-                    <div class="menu-card-image">
-                        <div class="image-placeholder">
-                            <i class="fas fa-pizza-slice"></i>
-                        </div>
-                        <div class="menu-card-badge">Premium</div>
-                    </div>
-                    <div class="menu-card-content">
-                        <h3 class="menu-card-title">Portuguesa Premium</h3>
-                        <p class="menu-card-description">
-                            Presunto parma, ovos caipira, ervilhas e azeitonas portuguesas
-                        </p>
-                        <div class="menu-card-footer">
-                            <span class="menu-card-price">A partir de R$ 42,00</span>
-                            <button class="menu-card-button" onclick="openPizzaDetails('portuguesa')">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                    try {
+                        await this.auth.signInWithEmailAndPassword(email, password);
+                        // onAuthStateChanged will handle rendering the panel
+                    } catch (error) {
+                        errorEl.textContent = "Email ou senha incorretos.";
+                        errorEl.classList.remove('hidden');
+                        console.error("Login failed:", error);
+                    }
+                });
+            }
 
-                <div class="menu-card" data-pizza="quatro-queijos">
-                    <div class="menu-card-image">
-                        <div class="image-placeholder">
-                            <i class="fas fa-pizza-slice"></i>
-                        </div>
-                        <div class="menu-card-badge">Gourmet</div>
+            renderAdminPanel() {
+               // A simplified admin panel for demonstration
+               this.appRoot.innerHTML = `
+                <div class="container admin-page">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+                        <h2 class="section-title">Painel Administrativo</h2>
+                        <button id="logout-btn" class="btn btn--secondary">Sair</button>
                     </div>
-                    <div class="menu-card-content">
-                        <h3 class="menu-card-title">Quatro Queijos Gourmet</h3>
-                        <p class="menu-card-description">
-                            Mozzarella, gorgonzola, parmesão reggiano e catupiry premium
-                        </p>
-                        <div class="menu-card-footer">
-                            <span class="menu-card-price">A partir de R$ 45,00</span>
-                            <button class="menu-card-button" onclick="openPizzaDetails('quatro-queijos')">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                    <p>Bem-vindo, ${this.user.email}.</p>
+                    <p>O painel de gerenciamento do cardápio está em desenvolvimento.</p>
+                    <!-- Here you would add the full CRUD for menu items and categories -->
+                </div>`;
 
-            <div class="menu-preview-footer">
-                <button class="btn btn--primary btn--large" id="fullMenuBtn">
-                    <i class="fas fa-book-open"></i>
-                    Ver Cardápio Completo
-                    <span class="btn-highlight">+15 Sabores</span>
-                </button>
-            </div>
-        </div>
-    </section>
+                document.getElementById('logout-btn').addEventListener('click', () => {
+                    this.auth.signOut();
+                    window.location.hash = ''; // Go back to home
+                    this.renderHomePage();
+                });
+            }
+        }
 
-    <!-- About Section -->
-    <section id="sobre" class="about">
-        <div class="container">
-            <div class="about-content">
-                <div class="about-text">
-                    <div class="section-badge">
-                        <i class="fas fa-heart"></i>
-                        <span>Nossa História</span>
-                    </div>
-                    <h2 class="section-title">Tradição e Sabor desde sempre</h2>
-                    <p class="about-description">
-                        Na Pizzaria Santa Sensação, cada pizza é preparada com ingredientes selecionados 
-                        e o carinho de quem faz com amor. Nossa massa é preparada diariamente, 
-                        nosso molho tem receita secreta da família, e cada pizza é uma experiência única.
-                    </p>
-                    <div class="about-features">
-                        <div class="feature-item">
-                            <i class="fas fa-check-circle"></i>
-                            <span>Massa artesanal fermentada por 24h</span>
-                        </div>
-                        <div class="feature-item">
-                            <i class="fas fa-check-circle"></i>
-                            <span>Ingredientes frescos e selecionados</span>
-                        </div>
-                        <div class="feature-item">
-                            <i class="fas fa-check-circle"></i>
-                            <span>Forno a lenha tradicional</span>
-                        </div>
-                        <div class="feature-item">
-                            <i class="fas fa-check-circle"></i>
-                            <span>Atendimento familiar e acolhedor</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="about-image">
-                    <div class="image-placeholder large">
-                        <i class="fas fa-store-alt"></i>
-                        <span>Nossa Pizzaria</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
+        // 8. INITIALIZE APP ON DOM CONTENT LOADED
+        window.addEventListener('DOMContentLoaded', () => {
+            new PizzariaApp();
+        });
 
-    <!-- Contact Section -->
-    <section id="contato" class="contact">
-        <div class="container">
-            <div class="section-header centered">
-                <div class="section-badge">
-                    <i class="fas fa-map-marker-alt"></i>
-                    <span>Fale Conosco</span>
-                </div>
-                <h2 class="section-title">Faça seu Pedido</h2>
-                <p class="section-description">
-                    Entre em contato conosco e faça seu pedido. Estamos prontos para atendê-lo!
-                </p>
-            </div>
-
-            <div class="contact-content">
-                <div class="contact-info">
-                    <div class="contact-card">
-                        <div class="contact-icon">
-                            <i class="fas fa-map-marker-alt"></i>
-                        </div>
-                        <div class="contact-details">
-                            <h3>Endereço</h3>
-                            <p>Porfilio Furtado, 178<br>Centro - Santa Leopoldina, ES</p>
-                        </div>
-                    </div>
-
-                    <div class="contact-card">
-                        <div class="contact-icon whatsapp">
-                            <i class="fab fa-whatsapp"></i>
-                        </div>
-                        <div class="contact-details">
-                            <h3>WhatsApp</h3>
-                            <p>
-                                <a href="https://wa.me/5527996500341" target="_blank">
-                                    (27) 99650-0341
-                                </a>
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="contact-card">
-                        <div class="contact-icon instagram">
-                            <i class="fab fa-instagram"></i>
-                        </div>
-                        <div class="contact-details">
-                            <h3>Instagram</h3>
-                            <p>
-                                <a href="https://www.instagram.com/santasensacao.sl" target="_blank">
-                                    @santasensacao.sl
-                                </a>
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="contact-card">
-                        <div class="contact-icon">
-                            <i class="fas fa-clock"></i>
-                        </div>
-                        <div class="contact-details">
-                            <h3>Horário de Funcionamento</h3>
-                            <p>De quarta a domingo<br>a partir das 19h</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="contact-actions">
-                    <a href="https://wa.me/5527996500341" target="_blank" class="btn btn--primary btn--large btn--full-width">
-                        <i class="fab fa-whatsapp"></i>
-                        Pedir pelo WhatsApp
-                    </a>
-                    <a href="https://www.instagram.com/santasensacao.sl" target="_blank" class="btn btn--outline btn--large btn--full-width">
-                        <i class="fab fa-instagram"></i>
-                        Seguir no Instagram
-                    </a>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-brand">
-                    <div class="logo">
-                        <i class="fas fa-pizza-slice"></i>
-                        <span class="logo-text">Santa Sensação</span>
-                    </div>
-                    <p class="footer-tagline">A pizza nº 1 do ES 🏅</p>
-                    <div class="footer-social">
-                        <a href="https://wa.me/5527996500341" target="_blank" class="social-link whatsapp">
-                            <i class="fab fa-whatsapp"></i>
-                        </a>
-                        <a href="https://www.instagram.com/santasensacao.sl" target="_blank" class="social-link instagram">
-                            <i class="fab fa-instagram"></i>
-                        </a>
-                    </div>
-                </div>
-                <div class="footer-info">
-                    <div class="footer-section">
-                        <h4>Contato</h4>
-                        <p>Porfilio Furtado, 178<br>Centro - Santa Leopoldina, ES</p>
-                        <p>WhatsApp: (27) 99650-0341</p>
-                    </div>
-                    <div class="footer-section">
-                        <h4>Funcionamento</h4>
-                        <p>Quarta a Domingo<br>19h às 23h</p>
-                        <p>Delivery disponível</p>
-                    </div>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <p>&copy; 2024 Pizzaria Santa Sensação. Todos os direitos reservados.</p>
-                <button class="admin-access-btn" id="footerAdminBtn">
-                    <i class="fas fa-shield-alt"></i>
-                    Área Administrativa
-                </button>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Full Menu Modal -->
-    <div id="menuModal" class="modal hidden">
-        <div class="modal-content large">
-            <div class="modal-header">
-                <h2>
-                    <i class="fas fa-book-open"></i>
-                    Cardápio Completo
-                </h2>
-                <button class="modal-close" id="closeMenuModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="menu-categories">
-                    <button class="category-tab active" data-category="pizzas-salgadas">
-                        <i class="fas fa-pizza-slice"></i>
-                        Pizzas Salgadas
-                    </button>
-                    <button class="category-tab" data-category="pizzas-doces">
-                        <i class="fas fa-birthday-cake"></i>
-                        Pizzas Doces
-                    </button>
-                    <button class="category-tab" data-category="bebidas">
-                        <i class="fas fa-glass-water"></i>
-                        Bebidas
-                    </button>
-                </div>
-                <div id="menuItems" class="menu-items-container">
-                    <div class="loading-spinner">
-                        <i class="fas fa-spinner fa-spin"></i>
-                        <span>Carregando cardápio...</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Admin Login Modal -->
-    <div id="adminModal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>
-                    <i class="fas fa-lock"></i>
-                    Acesso Administrativo
-                </h3>
-                <button class="modal-close" id="closeAdminModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <form id="adminLoginForm" class="admin-form">
-                    <div class="form-group">
-                        <label class="form-label">
-                            <i class="fas fa-user"></i>
-                            Email do Administrador
-                        </label>
-                        <input type="email" id="adminEmail" class="form-control" required autocomplete="username">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">
-                            <i class="fas fa-lock"></i>
-                            Senha
-                        </label>
-                        <input type="password" id="adminPassword" class="form-control" required autocomplete="current-password">
-                    </div>
-                    <button type="submit" class="btn btn--primary btn--full-width">
-                        <i class="fas fa-sign-in-alt"></i>
-                        Entrar
-                    </button>
-                </form>
-                <div id="adminError" class="error-message hidden"></div>
-                <div id="adminLoading" class="loading-message hidden">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <span>Verificando credenciais...</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Cart Sidebar -->
-    <div id="cartSidebar" class="cart-sidebar hidden">
-        <div class="cart-header">
-            <h3>
-                <i class="fas fa-shopping-cart"></i>
-                Seu Pedido
-            </h3>
-            <button class="cart-close" id="closeCart">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <div class="cart-content" id="cartContent">
-            <div class="empty-cart">
-                <i class="fas fa-shopping-cart"></i>
-                <p>Seu carrinho está vazio</p>
-                <small>Adicione pizzas deliciosas!</small>
-            </div>
-        </div>
-        <div class="cart-footer" id="cartFooter" style="display: none;">
-            <div class="cart-total">
-                <span>Total: </span>
-                <span id="cartTotal">R$ 0,00</span>
-            </div>
-            <button class="btn btn--primary btn--full-width" id="finishOrder">
-                <i class="fab fa-whatsapp"></i>
-                Finalizar no WhatsApp
-            </button>
-        </div>
-    </div>
-
-    <!-- Scripts -->
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
-    <script src="app.js"></script>
+    </script>
 </body>
 </html>
