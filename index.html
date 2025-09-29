@@ -150,7 +150,6 @@
                 this.loadCartFromStorage();
                 this.auth.onAuthStateChanged(user => this.handleAuthChange(user));
                 window.addEventListener('hashchange', () => this.handleRouting());
-                this.handleRouting();
             }
             async handleAuthChange(user) {
                 this.user = user;
@@ -192,8 +191,11 @@
                 this.listeners.push(categoriesUnsubscribe, itemsUnsubscribe);
             }
             updateUI() {
-                if (window.location.hash.startsWith('#admin')) {
-                    this.renderAdminPage(); 
+                const hash = window.location.hash;
+                if (hash.startsWith('#admin')) {
+                    if (this.user) {
+                        this.renderAdminPanelContent();
+                    }
                 } else {
                     this.updateMenuUI();
                 }
@@ -324,25 +326,40 @@
             renderAdminPage() {
                 this.appRoot.innerHTML = this.user ? this.renderAdminPanel() : this.renderAdminLogin();
                 if (this.user) {
-                    this.renderAdminTabContent('cardapio');
-                    this.attachAdminPanelListeners();
+                    this.renderAdminPanelContent();
                 } else {
                     this.attachAdminLoginListeners();
                 }
             }
             renderAdminLogin() { return `<div style="display: flex; justify-content: center; align-items: center; min-height: 100vh;"><div class="modal-content" style="max-width: 400px;"><div class="section-header"><h2 class="section-title">Acesso Restrito</h2><a href="#" style="position: absolute; top: 16px; right: 16px; font-size: 1.5rem; color: var(--color-text-light); text-decoration:none;">&times;</a></div><form id="admin-login-form"><div class="form-group"><label for="email">Email</label><input type="email" id="email" class="form-control" required></div><div class="form-group"><label for="password">Senha</label><input type="password" id="password" class="form-control" required></div><p id="login-error" class="hidden" style="color: var(--color-error);"></p><button type="submit" class="btn btn--primary" style="width: 100%;">Entrar</button></form></div></div>`; }
             attachAdminLoginListeners() {
-                document.getElementById('admin-login-form').addEventListener('submit', async e => {
-                    e.preventDefault();
-                    const email = document.getElementById('email').value, password = document.getElementById('password').value, errorEl = document.getElementById('login-error');
-                    try { await this.auth.signInWithEmailAndPassword(email, password); } 
-                    catch (error) { errorEl.textContent = "Email ou senha incorretos."; errorEl.classList.remove('hidden'); }
-                });
+                const form = document.getElementById('admin-login-form');
+                if(form){
+                    form.addEventListener('submit', async e => {
+                        e.preventDefault();
+                        const email = document.getElementById('email').value, password = document.getElementById('password').value, errorEl = document.getElementById('login-error');
+                        try { 
+                            await this.auth.signInWithEmailAndPassword(email, password);
+                            // handleAuthChange will trigger the rerender
+                        } 
+                        catch (error) { errorEl.textContent = "Email ou senha incorretos."; errorEl.classList.remove('hidden'); }
+                    });
+                }
             }
             renderAdminPanel() { return `<div class="container admin-page"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;"><h2 class="section-title">Painel Administrativo</h2><div><a href="#" class="btn btn--primary">Voltar ao Site</a><button id="logout-btn" class="btn btn--secondary">Sair</button></div></div>${!this.isAdmin ? '<p style="background: #fff3cd; color: #856404; padding: 1rem; border-radius: 8px; border: 1px solid #ffeeba;"><b>Atenção:</b> Você não tem permissão de administrador.</p>' : ''}<div class="admin-container"><nav class="admin-nav" id="admin-nav"><button class="admin-nav-btn active" data-tab="cardapio"><i class="fas fa-utensils"></i> Cardápio</button><button class="admin-nav-btn" data-tab="categorias"><i class="fas fa-tags"></i> Categorias</button><button class="admin-nav-btn" data-tab="seguranca"><i class="fas fa-shield-alt"></i> Segurança</button></nav><div class="admin-content" id="admin-content"></div></div></div>`; }
+            
+            renderAdminPanelContent() {
+                const activeTab = document.querySelector('.admin-nav-btn.active')?.dataset.tab || 'cardapio';
+                this.renderAdminTabContent(activeTab);
+                this.attachAdminPanelListeners();
+            }
+
             attachAdminPanelListeners() {
-                document.getElementById('logout-btn').addEventListener('click', () => this.auth.signOut());
-                document.getElementById('admin-nav').addEventListener('click', e => {
+                const logoutBtn = document.getElementById('logout-btn');
+                if(logoutBtn) logoutBtn.addEventListener('click', () => this.auth.signOut());
+                
+                const adminNav = document.getElementById('admin-nav');
+                if(adminNav) adminNav.addEventListener('click', e => {
                     const navBtn = e.target.closest('.admin-nav-btn');
                     if (navBtn) {
                         document.querySelectorAll('.admin-nav-btn').forEach(btn => btn.classList.remove('active'));
@@ -356,11 +373,13 @@
                 if (tab === 'categorias') {
                     container.innerHTML = `<div class="admin-header"><h3>Categorias</h3><button class="btn btn--primary" id="add-category-btn" ${!this.isAdmin ? 'disabled' : ''}><i class="fas fa-plus"></i> Nova</button></div><table class="admin-table"><thead><tr><th>Ordem</th><th>Nome</th><th>Ações</th></tr></thead><tbody id="category-table-body"></tbody></table>`;
                     this.updateCategoriesTable();
-                    document.getElementById('add-category-btn').addEventListener('click', () => this.renderCategoryModal());
+                    const addBtn = document.getElementById('add-category-btn');
+                    if(addBtn) addBtn.addEventListener('click', () => this.renderCategoryModal());
                 } else if (tab === 'cardapio') {
                     container.innerHTML = `<div class="admin-header"><h3>Itens do Cardápio</h3><button class="btn btn--primary" id="add-item-btn" ${!this.isAdmin ? 'disabled' : ''}><i class="fas fa-plus"></i> Novo</button></div><table class="admin-table"><thead><tr><th>Nome</th><th>Categoria</th><th>Preços</th><th>Ações</th></tr></thead><tbody id="item-table-body"></tbody></table>`;
                     this.updateItemsTable();
-                    document.getElementById('add-item-btn').addEventListener('click', () => this.renderItemModal());
+                    const addBtn = document.getElementById('add-item-btn');
+                    if(addBtn) addBtn.addEventListener('click', () => this.renderItemModal());
                 } else if (tab === 'seguranca') {
                     container.innerHTML = `<h3>Alterar Senha</h3><form id="change-password-form"><div class="form-group"><label for="new-password">Nova Senha</label><input type="password" id="new-password" class="form-control" required minlength="6"></div><div class="form-group"><label for="confirm-password">Confirmar Nova Senha</label><input type="password" id="confirm-password" class="form-control" required></div><p id="password-error" class="hidden" style="color: var(--color-error);"></p><p id="password-success" class="hidden" style="color: var(--color-success);"></p><button type="submit" class="btn btn--primary" style="margin-top: 16px;">Salvar</button></form>`;
                     this.attachChangePasswordListener();
