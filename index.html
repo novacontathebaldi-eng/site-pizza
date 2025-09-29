@@ -317,6 +317,15 @@
             transition: all var(--transition-fast);
             display: flex;
             flex-direction: column;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         .menu-card:hover {
             transform: translateY(-5px);
@@ -719,6 +728,7 @@
                 }
 
                 if (hash.startsWith('#admin')) {
+                    this.listenToMenuChanges(); // Listen to menu changes also on admin page
                     this.renderAdminPage();
                 } else {
                     this.listenToMenuChanges();
@@ -734,12 +744,16 @@
                             this.activeCategory = this.menu.categories[0].id;
                         }
                         this.updateMenuUI();
+                        if (window.location.hash.startsWith('#admin')) this.updateAdminUI();
+
                     }, err => console.error("Error listening to categories:", err));
 
                 const itemsUnsubscribe = this.db.collection('menu_items').orderBy('displayOrder')
                     .onSnapshot(snapshot => {
                         this.menu.items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         this.updateMenuUI();
+                        if (window.location.hash.startsWith('#admin')) this.updateAdminUI();
+
                     }, err => console.error("Error listening to items:", err));
                 
                 this.listeners.push(categoriesUnsubscribe, itemsUnsubscribe);
@@ -750,6 +764,11 @@
                     this.updateMenuCategoriesUI();
                     this.updateMenuItemsUI();
                 }
+            }
+            
+            updateAdminUI() {
+                if(document.getElementById('category-table-body')) this.updateCategoriesTable();
+                if(document.getElementById('item-table-body')) this.updateItemsTable();
             }
 
             // --- PUBLIC PAGE RENDERING ---
@@ -802,9 +821,9 @@
                 const grid = document.getElementById('menu-grid');
                 if (!grid) return;
                 const itemsToShow = this.menu.items.filter(item => item.categoryId === this.activeCategory);
-                if (itemsToShow.length === 0) { grid.innerHTML = `<p>Nenhum item nesta categoria.</p>`; return; }
-                grid.innerHTML = itemsToShow.map(item => `
-                    <div class="menu-card">
+                if (itemsToShow.length === 0) { grid.innerHTML = `<p style="text-align:center; padding: 2rem;">Nenhum item encontrado nesta categoria.</p>`; return; }
+                grid.innerHTML = itemsToShow.map((item, index) => `
+                    <div class="menu-card" style="animation-delay: ${index * 100}ms">
                         <img src="${item.imageUrl || 'https://placehold.co/600x400/8B0000/FDF8F0?text=Pizza'}" alt="${item.name}" class="menu-card-image">
                         <div class="menu-card-content">
                             <h3 class="menu-card-title">${item.name}</h3>
