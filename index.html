@@ -138,7 +138,7 @@
                 this.auth = firebase.auth();
                 this.menu = { categories: [], items: [] };
                 this.cart = [];
-                this.user = null;
+                this.user = undefined; // Undefined state for initial check
                 this.isAdmin = false;
                 this.activeCategory = null;
                 this.listeners = [];
@@ -148,9 +148,9 @@
             }
             async init() {
                 this.loadCartFromStorage();
+                // onAuthStateChanged is the single source of truth for user state
                 this.auth.onAuthStateChanged(user => this.handleAuthChange(user));
                 window.addEventListener('hashchange', () => this.handleRouting());
-                this.handleRouting(); 
             }
             async handleAuthChange(user) {
                 this.user = user;
@@ -213,7 +213,9 @@
             updateUI() {
                 const hash = window.location.hash;
                 if (hash.startsWith('#admin')) {
-                     this.renderAdminPage();
+                     if (this.user) { // Only update admin content if user is decided
+                        this.renderAdminPanelContent();
+                     }
                 } else {
                     this.updateMenuUI();
                 }
@@ -342,10 +344,14 @@
                 window.open(whatsappUrl, '_blank');
             }
             renderAdminPage() {
-                if(this.user === null) {
+                if(this.user === undefined) { // Still checking auth state
+                    this.appRoot.innerHTML = `<div style="display: flex; justify-content: center; align-items: center; height: 100vh;"><i class="fas fa-spinner fa-spin fa-3x" style="color: var(--color-primary);"></i></div>`;
+                    return;
+                }
+                if(this.user === null) { // User is logged out
                     this.appRoot.innerHTML = this.renderAdminLogin();
                     this.attachAdminLoginListeners();
-                } else {
+                } else { // User is logged in
                     this.appRoot.innerHTML = this.renderAdminPanel();
                     this.renderAdminPanelContent();
                 }
@@ -359,6 +365,7 @@
                         const email = document.getElementById('email').value, password = document.getElementById('password').value, errorEl = document.getElementById('login-error');
                         try { 
                             await this.auth.signInWithEmailAndPassword(email, password);
+                            // Auth change will trigger re-render
                         } 
                         catch (error) { errorEl.textContent = "Email ou senha incorretos."; errorEl.classList.remove('hidden'); }
                     });
