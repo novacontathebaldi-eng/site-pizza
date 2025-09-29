@@ -150,15 +150,22 @@
                 this.loadCartFromStorage();
                 this.auth.onAuthStateChanged(user => this.handleAuthChange(user));
                 window.addEventListener('hashchange', () => this.handleRouting());
+                this.handleRouting(); // Roda na inicialização para carregar a página correta
             }
             async handleAuthChange(user) {
                 this.user = user;
                 if (user) {
-                    const adminDoc = await this.db.collection('admins').doc(user.uid).get();
-                    this.isAdmin = adminDoc.exists;
+                    try {
+                        const adminDoc = await this.db.collection('admins').doc(user.uid).get();
+                        this.isAdmin = adminDoc.exists;
+                    } catch (e) {
+                        console.error("Erro ao verificar status de admin (verifique as regras de segurança):", e);
+                        this.isAdmin = false;
+                    }
                 } else {
                     this.isAdmin = false;
                 }
+                // Força a atualização da UI após a mudança de autenticação
                 this.handleRouting();
             }
             handleRouting() {
@@ -169,33 +176,47 @@
                     window.removeEventListener('scroll', this.scrollHandler);
                     this.scrollHandler = null;
                 }
-                this.listenToMenuChanges();
+                
                 if (hash.startsWith('#admin')) {
                     this.renderAdminPage();
                 } else {
                     this.renderHomePage();
                 }
+                this.listenToMenuChanges(); // Inicia os listeners para a página atual
             }
             listenToMenuChanges() {
+                // Previne erros se a base de dados ainda não estiver pronta
+                if (!this.db) return;
+
                 const categoriesUnsubscribe = this.db.collection('menu_categories').orderBy('order')
                     .onSnapshot(snapshot => {
                         this.menu.categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         if (!this.activeCategory && this.menu.categories.length > 0) { this.activeCategory = this.menu.categories[0].id; }
                         this.updateUI();
-                    }, err => console.error("Error listening to categories:", err));
+                    }, err => {
+                        console.error("Erro ao carregar categorias:", err);
+                        this.showDataError('categorias');
+                    });
                 const itemsUnsubscribe = this.db.collection('menu_items').orderBy('displayOrder')
                     .onSnapshot(snapshot => {
                         this.menu.items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         this.updateUI();
-                    }, err => console.error("Error listening to items:", err));
+                    }, err => {
+                         console.error("Erro ao carregar itens:", err);
+                         this.showDataError('itens');
+                    });
                 this.listeners.push(categoriesUnsubscribe, itemsUnsubscribe);
+            }
+            showDataError(type) {
+                const grid = document.getElementById('menu-grid');
+                if(grid) {
+                    grid.innerHTML = `<p style="text-align:center; color: var(--color-error);">Não foi possível carregar os ${type}. Verifique a consola para mais detalhes.</p>`;
+                }
             }
             updateUI() {
                 const hash = window.location.hash;
                 if (hash.startsWith('#admin')) {
-                    if (this.user) {
-                        this.renderAdminPanelContent();
-                    }
+                     this.renderAdminPage();
                 } else {
                     this.updateMenuUI();
                 }
@@ -223,7 +244,7 @@
                 const grid = document.getElementById('menu-grid');
                 if (!grid) return;
                 const itemsToShow = this.menu.items.filter(item => item.categoryId === this.activeCategory);
-                if (itemsToShow.length === 0) { grid.innerHTML = `<p>Nenhum item nesta categoria.</p>`; return; }
+                if (itemsToShow.length === 0) { grid.innerHTML = `<p style="text-align:center; padding: 2rem;">Nenhum item encontrado nesta categoria.</p>`; return; }
                 grid.innerHTML = itemsToShow.map(item => `<div class="menu-card"><img src="${item.imageUrl || 'https://placehold.co/600x400/8B0000/FDF8F0?text=Pizza'}" alt="${item.name}" class="menu-card-image"><div class="menu-card-content"><h3 class="menu-card-title">${item.name}</h3><p class="menu-card-description">${item.description}</p><div class="menu-card-footer"><div class="size-options">${Object.entries(item.prices).map(([size, price]) => `<button class="size-btn" data-item-id="${item.id}" data-size="${size}" data-price="${price}"><span class="size-name">${size}</span><span class="size-price">${Number(price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></button>`).join('')}</div></div></div></div>`).join('');
                 grid.querySelectorAll('.size-btn').forEach(btn => btn.addEventListener('click', e => {
                     const { itemId, size, price } = e.currentTarget.dataset;
@@ -340,7 +361,6 @@
                         const email = document.getElementById('email').value, password = document.getElementById('password').value, errorEl = document.getElementById('login-error');
                         try { 
                             await this.auth.signInWithEmailAndPassword(email, password);
-                            // handleAuthChange will trigger the rerender
                         } 
                         catch (error) { errorEl.textContent = "Email ou senha incorretos."; errorEl.classList.remove('hidden'); }
                     });
