@@ -107,6 +107,7 @@
         .btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
+            background-color: #ccc;
         }
 
         .btn--primary {
@@ -316,6 +317,15 @@
             transition: all var(--transition-fast);
             display: flex;
             flex-direction: column;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         .menu-card:hover {
             transform: translateY(-5px);
@@ -501,6 +511,9 @@
             flex-shrink: 0;
         }
         .admin-nav-btn {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
             padding: 12px;
             border-radius: var(--radius-md);
             font-weight: 600;
@@ -521,11 +534,13 @@
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow-md);
         }
-        .admin-tab-content {
-            display: none;
-        }
-        .admin-tab-content.active {
-            display: block;
+        .admin-tab-content { display: none; }
+        .admin-tab-content.active { display: block; }
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-lg);
         }
         .admin-table {
             width: 100%;
@@ -536,9 +551,16 @@
             text-align: left;
             padding: var(--spacing-md);
             border-bottom: 1px solid var(--color-border);
+            vertical-align: middle;
         }
         .admin-table th {
             font-family: var(--font-display);
+        }
+        .admin-table img {
+            width: 60px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: var(--radius-sm);
         }
         .admin-actions button {
             background: none;
@@ -567,6 +589,7 @@
             border: 1px solid var(--color-border);
             border-radius: var(--radius-md);
             font-size: 1rem;
+            width: 100%;
         }
         .form-control:focus {
             outline: none;
@@ -670,7 +693,7 @@
                 this.isAdmin = false;
                 this.activeCategory = null;
                 this.listeners = [];
-                this.scrollHandler = null; // To manage the scroll event listener
+                this.scrollHandler = null;
                 
                 this.appRoot = document.getElementById('app');
                 
@@ -681,6 +704,7 @@
                 this.loadCartFromStorage();
                 this.auth.onAuthStateChanged(user => this.handleAuthChange(user));
                 window.addEventListener('hashchange', () => this.handleRouting());
+                this.handleRouting(); // Initial call
             }
 
             async handleAuthChange(user) {
@@ -696,17 +720,16 @@
 
             handleRouting() {
                 const hash = window.location.hash;
-                // Detach previous listeners
                 this.listeners.forEach(unsubscribe => unsubscribe());
                 this.listeners = [];
 
-                // Remove the global scroll listener to prevent errors on other pages
                 if (this.scrollHandler) {
                     window.removeEventListener('scroll', this.scrollHandler);
                     this.scrollHandler = null;
                 }
 
                 if (hash.startsWith('#admin')) {
+                    this.listenToMenuChanges();
                     this.renderAdminPage();
                 } else {
                     this.listenToMenuChanges();
@@ -719,15 +742,22 @@
                     .onSnapshot(snapshot => {
                         this.menu.categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         if (!this.activeCategory && this.menu.categories.length > 0) {
-                            this.activeCategory = this.menu.categories[0].id;
+                            const currentActiveExists = this.menu.categories.some(c => c.id === this.activeCategory);
+                            if (!currentActiveExists) {
+                                this.activeCategory = this.menu.categories[0].id;
+                            }
                         }
                         this.updateMenuUI();
+                        if (window.location.hash.startsWith('#admin')) this.updateAdminUI();
+
                     }, err => console.error("Error listening to categories:", err));
 
                 const itemsUnsubscribe = this.db.collection('menu_items').orderBy('displayOrder')
                     .onSnapshot(snapshot => {
                         this.menu.items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         this.updateMenuUI();
+                        if (window.location.hash.startsWith('#admin')) this.updateAdminUI();
+
                     }, err => console.error("Error listening to items:", err));
                 
                 this.listeners.push(categoriesUnsubscribe, itemsUnsubscribe);
@@ -738,6 +768,12 @@
                     this.updateMenuCategoriesUI();
                     this.updateMenuItemsUI();
                 }
+            }
+            
+            updateAdminUI() {
+                const activeTab = document.querySelector('.admin-nav-btn.active')?.dataset.tab;
+                if (activeTab === 'categorias') this.updateCategoriesTable();
+                if (activeTab === 'cardapio') this.updateItemsTable();
             }
 
             // --- PUBLIC PAGE RENDERING ---
@@ -790,9 +826,9 @@
                 const grid = document.getElementById('menu-grid');
                 if (!grid) return;
                 const itemsToShow = this.menu.items.filter(item => item.categoryId === this.activeCategory);
-                if (itemsToShow.length === 0) { grid.innerHTML = `<p>Nenhum item nesta categoria.</p>`; return; }
-                grid.innerHTML = itemsToShow.map(item => `
-                    <div class="menu-card">
+                if (itemsToShow.length === 0) { grid.innerHTML = `<p style="text-align:center; padding: 2rem;">Nenhum item encontrado nesta categoria.</p>`; return; }
+                grid.innerHTML = itemsToShow.map((item, index) => `
+                    <div class="menu-card" style="animation-delay: ${index * 100}ms">
                         <img src="${item.imageUrl || 'https://placehold.co/600x400/8B0000/FDF8F0?text=Pizza'}" alt="${item.name}" class="menu-card-image">
                         <div class="menu-card-content">
                             <h3 class="menu-card-title">${item.name}</h3>
@@ -904,15 +940,18 @@
 
             // --- ADMIN PAGE LOGIC ---
             renderAdminPage() {
-                this.appRoot.innerHTML = this.user ? this.renderAdminPanel() : this.renderAdminLogin();
-                if (this.user) {
-                    this.renderAdminTabContent('cardapio');
-                    this.attachAdminPanelListeners();
-                } else {
-                    this.attachAdminLoginListeners();
-                }
+                if (!this.user) { this.renderAdminLogin(); return; }
+                
+                this.appRoot.innerHTML = this.renderAdminPanel();
+                this.attachAdminPanelListeners();
+                this.renderAdminTabContent('cardapio');
             }
-            renderAdminLogin() { return `<div style="display: flex; justify-content: center; align-items: center; min-height: 100vh;"><div class="modal-content" style="max-width: 400px;"><div class="section-header"><h2 class="section-title">Acesso Restrito</h2><a href="#" style="position: absolute; top: 16px; right: 16px; font-size: 1.5rem; color: var(--color-text-light); text-decoration:none;">&times;</a></div><form id="admin-login-form"><div class="form-group"><label for="email">Email</label><input type="email" id="email" class="form-control" required></div><div class="form-group"><label for="password">Senha</label><input type="password" id="password" class="form-control" required></div><p id="login-error" class="hidden" style="color: var(--color-error);"></p><button type="submit" class="btn btn--primary" style="width: 100%;">Entrar</button></form></div></div>`; }
+
+            renderAdminLogin() { 
+                this.appRoot.innerHTML = `<div style="display: flex; justify-content: center; align-items: center; min-height: 100vh;"><div class="modal-content" style="max-width: 400px;"><div class="section-header"><h2 class="section-title">Acesso Restrito</h2><a href="#" style="position: absolute; top: 16px; right: 16px; font-size: 1.5rem; color: var(--color-text-light); text-decoration:none;">&times;</a></div><form id="admin-login-form"><div class="form-group"><label for="email">Email</label><input type="email" id="email" class="form-control" required></div><div class="form-group"><label for="password">Senha</label><input type="password" id="password" class="form-control" required></div><p id="login-error" class="hidden" style="color: var(--color-error);"></p><button type="submit" class="btn btn--primary" style="width: 100%;">Entrar</button></form></div></div>`;
+                this.attachAdminLoginListeners();
+             }
+            
             attachAdminLoginListeners() {
                 document.getElementById('admin-login-form').addEventListener('submit', async e => {
                     e.preventDefault();
@@ -921,26 +960,200 @@
                     catch (error) { errorEl.textContent = "Email ou senha incorretos."; errorEl.classList.remove('hidden'); }
                 });
             }
-            renderAdminPanel() { return `<div class="container admin-page"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;"><h2 class="section-title">Painel Administrativo</h2><div><a href="#" class="btn btn--primary">Voltar ao Site</a><button id="logout-btn" class="btn btn--secondary">Sair</button></div></div><div class="admin-container"><nav class="admin-nav" id="admin-nav"><button class="admin-nav-btn active" data-tab="cardapio"><i class="fas fa-utensils"></i> Cardápio</button><button class="admin-nav-btn" data-tab="categorias"><i class="fas fa-tags"></i> Categorias</button><button class="admin-nav-btn" data-tab="seguranca"><i class="fas fa-shield-alt"></i> Segurança</button></nav><div class="admin-content" id="admin-content"></div></div></div>`; }
+
+            renderAdminPanel() { 
+                return `
+                <div class="container admin-page">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+                        <h2 class="section-title">Painel Administrativo</h2>
+                        <div>
+                            <a href="#" class="btn btn--primary">Voltar ao Site</a>
+                            <button id="logout-btn" class="btn btn--secondary">Sair</button>
+                        </div>
+                    </div>
+                    ${!this.isAdmin ? '<p style="background: #fff3cd; color: #856404; padding: 1rem; border-radius: 8px; border: 1px solid #ffeeba;"><b>Atenção:</b> Você está logado, mas não tem permissão de administrador para editar o conteúdo. Peça para um administrador te conceder a permissão.</p>' : ''}
+                    <div class="admin-container">
+                        <nav class="admin-nav" id="admin-nav">
+                            <button class="admin-nav-btn active" data-tab="cardapio"><i class="fas fa-utensils"></i> Itens do Cardápio</button>
+                            <button class="admin-nav-btn" data-tab="categorias"><i class="fas fa-tags"></i> Categorias</button>
+                            <button class="admin-nav-btn" data-tab="seguranca"><i class="fas fa-shield-alt"></i> Segurança</button>
+                        </nav>
+                        <div class="admin-content" id="admin-content"></div>
+                    </div>
+                </div>`; 
+            }
+            
             attachAdminPanelListeners() {
                 document.getElementById('logout-btn').addEventListener('click', () => this.auth.signOut());
                 document.getElementById('admin-nav').addEventListener('click', e => {
-                    if (e.target.classList.contains('admin-nav-btn')) {
-                        const tab = e.target.dataset.tab;
+                    const navBtn = e.target.closest('.admin-nav-btn');
+                    if (navBtn) {
+                        const tab = navBtn.dataset.tab;
                         document.querySelectorAll('.admin-nav-btn').forEach(btn => btn.classList.remove('active'));
-                        e.target.classList.add('active'); this.renderAdminTabContent(tab);
+                        navBtn.classList.add('active'); this.renderAdminTabContent(tab);
                     }
                 });
             }
-            renderAdminTabContent(tab) {
+
+            async renderAdminTabContent(tab) {
                 const container = document.getElementById('admin-content');
-                if (tab === 'cardapio') container.innerHTML = `<h3>Gerenciar Cardápio</h3><p>Funcionalidade de CRUD para itens em desenvolvimento.</p>`;
-                else if (tab === 'categorias') container.innerHTML = `<h3>Gerenciar Categorias</h3><p>Funcionalidade de CRUD para categorias em desenvolvimento.</p>`;
-                else if (tab === 'seguranca') {
+                if (!container) return;
+
+                if (tab === 'categorias') {
+                    container.innerHTML = `
+                    <div class="admin-header"><h3>Categorias</h3><button class="btn btn--primary" id="add-category-btn" ${!this.isAdmin ? 'disabled' : ''}><i class="fas fa-plus"></i> Nova Categoria</button></div>
+                    <table class="admin-table"><thead><tr><th>Ordem</th><th>Nome</th><th>Ações</th></tr></thead><tbody id="category-table-body"></tbody></table>`;
+                    this.updateCategoriesTable();
+                    document.getElementById('add-category-btn').addEventListener('click', () => this.renderCategoryModal());
+                } else if (tab === 'cardapio') {
+                    container.innerHTML = `
+                    <div class="admin-header"><h3>Itens do Cardápio</h3><button class="btn btn--primary" id="add-item-btn" ${!this.isAdmin ? 'disabled' : ''}><i class="fas fa-plus"></i> Novo Item</button></div>
+                    <table class="admin-table"><thead><tr><th>Imagem</th><th>Nome</th><th>Categoria</th><th>Preços</th><th>Ações</th></tr></thead><tbody id="item-table-body"></tbody></table>`;
+                    this.updateItemsTable();
+                    document.getElementById('add-item-btn').addEventListener('click', () => this.renderItemModal());
+                } else if (tab === 'seguranca') {
                     container.innerHTML = `<h3>Alterar Senha</h3><form id="change-password-form"><div class="form-group"><label for="new-password">Nova Senha</label><input type="password" id="new-password" class="form-control" required minlength="6"></div><div class="form-group"><label for="confirm-password">Confirmar Nova Senha</label><input type="password" id="confirm-password" class="form-control" required></div><p id="password-error" class="hidden" style="color: var(--color-error);"></p><p id="password-success" class="hidden" style="color: var(--color-success);"></p><button type="submit" class="btn btn--primary" style="margin-top: 16px;">Salvar Nova Senha</button></form>`;
                     this.attachChangePasswordListener();
                 }
             }
+            
+            updateCategoriesTable() {
+                const tableBody = document.getElementById('category-table-body');
+                if(!tableBody) return;
+                tableBody.innerHTML = this.menu.categories.map(cat => `
+                    <tr>
+                        <td>${cat.order}</td>
+                        <td>${cat.name}</td>
+                        <td class="admin-actions">
+                            <button class="btn-edit" data-id="${cat.id}" ${!this.isAdmin ? 'disabled' : ''}><i class="fas fa-edit"></i></button>
+                            <button class="btn-delete" data-id="${cat.id}" ${!this.isAdmin ? 'disabled' : ''}><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>`).join('');
+                tableBody.querySelectorAll('.btn-edit').forEach(btn => btn.addEventListener('click', e => this.renderCategoryModal(e.currentTarget.dataset.id)));
+                tableBody.querySelectorAll('.btn-delete').forEach(btn => btn.addEventListener('click', e => this.deleteCategory(e.currentTarget.dataset.id)));
+            }
+
+            updateItemsTable() {
+                const tableBody = document.getElementById('item-table-body');
+                if(!tableBody) return;
+                tableBody.innerHTML = this.menu.items.map(item => {
+                    const category = this.menu.categories.find(c => c.id === item.categoryId);
+                    const prices = Object.entries(item.prices).map(([size, price]) => `${size}: ${Number(price).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}`).join('<br>');
+                    return `
+                    <tr>
+                        <td><img src="${item.imageUrl || 'https://placehold.co/120x80/8B0000/FDF8F0?text=Item'}" alt="${item.name}"></td>
+                        <td>${item.name}</td>
+                        <td>${category ? category.name : 'N/A'}</td>
+                        <td>${prices}</td>
+                        <td class="admin-actions">
+                            <button class="btn-edit" data-id="${item.id}" ${!this.isAdmin ? 'disabled' : ''}><i class="fas fa-edit"></i></button>
+                            <button class="btn-delete" data-id="${item.id}" ${!this.isAdmin ? 'disabled' : ''}><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>`
+                }).join('');
+                tableBody.querySelectorAll('.btn-edit').forEach(btn => btn.addEventListener('click', e => this.renderItemModal(e.currentTarget.dataset.id)));
+                tableBody.querySelectorAll('.btn-delete').forEach(btn => btn.addEventListener('click', e => this.deleteItem(e.currentTarget.dataset.id)));
+            }
+
+            // --- ADMIN MODALS & CRUD ---
+            renderModal(title, content, formId, onSubmit) {
+                const modalHTML = `<div class="modal-overlay open" id="admin-modal-overlay"><div class="modal-content"><div class="modal-header"><h3 class="modal-title">${title}</h3><button class="modal-close-btn">&times;</button></div><form id="${formId}">${content}</form></div></div>`;
+                document.getElementById('modals-container').innerHTML = modalHTML;
+                const overlay = document.getElementById('admin-modal-overlay');
+                const closeModal = () => { overlay.classList.remove('open'); setTimeout(() => overlay.remove(), 200); };
+                overlay.addEventListener('click', e => { if (e.target === overlay || e.target.closest('.modal-close-btn')) closeModal(); });
+                document.getElementById(formId).addEventListener('submit', e => { e.preventDefault(); onSubmit(new FormData(e.target)); closeModal(); });
+            }
+
+            renderCategoryModal(id = null) {
+                const category = id ? this.menu.categories.find(c => c.id === id) : { name: '', order: '' };
+                const title = id ? 'Editar Categoria' : 'Nova Categoria';
+                const content = `
+                    <div class="form-group"><label for="name">Nome da Categoria</label><input type="text" name="name" class="form-control" value="${category.name}" required></div>
+                    <div class="form-group"><label for="order">Ordem de Exibição</label><input type="number" name="order" class="form-control" value="${category.order}" required></div>
+                    <button type="submit" class="btn btn--primary" style="width: 100%; margin-top: 16px;">Salvar</button>`;
+                this.renderModal(title, content, 'category-form', (formData) => {
+                    const data = { name: formData.get('name'), order: Number(formData.get('order')) };
+                    this.saveCategory(id, data);
+                });
+            }
+
+            renderItemModal(id = null) {
+                const item = id ? this.menu.items.find(i => i.id === id) : { name: '', description: '', categoryId: '', prices: { P: '', M: '', G: '' }, imageUrl: '', displayOrder: '' };
+                const title = id ? 'Editar Item' : 'Novo Item';
+                const categoryOptions = this.menu.categories.map(c => `<option value="${c.id}" ${c.id === item.categoryId ? 'selected' : ''}>${c.name}</option>`).join('');
+                const content = `
+                    <div class="form-grid">
+                        <div class="form-group"><label for="name">Nome do Item</label><input type="text" name="name" class="form-control" value="${item.name}" required></div>
+                        <div class="form-group"><label for="categoryId">Categoria</label><select name="categoryId" class="form-control" required>${categoryOptions}</select></div>
+                    </div>
+                    <div class="form-group"><label for="description">Descrição</label><textarea name="description" class="form-control" rows="3">${item.description || ''}</textarea></div>
+                    <div class="form-grid">
+                        <div class="form-group"><label for="priceP">Preço P</label><input type="number" name="priceP" step="0.01" class="form-control" value="${item.prices.P || ''}"></div>
+                        <div class="form-group"><label for="priceM">Preço M</label><input type="number" name="priceM" step="0.01" class="form-control" value="${item.prices.M || ''}"></div>
+                        <div class="form-group"><label for="priceG">Preço G</label><input type="number" name="priceG" step="0.01" class="form-control" value="${item.prices.G || ''}"></div>
+                    </div>
+                     <div class="form-grid">
+                        <div class="form-group"><label for="priceUnica">Preço Único (Bebidas, etc)</label><input type="number" name="priceUnica" step="0.01" class="form-control" value="${item.prices['Única'] || ''}"></div>
+                        <div class="form-group"><label for="displayOrder">Ordem de Exibição</label><input type="number" name="displayOrder" class="form-control" value="${item.displayOrder || ''}"></div>
+                    </div>
+                    <div class="form-group"><label for="imageUrl">URL da Imagem (.webp)</label><input type="url" name="imageUrl" class="form-control" value="${item.imageUrl || ''}"></div>
+                    <button type="submit" class="btn btn--primary" style="width: 100%; margin-top: 16px;">Salvar Item</button>`;
+                this.renderModal(title, content, 'item-form', (formData) => {
+                    const prices = {};
+                    if(formData.get('priceP')) prices.P = Number(formData.get('priceP'));
+                    if(formData.get('priceM')) prices.M = Number(formData.get('priceM'));
+                    if(formData.get('priceG')) prices.G = Number(formData.get('priceG'));
+                    if(formData.get('priceUnica')) prices['Única'] = Number(formData.get('priceUnica'));
+
+                    const data = {
+                        name: formData.get('name'),
+                        categoryId: formData.get('categoryId'),
+                        description: formData.get('description'),
+                        displayOrder: Number(formData.get('displayOrder')),
+                        imageUrl: formData.get('imageUrl'),
+                        prices: prices
+                    };
+                    this.saveItem(id, data);
+                });
+            }
+
+            async saveCategory(id, data) {
+                if (!this.isAdmin) return alert("Acesso negado.");
+                try {
+                    if (id) await this.db.collection('menu_categories').doc(id).update(data);
+                    else await this.db.collection('menu_categories').add(data);
+                    alert("Categoria salva com sucesso!");
+                } catch (err) { console.error(err); alert("Erro ao salvar categoria."); }
+            }
+
+            async deleteCategory(id) {
+                if (!this.isAdmin) return alert("Acesso negado.");
+                if (!confirm("Tem certeza que deseja excluir esta categoria? Os itens associados não serão apagados, mas ficarão sem categoria.")) return;
+                try {
+                    await this.db.collection('menu_categories').doc(id).delete();
+                    alert("Categoria excluída com sucesso!");
+                } catch (err) { console.error(err); alert("Erro ao excluir categoria."); }
+            }
+            
+            async saveItem(id, data) {
+                 if (!this.isAdmin) return alert("Acesso negado.");
+                 try {
+                    if (id) await this.db.collection('menu_items').doc(id).update(data);
+                    else await this.db.collection('menu_items').add(data);
+                    alert("Item salvo com sucesso!");
+                } catch (err) { console.error(err); alert("Erro ao salvar item."); }
+            }
+
+            async deleteItem(id) {
+                if (!this.isAdmin) return alert("Acesso negado.");
+                if (!confirm("Tem certeza que deseja excluir este item?")) return;
+                try {
+                    await this.db.collection('menu_items').doc(id).delete();
+                    alert("Item excluído com sucesso!");
+                } catch (err) { console.error(err); alert("Erro ao excluir item."); }
+            }
+
             attachChangePasswordListener() {
                 document.getElementById('change-password-form').addEventListener('submit', async e => {
                     e.preventDefault();
