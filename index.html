@@ -29,10 +29,13 @@
         .hidden { display: none !important; }
         .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--spacing-sm); padding: 12px 24px; border-radius: var(--radius-md); font-weight: 600; text-decoration: none; cursor: pointer; transition: all var(--transition-fast); border: 2px solid transparent; font-size: 1rem; }
         .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn .fa-spin { margin-right: 8px; }
         .btn--primary { background-color: var(--color-primary); color: var(--color-white); }
         .btn--primary:hover:not(:disabled) { background-color: var(--color-primary-dark); transform: translateY(-2px); box-shadow: var(--shadow-md); }
         .btn--secondary { background-color: transparent; color: var(--color-primary); border-color: var(--color-primary); }
         .btn--secondary:hover:not(:disabled) { background-color: var(--color-primary); color: var(--color-white); }
+        .btn-ai { background: linear-gradient(45deg, #4285F4, #9B72F5); color: white; border: none; }
+        .btn-ai:hover:not(:disabled) { box-shadow: var(--shadow-md); opacity: 0.9; }
         #app { transition: opacity var(--transition-normal); }
         .header { position: fixed; top: 0; left: 0; width: 100%; z-index: 1000; padding: var(--spacing-md) 0; transition: all var(--transition-fast); }
         .header.scrolled { background-color: rgba(255, 255, 255, 0.95); box-shadow: var(--shadow-md); backdrop-filter: blur(10px); }
@@ -54,7 +57,8 @@
         .hero-subtitle { font-size: 1.5rem; margin-bottom: var(--spacing-lg); font-weight: 400; }
         .hero-title span { color: var(--color-secondary); }
         #cardapio { background-color: var(--color-surface); }
-        .menu-categories { display: flex; justify-content: center; gap: var(--spacing-md); margin-bottom: var(--spacing-lg); flex-wrap: wrap; }
+        .menu-header { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: var(--spacing-md); margin-bottom: var(--spacing-lg); }
+        .menu-categories { display: flex; justify-content: center; gap: var(--spacing-md); flex-wrap: wrap; }
         .category-tab { background-color: transparent; border: 2px solid var(--color-border); padding: 10px 20px; border-radius: var(--radius-md); font-weight: 600; cursor: pointer; transition: all var(--transition-fast); }
         .category-tab:hover, .category-tab.active { background-color: var(--color-primary); color: var(--color-white); border-color: var(--color-primary); }
         .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--spacing-lg); }
@@ -207,7 +211,7 @@
             }
             renderHeader() { return `<header class="header" id="header"><div class="container header-content"><a href="#" class="logo"><i class="fas fa-pizza-slice"></i> Santa Sensação</a><nav class="nav-links"><a href="#inicio" class="nav-link active">Início</a><a href="#cardapio" class="nav-link">Cardápio</a><a href="#sobre" class="nav-link">Sobre</a></nav><div class="header-actions"><button class="cart-button" id="open-cart-btn"><i class="fas fa-shopping-cart"></i><span class="cart-count hidden">0</span></button><a href="#admin" class="btn btn--secondary">Admin</a></div></div></header>`; }
             renderHero() { return `<section id="inicio"><div class="container hero-content"><h1 class="hero-title">O Sabor Original de <span>Santa Leopoldina</span></h1><p class="hero-subtitle">Massa artesanal, ingredientes frescos e o calor do forno a lenha.</p><a href="#cardapio" class="btn btn--primary">Ver Cardápio</a></div></section>`; }
-            renderMenuSection() { return `<section id="cardapio" class="section"><div class="container"><div class="section-header"><h2 class="section-title">Nosso Cardápio</h2><p class="section-subtitle">Pizzas preparadas com amor e tradição.</p></div><div class="menu-categories" id="menu-categories"></div><div class="menu-grid" id="menu-grid"></div></div></section>`; }
+            renderMenuSection() { return `<section id="cardapio" class="section"><div class="container"><div class="section-header"><h2 class="section-title">Nosso Cardápio</h2><p class="section-subtitle">Pizzas preparadas com amor e tradição.</p></div><div class="menu-header"><div class="menu-categories" id="menu-categories"></div><button class="btn btn-ai" id="ai-suggestion-btn"><i class="fas fa-wand-magic-sparkles"></i> Sugestão do Chef com IA</button></div><div class="menu-grid" id="menu-grid"></div></div></section>`; }
             updateMenuCategoriesUI() {
                 const container = document.getElementById('menu-categories');
                 if(!container) return;
@@ -244,6 +248,7 @@
                         this.updateMenuUI();
                     }
                 });
+                document.getElementById('ai-suggestion-btn').addEventListener('click', (e) => this.handleAiSuggestion(e.currentTarget));
                 document.getElementById('open-cart-btn').addEventListener('click', () => this.openCart());
                 document.getElementById('cart-close-btn').addEventListener('click', () => this.closeCart());
                 document.getElementById('cart-overlay').addEventListener('click', () => this.closeCart());
@@ -390,7 +395,8 @@
             renderItemModal(id = null) {
                 const item = id ? this.menu.items.find(i => i.id === id) : { name: '', description: '', categoryId: '', prices: {}, imageUrl: '', displayOrder: '' };
                 const catOptions = this.menu.categories.map(c => `<option value="${c.id}" ${c.id === item.categoryId ? 'selected' : ''}>${c.name}</option>`).join('');
-                this.renderModal(id ? 'Editar Item' : 'Novo Item', `<div class="form-group"><label>Nome</label><input type="text" name="name" value="${item.name}" required class="form-control"></div><div class="form-group"><label>Categoria</label><select name="categoryId" required class="form-control">${catOptions}</select></div><div class="form-group"><label>Descrição</label><textarea name="description" class="form-control">${item.description || ''}</textarea></div><div class="form-group"><label>Preços (P, M, G, Único)</label><div style="display:flex; gap:8px;"><input name="priceP" placeholder="P" value="${item.prices.P || ''}" class="form-control"><input name="priceM" placeholder="M" value="${item.prices.M || ''}" class="form-control"><input name="priceG" placeholder="G" value="${item.prices.G || ''}" class="form-control"><input name="priceUnica" placeholder="Único" value="${item.prices['Única'] || ''}" class="form-control"></div></div><div class="form-group"><label>Ordem</label><input type="number" name="displayOrder" value="${item.displayOrder || ''}" class="form-control"></div><div class="form-group"><label>URL da Imagem</label><input type="url" name="imageUrl" value="${item.imageUrl || ''}" class="form-control"></div><button type="submit" class="btn btn--primary" style="width:100%; margin-top:16px;">Salvar</button>`, 'item-form', fd => {
+                const content = `<div class="form-group"><label>Nome</label><input type="text" name="name" value="${item.name}" required class="form-control"></div><div class="form-group"><label>Categoria</label><select name="categoryId" required class="form-control">${catOptions}</select></div><div class="form-group"><label>Descrição</label><textarea name="description" class="form-control" rows="4">${item.description || ''}</textarea><button type="button" class="btn btn-ai" id="ai-description-btn" style="margin-top:8px;"><i class="fas fa-wand-magic-sparkles"></i> Gerar Descrição com IA</button></div><div class="form-group"><label>Preços (P, M, G, Único)</label><div style="display:flex; gap:8px;"><input name="priceP" placeholder="P" value="${item.prices.P || ''}" class="form-control"><input name="priceM" placeholder="M" value="${item.prices.M || ''}" class="form-control"><input name="priceG" placeholder="G" value="${item.prices.G || ''}" class="form-control"><input name="priceUnica" placeholder="Único" value="${item.prices['Única'] || ''}" class="form-control"></div></div><div class="form-group"><label>Ordem</label><input type="number" name="displayOrder" value="${item.displayOrder || ''}" class="form-control"></div><div class="form-group"><label>URL da Imagem</label><input type="url" name="imageUrl" value="${item.imageUrl || ''}" class="form-control"></div><button type="submit" class="btn btn--primary" style="width:100%; margin-top:16px;">Salvar</button>`;
+                this.renderModal(id ? 'Editar Item' : 'Novo Item', content, 'item-form', fd => {
                     const prices = {};
                     if(fd.get('priceP')) prices.P = Number(fd.get('priceP'));
                     if(fd.get('priceM')) prices.M = Number(fd.get('priceM'));
@@ -398,6 +404,7 @@
                     if(fd.get('priceUnica')) prices['Única'] = Number(fd.get('priceUnica'));
                     this.saveItem(id, { name: fd.get('name'), categoryId: fd.get('categoryId'), description: fd.get('description'), prices, displayOrder: Number(fd.get('displayOrder')), imageUrl: fd.get('imageUrl') });
                 });
+                document.getElementById('ai-description-btn').addEventListener('click', (e) => this.handleAiDescription(e.currentTarget));
             }
             async saveCategory(id, data) { if (!this.isAdmin) return; try { id ? await this.db.collection('menu_categories').doc(id).update(data) : await this.db.collection('menu_categories').add(data); } catch (err) { console.error(err); } }
             async deleteCategory(id) { if (!this.isAdmin || !confirm("Tem certeza?")) return; try { await this.db.collection('menu_categories').doc(id).delete(); } catch (err) { console.error(err); } }
@@ -412,6 +419,75 @@
                     try { await this.user.updatePassword(newPassword); successEl.textContent = 'Senha alterada com sucesso!'; successEl.classList.remove('hidden'); e.target.reset(); }
                     catch (error) { errorEl.textContent = 'Erro ao alterar a senha.'; errorEl.classList.remove('hidden'); }
                 });
+            }
+
+            // --- GEMINI API FEATURES ---
+            async callGeminiAPI(prompt, systemInstruction = "") {
+                const apiKey = ""; // Será injetado pelo ambiente
+                const model = 'gemini-2.5-flash-preview-05-20';
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                };
+
+                if (systemInstruction) {
+                    payload.systemInstruction = { parts: [{ text: systemInstruction }] };
+                }
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) {
+                        const errorBody = await response.json();
+                        throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorBody.error?.message}`);
+                    }
+                    const result = await response.json();
+                    return result.candidates[0]?.content?.parts[0]?.text || "";
+                } catch (error) {
+                    console.error("Gemini API call failed:", error);
+                    return "Desculpe, não foi possível obter uma resposta da IA neste momento.";
+                }
+            }
+
+            async handleAiDescription(button) {
+                const form = button.closest('form');
+                const itemName = form.querySelector('input[name="name"]').value;
+                if (!itemName) {
+                    alert("Por favor, preencha o nome do item primeiro.");
+                    return;
+                }
+
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
+
+                const prompt = `Crie uma descrição de produto curta (20 a 30 palavras), apetitosa e um pouco rústica para um item de pizzaria chamado "${itemName}". Use linguagem que dê água na boca.`;
+                const systemInstruction = "Você é um especialista em marketing para restaurantes, especializado em descrições de cardápio que vendem.";
+                
+                const description = await this.callGeminiAPI(prompt, systemInstruction);
+                form.querySelector('textarea[name="description"]').value = description.replace(/"/g, ''); // Remove quotes
+
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Gerar Descrição com IA';
+            }
+
+            async handleAiSuggestion(button) {
+                 button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Pensando...';
+
+                const menuList = this.menu.items.map(item => `- ${item.name} (${Object.keys(item.prices).join('/')})`).join('\n');
+                const prompt = `Analise a seguinte lista de itens de uma pizzaria:\n${menuList}\n\nSugira uma combinação clássica e deliciosa de uma pizza e uma bebida da lista. Apresente a sugestão de forma divertida e curta, como um verdadeiro chef italiano faria.`;
+                const systemInstruction = "Você é o Chef Antonello, um chef de pizzaria italiano carismático e divertido. Suas sugestões são sempre cheias de paixão e personalidade.";
+
+                const suggestion = await this.callGeminiAPI(prompt, systemInstruction);
+                
+                this.renderModal("Sugestão do Chef Antonello!", `<p style="font-size: 1.2rem; text-align:center;">${suggestion}</p>`, 'ai-suggestion-form', () => {});
+                
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Sugestão do Chef com IA';
             }
         }
         window.addEventListener('DOMContentLoaded', () => new PizzariaApp());
