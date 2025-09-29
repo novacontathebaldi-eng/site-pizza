@@ -248,42 +248,50 @@
 
                 this.loadCartFromStorage();
                 
+                // This listener handles both initial auth state and subsequent changes
                 this.auth.onAuthStateChanged(async (user) => {
+                    const wasAdmin = this.isAdmin;
                     this.currentUser = user;
+                    
                     if (user) {
-                        const adminCheck = await this.db.collection('admins').doc(user.uid).get();
-                        this.isAdmin = adminCheck.exists;
+                        const adminDoc = await this.db.collection('admins').doc(user.uid).get();
+                        this.isAdmin = adminDoc.exists;
                     } else {
                         this.isAdmin = false;
                     }
-                    this.handleRouting();
+
+                    // Only re-route if admin status changed or it's the first load
+                    if (this.isAdmin !== wasAdmin || !this.appContainer.classList.contains('loaded')) {
+                         this.handleRouting();
+                    }
+
+                    // On the very first run of this listener, fetch data and show the app
+                    if (!this.appContainer.classList.contains('loaded')) {
+                        this.fetchData();
+                        document.getElementById('loading-overlay').setAttribute('aria-hidden', 'true');
+                        document.getElementById('app-container').classList.add('loaded');
+                    }
                 });
 
                 window.addEventListener('hashchange', () => this.handleRouting());
-
-                // Fetch initial data and then unhide the app
-                await this.seedDatabaseIfNeeded();
-                await this.fetchData();
-                document.getElementById('loading-overlay').setAttribute('aria-hidden', 'true');
-                document.getElementById('app-container').classList.add('loaded');
             }
 
-            async fetchData() {
+            fetchData() {
                 // Real-time listeners
                 this.db.collection('admin_settings').doc('store').onSnapshot(doc => {
                     this.settings = doc.data() || { isOpen: true };
                     this.updateStoreStatusUI();
-                });
+                }, err => console.error("Error fetching settings:", err));
 
                 this.db.collection('menu_categories').orderBy('order').onSnapshot(snapshot => {
                     this.menu.categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     this.renderMenu();
-                });
+                }, err => console.error("Error fetching categories:", err));
 
                 this.db.collection('menu_items').orderBy('displayOrder').onSnapshot(snapshot => {
                     this.menu.items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     this.renderMenu();
-                });
+                }, err => console.error("Error fetching items:", err));
             }
 
             handleRouting() {
@@ -808,52 +816,6 @@
             formatCurrency(value) {
                 return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
             }
-            
-            async seedDatabaseIfNeeded() {
-                const itemsCheck = await this.db.collection('menu_items').limit(1).get();
-                if (itemsCheck.empty) {
-                    console.log("Banco de dados vazio. Semeando com dados iniciais...");
-                    const seedData = this.getSeedData();
-                    const batch = this.db.batch();
-
-                    for (const [id, data] of Object.entries(seedData.menu_categories)) {
-                        batch.set(this.db.collection('menu_categories').doc(id), data);
-                    }
-                    for (const [id, data] of Object.entries(seedData.menu_items)) {
-                        batch.set(this.db.collection('menu_items').doc(id), data);
-                    }
-                    batch.set(this.db.collection('admin_settings').doc('store'), { isOpen: true });
-                    
-                    // Create default admin user in Auth and add to 'admins' collection
-                    try {
-                        const userCredential = await this.auth.createUserWithEmailAndPassword('admin@santasensacao.com', 'admin1234');
-                        batch.set(this.db.collection('admins').doc(userCredential.user.uid), { email: 'admin@santasensacao.com' });
-                        console.log("Usuário admin padrão criado: admin@santasensacao.com / admin1234");
-                    } catch (error) {
-                        if (error.code !== 'auth/email-already-in-use') console.error("Erro ao criar admin:", error);
-                    }
-                    
-                    await batch.commit();
-                    console.log("Semeação concluída.");
-                }
-            }
-
-            getSeedData() {
-                // This data is embedded for simplicity of a single file solution
-                return {
-                  "menu_categories": { "pizzas_classicas": { "name": "Pizzas Clássicas", "order": 1 }, "pizzas_especiais": { "name": "Pizzas Especiais", "order": 2 }, "pizzas_doces": { "name": "Pizzas Doces", "order": 3 }, "entradas": { "name": "Entradas", "order": 4 }, "sobremesas": { "name": "Sobremesas", "order": 5 }, "bebidas": { "name": "Bebidas", "order": 6 } },
-                  "menu_items": {
-                    "calabresa": { "name": "Calabresa", "description": "Molho de tomate fresco, queijo muçarela derretido, fatias de calabresa artesanal e azeitonas pretas.", "categoryId": "pizzas_classicas", "prices": { "M": 40, "G": 50, "F": 60 }, "displayOrder": 1, "imageUrl": "https://i.imgur.com/7z8d9Xj.webp" },
-                    "margherita": { "name": "Margherita", "description": "A clássica combinação de molho de tomate pelati, muçarela de búfala, manjericão fresco e um fio de azeite.", "categoryId": "pizzas_classicas", "prices": { "M": 38, "G": 48, "F": 58 }, "displayOrder": 2, "imageUrl": "https://i.imgur.com/bSkht5G.webp" },
-                    "portuguesa": { "name": "Portuguesa", "description": "Uma rica mistura de presunto, ovos cozidos, cebola, ervilhas frescas, azeitonas e cobertura de muçarela.", "categoryId": "pizzas_classicas", "prices": { "M": 42, "G": 52, "F": 62 }, "displayOrder": 3, "imageUrl": "https://i.imgur.com/pmnl4n7.webp" },
-                    "parma_rucula": { "name": "Parma com Rúcula", "description": "Finas fatias de presunto de parma sobre uma base de queijo, finalizada com rúcula fresca e lascas de parmesão.", "categoryId": "pizzas_especiais", "prices": { "M": 50, "G": 62, "F": 75 }, "displayOrder": 1, "imageUrl": "https://i.imgur.com/jW4Vf5m.webp" },
-                    "brigadeiro": { "name": "Brigadeiro", "description": "Nossa massa especial coberta com brigadeiro cremoso e chocolate granulado de alta qualidade.", "categoryId": "pizzas_doces", "prices": { "P": 30, "M": 40 }, "displayOrder": 1, "imageUrl": "https://i.imgur.com/2Xy5B8w.webp" },
-                    "pao_alho": { "name": "Pão de Alho", "description": "Pão fresquinho e crocante, recheado com uma pasta de alho caseira e gratinado no forno.", "categoryId": "entradas", "prices": { "Único": 15 }, "displayOrder": 1, "imageUrl": "https://i.imgur.com/x4W8G9z.webp" },
-                    "brownie_sorvete": { "name": "Brownie com Sorvete", "description": "Brownie de chocolate quentinho acompanhado de uma bola de sorvete de creme artesanal.", "categoryId": "sobremesas", "prices": { "Único": 20 }, "displayOrder": 1, "imageUrl": "https://i.imgur.com/9xXQ6f7.webp" },
-                    "coca_cola_lata": { "name": "Coca-Cola Lata", "description": "Refrigerante Coca-Cola 350ml, gelado.", "categoryId": "bebidas", "prices": { "Único": 6 }, "displayOrder": 1, "imageUrl": "https://i.imgur.com/dKmgk28.webp" }
-                  }
-                };
-            }
         }
         
         // --- App Initialization ---
@@ -863,3 +825,4 @@
     </script>
 </body>
 </html>
+
