@@ -80,9 +80,12 @@
         .cart-header h3 { font-family: var(--font-display); }
         .cart-close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; }
         .cart-body { flex-grow: 1; padding: var(--spacing-md); overflow-y: auto; }
+        .cart-item-info { width: 100%; }
+        .cart-item-title { font-weight: 600;}
+        .cart-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md); }
         .cart-item-controls { display: flex; align-items: center; gap: var(--spacing-sm); margin-top: 4px; }
-        .quantity-btn { background: var(--color-border); border: none; width: 25px; height: 25px; border-radius: 50%; cursor: pointer; }
-        .cart-item-remove { background: none; border: none; color: var(--color-error); cursor: pointer; }
+        .quantity-btn { background: var(--color-border); border: none; width: 25px; height: 25px; border-radius: 50%; cursor: pointer; font-weight: bold; }
+        .cart-item-remove { background: none; border: none; color: var(--color-error); cursor: pointer; margin-left: auto; }
         .cart-footer { padding: var(--spacing-md); border-top: 1px solid var(--color-border); }
         .cart-total { display: flex; justify-content: space-between; font-weight: bold; font-size: 1.2rem; margin-bottom: var(--spacing-md); }
         .admin-page { padding-top: 120px; padding-bottom: var(--spacing-xl); }
@@ -146,7 +149,7 @@
             cart: [],
             activeCategory: null,
             listeners: [],
-            activePage: '',
+            activeAdminTab: 'cardapio',
         };
         state.auth = getAuth(state.firebaseApp);
         state.db = getFirestore(state.firebaseApp);
@@ -163,6 +166,11 @@
         // --- RENDER FUNCTIONS ---
         const render = () => {
             const hash = window.location.hash || '#';
+            // Clean up previous event listeners before re-rendering
+            const oldAppRoot = document.getElementById('app');
+            const newAppRoot = oldAppRoot.cloneNode(false);
+            oldAppRoot.parentNode.replaceChild(newAppRoot, oldAppRoot);
+
             if (hash.startsWith('#admin')) {
                 renderAdminPage();
             } else {
@@ -171,7 +179,6 @@
         };
 
         const renderHomePage = () => {
-            const headerHTML = `...`; // Header, Hero, Menu, About, Footer sections here, unchanged for brevity.
             appRoot.innerHTML = `
                 <header class="header" id="header"><div class="container header-content"><a href="#" class="logo"><i class="fas fa-pizza-slice"></i> Santa Sensação</a><nav class="nav-links"><a href="#inicio" class="nav-link active">Início</a><a href="#cardapio" class="nav-link">Cardápio</a><a href="#sobre" class="nav-link">Sobre</a></nav><div class="header-actions"><button class="cart-button" id="open-cart-btn"><i class="fas fa-shopping-cart"></i><span class="cart-count hidden">0</span></button><a href="#admin" class="btn btn--secondary">Admin</a></div></div></header>
                 <main>
@@ -187,8 +194,25 @@
             attachHomeEventListeners();
         };
         
-        // ... (other render functions for admin, etc.)
+        const renderAdminPage = () => {
+            if (state.user === undefined) {
+                 appRoot.innerHTML = `<div style="display: flex; justify-content: center; align-items: center; height: 100vh;"><i class="fas fa-spinner fa-spin fa-3x" style="color: var(--color-primary);"></i></div>`;
+                 return;
+            }
+            if (state.user === null) {
+                appRoot.innerHTML = renderAdminLogin();
+                attachAdminLoginListeners();
+            } else {
+                appRoot.innerHTML = renderAdminPanel();
+                renderAdminTabContent();
+                attachAdminPanelListeners();
+            }
+        };
+
+        const renderAdminLogin = () => `<div style="display: flex; justify-content: center; align-items: center; min-height: 100vh;"><div class="modal-content" style="max-width: 400px;"><div class="section-header"><h2 class="section-title">Acesso Restrito</h2><a href="#" style="position: absolute; top: 16px; right: 16px; font-size: 1.5rem; color: var(--color-text-light); text-decoration:none;">&times;</a></div><form id="admin-login-form"><div class="form-group"><label for="email">Email</label><input type="email" id="email" class="form-control" required></div><div class="form-group"><label for="password">Senha</label><input type="password" id="password" class="form-control" required></div><p id="login-error" class="hidden" style="color: var(--color-error);"></p><button type="submit" class="btn btn--primary" style="width: 100%;">Entrar</button></form></div></div>`;
         
+        const renderAdminPanel = () => `<div class="container admin-page"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;"><h2 class="section-title">Painel Administrativo</h2><div><a href="#" class="btn btn--primary">Voltar ao Site</a><button id="logout-btn" class="btn btn--secondary">Sair</button></div></div>${!state.isAdmin ? '<p style="background: #fff3cd; color: #856404; padding: 1rem; border-radius: 8px; border: 1px solid #ffeeba;"><b>Atenção:</b> Você não tem permissão de administrador.</p>' : ''}<div class="admin-container"><nav class="admin-nav" id="admin-nav"><button class="admin-nav-btn ${state.activeAdminTab === 'cardapio' ? 'active' : ''}" data-tab="cardapio"><i class="fas fa-utensils"></i> Cardápio</button><button class="admin-nav-btn ${state.activeAdminTab === 'categorias' ? 'active' : ''}" data-tab="categorias"><i class="fas fa-tags"></i> Categorias</button><button class="admin-nav-btn ${state.activeAdminTab === 'seguranca' ? 'active' : ''}" data-tab="seguranca"><i class="fas fa-shield-alt"></i> Segurança</button></nav><div class="admin-content" id="admin-content"></div></div></div>`;
+
         // --- UI UPDATE FUNCTIONS ---
         const updateMenuUI = () => {
             const categoriesContainer = document.getElementById('menu-categories');
@@ -221,10 +245,45 @@
         };
         
         const updateCartUI = () => {
-            // ... (cart UI logic unchanged)
+            const cartBody = document.getElementById('cart-body');
+            const cartFooter = document.getElementById('cart-footer');
+            const cartCount = document.querySelector('.cart-count');
+            const cartTotalPrice = document.getElementById('cart-total-price');
+            if (!cartBody || !cartCount) return;
+
+            const totalItems = state.cart.reduce((sum, item) => sum + item.quantity, 0);
+            cartCount.textContent = totalItems;
+            cartCount.classList.toggle('hidden', totalItems === 0);
+            cartFooter.classList.toggle('hidden', totalItems === 0);
+            
+            cartBody.innerHTML = state.cart.length === 0 
+                ? `<p style="text-align: center; color: var(--color-text-light);">Seu carrinho está vazio.</p>` 
+                : state.cart.map(item => `
+                    <div class="cart-item" data-cart-id="${item.cartId}">
+                        <div class="cart-item-info">
+                            <p class="cart-item-title">${item.name}</p>
+                            <p class="cart-item-details">${item.size} - ${formatPrice(item.price)}</p>
+                            <div class="cart-item-controls">
+                                <button class="quantity-btn" data-action="decrease">-</button>
+                                <span>${item.quantity}</span>
+                                <button class="quantity-btn" data-action="increase">+</button>
+                                <button class="cart-item-remove" data-action="remove"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>`).join('');
+
+            const total = state.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+            cartTotalPrice.textContent = formatPrice(total);
         };
 
-        // --- EVENT HANDLERS ---
+        const renderAdminTabContent = () => {
+             const container = document.getElementById('admin-content');
+             if (!container) return;
+
+             // ... logic for rendering different tabs
+        }
+
+        // --- EVENT HANDLERS & ACTIONS ---
         const handleAuthChange = async (user) => {
             state.user = user;
             if (user) {
@@ -250,8 +309,135 @@
         };
 
         const attachHomeEventListeners = () => {
-            // ... (event listeners for cart, scroll, etc.)
+            const header = document.getElementById('header');
+            if(header) {
+                const scrollHandler = () => header.classList.toggle('scrolled', window.scrollY > 50);
+                window.addEventListener('scroll', scrollHandler);
+                state.listeners.push(() => window.removeEventListener('scroll', scrollHandler));
+            }
+
+            appRoot.addEventListener('click', e => {
+                 // Category tabs
+                const categoryTab = e.target.closest('.category-tab');
+                if (categoryTab) {
+                    state.activeCategory = categoryTab.dataset.categoryId;
+                    updateMenuUI();
+                    return;
+                }
+                
+                // Add to cart buttons
+                const sizeBtn = e.target.closest('.size-btn');
+                if (sizeBtn) {
+                    const { itemId, size, price } = sizeBtn.dataset;
+                    addToCart(itemId, size, parseFloat(price));
+                    return;
+                }
+                
+                // Cart controls
+                const openCartBtn = e.target.closest('#open-cart-btn');
+                if(openCartBtn) {
+                    toggleCart(true);
+                    return;
+                }
+                const closeCartBtn = e.target.closest('#cart-close-btn');
+                const cartOverlay = e.target.closest('#cart-overlay');
+                if(closeCartBtn || cartOverlay) {
+                    toggleCart(false);
+                    return;
+                }
+
+                // Cart item actions
+                const cartActionBtn = e.target.closest('[data-action]');
+                if(cartActionBtn) {
+                    const cartItemEl = e.target.closest('.cart-item');
+                    if(cartItemEl) {
+                         handleCartAction(cartItemEl.dataset.cartId, cartActionBtn.dataset.action);
+                    }
+                    return;
+                }
+
+                // Finish order
+                const finishOrderBtn = e.target.closest('#finish-order-btn');
+                if (finishOrderBtn) {
+                    handleFinishOrder();
+                }
+            });
         };
+        
+        const attachAdminLoginListeners = () => {
+            const form = document.getElementById('admin-login-form');
+            if (form) {
+                form.addEventListener('submit', async e => {
+                    e.preventDefault();
+                    const email = document.getElementById('email').value;
+                    const password = document.getElementById('password').value;
+                    const errorEl = document.getElementById('login-error');
+                    try {
+                        await signInWithEmailAndPassword(state.auth, email, password);
+                    } catch (error) {
+                        errorEl.textContent = "Email ou senha incorretos.";
+                        errorEl.classList.remove('hidden');
+                    }
+                });
+            }
+        };
+
+        const attachAdminPanelListeners = () => {
+            const logoutBtn = document.getElementById('logout-btn');
+            if(logoutBtn) logoutBtn.addEventListener('click', () => signOut(state.auth));
+            
+            const adminNav = document.getElementById('admin-nav');
+            if(adminNav) adminNav.addEventListener('click', e => {
+                const navBtn = e.target.closest('.admin-nav-btn');
+                if (navBtn) {
+                    state.activeAdminTab = navBtn.dataset.tab;
+                    renderAdminPage(); // Re-render to update tab content
+                }
+            });
+        };
+
+        const addToCart = (itemId, size, price) => {
+            const itemDetails = state.menu.items.find(i => i.id === itemId);
+            if (!itemDetails) return;
+            const cartId = `${itemId}-${size}`;
+            const existingItem = state.cart.find(item => item.cartId === cartId);
+
+            if (existingItem) {
+                existingItem.quantity++;
+            } else {
+                state.cart.push({ cartId, itemId, name: itemDetails.name, size, price, quantity: 1 });
+            }
+            saveCartToStorage();
+            updateCartUI();
+            toggleCart(true);
+        };
+
+        const handleCartAction = (cartId, action) => {
+             const itemIndex = state.cart.findIndex(i => i.cartId === cartId);
+             if (itemIndex === -1) return;
+             
+             if (action === 'increase') state.cart[itemIndex].quantity++;
+             else if (action === 'decrease') {
+                 if (--state.cart[itemIndex].quantity <= 0) state.cart.splice(itemIndex, 1);
+             } else if (action === 'remove') {
+                 state.cart.splice(itemIndex, 1);
+             }
+             saveCartToStorage();
+             updateCartUI();
+        };
+
+        const toggleCart = (open) => {
+            document.getElementById('cart-sidebar')?.classList.toggle('open', open);
+            document.getElementById('cart-overlay')?.classList.toggle('hidden', !open);
+        };
+
+        const handleFinishOrder = () => {
+            if (state.cart.length === 0) {
+                 showModal({ title: 'Atenção', body: '<p>Seu carrinho está vazio.</p>', confirmText: 'OK'});
+                 return;
+            }
+            // Logic for checkout modal will go here
+        }
 
         // --- FIRESTORE ---
         const setupFirestoreListeners = () => {
@@ -274,7 +460,7 @@
         };
         
         // --- MODAL SYSTEM ---
-        const showModal = ({ title, body, confirmText = 'Confirmar', cancelText = 'Cancelar', onConfirm }) => {
+        const showModal = ({ title, body, confirmText = 'Confirmar', cancelText = 'Cancelar', onConfirm, showCancel = true }) => {
             const modalId = `modal-${Date.now()}`;
             const modalHTML = `
                 <div class="modal-overlay open" id="${modalId}">
@@ -285,7 +471,7 @@
                         </div>
                         <div class="modal-body">${body}</div>
                         <div class="modal-footer">
-                             <button class="btn btn--secondary">${cancelText}</button>
+                             ${showCancel ? `<button class="btn btn--secondary">${cancelText}</button>` : ''}
                              <button class="btn btn--primary">${confirmText}</button>
                         </div>
                     </div>
@@ -295,7 +481,11 @@
             const overlay = document.getElementById(modalId);
             const closeModal = () => {
                 overlay.classList.remove('open');
-                setTimeout(() => overlay.remove(), 200);
+                setTimeout(() => { 
+                    if(overlay.parentElement) {
+                       modalsContainer.innerHTML = '';
+                    }
+                }, 200);
             };
 
             overlay.querySelector('.btn--primary').addEventListener('click', () => {
@@ -303,7 +493,8 @@
                 closeModal();
             });
             overlay.addEventListener('click', e => {
-                if (e.target === overlay || e.target.closest('.modal-close-btn') || e.target.closest('.btn--secondary')) {
+                const secondaryBtn = e.target.closest('.btn--secondary');
+                if (e.target === overlay || e.target.closest('.modal-close-btn') || (secondaryBtn && showCancel) ) {
                     closeModal();
                 }
             });
