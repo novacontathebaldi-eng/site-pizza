@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pizzaria Santa Sensação - A pizza nº 1 do ES</title>
+    <meta name="description" content="Pizzaria Santa Sensação - Experiência que vai além do sabor. A pizza nº 1 do Espírito Santo.">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Navigation Header -->
+    <header class="header" id="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo">
+                        <i class="fas fa-pizza-slice"></i>
+                        <span class="logo-text">Santa Sensação</span>
+                    </div>
+                </div>
+                <nav class="nav" id="mainNav">
+                    <div class="nav-links">
+                        <a href="#inicio" class="nav-link active">Início</a>
+                        <a href="#cardapio" class="nav-link">Cardápio</a>
+                        <a href="#sobre" class="nav-link">Sobre</a>
+                        <a href="#contato" class="nav-link">Contato</a>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn--primary" id="verCardapioBtn">
+                            <i class="fas fa-utensils"></i>
+                            Ver Cardápio
+                        </button>
+                        <button class="admin-login-btn" id="adminBtn" title="Área Administrativa">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                    </div>
+                </nav>
+                <button class="mobile-menu-toggle" id="mobileMenuToggle">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section id="inicio" class="hero">
+        <div class="hero-background"></div>
+        <div class="hero-content">
+            <div class="container">
+                <div class="hero-text">
+                    <div class="hero-badge">
+                        <i class="fas fa-award"></i>
+                        <span>A pizza nº 1 do ES</span>
+                    </div>
+                    <h1 class="hero-title">
+                        Pizzaria <span class="text-gradient">Santa Sensação</span>
+                    </h1>
+                    <p class="hero-subtitle">Experiência que vai além do sabor</p>
+                    <p class="hero-description">
+                        Ingredientes frescos, massa artesanal e o carinho de sempre. 
+                        Venha descobrir por que somos a pizzaria favorita de Santa Leopoldina!
+                    </p>
+                    <div class="hero-actions">
+                        <button class="btn btn--primary btn--large" id="heroCardapioBtn">
+                            <i class="fas fa-pizza-slice"></i>
+                            Ver Cardápio Completo
+                        </button>
+                        <a href="https://wa.me/5527996500341" target="_blank" class="btn btn--outline btn--large">
+                            <i class="fab fa-whatsapp"></i>
+                            Pedir no WhatsApp
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="hero-scroll-indicator">
+            <div class="scroll-arrow"></div>
+        </div>
+    </section>
+
+    <!-- Menu Preview Section -->
+    <section id="cardapio" class="menu-preview">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-badge">
+                    <i class="fas fa-star"></i>
+                    <span>Nossos Sabores</span>
+                </div>
+                <h2 class="section-title">Pizzas em Destaque</h2>
+                <p class="section-description">
+                    Conheça algumas de nossas pizzas mais pedidas, feitas com ingredientes frescos e muito amor
+                </p>
+            </div>
+            
+            <div class="menu-showcase">
+                <div class="menu-card" data-pizza="margherita">
+                    <div class="menu-card-image">
+                        <div class="image-placeholder">
+                            <i class="fas fa-pizza-slice"></i>
+                        </div>
+                        <div class="menu-card-badge">Popular</div>
+                    </div>
+                    <div class="menu-card-content">
+                        <h3 class="menu-card-title">Pizza Margherita</h3>
+                        <p class="menu-card-description">
+                            Molho de tomate, mozzarella de búfala, manjericão fresco e azeite extravirgem
+                        </p>
+                        <div class="menu-card-footer">
+                            <span class="menu-card-price">A partir de R$ 32,00</span>
+                            <button class="menu-card-button" onclick="openPizzaDetails('margherita')">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="menu-card" data-pizza="calabresa">
+                    <div class="menu-card-image">
+                        <div class="image-placeholder">
+                            <i class="fas fa-pizza-slice"></i>
+                        </div>
+                        <div class="menu-card-badge">Tradicional</div>
+                    </div>
+                    <div class="menu-card-content">
+                        <h3 class="menu-card-title">Calabresa Especial</h3>
+                        <p class="menu-card-description">
+                            Molho de tomate, calabresa artesanal, cebola roxa e azeitonas pretas
+                        </p>
+                        <div class="menu-card-footer">
+                            <span class="menu-card-price">A partir de R$ 35,00</span>
+                            <button class="menu-card-button" onclick="openPizzaDetails('calabresa')">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="menu-card" data-pizza="portuguesa">
+                    <div class="menu-card-image">
+                        <div class="image-placeholder">
+                            <i class="fas fa-pizza-slice"></i>
+                        </div>
+                        <div class="menu-card-badge">Premium</div>
+                    </div>
+                    <div class="menu-card-content">
+                        <h3 class="menu-card-title">Portuguesa Premium</h3>
+                        <p class="menu-card-description">
+                            Presunto parma, ovos caipira, ervilhas e azeitonas portuguesas
+                        </p>
+                        <div class="menu-card-footer">
+                            <span class="menu-card-price">A partir de R$ 42,00</span>
+                            <button class="menu-card-button" onclick="openPizzaDetails('portuguesa')">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="menu-card" data-pizza="quatro-queijos">
+                    <div class="menu-card-image">
+                        <div class="image-placeholder">
+                            <i class="fas fa-pizza-slice"></i>
+                        </div>
+                        <div class="menu-card-badge">Gourmet</div>
+                    </div>
+                    <div class="menu-card-content">
+                        <h3 class="menu-card-title">Quatro Queijos Gourmet</h3>
+                        <p class="menu-card-description">
+                            Mozzarella, gorgonzola, parmesão reggiano e catupiry premium
+                        </p>
+                        <div class="menu-card-footer">
+                            <span class="menu-card-price">A partir de R$ 45,00</span>
+                            <button class="menu-card-button" onclick="openPizzaDetails('quatro-queijos')">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="menu-preview-footer">
+                <button class="btn btn--primary btn--large" id="fullMenuBtn">
+                    <i class="fas fa-book-open"></i>
+                    Ver Cardápio Completo
+                    <span class="btn-highlight">+15 Sabores</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="sobre" class="about">
+        <div class="container">
+            <div class="about-content">
+                <div class="about-text">
+                    <div class="section-badge">
+                        <i class="fas fa-heart"></i>
+                        <span>Nossa História</span>
+                    </div>
+                    <h2 class="section-title">Tradição e Sabor desde sempre</h2>
+                    <p class="about-description">
+                        Na Pizzaria Santa Sensação, cada pizza é preparada com ingredientes selecionados 
+                        e o carinho de quem faz com amor. Nossa massa é preparada diariamente, 
+                        nosso molho tem receita secreta da família, e cada pizza é uma experiência única.
+                    </p>
+                    <div class="about-features">
+                        <div class="feature-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Massa artesanal fermentada por 24h</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Ingredientes frescos e selecionados</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Forno a lenha tradicional</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Atendimento familiar e acolhedor</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="about-image">
+                    <div class="image-placeholder large">
+                        <i class="fas fa-store-alt"></i>
+                        <span>Nossa Pizzaria</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contato" class="contact">
+        <div class="container">
+            <div class="section-header centered">
+                <div class="section-badge">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span>Fale Conosco</span>
+                </div>
+                <h2 class="section-title">Faça seu Pedido</h2>
+                <p class="section-description">
+                    Entre em contato conosco e faça seu pedido. Estamos prontos para atendê-lo!
+                </p>
+            </div>
+
+            <div class="contact-content">
+                <div class="contact-info">
+                    <div class="contact-card">
+                        <div class="contact-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="contact-details">
+                            <h3>Endereço</h3>
+                            <p>Porfilio Furtado, 178<br>Centro - Santa Leopoldina, ES</p>
+                        </div>
+                    </div>
+
+                    <div class="contact-card">
+                        <div class="contact-icon whatsapp">
+                            <i class="fab fa-whatsapp"></i>
+                        </div>
+                        <div class="contact-details">
+                            <h3>WhatsApp</h3>
+                            <p>
+                                <a href="https://wa.me/5527996500341" target="_blank">
+                                    (27) 99650-0341
+                                </a>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="contact-card">
+                        <div class="contact-icon instagram">
+                            <i class="fab fa-instagram"></i>
+                        </div>
+                        <div class="contact-details">
+                            <h3>Instagram</h3>
+                            <p>
+                                <a href="https://www.instagram.com/santasensacao.sl" target="_blank">
+                                    @santasensacao.sl
+                                </a>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="contact-card">
+                        <div class="contact-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="contact-details">
+                            <h3>Horário de Funcionamento</h3>
+                            <p>De quarta a domingo<br>a partir das 19h</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="contact-actions">
+                    <a href="https://wa.me/5527996500341" target="_blank" class="btn btn--primary btn--large btn--full-width">
+                        <i class="fab fa-whatsapp"></i>
+                        Pedir pelo WhatsApp
+                    </a>
+                    <a href="https://www.instagram.com/santasensacao.sl" target="_blank" class="btn btn--outline btn--large btn--full-width">
+                        <i class="fab fa-instagram"></i>
+                        Seguir no Instagram
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <div class="logo">
+                        <i class="fas fa-pizza-slice"></i>
+                        <span class="logo-text">Santa Sensação</span>
+                    </div>
+                    <p class="footer-tagline">A pizza nº 1 do ES 🏅</p>
+                    <div class="footer-social">
+                        <a href="https://wa.me/5527996500341" target="_blank" class="social-link whatsapp">
+                            <i class="fab fa-whatsapp"></i>
+                        </a>
+                        <a href="https://www.instagram.com/santasensacao.sl" target="_blank" class="social-link instagram">
+                            <i class="fab fa-instagram"></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="footer-info">
+                    <div class="footer-section">
+                        <h4>Contato</h4>
+                        <p>Porfilio Furtado, 178<br>Centro - Santa Leopoldina, ES</p>
+                        <p>WhatsApp: (27) 99650-0341</p>
+                    </div>
+                    <div class="footer-section">
+                        <h4>Funcionamento</h4>
+                        <p>Quarta a Domingo<br>19h às 23h</p>
+                        <p>Delivery disponível</p>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Pizzaria Santa Sensação. Todos os direitos reservados.</p>
+                <button class="admin-access-btn" id="footerAdminBtn">
+                    <i class="fas fa-shield-alt"></i>
+                    Área Administrativa
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Full Menu Modal -->
+    <div id="menuModal" class="modal hidden">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2>
+                    <i class="fas fa-book-open"></i>
+                    Cardápio Completo
+                </h2>
+                <button class="modal-close" id="closeMenuModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="menu-categories">
+                    <button class="category-tab active" data-category="pizzas-salgadas">
+                        <i class="fas fa-pizza-slice"></i>
+                        Pizzas Salgadas
+                    </button>
+                    <button class="category-tab" data-category="pizzas-doces">
+                        <i class="fas fa-birthday-cake"></i>
+                        Pizzas Doces
+                    </button>
+                    <button class="category-tab" data-category="bebidas">
+                        <i class="fas fa-glass-water"></i>
+                        Bebidas
+                    </button>
+                </div>
+                <div id="menuItems" class="menu-items-container">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>Carregando cardápio...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Login Modal -->
+    <div id="adminModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>
+                    <i class="fas fa-lock"></i>
+                    Acesso Administrativo
+                </h3>
+                <button class="modal-close" id="closeAdminModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="adminLoginForm" class="admin-form">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-user"></i>
+                            Email do Administrador
+                        </label>
+                        <input type="email" id="adminEmail" class="form-control" required autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-lock"></i>
+                            Senha
+                        </label>
+                        <input type="password" id="adminPassword" class="form-control" required autocomplete="current-password">
+                    </div>
+                    <button type="submit" class="btn btn--primary btn--full-width">
+                        <i class="fas fa-sign-in-alt"></i>
+                        Entrar
+                    </button>
+                </form>
+                <div id="adminError" class="error-message hidden"></div>
+                <div id="adminLoading" class="loading-message hidden">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Verificando credenciais...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cart Sidebar -->
+    <div id="cartSidebar" class="cart-sidebar hidden">
+        <div class="cart-header">
+            <h3>
+                <i class="fas fa-shopping-cart"></i>
+                Seu Pedido
+            </h3>
+            <button class="cart-close" id="closeCart">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="cart-content" id="cartContent">
+            <div class="empty-cart">
+                <i class="fas fa-shopping-cart"></i>
+                <p>Seu carrinho está vazio</p>
+                <small>Adicione pizzas deliciosas!</small>
+            </div>
+        </div>
+        <div class="cart-footer" id="cartFooter" style="display: none;">
+            <div class="cart-total">
+                <span>Total: </span>
+                <span id="cartTotal">R$ 0,00</span>
+            </div>
+            <button class="btn btn--primary btn--full-width" id="finishOrder">
+                <i class="fab fa-whatsapp"></i>
+                Finalizar no WhatsApp
+            </button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

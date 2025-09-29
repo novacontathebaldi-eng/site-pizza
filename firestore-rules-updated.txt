@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Coleção de usuários do portfólio (clientes da pizzaria)
+    match /portfolio_users/{userId} {
+      allow read, write: if true; // Temporário para desenvolvimento
+    }
+
+    // Coleção de configurações administrativas
+    match /admin_settings/{document} {
+      allow read, write: if true; // Temporário para desenvolvimento  
+    }
+
+    // Coleção de logs do sistema
+    match /system_logs/{logId} {
+      allow create: if true;
+      allow read: if true; // Temporário para desenvolvimento
+    }
+
+    // Coleção de categorias do menu - NOVA
+    match /menu_categories/{categoryId} {
+      allow read: if true; // Público pode ler categorias
+      allow write: if true; // Temporário - deve ser restrito a admin
+    }
+
+    // Coleção de itens do menu - NOVA  
+    match /menu_items/{itemId} {
+      allow read: if true; // Público pode ler itens do menu
+      allow write: if true; // Temporário - deve ser restrito a admin
+    }
+
+    // Bloquear acesso a todas as outras coleções
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

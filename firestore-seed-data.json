@@ -1,0 +1,203 @@
+{
+  "menu_categories": {
+    "pizzas-salgadas": {
+      "name": "Pizzas Salgadas",
+      "description": "Nossas deliciosas pizzas salgadas tradicionais",
+      "order": 1,
+      "active": true,
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z"
+    },
+    "pizzas-doces": {
+      "name": "Pizzas Doces",
+      "description": "Pizzas doces irresistíveis para sobremesa",
+      "order": 2,
+      "active": true,
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z"
+    },
+    "bebidas": {
+      "name": "Bebidas",
+      "description": "Bebidas refrescantes para acompanhar sua pizza",
+      "order": 3,
+      "active": true,
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z"
+    }
+  },
+  "menu_items": {
+    "margherita": {
+      "name": "Pizza Margherita",
+      "description": "Molho de tomate, mozzarella, manjericão fresco e azeite de oliva",
+      "categoryId": "pizzas-salgadas",
+      "prices": {
+        "pequena": 35.0,
+        "media": 42.0,
+        "grande": 48.0
+      },
+      "imageUrl": "assets/pizza1.webp",
+      "isAvailable": true,
+      "displayOrder": 1,
+      "extras": [
+        {
+          "name": "Borda Catupiry",
+          "price": 5.0
+        },
+        {
+          "name": "Azeitonas",
+          "price": 3.0
+        },
+        {
+          "name": "Orégano Extra",
+          "price": 1.0
+        }
+      ],
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z"
+    },
+    "calabresa": {
+      "name": "Pizza Calabresa",
+      "description": "Molho de tomate, calabresa fatiada, cebola roxa e azeitonas pretas",
+      "categoryId": "pizzas-salgadas",
+      "prices": {
+        "pequena": 38.0,
+        "media": 45.0,
+        "grande": 52.0
+      },
+      "imageUrl": "assets/pizza2.webp",
+      "isAvailable": true,
+      "displayOrder": 2,
+      "extras": [
+        {
+          "name": "Borda Catupiry",
+          "price": 5.0
+        },
+        {
+          "name": "Cebola Extra",
+          "price": 2.0
+        },
+        {
+          "name": "Pimenta",
+          "price": 1.5
+        }
+      ],
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z"
+    },
+    "portuguesa": {
+      "name": "Pizza Portuguesa",
+      "description": "Molho de tomate, presunto, ovos, ervilha, cebola e azeitonas",
+      "categoryId": "pizzas-salgadas",
+      "prices": {
+        "pequena": 42.0,
+        "media": 49.0,
+        "grande": 56.0
+      },
+      "imageUrl": "assets/pizza3.webp",
+      "isAvailable": true,
+      "displayOrder": 3,
+      "extras": [
+        {
+          "name": "Borda Catupiry",
+          "price": 5.0
+        },
+        {
+          "name": "Ovo Extra",
+          "price": 3.0
+        },
+        {
+          "name": "Presunto Extra",
+          "price": 4.0
+        }
+      ],
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z"
+    },
+    "quatro-queijos": {
+      "name": "Pizza Quatro Queijos",
+      "description": "Molho branco, mozzarella, gorgonzola, parmesão e catupiry",
+      "categoryId": "pizzas-salgadas",
+      "prices": {
+        "pequena": 45.0,
+        "media": 52.0,
+        "grande": 58.0
+      },
+      "imageUrl": "assets/pizza4.webp",
+      "isAvailable": true,
+      "displayOrder": 4,
+      "extras": [
+        {
+          "name": "Queijo Extra",
+          "price": 6.0
+        },
+        {
+          "name": "Nozes",
+          "price": 4.0
+        },
+        {
+          "name": "Mel",
+          "price": 2.5
+        }
+      ],
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z"
+    },
+    "chocolate": {
+      "name": "Pizza de Chocolate",
+      "description": "Massa doce, chocolate ao leite, morangos frescos e açúcar de confeiteiro",
+      "categoryId": "pizzas-doces",
+      "prices": {
+        "pequena": 32.0,
+        "media": 38.0,
+        "grande": 45.0
+      },
+      "imageUrl": "assets/pizza5.webp",
+      "isAvailable": true,
+      "displayOrder": 1,
+      "extras": [
+        {
+          "name": "Chocolate Extra",
+          "price": 4.0
+        },
+        {
+          "name": "Morango Extra",
+          "price": 3.0
+        },
+        {
+          "name": "Leite Condensado",
+          "price": 2.0
+        }
+      ],
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z"
+    },
+    "coca-cola-2l": {
+      "name": "Coca-Cola 2L",
+      "description": "Refrigerante Coca-Cola 2 litros gelado",
+      "categoryId": "bebidas",
+      "prices": {
+        "unica": 8.0
+      },
+      "imageUrl": "assets/coca-cola.webp",
+      "isAvailable": true,
+      "displayOrder": 1,
+      "extras": [],
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z"
+    },
+    "guarana-2l": {
+      "name": "Guaraná Antarctica 2L",
+      "description": "Refrigerante Guaraná Antarctica 2 litros gelado",
+      "categoryId": "bebidas",
+      "prices": {
+        "unica": 8.0
+      },
+      "imageUrl": "assets/guarana.webp",
+      "isAvailable": true,
+      "displayOrder": 2,
+      "extras": [],
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z"
+    }
+  }
+}
