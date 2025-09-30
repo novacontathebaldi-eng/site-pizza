@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Product, Category } from '../types';
 import { MenuItemCard } from './MenuItemCard';
 
@@ -8,8 +8,6 @@ interface MenuSectionProps {
     products: Product[];
     onAddToCart: (product: Product, size: string, price: number) => void;
     isStoreOnline: boolean;
-    activeCategoryId: string;
-    setActiveCategoryId: (id: string) => void;
 }
 
 const categoryIcons: { [key: string]: string } = {
@@ -20,7 +18,15 @@ const categoryIcons: { [key: string]: string } = {
     'aperitivos': 'fas fa-drumstick-bite'
 };
 
-export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, onAddToCart, isStoreOnline, activeCategoryId, setActiveCategoryId }) => {
+export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, onAddToCart, isStoreOnline }) => {
+    const [activeCategoryId, setActiveCategoryId] = useState<string>(categories[0]?.id || '');
+    
+    // Set initial category when categories load
+    React.useEffect(() => {
+        if(categories.length > 0 && !activeCategoryId) {
+            setActiveCategoryId(categories[0].id);
+        }
+    }, [categories, activeCategoryId]);
 
     const filteredProducts = useMemo(() => 
         products.filter(p => p.categoryId === activeCategoryId && p.active),
@@ -43,28 +49,25 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
                     <p className="text-lg text-gray-600 mt-2 max-w-2xl mx-auto">Descubra nossa seleção especial de pizzas artesanais, bebidas e sobremesas.</p>
                 </div>
                 
-                <div id="menu-filters-container" className="sticky top-20 bg-white z-30 py-4 -mx-4 px-4 shadow-sm mb-10">
-                    <div className="flex justify-center flex-wrap gap-3">
-                        {sortedCategories.filter(c => c.active).map(category => (
-                            <button 
-                                key={category.id} 
-                                onClick={() => setActiveCategoryId(category.id)}
-                                className={`px-6 py-3 rounded-full font-semibold text-sm transition-all duration-300 flex items-center gap-2
-                                    ${activeCategoryId === category.id 
-                                        ? 'bg-brand-green-700 text-text-on-dark shadow-md' 
-                                        : 'bg-brand-ivory-50 text-text-on-light hover:bg-brand-green-300'
-                                    }`}
-                            >
-                                <i className={categoryIcons[category.id] || 'fas fa-utensils'}></i>
-                                {category.name}
-                            </button>
-                        ))}
-                    </div>
+                <div className="flex justify-center flex-wrap gap-3 mb-10 px-2">
+                    {sortedCategories.filter(c => c.active).map(category => (
+                        <button 
+                            key={category.id} 
+                            onClick={() => setActiveCategoryId(category.id)}
+                            className={`px-6 py-3 rounded-full font-semibold text-sm transition-all duration-300 flex items-center gap-2
+                                ${activeCategoryId === category.id 
+                                    ? 'bg-brand-green-700 text-text-on-dark shadow-md' 
+                                    : 'bg-brand-ivory-50 text-text-on-light hover:bg-brand-green-300'
+                                }`}
+                        >
+                            <i className={categoryIcons[category.id] || 'fas fa-utensils'}></i>
+                            {category.name}
+                        </button>
+                    ))}
                 </div>
 
-
                 {filteredProducts.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                         {filteredProducts.map(product => (
                             <MenuItemCard 
                                 key={product.id} 

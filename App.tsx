@@ -26,7 +26,6 @@ const App: React.FC = () => {
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [activeSection, setActiveSection] = useState('Início');
-    const [activeMenuCategory, setActiveMenuCategory] = useState<string>('');
     
     useEffect(() => {
         const savedCart = localStorage.getItem('santaSensacaoCart');
@@ -42,8 +41,8 @@ const App: React.FC = () => {
         
         const observerOptions = {
             root: null,
-            rootMargin: '-80px 0px -60% 0px', // Focus on the top part of the viewport, below the header
-            threshold: 0
+            rootMargin: '0px',
+            threshold: 0.4
         };
 
         const observer = new IntersectionObserver((entries) => {
@@ -98,9 +97,6 @@ const App: React.FC = () => {
         const unsubCategories = onSnapshot(categoriesQuery, snapshot => {
             const fetchedCategories: Category[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
             setCategories(fetchedCategories);
-            if (fetchedCategories.length > 0 && !activeMenuCategory) {
-                setActiveMenuCategory(fetchedCategories[0].id);
-            }
         }, err => handleConnectionError(err, "categories"));
 
         // Listener for products
@@ -117,7 +113,7 @@ const App: React.FC = () => {
             unsubCategories();
             unsubProducts();
         };
-    }, [activeMenuCategory]);
+    }, []);
     
     useEffect(() => {
         localStorage.setItem('santaSensacaoCart', JSON.stringify(cart));
@@ -143,29 +139,8 @@ const App: React.FC = () => {
                 return [...prevCart, newItem];
             }
         });
-        
-        // Guided ordering flow
-        const sortedActiveCategories = [...categories].sort((a,b) => a.order - b.order).filter(c => c.active);
-        const currentCategoryIndex = sortedActiveCategories.findIndex(c => c.id === product.categoryId);
-
-        if (currentCategoryIndex > -1 && currentCategoryIndex < sortedActiveCategories.length - 1) {
-            const nextCategory = sortedActiveCategories[currentCategoryIndex + 1];
-            setActiveMenuCategory(nextCategory.id);
-            
-            const filtersElement = document.getElementById('menu-filters-container');
-            if (filtersElement) {
-                const headerOffset = 160; // main header (80) + sticky filters (80)
-                const elementPosition = filtersElement.getBoundingClientRect().top;
-                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-                
-                window.scrollTo({
-                  top: offsetPosition,
-                  behavior: 'smooth'
-                });
-            }
-        }
-
-    }, [categories]);
+        setIsCartOpen(true);
+    }, []);
 
     const handleUpdateCartQuantity = useCallback((itemId: string, newQuantity: number) => {
         setCart(prevCart => {
@@ -321,8 +296,6 @@ const App: React.FC = () => {
                         products={products} 
                         onAddToCart={handleAddToCart}
                         isStoreOnline={isStoreOnline}
-                        activeCategoryId={activeMenuCategory}
-                        setActiveCategoryId={setActiveMenuCategory}
                     />
                 )}
 
@@ -344,20 +317,6 @@ const App: React.FC = () => {
             </main>
 
             <Footer />
-
-            {cart.length > 0 && (
-                <div className="fixed bottom-5 right-5 z-40">
-                    <button 
-                        onClick={() => setIsCartOpen(true)}
-                        className="bg-accent text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transform transition-transform hover:scale-105 animate-fade-in-up">
-                        <i className="fas fa-shopping-bag text-xl"></i>
-                        <div className="text-left">
-                            <span className="text-sm block leading-tight">{cartTotalItems} {cartTotalItems > 1 ? 'itens' : 'item'}</span>
-                            <span className="font-semibold text-lg block leading-tight">Ver Pedido</span>
-                        </div>
-                    </button>
-                </div>
-            )}
 
             <CartSidebar 
                 isOpen={isCartOpen}

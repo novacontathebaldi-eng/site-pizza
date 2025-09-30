@@ -1,4 +1,6 @@
+
 import React from 'react';
+import logoImg from '../assets/logo.png';
 
 export const Footer: React.FC = () => {
     return (
@@ -7,7 +9,7 @@ export const Footer: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
                     <div className="flex flex-col items-center md:items-start">
                         <div className="flex items-center gap-3 text-2xl font-bold mb-4">
-                           <img src="./assets/logo.png" alt="Santa Sensação Logo" className="h-12" />
+                           <img src={logoImg} alt="Santa Sensação Logo" className="h-12" />
                             <span>Santa Sensação</span>
                         </div>
                         <p className="text-brand-green-300 mb-4">A pizza nº 1 do ES 🏅</p>
@@ -34,13 +36,10 @@ export const Footer: React.FC = () => {
                     </div>
                 </div>
                 <div className="border-t border-brand-olive-600 mt-8 pt-6 text-center text-brand-green-300 text-sm">
-                    <p>&copy; 2025 THEBALDI. Todos os direitos reservados.</p>
-                     <div className="mt-2">
-                        <a href="#admin" className="inline-flex items-center gap-2 text-xs hover:text-white transition-colors">
-                            <span className="bg-brand-olive-600/50 px-1.5 py-0.5 rounded text-base">🛡️</span>
-                            <span className="text-brand-green-300">administração</span>
-                        </a>
-                    </div>
+                    <p>&copy; {new Date().getFullYear()} Pizzaria Santa Sensação. Todos os direitos reservados.</p>
+                    <p className="mt-2 text-xs">
+                        <a href="#admin" className="hover:text-white transition-colors">Acesso Restrito</a>
+                    </p>
                 </div>
             </div>
         </footer>
