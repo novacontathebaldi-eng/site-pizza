@@ -38,7 +38,13 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ isOpen, onClose, cartI
                                     <p className="font-bold text-text-on-light">{item.name}</p>
                                     <p className="text-sm text-gray-500">{item.size}</p>
                                     <div className="flex items-center gap-2 mt-2">
-                                        <button onClick={() => onUpdateQuantity(item.id, item.quantity - 1)} className="w-7 h-7 bg-gray-200 rounded-md font-bold">-</button>
+                                        {item.quantity > 1 ? (
+                                            <button onClick={() => onUpdateQuantity(item.id, item.quantity - 1)} className="w-7 h-7 bg-gray-200 rounded-md font-bold">-</button>
+                                        ) : (
+                                            <button onClick={() => onUpdateQuantity(item.id, 0)} className="w-7 h-7 bg-red-100 text-red-600 rounded-md flex items-center justify-center hover:bg-red-200 transition-colors" aria-label="Remover item">
+                                                <i className="fas fa-trash-alt text-sm"></i>
+                                            </button>
+                                        )}
                                         <span className="w-8 text-center font-semibold">{item.quantity}</span>
                                         <button onClick={() => onUpdateQuantity(item.id, item.quantity + 1)} className="w-7 h-7 bg-gray-200 rounded-md font-bold">+</button>
                                     </div>
@@ -62,7 +68,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ isOpen, onClose, cartI
                             disabled={!isStoreOnline}
                             className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed"
                         >
-                            <i className={`fas ${isStoreOnline ? 'fa-whatsapp' : 'fa-clock'} mr-2`}></i>
+                            <i className={`fas ${isStoreOnline ? 'fa-check-circle' : 'fa-clock'} mr-2`}></i>
                             {isStoreOnline ? 'Finalizar Pedido' : 'Loja Fechada'}
                         </button>
                     </div>

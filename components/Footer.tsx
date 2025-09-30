@@ -34,10 +34,13 @@ export const Footer: React.FC = () => {
                     </div>
                 </div>
                 <div className="border-t border-brand-olive-600 mt-8 pt-6 text-center text-brand-green-300 text-sm">
-                    <p>&copy; {new Date().getFullYear()} Pizzaria Santa Sensação. Todos os direitos reservados.</p>
-                    <p className="mt-2 text-xs">
-                        <a href="#admin" className="hover:text-white transition-colors">Acesso Restrito</a>
-                    </p>
+                    <p>&copy; 2025 THEBALDI. Todos os direitos reservados.</p>
+                     <div className="mt-2">
+                        <a href="#admin" className="inline-flex items-center gap-2 text-xs hover:text-white transition-colors">
+                            <span className="bg-brand-olive-600/50 px-1.5 py-0.5 rounded text-base">🛡️</span>
+                            <span className="text-brand-green-300">administração</span>
+                        </a>
+                    </div>
                 </div>
             </div>
         </footer>
