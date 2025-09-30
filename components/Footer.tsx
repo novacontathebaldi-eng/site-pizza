@@ -5,8 +5,8 @@ export const Footer: React.FC = () => {
     return (
         <footer className="bg-brand-green-700 text-text-on-dark pt-16 pb-8">
             <div className="container mx-auto px-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
-                    <div className="flex flex-col items-center md:items-start">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center md:text-left">
+                    <div className="flex flex-col items-center md:items-start md:col-span-1">
                         <div className="flex items-center gap-3 text-2xl font-bold mb-4">
                            <img src={logo} alt="Santa Sensação Logo" className="h-12" />
                             <span>Santa Sensação</span>
@@ -33,15 +33,20 @@ export const Footer: React.FC = () => {
                             <li><i className="fas fa-truck mr-2 text-accent"></i>Delivery disponível</li>
                         </ul>
                     </div>
+                     <div>
+                        <h4 className="font-bold text-lg mb-4">Acesso Restrito</h4>
+                         <ul className="space-y-2 text-brand-green-300">
+                            <li>
+                                <a href="#admin" className="inline-flex items-center gap-2 hover:text-white transition-colors">
+                                    <i className="fas fa-key mr-1 text-accent"></i>
+                                    <span>Painel Administrativo</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
                 <div className="border-t border-brand-olive-600 mt-8 pt-6 text-center text-brand-green-300 text-sm">
                     <p>&copy; 2025 THEBALDI. Todos os direitos reservados.</p>
-                     <div className="mt-2">
-                        <a href="#admin" className="inline-flex items-center gap-2 text-xs hover:text-white transition-colors">
-                            <span className="bg-brand-olive-600/50 px-1.5 py-0.5 rounded text-base">🛡️</span>
-                            <span className="text-brand-green-300">administração</span>
-                        </a>
-                    </div>
                 </div>
             </div>
         </footer>
