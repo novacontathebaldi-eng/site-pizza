@@ -41,7 +41,11 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     const categoryListRef = useRef<HTMLDivElement>(null);
     const sortableCategories = useRef<Sortable | null>(null);
     
-    // Refs for product lists grouped by category
+    const productsRef = useRef(allProducts);
+    useEffect(() => {
+        productsRef.current = allProducts;
+    }, [allProducts]);
+
     const productListRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
     const sortableProductInstances = useRef<Map<string, Sortable>>(new Map());
 
@@ -62,7 +66,6 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     useEffect(() => {
         if (!isLoggedIn) return;
 
-        // Cleanup function to destroy all instances on re-render or component unmount
         const cleanup = () => {
             sortableProductInstances.current.forEach(instance => instance.destroy());
             sortableProductInstances.current.clear();
@@ -73,7 +76,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         };
 
         if (activeTab === 'products') {
-            cleanup(); // Destroy previous instances before creating new ones
+            cleanup();
             
             productListRefs.current.forEach((el, categoryId) => {
                 if (el) {
@@ -85,11 +88,10 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                         delay: 100,
                         delayOnTouchOnly: true,
                         onEnd: () => {
-                            // This logic now runs with the most up-to-date `allProducts`
-                            // because this entire effect is re-run when `allProducts` changes.
+                            const currentProducts = productsRef.current;
                             const allProductElements = Array.from(document.querySelectorAll('.product-list .product-item'));
                             
-                            if (allProductElements.length !== allProducts.length) {
+                            if (allProductElements.length !== currentProducts.length) {
                                 console.error("Mismatch between DOM elements and products state. Aborting reorder.");
                                 alert("Erro de sincronização. Por favor, atualize a página e tente novamente.");
                                 return;
@@ -100,10 +102,10 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                 .filter((id): id is string => !!id);
                             
                             const reorderedProductList = reorderedIds.map(id => {
-                                return allProducts.find(p => p.id === id);
+                                return currentProducts.find(p => p.id === id);
                             }).filter((p): p is Product => !!p);
 
-                            if (reorderedProductList.length !== allProducts.length) {
+                            if (reorderedProductList.length !== currentProducts.length) {
                                 console.error("Could not map all DOM elements back to products in state. Aborting.");
                                 alert("Erro de mapeamento de dados. A reordenação foi cancelada.");
                                 return;
@@ -123,7 +125,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         }
         
         if (activeTab === 'categories') {
-            cleanup(); // Destroy previous instances
+            cleanup();
             if (categoryListRef.current) {
                 sortableCategories.current = Sortable.create(categoryListRef.current, {
                     animation: 150,
