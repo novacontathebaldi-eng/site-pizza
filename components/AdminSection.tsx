@@ -65,23 +65,29 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
 
     const handleProductReorder = useCallback(() => {
         const allProductElements = Array.from(document.querySelectorAll('.product-list .product-item'));
-        let reorderedProducts: Product[] = [];
-    
-        allProductElements.forEach(el => {
-            const productId = (el as HTMLElement).dataset.id;
-            const newCategoryId = (el.parentElement as HTMLElement).dataset.categoryId;
+        
+        // Safety Check: Ensure the number of rendered products matches our state reference.
+        if (allProductElements.length !== allProductsRef.current.length) {
+            console.error("Mismatch between rendered products and state. Aborting reorder to prevent data corruption.");
+            alert("Erro de sincronização de dados. A reordenação foi cancelada. Por favor, atualize a página e tente novamente.");
+            return;
+        }
+
+        const reorderedProductList: Product[] = [];
+        for (const element of allProductElements) {
+            const productId = (element as HTMLElement).dataset.id;
             const product = allProductsRef.current.find(p => p.id === productId);
-    
-            if (product && newCategoryId) {
-                reorderedProducts.push({
-                    ...product,
-                    categoryId: newCategoryId,
-                });
+            if (product) {
+                reorderedProductList.push(product);
+            } else {
+                 console.error(`Product with ID ${productId} exists in the DOM but not in the current state. Aborting.`);
+                 alert("Erro de sincronização grave. A página será recarregada.");
+                 window.location.reload();
+                 return;
             }
-        });
+        }
     
-        // Update orderIndex based on the new flat array order
-        const finalProducts = reorderedProducts.map((p, index) => ({ ...p, orderIndex: index }));
+        const finalProducts = reorderedProductList.map((p, index) => ({ ...p, orderIndex: index }));
         onReorderProducts(finalProducts);
     }, [onReorderProducts]);
 
@@ -89,14 +95,15 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         if (!isLoggedIn) return;
 
         if (activeTab === 'products') {
-            // Cleanup previous instances
+            // Cleanup previous instances to avoid memory leaks
             sortableProductInstances.current.forEach(instance => instance.destroy());
             sortableProductInstances.current.clear();
             
             productListRefs.current.forEach((el, categoryId) => {
                 if (el) {
                     const instance = Sortable.create(el, {
-                        group: `products-${categoryId}`, // Disallow dragging between lists
+                        // Using a unique group for each category list correctly prevents dragging items between them.
+                        group: `products-${categoryId}`,
                         animation: 150,
                         handle: '.drag-handle',
                         ghostClass: 'sortable-ghost',
@@ -133,7 +140,10 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             sortableProductInstances.current.forEach(instance => instance.destroy());
             if (sortableCategories.current) sortableCategories.current.destroy();
         };
-    }, [isLoggedIn, activeTab, allCategories, onReorderCategories, handleProductReorder]);
+    // CRITICAL FIX: Added allProducts to the dependency array.
+    // This ensures that SortableJS is re-initialized whenever the product list changes,
+    // preventing stale state and DOM inconsistencies that were causing the reorder to fail.
+    }, [isLoggedIn, activeTab, allCategories, allProducts, onReorderCategories, handleProductReorder]);
     
     const sortedCategories = useMemo(() => 
         [...allCategories].sort((a, b) => a.order - b.order),
