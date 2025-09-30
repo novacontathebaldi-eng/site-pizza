@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import ambienteImg from '../assets/ambiente-pizzaria.webp';
+import heroBg from '../assets/ambiente-pizzaria.webp';
 
 export const HeroSection: React.FC = () => {
     const [scrollOpacity, setScrollOpacity] = useState(1);
@@ -46,7 +45,7 @@ export const HeroSection: React.FC = () => {
             <div 
                 className="absolute inset-0 bg-cover bg-center" 
                 style={{
-                    backgroundImage: `url(${ambienteImg})`,
+                    backgroundImage: `url(${heroBg})`,
                     opacity: scrollOpacity,
                     transition: 'opacity 0.1s ease-out'
                 }}
