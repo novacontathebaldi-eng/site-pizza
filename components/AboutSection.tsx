@@ -1,6 +1,4 @@
-
 import React from 'react';
-import sobreImg from '../assets/sobre-imagem.webp';
 
 export const AboutSection: React.FC = () => {
     return (
@@ -23,7 +21,7 @@ export const AboutSection: React.FC = () => {
                         </div>
                     </div>
                     <div className="relative">
-                        <img src={sobreImg} alt="Mestre Pizzaiolo Luca Lonardi segurando a pizza premiada" className="rounded-2xl shadow-xl w-full h-auto object-cover" />
+                        <img src="/assets/sobre-imagem.webp" alt="Mestre Pizzaiolo Luca Lonardi segurando a pizza premiada" className="rounded-2xl shadow-xl w-full h-auto object-cover" />
                     </div>
                 </div>
             </div>
