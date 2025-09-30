@@ -45,27 +45,3 @@ export const deleteCategory = async (categoryId: string, allProducts: Product[])
     const categoryRef = doc(db, 'categories', categoryId);
     await deleteDoc(categoryRef);
 };
-
-// Reordering Functions
-export const reorderProducts = async (products: Product[]): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized");
-    const batch = writeBatch(db);
-    products.forEach((product) => {
-        const productRef = doc(db, 'products', product.id);
-        batch.update(productRef, { 
-            orderIndex: product.orderIndex,
-            categoryId: product.categoryId 
-        });
-    });
-    await batch.commit();
-};
-
-export const reorderCategories = async (categories: Category[]): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized");
-    const batch = writeBatch(db);
-    categories.forEach((category) => {
-        const categoryRef = doc(db, 'categories', category.id);
-        batch.update(categoryRef, { order: category.order });
-    });
-    await batch.commit();
-};
