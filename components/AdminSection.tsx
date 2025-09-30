@@ -41,7 +41,11 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     const categoryListRef = useRef<HTMLDivElement>(null);
     const sortableCategories = useRef<Sortable | null>(null);
     
-    // Refs for product lists grouped by category
+    const productsRef = useRef(allProducts);
+    useEffect(() => {
+        productsRef.current = allProducts;
+    }, [allProducts]);
+
     const productListRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
     const sortableProductInstances = useRef<Map<string, Sortable>>(new Map());
 
@@ -58,44 +62,73 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         };
     }, []);
 
-    const handleProductReorder = useCallback(() => {
-        const allProductElements = Array.from(document.querySelectorAll('.product-list .product-item'));
-        let reorderedProducts: Product[] = [];
-    
-        allProductElements.forEach(el => {
-            const productId = (el as HTMLElement).dataset.id;
-            const newCategoryId = (el.parentElement as HTMLElement).dataset.categoryId;
-            const product = allProducts.find(p => p.id === productId);
-    
-            if (product && newCategoryId) {
-                reorderedProducts.push({
-                    ...product,
-                    categoryId: newCategoryId,
-                });
-            }
-        });
-    
-        // Update orderIndex based on the new flat array order
-        const finalProducts = reorderedProducts.map((p, index) => ({ ...p, orderIndex: index }));
-        onReorderProducts(finalProducts);
-    }, [allProducts, onReorderProducts]);
 
     useEffect(() => {
-        if (activeTab === 'products') {
-            // Cleanup previous instances
+        if (!isLoggedIn) return;
+
+        const cleanup = () => {
             sortableProductInstances.current.forEach(instance => instance.destroy());
             sortableProductInstances.current.clear();
+            if (sortableCategories.current) {
+                sortableCategories.current.destroy();
+                sortableCategories.current = null;
+            }
+        };
+
+        if (activeTab === 'products') {
+            cleanup();
             
             productListRefs.current.forEach((el, categoryId) => {
                 if (el) {
                     const instance = Sortable.create(el, {
-                        group: 'products', // Allow dragging between lists
+                        group: 'products', // Shared group to allow dragging between categories
                         animation: 150,
                         handle: '.drag-handle',
                         ghostClass: 'sortable-ghost',
                         delay: 100,
                         delayOnTouchOnly: true,
-                        onEnd: handleProductReorder,
+                        onEnd: () => {
+                            const currentProducts = productsRef.current;
+                            const allProductElements = Array.from(document.querySelectorAll('.product-list .product-item'));
+
+                            if (allProductElements.length !== currentProducts.length) {
+                                console.error("Mismatch between DOM elements and products state. Aborting reorder.");
+                                alert("Erro de sincronização. Por favor, atualize a página e tente novamente.");
+                                return;
+                            }
+                            
+                            const updatedProducts = allProductElements.map((el, index) => {
+                                const productId = (el as HTMLElement).dataset.id;
+                                const product = currentProducts.find(p => p.id === productId);
+                                
+                                if (!product) {
+                                    console.error(`Product with id ${productId} not found in state.`);
+                                    return null;
+                                }
+
+                                const newCategoryId = (el.closest('.product-list') as HTMLElement)?.dataset.categoryId;
+
+                                if (!newCategoryId) {
+                                    console.error(`Could not find category for product ${productId}.`);
+                                    return null;
+                                }
+
+                                return {
+                                    ...product,
+                                    orderIndex: index,
+                                    categoryId: newCategoryId,
+                                };
+                            }).filter((p): p is Product => p !== null);
+
+
+                            if (updatedProducts.length !== currentProducts.length) {
+                                console.error("Could not map all DOM elements back to products in state. Aborting.");
+                                alert("Erro de mapeamento de dados. A reordenação foi cancelada.");
+                                return;
+                            }
+                            
+                            onReorderProducts(updatedProducts);
+                        },
                     });
                     sortableProductInstances.current.set(categoryId, instance);
                 }
@@ -103,7 +136,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         }
         
         if (activeTab === 'categories') {
-            if (sortableCategories.current) sortableCategories.current.destroy();
+            cleanup();
             if (categoryListRef.current) {
                 sortableCategories.current = Sortable.create(categoryListRef.current, {
                     animation: 150,
@@ -122,11 +155,8 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             }
         }
         
-        return () => {
-            sortableProductInstances.current.forEach(instance => instance.destroy());
-            if (sortableCategories.current) sortableCategories.current.destroy();
-        };
-    }, [activeTab, allCategories, allProducts, onReorderCategories, handleProductReorder]);
+        return cleanup;
+    }, [isLoggedIn, activeTab, allCategories, allProducts, onReorderCategories, onReorderProducts]);
     
     const sortedCategories = useMemo(() => 
         [...allCategories].sort((a, b) => a.order - b.order),
@@ -170,7 +200,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     };
 
     const handleSeedDatabase = async () => {
-        if (window.confirm('Você tem certeza que deseja popular o banco de dados? Isso adicionará os produtos e categorias iniciais. Esta ação só deve ser feita uma vez.')) {
+        if (window.confirm('Você tem certeza que deseja popular o banco de dados? Isso adicionará os produtos e categorias iniciais. Esta ação só deve ser feita uma vez em um banco de dados vazio.')) {
             try {
                 await onSeedDatabase();
                 alert('Banco de dados populado com sucesso!');
@@ -178,6 +208,32 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                 console.error("Failed to seed database:", error);
                 alert("Erro ao popular o banco de dados. Verifique o console para mais detalhes.");
             }
+        }
+    };
+
+    const handleBackup = () => {
+        try {
+            const backupData = {
+                products: allProducts,
+                categories: allCategories,
+                store_config: { status: { isOpen: isStoreOnline } },
+                backupDate: new Date().toISOString(),
+            };
+    
+            const jsonString = JSON.stringify(backupData, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const href = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = href;
+            link.download = `santasensacao_backup_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(href);
+            alert('Backup concluído com sucesso!');
+        } catch (error) {
+            console.error("Backup failed:", error);
+            alert("Falha ao criar o backup.");
         }
     };
 
@@ -220,6 +276,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                         <button onClick={() => setActiveTab('status')} className={`py-2 px-6 font-semibold ${activeTab === 'status' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Status</button>
                         <button onClick={() => setActiveTab('products')} className={`py-2 px-6 font-semibold ${activeTab === 'products' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Produtos</button>
                         <button onClick={() => setActiveTab('categories')} className={`py-2 px-6 font-semibold ${activeTab === 'categories' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Categorias</button>
+                        <button onClick={() => setActiveTab('data')} className={`py-2 px-6 font-semibold ${activeTab === 'data' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Dados</button>
                     </div>
 
                     {activeTab === 'status' && (
@@ -233,13 +290,6 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                 <span className={`font-semibold text-lg ${isStoreOnline ? 'text-green-600' : 'text-red-600'}`}>
                                     {isStoreOnline ? 'Aberta para pedidos' : 'Fechada'}
                                 </span>
-                            </div>
-                            <h3 className="text-xl font-bold mb-4">Ações do Banco de Dados</h3>
-                             <div className="bg-gray-50 p-4 rounded-lg">
-                                <p className="text-gray-600 mb-3">Use este botão para popular o banco de dados com os produtos e categorias iniciais. Use apenas uma vez na configuração inicial.</p>
-                                <button onClick={handleSeedDatabase} className="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition-all">
-                                    <i className="fas fa-database mr-2"></i>Popular Banco de Dados
-                                </button>
                             </div>
                         </div>
                     )}
@@ -255,7 +305,6 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                     <div key={category.id}>
                                         <h4 className="text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300">{category.name}</h4>
                                         <div 
-                                            // FIX: The ref callback must not return a value. Wrapped the expression in a block.
                                             ref={el => { productListRefs.current.set(category.id, el); }}
                                             className="product-list space-y-3 min-h-[50px]"
                                             data-category-id={category.id}
@@ -288,7 +337,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                 <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"><i className="fas fa-plus mr-2"></i>Nova Categoria</button>
                             </div>
                              <div ref={categoryListRef} className="space-y-3">
-                                {allCategories.map(cat => (
+                                {sortedCategories.map(cat => (
                                     <div key={cat.id} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
                                          <div className="flex items-center gap-4">
                                             <i className="fas fa-grip-vertical drag-handle text-gray-400" title="Arraste para reordenar"></i>
@@ -301,6 +350,26 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                     </div>
                                 ))}
                              </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'data' && (
+                        <div>
+                            <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3>
+                            <div className="bg-gray-50 p-4 rounded-lg mb-6 border">
+                                <h4 className="font-semibold text-lg mb-2">Backup</h4>
+                                <p className="text-gray-600 mb-3">Crie um backup de todos os seus produtos, categorias e configurações da loja. O backup será salvo como um arquivo JSON no seu computador.</p>
+                                <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition-all">
+                                    <i className="fas fa-download mr-2"></i>Fazer Backup
+                                </button>
+                            </div>
+                            <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                                <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa: Popular Banco de Dados</h4>
+                                <p className="text-yellow-700 mb-3">Esta ação irá adicionar os produtos e categorias iniciais ao seu banco de dados. Use apenas uma vez na configuração inicial ou se você limpou o banco de dados. Isso não substituirá itens existentes com o mesmo nome.</p>
+                                <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600 transition-all">
+                                    <i className="fas fa-database mr-2"></i>Popular Banco de Dados
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>

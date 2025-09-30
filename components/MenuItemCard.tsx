@@ -34,49 +34,46 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
     };
 
     return (
-        <div className="bg-brand-ivory-50 rounded-2xl shadow-md hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden border border-brand-green-300/50">
+        <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col overflow-hidden border border-gray-200">
             <div className="relative">
-                <img src={product.imageUrl} alt={product.name} className="w-full h-52 object-cover" />
+                <img src={product.imageUrl} alt={product.name} className="w-full h-40 object-cover" />
                 {product.badge && (
-                    <span className="absolute top-3 right-3 bg-accent text-white px-3 py-1 text-xs font-bold rounded-full">{product.badge}</span>
+                    <span className="absolute top-2 right-2 bg-accent text-white px-2 py-0.5 text-xs font-bold rounded-full">{product.badge}</span>
                 )}
             </div>
-            <div className="p-5 flex flex-col flex-grow">
-                <h3 className="text-xl font-bold text-text-on-light mb-2">{product.name}</h3>
-                <p className="text-gray-600 text-sm flex-grow mb-4">{product.description}</p>
+            <div className="p-4 flex flex-col flex-grow">
+                <h3 className="text-lg font-bold text-text-on-light mb-1">{product.name}</h3>
+                <p className="text-gray-500 text-xs flex-grow mb-3 line-clamp-2">{product.description}</p>
                 
                 {sortedSizes.length > 1 && (
-                    <div className="mb-4">
-                        <p className="text-sm font-semibold mb-2 text-gray-700">Tamanhos:</p>
-                        <div className="flex flex-wrap gap-2">
-                            {sortedSizes.map(size => (
-                                <button
-                                    key={size}
-                                    onClick={() => setSelectedSize(size)}
-                                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg border-2 transition-colors ${
-                                        selectedSize === size
-                                            ? 'bg-brand-olive-600 text-white border-brand-olive-600'
-                                            : 'bg-white text-gray-700 border-gray-300 hover:border-brand-olive-600'
-                                    }`}
-                                >
-                                    {size} - {formatPrice(product.prices[size])}
-                                </button>
-                            ))}
-                        </div>
+                    <div className="flex flex-wrap gap-1 mb-3">
+                        {sortedSizes.map(size => (
+                            <button
+                                key={size}
+                                onClick={() => setSelectedSize(size)}
+                                className={`px-2 py-1 text-[11px] font-semibold rounded-md border transition-colors ${
+                                    selectedSize === size
+                                        ? 'bg-brand-olive-600 text-white border-brand-olive-600'
+                                        : 'bg-gray-100 text-gray-700 border-gray-300 hover:border-brand-olive-600'
+                                }`}
+                            >
+                                {size}
+                            </button>
+                        ))}
                     </div>
                 )}
 
-                <div className="mt-auto pt-4 flex justify-between items-center">
-                    <span className="text-2xl font-bold text-accent">
+                <div className="mt-auto pt-2 flex justify-between items-center">
+                    <span className="text-xl font-bold text-accent">
                         {formatPrice(product.prices[selectedSize] || Object.values(product.prices)[0])}
                     </span>
                     <button 
                         onClick={handleAddToCart}
                         disabled={!isStoreOnline}
-                        className="bg-accent text-white font-bold py-2 px-4 rounded-lg transition-all transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:scale-100"
+                        className="bg-accent text-white font-bold py-2 px-3 rounded-lg text-sm transition-all transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
-                        <i className={`fas ${isStoreOnline ? 'fa-plus' : 'fa-clock'} mr-2`}></i>
-                        {isStoreOnline ? 'Adicionar' : 'Fechado'}
+                        <i className="fas fa-plus mr-1"></i>
+                        Adicionar
                     </button>
                 </div>
             </div>
