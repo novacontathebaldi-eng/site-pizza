@@ -1,5 +1,5 @@
 {
-  "name": "novo-app-pizzaria-santa-sensação",
+  "name": "app-ok-pizzaria-santa-sensação-limpo-sem-arrastar",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,7 +11,9 @@
   "dependencies": {
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "firebase": "^12.3.0"
+    "firebase": "^12.3.0",
+    "sortablejs": "1.15.2",
+    "react-sortablejs": "^6.1.4"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

@@ -246,6 +246,23 @@ const App: React.FC = () => {
             alert("Erro ao atualizar status da loja. Tente novamente.");
         }
     }, []);
+
+    const handleReorderProducts = useCallback(async (reorderedProducts: Product[]) => {
+        try {
+            // Identifica apenas os produtos que realmente mudaram de ordem para otimizar a escrita no banco.
+            const changedProducts = reorderedProducts.filter(newProd => {
+                const oldProd = products.find(p => p.id === newProd.id);
+                return !oldProd || oldProd.orderIndex !== newProd.orderIndex;
+            });
+            
+            if (changedProducts.length > 0) {
+                await firebaseService.reorderProducts(changedProducts);
+            }
+        } catch (error) {
+            console.error("Failed to reorder products:", error);
+            alert("Erro ao reordenar produtos. Tente novamente.");
+        }
+    }, [products]);
     
     const handleSaveCategory = useCallback(async (category: Category) => {
         try {
@@ -268,6 +285,25 @@ const App: React.FC = () => {
             alert(`Erro ao deletar categoria: ${error.message}`);
         }
     }, [products]);
+
+    const handleReorderCategories = useCallback(async (reorderedCategories: Category[]) => {
+        try {
+            // Otimização: atualiza apenas as categorias cuja ordem foi alterada.
+            const categoriesWithNewOrder = reorderedCategories.map((cat, index) => ({ ...cat, order: index }));
+    
+            const changedCategories = categoriesWithNewOrder.filter(newCat => {
+                const oldCat = categories.find(c => c.id === newCat.id);
+                return !oldCat || oldCat.order !== newCat.order;
+            });
+    
+            if (changedCategories.length > 0) {
+                await firebaseService.reorderCategories(changedCategories);
+            }
+        } catch (error) {
+            console.error("Failed to reorder categories:", error);
+            alert("Erro ao reordenar categorias. Tente novamente.");
+        }
+    }, [categories]);
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
 
@@ -317,8 +353,10 @@ const App: React.FC = () => {
                     onSaveProduct={handleSaveProduct}
                     onDeleteProduct={handleDeleteProduct}
                     onStoreStatusChange={handleStoreStatusChange}
+                    onReorderProducts={handleReorderProducts}
                     onSaveCategory={handleSaveCategory}
                     onDeleteCategory={handleDeleteCategory}
+                    onReorderCategories={handleReorderCategories}
                     onSeedDatabase={seedDatabase}
                 />
             </main>

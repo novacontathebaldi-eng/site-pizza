@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Product, Category } from '../types';
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
+import Sortable from 'sortablejs';
+import { ReactSortable } from 'react-sortablejs';
+
 
 interface AdminSectionProps {
     allProducts: Product[];
@@ -10,15 +13,17 @@ interface AdminSectionProps {
     onSaveProduct: (product: Product) => Promise<void>;
     onDeleteProduct: (productId: string) => Promise<void>;
     onStoreStatusChange: (isOnline: boolean) => Promise<void>;
+    onReorderProducts: (products: Product[]) => Promise<void>;
     onSaveCategory: (category: Category) => Promise<void>;
     onDeleteCategory: (categoryId: string) => Promise<void>;
+    onReorderCategories: (categories: Category[]) => Promise<void>;
     onSeedDatabase: () => Promise<void>;
 }
 
 export const AdminSection: React.FC<AdminSectionProps> = ({ 
     allProducts, allCategories, isStoreOnline, 
-    onSaveProduct, onDeleteProduct, onStoreStatusChange,
-    onSaveCategory, onDeleteCategory,
+    onSaveProduct, onDeleteProduct, onStoreStatusChange, onReorderProducts,
+    onSaveCategory, onDeleteCategory, onReorderCategories,
     onSeedDatabase 
 }) => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -34,6 +39,16 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
+    const [displayCategories, setDisplayCategories] = useState<Category[]>([]);
+
+    const sortedCategoriesMemo = useMemo(() => 
+        [...allCategories].sort((a, b) => a.order - b.order),
+    [allCategories]);
+
+    useEffect(() => {
+        setDisplayCategories(sortedCategoriesMemo);
+    }, [sortedCategoriesMemo]);
+    
     useEffect(() => {
         const handleHashChange = () => {
             setShowAdminPanel(window.location.hash === '#admin');
@@ -46,10 +61,6 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             window.removeEventListener('hashchange', handleHashChange, false);
         };
     }, []);
-    
-    const sortedCategories = useMemo(() => 
-        [...allCategories].sort((a, b) => a.order - b.order),
-    [allCategories]);
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -126,6 +137,32 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         }
     };
 
+    const handleProductReorder = useCallback((reorderedProductsInCategory: Product[], categoryId: string) => {
+        // Create a new, full list of products in the correct visual order.
+        const newFullProductList: Product[] = [];
+        displayCategories.forEach(cat => {
+            if (cat.id === categoryId) {
+                // For the modified category, use the newly reordered list of products.
+                newFullProductList.push(...reorderedProductsInCategory);
+            } else {
+                // For all other categories, add their products from the original source.
+                const productsForCategory = allProducts
+                    .filter(p => p.categoryId === cat.id)
+                    .sort((a, b) => a.orderIndex - b.orderIndex);
+                newFullProductList.push(...productsForCategory);
+            }
+        });
+
+        // Re-assign the global orderIndex to every product to ensure consistency.
+        const reindexedProducts = newFullProductList.map((p, index) => ({
+            ...p,
+            orderIndex: index
+        }));
+
+        onReorderProducts(reindexedProducts);
+    }, [allProducts, displayCategories, onReorderProducts]);
+
+
     if (!showAdminPanel) return null;
 
     if (!isLoggedIn) {
@@ -190,27 +227,39 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                 <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"><i className="fas fa-plus mr-2"></i>Novo Produto</button>
                             </div>
                             <div className="space-y-6">
-                                {sortedCategories.map(category => (
-                                    <div key={category.id}>
-                                        <h4 className="text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300">{category.name}</h4>
-                                        <div className="space-y-3 min-h-[50px]">
-                                            {allProducts
-                                                .filter(p => p.categoryId === category.id)
-                                                .sort((a, b) => a.orderIndex - b.orderIndex)
-                                                .map(product => (
-                                                    <div key={product.id} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
-                                                        <div className="flex items-center gap-4">
-                                                            <p className="font-bold">{product.name}</p>
+                                {displayCategories.map(category => {
+                                    const categoryProducts = allProducts
+                                        .filter(p => p.categoryId === category.id)
+                                        .sort((a, b) => a.orderIndex - b.orderIndex);
+                                    
+                                    return (
+                                        <div key={category.id}>
+                                            <h4 className="text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300">{category.name}</h4>
+                                            <ReactSortable
+                                                list={categoryProducts}
+                                                setList={(newList) => handleProductReorder(newList, category.id)}
+                                                group={{ name: 'products', pull: false, put: false }}
+                                                animation={200}
+                                                delay={2}
+                                                className="space-y-3 min-h-[50px]"
+                                                handle=".handle"
+                                            >
+                                                {categoryProducts.map((product) => (
+                                                    <div key={product.id} className="bg-gray-50 p-3 rounded-lg flex items-center">
+                                                        <div className="handle cursor-grab text-gray-400 mr-4" aria-label={`Arrastar para reordenar ${product.name}`}>
+                                                            <i className="fas fa-grip-vertical"></i>
                                                         </div>
-                                                        <div className="flex gap-2">
+                                                        <p className="font-bold flex-grow">{product.name}</p>
+                                                        <div className="flex items-center gap-2">
                                                             <button onClick={() => handleEditProduct(product)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${product.name}`}><i className="fas fa-edit"></i></button>
                                                             <button onClick={() => window.confirm('Tem certeza que deseja excluir este produto?') && onDeleteProduct(product.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${product.name}`}><i className="fas fa-trash"></i></button>
                                                         </div>
                                                     </div>
-                                            ))}
+                                                ))}
+                                            </ReactSortable>
                                         </div>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         </div>
                     )}
@@ -221,19 +270,28 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                 <h3 className="text-xl font-bold">Gerenciar Categorias</h3>
                                 <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"><i className="fas fa-plus mr-2"></i>Nova Categoria</button>
                             </div>
-                             <div className="space-y-3">
-                                {sortedCategories.map(cat => (
-                                    <div key={cat.id} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
-                                         <div className="flex items-center gap-4">
-                                            <p className="font-bold">{cat.name}</p>
-                                         </div>
-                                        <div className="flex gap-2">
+                            <ReactSortable
+                                list={displayCategories}
+                                setList={setDisplayCategories}
+                                onEnd={() => onReorderCategories(displayCategories)}
+                                animation={200}
+                                delay={2}
+                                className="space-y-3"
+                                handle=".handle"
+                            >
+                                {displayCategories.map((cat) => (
+                                    <div key={cat.id} className="bg-gray-50 p-3 rounded-lg flex items-center">
+                                        <div className="handle cursor-grab text-gray-400 mr-4" aria-label={`Arrastar para reordenar ${cat.name}`}>
+                                            <i className="fas fa-grip-vertical"></i>
+                                        </div>
+                                        <p className="font-bold flex-grow">{cat.name}</p>
+                                        <div className="flex items-center gap-2">
                                             <button onClick={() => handleEditCategory(cat)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${cat.name}`}><i className="fas fa-edit"></i></button>
                                             <button onClick={() => window.confirm(`Tem certeza que deseja excluir a categoria "${cat.name}"?`) && onDeleteCategory(cat.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${cat.name}`}><i className="fas fa-trash"></i></button>
                                         </div>
                                     </div>
                                 ))}
-                             </div>
+                            </ReactSortable>
                         </div>
                     )}
 
