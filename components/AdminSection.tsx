@@ -81,7 +81,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             productListRefs.current.forEach((el, categoryId) => {
                 if (el) {
                     const instance = Sortable.create(el, {
-                        group: `products-${categoryId}`,
+                        group: 'products', // Shared group to allow dragging between categories
                         animation: 150,
                         handle: '.drag-handle',
                         ghostClass: 'sortable-ghost',
@@ -90,33 +90,44 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                         onEnd: () => {
                             const currentProducts = productsRef.current;
                             const allProductElements = Array.from(document.querySelectorAll('.product-list .product-item'));
-                            
+
                             if (allProductElements.length !== currentProducts.length) {
                                 console.error("Mismatch between DOM elements and products state. Aborting reorder.");
                                 alert("Erro de sincronização. Por favor, atualize a página e tente novamente.");
                                 return;
                             }
-
-                            const reorderedIds = allProductElements
-                                .map(el => (el as HTMLElement).dataset.id)
-                                .filter((id): id is string => !!id);
                             
-                            const reorderedProductList = reorderedIds.map(id => {
-                                return currentProducts.find(p => p.id === id);
-                            }).filter((p): p is Product => !!p);
+                            const updatedProducts = allProductElements.map((el, index) => {
+                                const productId = (el as HTMLElement).dataset.id;
+                                const product = currentProducts.find(p => p.id === productId);
+                                
+                                if (!product) {
+                                    console.error(`Product with id ${productId} not found in state.`);
+                                    return null;
+                                }
 
-                            if (reorderedProductList.length !== currentProducts.length) {
+                                const newCategoryId = (el.closest('.product-list') as HTMLElement)?.dataset.categoryId;
+
+                                if (!newCategoryId) {
+                                    console.error(`Could not find category for product ${productId}.`);
+                                    return null;
+                                }
+
+                                return {
+                                    ...product,
+                                    orderIndex: index,
+                                    categoryId: newCategoryId,
+                                };
+                            }).filter((p): p is Product => p !== null);
+
+
+                            if (updatedProducts.length !== currentProducts.length) {
                                 console.error("Could not map all DOM elements back to products in state. Aborting.");
                                 alert("Erro de mapeamento de dados. A reordenação foi cancelada.");
                                 return;
                             }
-
-                            const finalProducts = reorderedProductList.map((p, index) => ({
-                                ...p,
-                                orderIndex: index
-                            }));
-
-                            onReorderProducts(finalProducts);
+                            
+                            onReorderProducts(updatedProducts);
                         },
                     });
                     sortableProductInstances.current.set(categoryId, instance);
