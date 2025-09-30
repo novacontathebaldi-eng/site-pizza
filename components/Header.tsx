@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import logo from '../assets/logo.png';
 
 interface HeaderProps {
     cartItemCount: number;
@@ -42,7 +41,7 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, acti
             <div className="container mx-auto px-4">
                 <div className="flex justify-between items-center h-20 relative">
                     <a href="#inicio" onClick={(e) => { e.preventDefault(); scrollToSection('inicio');}} className="flex items-center gap-3 text-xl font-bold">
-                        <img src={logo} alt="Santa Sensação Logo" className="h-14" />
+                        <img src="./assets/logo.png" alt="Santa Sensação Logo" className="h-14" />
                         <span className="hidden sm:inline">Santa Sensação</span>
                     </a>
                     

@@ -41,13 +41,14 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     const categoryListRef = useRef<HTMLDivElement>(null);
     const sortableCategories = useRef<Sortable | null>(null);
     
-    const productsRef = useRef(allProducts);
-    useEffect(() => {
-        productsRef.current = allProducts;
-    }, [allProducts]);
-
+    // Refs for product lists grouped by category
     const productListRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
     const sortableProductInstances = useRef<Map<string, Sortable>>(new Map());
+    const allProductsRef = useRef(allProducts);
+
+    useEffect(() => {
+        allProductsRef.current = allProducts;
+    }, [allProducts]);
 
     useEffect(() => {
         const handleHashChange = () => {
@@ -62,73 +63,46 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         };
     }, []);
 
+    const handleProductReorder = useCallback(() => {
+        const allProductElements = Array.from(document.querySelectorAll('.product-list .product-item'));
+        let reorderedProducts: Product[] = [];
+    
+        allProductElements.forEach(el => {
+            const productId = (el as HTMLElement).dataset.id;
+            const newCategoryId = (el.parentElement as HTMLElement).dataset.categoryId;
+            const product = allProductsRef.current.find(p => p.id === productId);
+    
+            if (product && newCategoryId) {
+                reorderedProducts.push({
+                    ...product,
+                    categoryId: newCategoryId,
+                });
+            }
+        });
+    
+        // Update orderIndex based on the new flat array order
+        const finalProducts = reorderedProducts.map((p, index) => ({ ...p, orderIndex: index }));
+        onReorderProducts(finalProducts);
+    }, [onReorderProducts]);
 
     useEffect(() => {
         if (!isLoggedIn) return;
 
-        const cleanup = () => {
+        if (activeTab === 'products') {
+            // Cleanup previous instances
             sortableProductInstances.current.forEach(instance => instance.destroy());
             sortableProductInstances.current.clear();
-            if (sortableCategories.current) {
-                sortableCategories.current.destroy();
-                sortableCategories.current = null;
-            }
-        };
-
-        if (activeTab === 'products') {
-            cleanup();
             
             productListRefs.current.forEach((el, categoryId) => {
                 if (el) {
                     const instance = Sortable.create(el, {
-                        group: 'products', // Shared group to allow dragging between categories
+                        group: `products-${categoryId}`, // Disallow dragging between lists
                         animation: 150,
                         handle: '.drag-handle',
                         ghostClass: 'sortable-ghost',
                         delay: 100,
                         delayOnTouchOnly: true,
-                        onEnd: () => {
-                            const currentProducts = productsRef.current;
-                            const allProductElements = Array.from(document.querySelectorAll('.product-list .product-item'));
-
-                            if (allProductElements.length !== currentProducts.length) {
-                                console.error("Mismatch between DOM elements and products state. Aborting reorder.");
-                                alert("Erro de sincronização. Por favor, atualize a página e tente novamente.");
-                                return;
-                            }
-                            
-                            const updatedProducts = allProductElements.map((el, index) => {
-                                const productId = (el as HTMLElement).dataset.id;
-                                const product = currentProducts.find(p => p.id === productId);
-                                
-                                if (!product) {
-                                    console.error(`Product with id ${productId} not found in state.`);
-                                    return null;
-                                }
-
-                                const newCategoryId = (el.closest('.product-list') as HTMLElement)?.dataset.categoryId;
-
-                                if (!newCategoryId) {
-                                    console.error(`Could not find category for product ${productId}.`);
-                                    return null;
-                                }
-
-                                return {
-                                    ...product,
-                                    orderIndex: index,
-                                    categoryId: newCategoryId,
-                                };
-                            }).filter((p): p is Product => p !== null);
-
-
-                            if (updatedProducts.length !== currentProducts.length) {
-                                console.error("Could not map all DOM elements back to products in state. Aborting.");
-                                alert("Erro de mapeamento de dados. A reordenação foi cancelada.");
-                                return;
-                            }
-                            
-                            onReorderProducts(updatedProducts);
-                        },
+                        onEnd: handleProductReorder,
                     });
                     sortableProductInstances.current.set(categoryId, instance);
                 }
@@ -136,7 +110,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         }
         
         if (activeTab === 'categories') {
-            cleanup();
+            if (sortableCategories.current) sortableCategories.current.destroy();
             if (categoryListRef.current) {
                 sortableCategories.current = Sortable.create(categoryListRef.current, {
                     animation: 150,
@@ -155,8 +129,11 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             }
         }
         
-        return cleanup;
-    }, [isLoggedIn, activeTab, allCategories, allProducts, onReorderCategories, onReorderProducts]);
+        return () => {
+            sortableProductInstances.current.forEach(instance => instance.destroy());
+            if (sortableCategories.current) sortableCategories.current.destroy();
+        };
+    }, [isLoggedIn, activeTab, allCategories, onReorderCategories, handleProductReorder]);
     
     const sortedCategories = useMemo(() => 
         [...allCategories].sort((a, b) => a.order - b.order),
