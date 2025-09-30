@@ -41,17 +41,6 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     const categoryListRef = useRef<HTMLDivElement>(null);
     const productListRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
 
-    const productsRef = useRef(allProducts);
-    const categoriesRef = useRef(allCategories);
-
-    useEffect(() => {
-        productsRef.current = allProducts;
-    }, [allProducts]);
-
-    useEffect(() => {
-        categoriesRef.current = allCategories;
-    }, [allCategories]);
-
     useEffect(() => {
         const handleHashChange = () => {
             setShowAdminPanel(window.location.hash === '#admin');
@@ -78,7 +67,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             onEnd: (evt) => {
                 if (evt.oldIndex === undefined || evt.newIndex === undefined) return;
                 
-                const currentCategories = [...categoriesRef.current].sort((a, b) => a.order - b.order);
+                const currentCategories = [...sortedCategories]; // Use the already sorted memoized array
                 const [movedItem] = currentCategories.splice(evt.oldIndex, 1);
                 currentCategories.splice(evt.newIndex, 0, movedItem);
                 
@@ -90,7 +79,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         return () => {
             sortable.destroy();
         };
-    }, [isLoggedIn, activeTab, allCategories, onReorderCategories]);
+    }, [isLoggedIn, activeTab, sortedCategories, onReorderCategories]);
 
     // Effect for initializing Product Sortables
     useEffect(() => {
@@ -103,54 +92,59 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         productListRefs.current.forEach((el, categoryId) => {
             if (el) {
                 const instance = Sortable.create(el, {
-                    group: 'products',
+                    group: 'products', // Allows dragging between lists with the same group name
                     animation: 150,
                     handle: '.drag-handle',
                     ghostClass: 'sortable-ghost',
                     onEnd: (evt) => {
                         const { from, to, oldIndex, newIndex } = evt;
                         if (oldIndex === undefined || newIndex === undefined || !from || !to) {
-                            alert("Erro ao reordenar produtos. Tente novamente.");
+                            alert("Ocorreu um erro ao mover o item. Tente novamente.");
                             return;
                         }
 
                         const fromCategoryId = from.dataset.categoryId;
                         const toCategoryId = to.dataset.categoryId;
                         if (!fromCategoryId || !toCategoryId) {
-                            alert("Erro ao reordenar produtos. Tente novamente.");
+                            alert("Ocorreu um erro de categoria. Tente novamente.");
                             return;
                         }
 
-                        const currentProducts = [...productsRef.current];
-                        const productsByCat = new Map<string, Product[]>();
+                        // Create a mutable copy of all products
+                        let productsCopy = [...allProducts];
+
+                        // Find the list of products in the source category and identify the moved item
+                        const sourceProducts = productsCopy
+                            .filter(p => p.categoryId === fromCategoryId)
+                            .sort((a, b) => a.orderIndex - b.orderIndex);
                         
-                        categoriesRef.current.forEach(cat => {
-                            productsByCat.set(cat.id, 
-                                currentProducts.filter(p => p.categoryId === cat.id).sort((a, b) => a.orderIndex - b.orderIndex)
-                            );
-                        });
-
-                        const fromList = productsByCat.get(fromCategoryId);
-                        if (!fromList) return;
-
-                        const [movedItem] = fromList.splice(oldIndex, 1);
+                        const [movedItem] = sourceProducts.splice(oldIndex, 1);
                         if (!movedItem) {
-                             alert("Erro ao reordenar produtos. Tente novamente.");
+                             alert("Não foi possível encontrar o item movido. Tente novamente.");
                              return;
                         }
 
+                        // Update the item's category
                         movedItem.categoryId = toCategoryId;
 
-                        const toList = productsByCat.get(toCategoryId);
-                        if (!toList) return;
-                        toList.splice(newIndex, 0, movedItem);
+                        // Create a new list of all products *without* the moved item
+                        let remainingProducts = productsCopy.filter(p => p.id !== movedItem.id);
 
-                        let finalProducts: Product[] = [];
-                        categoriesRef.current.sort((a, b) => a.order - b.order).forEach(cat => {
-                            finalProducts.push(...(productsByCat.get(cat.id) || []));
-                        });
+                        // Find the destination list from the remaining products
+                        const destinationProducts = remainingProducts
+                            .filter(p => p.categoryId === toCategoryId)
+                            .sort((a, b) => a.orderIndex - b.orderIndex);
+                        
+                        // Insert the moved item into its new position in the destination list
+                        destinationProducts.splice(newIndex, 0, movedItem);
 
-                        const reorderedProducts = finalProducts.map((p, index) => ({
+                        // Reconstruct the full list of products
+                        const unaffectedProducts = remainingProducts.filter(p => p.categoryId !== toCategoryId);
+                        
+                        const finalProductList = [...unaffectedProducts, ...destinationProducts];
+
+                        // Re-assign orderIndex to everything to ensure consistency
+                        const reorderedProducts = finalProductList.map((p, index) => ({
                             ...p,
                             orderIndex: index,
                         }));
@@ -169,6 +163,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
+        // NEVER do this in a real app. This is for demonstration purposes only.
         if (email === 'admin@santa.com' && password === 'admin123') {
             setIsLoggedIn(true);
             setError('');
