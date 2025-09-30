@@ -318,11 +318,25 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                         <button onClick={handleLogout} className="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600 transition-all"><i className="fas fa-sign-out-alt mr-2"></i>Sair</button>
                     </div>
 
-                    <div className="flex border-b border-gray-200 mb-6">
-                        <button onClick={() => setActiveTab('status')} className={`py-2 px-6 font-semibold ${activeTab === 'status' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Status</button>
-                        <button onClick={() => setActiveTab('products')} className={`py-2 px-6 font-semibold ${activeTab === 'products' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Produtos</button>
-                        <button onClick={() => setActiveTab('categories')} className={`py-2 px-6 font-semibold ${activeTab === 'categories' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Categorias</button>
-                        <button onClick={() => setActiveTab('data')} className={`py-2 px-6 font-semibold ${activeTab === 'data' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Dados</button>
+                    <div className="border-b border-gray-200 mb-6">
+                        <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
+                            <button onClick={() => setActiveTab('status')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'status' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                <i className="fas fa-store-alt w-5 text-center"></i>
+                                <span>Status</span>
+                            </button>
+                            <button onClick={() => setActiveTab('products')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'products' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                <i className="fas fa-pizza-slice w-5 text-center"></i>
+                                <span>Produtos</span>
+                            </button>
+                            <button onClick={() => setActiveTab('categories')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'categories' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                <i className="fas fa-tags w-5 text-center"></i>
+                                <span>Categorias</span>
+                            </button>
+                            <button onClick={() => setActiveTab('data')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'data' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                <i className="fas fa-database w-5 text-center"></i>
+                                <span>Dados</span>
+                            </button>
+                        </div>
                     </div>
 
                     {activeTab === 'status' && (
