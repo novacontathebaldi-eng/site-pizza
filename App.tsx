@@ -269,6 +269,25 @@ const App: React.FC = () => {
         }
     }, [products]);
 
+    const handleReorderProducts = useCallback(async (reorderedProducts: Product[]) => {
+        try {
+            await firebaseService.reorderProducts(reorderedProducts);
+        } catch (error) {
+            console.error("Failed to reorder products:", error);
+            alert("Erro ao reordenar produtos. Tente novamente.");
+        }
+    }, []);
+
+    const handleReorderCategories = useCallback(async (reorderedCategories: Category[]) => {
+        try {
+            await firebaseService.reorderCategories(reorderedCategories);
+        } catch (error) {
+            console.error("Failed to reorder categories:", error);
+            alert("Erro ao reordenar categorias. Tente novamente.");
+        }
+    }, []);
+
+
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
 
     return (
@@ -320,6 +339,8 @@ const App: React.FC = () => {
                     onSaveCategory={handleSaveCategory}
                     onDeleteCategory={handleDeleteCategory}
                     onSeedDatabase={seedDatabase}
+                    onReorderProducts={handleReorderProducts}
+                    onReorderCategories={handleReorderCategories}
                 />
             </main>
 
