@@ -1,0 +1,73 @@
+import React from 'react';
+import { CartItem } from '../types';
+
+interface CartSidebarProps {
+    isOpen: boolean;
+    onClose: () => void;
+    cartItems: CartItem[];
+    onUpdateQuantity: (itemId: string, newQuantity: number) => void;
+    onCheckout: () => void;
+    isStoreOnline: boolean;
+}
+
+export const CartSidebar: React.FC<CartSidebarProps> = ({ isOpen, onClose, cartItems, onUpdateQuantity, onCheckout, isStoreOnline }) => {
+    const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+    return (
+        <>
+            <div className={`fixed inset-0 bg-black/60 z-50 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose}></div>
+            <div className={`fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'} flex flex-col`}>
+                <div className="flex justify-between items-center p-5 border-b border-gray-200 bg-brand-ivory-50">
+                    <h2 className="text-2xl font-bold text-text-on-light flex items-center gap-2"><i className="fas fa-shopping-cart"></i>Seu Pedido</h2>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                </div>
+
+                {cartItems.length === 0 ? (
+                    <div className="flex-grow flex flex-col items-center justify-center text-center p-8">
+                        <i className="fas fa-shopping-cart text-6xl text-gray-300 mb-4"></i>
+                        <h3 className="text-xl font-semibold text-gray-700">Seu carrinho está vazio</h3>
+                        <p className="text-gray-500 mt-2">Adicione pizzas deliciosas para começar!</p>
+                    </div>
+                ) : (
+                    <div className="flex-grow overflow-y-auto p-5 space-y-4">
+                        {cartItems.map(item => (
+                            <div key={item.id} className="flex items-center gap-4">
+                                <img src={item.imageUrl} alt={item.name} className="w-20 h-20 rounded-lg object-cover flex-shrink-0" />
+                                <div className="flex-grow">
+                                    <p className="font-bold text-text-on-light">{item.name}</p>
+                                    <p className="text-sm text-gray-500">{item.size}</p>
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <button onClick={() => onUpdateQuantity(item.id, item.quantity - 1)} className="w-7 h-7 bg-gray-200 rounded-md font-bold">-</button>
+                                        <span className="w-8 text-center font-semibold">{item.quantity}</span>
+                                        <button onClick={() => onUpdateQuantity(item.id, item.quantity + 1)} className="w-7 h-7 bg-gray-200 rounded-md font-bold">+</button>
+                                    </div>
+                                </div>
+                                <p className="font-bold text-lg text-accent">
+                                    {(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {cartItems.length > 0 && (
+                    <div className="p-5 border-t border-gray-200 bg-brand-ivory-50">
+                        <div className="flex justify-between items-center mb-4 text-lg">
+                            <span className="font-semibold text-gray-700">Total ({totalItems} {totalItems > 1 ? 'itens' : 'item'}):</span>
+                            <span className="font-bold text-2xl text-accent">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </div>
+                        <button 
+                            onClick={onCheckout} 
+                            disabled={!isStoreOnline}
+                            className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        >
+                            <i className={`fas ${isStoreOnline ? 'fa-whatsapp' : 'fa-clock'} mr-2`}></i>
+                            {isStoreOnline ? 'Finalizar Pedido' : 'Loja Fechada'}
+                        </button>
+                    </div>
+                )}
+            </div>
+        </>
+    );
+};
