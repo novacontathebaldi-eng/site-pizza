@@ -216,46 +216,16 @@ const App: React.FC = () => {
         setIsCartOpen(false);
     };
 
-    const handleSaveProduct = useCallback(async (product: Product, imageFile?: File) => {
+    const handleSaveProduct = useCallback(async (product: Product) => {
         try {
-            const productData = { ...product };
-    
-            // Se houver um novo arquivo de imagem para upload
-            if (imageFile) {
-                if (productData.id) { // Produto existente
-                    productData.imageUrl = await firebaseService.uploadImage(imageFile, productData.id);
-                    await firebaseService.updateProduct(productData);
-                } else { // Novo produto
-                    // 1. Gere uma nova referência de documento para obter um ID *antes* de salvar.
-                    const newProductRef = doc(collection(db!, 'products'));
-                    const newId = newProductRef.id;
-                    
-                    // 2. Faça o upload da imagem usando o novo ID.
-                    const imageUrl = await firebaseService.uploadImage(imageFile, newId);
-                    
-                    // 3. Crie o objeto do produto com todos os dados.
-                    const newProduct: Product = { 
-                        ...productData, 
-                        id: newId, 
-                        imageUrl: imageUrl, 
-                        orderIndex: products.length 
-                    };
-                    
-                    // 4. Salve o novo documento do produto usando setDoc com a referência.
-                    await firebaseService.addProductWithId(newProduct);
-                }
+            if (product.id) {
+                await firebaseService.updateProduct(product);
             } else {
-                // Nenhum novo arquivo de imagem, apenas um salvamento/atualização regular
-                if (productData.id) {
-                    await firebaseService.updateProduct(productData);
-                } else {
-                    await firebaseService.addProduct({ ...productData, orderIndex: products.length });
-                }
+                await firebaseService.addProduct({ ...product, orderIndex: products.length });
             }
         } catch (error) {
             console.error("Failed to save product:", error);
             alert("Erro ao salvar produto. Tente novamente.");
-            throw error; // Propaga o erro para o modal poder parar o loading.
         }
     }, [products.length]);
     
@@ -276,23 +246,6 @@ const App: React.FC = () => {
             alert("Erro ao atualizar status da loja. Tente novamente.");
         }
     }, []);
-
-    const handleReorderProducts = useCallback(async (reorderedProducts: Product[]) => {
-        try {
-            // Identifica apenas os produtos que realmente mudaram de ordem para otimizar a escrita no banco.
-            const changedProducts = reorderedProducts.filter(newProd => {
-                const oldProd = products.find(p => p.id === newProd.id);
-                return !oldProd || oldProd.orderIndex !== newProd.orderIndex;
-            });
-            
-            if (changedProducts.length > 0) {
-                await firebaseService.reorderProducts(changedProducts);
-            }
-        } catch (error) {
-            console.error("Failed to reorder products:", error);
-            alert("Erro ao reordenar produtos. Tente novamente.");
-        }
-    }, [products]);
     
     const handleSaveCategory = useCallback(async (category: Category) => {
         try {
@@ -316,24 +269,23 @@ const App: React.FC = () => {
         }
     }, [products]);
 
-    const handleReorderCategories = useCallback(async (reorderedCategories: Category[]) => {
+    const handleReorderProducts = useCallback(async (productsToUpdate: { id: string; orderIndex: number }[]) => {
         try {
-            // Otimização: atualiza apenas as categorias cuja ordem foi alterada.
-            const categoriesWithNewOrder = reorderedCategories.map((cat, index) => ({ ...cat, order: index }));
-    
-            const changedCategories = categoriesWithNewOrder.filter(newCat => {
-                const oldCat = categories.find(c => c.id === newCat.id);
-                return !oldCat || oldCat.order !== newCat.order;
-            });
-    
-            if (changedCategories.length > 0) {
-                await firebaseService.reorderCategories(changedCategories);
-            }
+            await firebaseService.updateProductsOrder(productsToUpdate);
+        } catch (error) {
+            console.error("Failed to reorder products:", error);
+            alert("Erro ao reordenar produtos. A página pode precisar ser atualizada para refletir a ordem correta.");
+        }
+    }, []);
+
+    const handleReorderCategories = useCallback(async (categoriesToUpdate: { id: string; order: number }[]) => {
+        try {
+            await firebaseService.updateCategoriesOrder(categoriesToUpdate);
         } catch (error) {
             console.error("Failed to reorder categories:", error);
-            alert("Erro ao reordenar categorias. Tente novamente.");
+            alert("Erro ao reordenar categorias. A página pode precisar ser atualizada para refletir a ordem correta.");
         }
-    }, [categories]);
+    }, []);
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
 
@@ -383,9 +335,9 @@ const App: React.FC = () => {
                     onSaveProduct={handleSaveProduct}
                     onDeleteProduct={handleDeleteProduct}
                     onStoreStatusChange={handleStoreStatusChange}
-                    onReorderProducts={handleReorderProducts}
                     onSaveCategory={handleSaveCategory}
                     onDeleteCategory={handleDeleteCategory}
+                    onReorderProducts={handleReorderProducts}
                     onReorderCategories={handleReorderCategories}
                     onSeedDatabase={seedDatabase}
                 />

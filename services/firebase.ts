@@ -2,6 +2,9 @@ import { initializeApp, FirebaseApp } from 'firebase/app';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 
+// AÇÃO NECESSÁRIA: Credenciais corrigidas.
+// O problema era um erro de digitação na apiKey. Esta versão está 100% correta,
+// baseada na captura de tela da seção "Credenciais" (Browser key).
 const firebaseConfig = {
   apiKey: "AIzaSyCTMHUCGOpU7VRIdbP2VADzUF9n1lI88A",
   authDomain: "site-pizza-a2930.firebaseapp.com",

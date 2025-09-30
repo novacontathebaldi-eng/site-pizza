@@ -37,8 +37,8 @@ export const Footer: React.FC = () => {
                         <h4 className="font-bold text-lg mb-4">Acesso Restrito</h4>
                          <ul className="space-y-2 text-brand-green-300">
                             <li>
-                                <a href="#admin" className="inline-flex items-center hover:text-white transition-colors">
-                                    <i className="fas fa-user-shield mr-2 text-accent"></i>
+                                <a href="#admin" className="inline-flex items-center gap-2 hover:text-white transition-colors">
+                                    <i className="fas fa-key mr-1 text-accent"></i>
                                     <span>Painel Administrativo</span>
                                 </a>
                             </li>

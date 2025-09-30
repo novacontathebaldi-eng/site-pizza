@@ -44,18 +44,12 @@
       .animate-fade-in-up {
         animation: fadeInUp 0.5s ease-out forwards;
       }
-      .sortable-chosen {
-        cursor: grabbing;
-        background-color: #f0fdf4; /* Um verde bem claro */
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        border: 1px solid #4ade80; /* Verde mais forte */
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
       }
-      .sortable-ghost {
-        opacity: 0.4;
-        background: #d1fae5;
-      }
-      .sortable-drag {
-        opacity: 1 !important;
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
       }
     </style>
     
@@ -85,8 +79,9 @@
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
     "react/": "https://aistudiocdn.com/react@^19.1.1/",
     "firebase/": "https://aistudiocdn.com/firebase@^12.3.0/",
-    "sortablejs": "https://ga.jspm.io/npm:sortablejs@1.15.2/modular/sortable.esm.js",
-    "react-sortablejs": "https://aistudiocdn.com/react-sortablejs@^6.1.4"
+    "@dnd-kit/core": "https://esm.sh/@dnd-kit/core@6.1.0",
+    "@dnd-kit/sortable": "https://esm.sh/@dnd-kit/sortable@8.0.0",
+    "@dnd-kit/utilities": "https://esm.sh/@dnd-kit/utilities@3.2.2"
   }
 }
 </script>
