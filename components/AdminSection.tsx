@@ -41,9 +41,9 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     const categoryListRef = useRef<HTMLDivElement>(null);
     const sortableCategories = useRef<Sortable | null>(null);
     
-    const productsRef = useRef(allProducts);
+    const allProductsRef = useRef(allProducts);
     useEffect(() => {
-        productsRef.current = allProducts;
+        allProductsRef.current = allProducts;
     }, [allProducts]);
 
     const productListRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
@@ -89,52 +89,62 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                         delayOnTouchOnly: true,
                         onEnd: () => {
                             try {
-                                const currentProducts = productsRef.current;
-                                const allProductElements = Array.from(document.querySelectorAll('.product-list .product-item'));
-                        
-                                if (allProductElements.length !== currentProducts.length) {
-                                    console.error("DOM and state mismatch on reorder. Aborting.", {
-                                        domCount: allProductElements.length,
-                                        stateCount: currentProducts.length,
+                                const productsFromState = allProductsRef.current;
+                                const productMap = new Map(productsFromState.map(p => [p.id, p]));
+                                const allProductElements = Array.from(document.querySelectorAll('#admin .product-list .product-item'));
+    
+                                if (allProductElements.length !== productsFromState.length) {
+                                    console.error("DOM count differs from state count. Aborting reorder.", {
+                                        dom: allProductElements.length,
+                                        state: productsFromState.length,
                                     });
-                                    alert("Erro de sincronização. Por favor, atualize a página e tente novamente.");
+                                    alert("Erro de sincronização. Por favor, atualize a página.");
                                     return;
                                 }
-                        
-                                const updatedProducts: Product[] = [];
-                                let errorOccurred = false;
-                        
-                                allProductElements.forEach((el, index) => {
-                                    if (errorOccurred) return;
-                        
-                                    const productId = (el as HTMLElement).dataset.id;
-                                    const product = currentProducts.find(p => p.id === productId);
-                                    const newCategoryId = (el.closest('.product-list') as HTMLElement)?.dataset.categoryId;
-                        
-                                    if (!productId || !product || !newCategoryId) {
-                                        console.error("Error mapping DOM element to product state.", { productId, hasProduct: !!product, newCategoryId });
-                                        errorOccurred = true;
+    
+                                const reorderedProducts: Product[] = [];
+                                let errorFound = false;
+    
+                                allProductElements.forEach((itemEl, index) => {
+                                    if (errorFound) return;
+    
+                                    const element = itemEl as HTMLElement;
+                                    const productId = element.dataset.id;
+                                    const newParentList = element.closest('.product-list') as HTMLElement;
+                                    const newCategoryId = newParentList?.dataset.categoryId;
+    
+                                    if (!productId || !newCategoryId) {
+                                        console.error("Missing data attribute on element.", { productId, newCategoryId });
+                                        errorFound = true;
                                         return;
                                     }
-                        
-                                    updatedProducts.push({
-                                        ...product,
+    
+                                    const originalProduct = productMap.get(productId);
+    
+                                    if (!originalProduct) {
+                                        console.error(`Product with ID ${productId} not found in state.`);
+                                        errorFound = true;
+                                        return;
+                                    }
+    
+                                    reorderedProducts.push({
+                                        ...originalProduct,
                                         orderIndex: index,
                                         categoryId: newCategoryId,
                                     });
                                 });
-                        
-                                if (errorOccurred || updatedProducts.length !== currentProducts.length) {
-                                    console.error("An error occurred during product mapping. Reordering aborted.");
-                                    alert("Erro ao processar a nova ordem dos produtos. Tente novamente.");
+                                
+                                if (errorFound || reorderedProducts.length !== productsFromState.length) {
+                                    console.error("Failed to build the reordered product list. Aborting.");
+                                    alert("Erro ao reordenar produtos. Tente novamente.");
                                     return;
                                 }
                                 
-                                onReorderProducts(updatedProducts);
-                        
+                                onReorderProducts(reorderedProducts);
+    
                             } catch (e) {
-                                console.error("Critical error in onEnd handler:", e);
-                                alert("Ocorreu um erro inesperado ao reordenar. Tente novamente.");
+                                console.error("Critical error in onEnd reorder handler:", e);
+                                alert("Ocorreu um erro crítico. Tente novamente.");
                             }
                         },
                     });
