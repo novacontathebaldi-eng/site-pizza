@@ -246,15 +246,6 @@ const App: React.FC = () => {
             alert("Erro ao atualizar status da loja. Tente novamente.");
         }
     }, []);
-
-    const handleReorderProducts = useCallback(async (reorderedProducts: Product[]) => {
-        try {
-            await firebaseService.reorderProducts(reorderedProducts);
-        } catch (error) {
-            console.error("Failed to reorder products:", error);
-            alert("Erro ao reordenar produtos. Tente novamente.");
-        }
-    }, []);
     
     const handleSaveCategory = useCallback(async (category: Category) => {
         try {
@@ -277,15 +268,6 @@ const App: React.FC = () => {
             alert(`Erro ao deletar categoria: ${error.message}`);
         }
     }, [products]);
-
-    const handleReorderCategories = useCallback(async (reorderedCategories: Category[]) => {
-        try {
-            await firebaseService.reorderCategories(reorderedCategories);
-        } catch (error) {
-            console.error("Failed to reorder categories:", error);
-            alert("Erro ao reordenar categorias. Tente novamente.");
-        }
-    }, []);
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
 
@@ -335,10 +317,8 @@ const App: React.FC = () => {
                     onSaveProduct={handleSaveProduct}
                     onDeleteProduct={handleDeleteProduct}
                     onStoreStatusChange={handleStoreStatusChange}
-                    onReorderProducts={handleReorderProducts}
                     onSaveCategory={handleSaveCategory}
                     onDeleteCategory={handleDeleteCategory}
-                    onReorderCategories={handleReorderCategories}
                     onSeedDatabase={seedDatabase}
                 />
             </main>

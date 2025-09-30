@@ -24,20 +24,6 @@ export const deleteProduct = async (productId: string): Promise<void> => {
     await deleteDoc(productRef);
 };
 
-export const reorderProducts = async (products: Product[]): Promise<void> => {
-    const batch = writeBatch(db);
-    products.forEach((product, index) => {
-        const productRef = doc(db, 'products', product.id);
-        // Atualiza tanto a ordem quanto a categoria, caso tenha sido movido
-        batch.update(productRef, { 
-            orderIndex: index,
-            categoryId: product.categoryId 
-        });
-    });
-    await batch.commit();
-};
-
-
 // Category Functions
 export const addCategory = async (categoryData: Omit<Category, 'id'>): Promise<void> => {
     await addDoc(collection(db, 'categories'), categoryData);
@@ -58,13 +44,4 @@ export const deleteCategory = async (categoryId: string, allProducts: Product[])
     }
     const categoryRef = doc(db, 'categories', categoryId);
     await deleteDoc(categoryRef);
-};
-
-export const reorderCategories = async (categories: Category[]): Promise<void> => {
-    const batch = writeBatch(db);
-    categories.forEach((category, index) => {
-        const categoryRef = doc(db, 'categories', category.id);
-        batch.update(categoryRef, { order: index });
-    });
-    await batch.commit();
 };

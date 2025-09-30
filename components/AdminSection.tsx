@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Product, Category } from '../types';
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
-// @ts-ignore - Sortable will be a global from CDN
-import Sortable from 'sortablejs';
 
 interface AdminSectionProps {
     allProducts: Product[];
@@ -12,17 +10,15 @@ interface AdminSectionProps {
     onSaveProduct: (product: Product) => Promise<void>;
     onDeleteProduct: (productId: string) => Promise<void>;
     onStoreStatusChange: (isOnline: boolean) => Promise<void>;
-    onReorderProducts: (products: Product[]) => Promise<void>;
     onSaveCategory: (category: Category) => Promise<void>;
     onDeleteCategory: (categoryId: string) => Promise<void>;
-    onReorderCategories: (categories: Category[]) => Promise<void>;
     onSeedDatabase: () => Promise<void>;
 }
 
 export const AdminSection: React.FC<AdminSectionProps> = ({
     allProducts, allCategories, isStoreOnline,
-    onSaveProduct, onDeleteProduct, onStoreStatusChange, onReorderProducts,
-    onSaveCategory, onDeleteCategory, onReorderCategories,
+    onSaveProduct, onDeleteProduct, onStoreStatusChange,
+    onSaveCategory, onDeleteCategory,
     onSeedDatabase
 }) => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -38,9 +34,6 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
-    const categoryListRef = useRef<HTMLDivElement>(null);
-    const productListRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
-
     useEffect(() => {
         const handleHashChange = () => {
             setShowAdminPanel(window.location.hash === '#admin');
@@ -53,113 +46,6 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         [...allCategories].sort((a, b) => a.order - b.order),
         [allCategories]
     );
-
-    // Effect for initializing Category Sortable
-    useEffect(() => {
-        if (!isLoggedIn || activeTab !== 'categories' || !categoryListRef.current) {
-            return;
-        }
-
-        const sortable = Sortable.create(categoryListRef.current, {
-            animation: 150,
-            handle: '.drag-handle',
-            ghostClass: 'sortable-ghost',
-            onEnd: (evt) => {
-                if (evt.oldIndex === undefined || evt.newIndex === undefined) return;
-                
-                const currentCategories = [...sortedCategories]; // Use the already sorted memoized array
-                const [movedItem] = currentCategories.splice(evt.oldIndex, 1);
-                currentCategories.splice(evt.newIndex, 0, movedItem);
-                
-                const reorderedCategories = currentCategories.map((cat, index) => ({ ...cat, order: index }));
-                onReorderCategories(reorderedCategories);
-            },
-        });
-
-        return () => {
-            sortable.destroy();
-        };
-    }, [isLoggedIn, activeTab, sortedCategories, onReorderCategories]);
-
-    // Effect for initializing Product Sortables
-    useEffect(() => {
-        if (!isLoggedIn || activeTab !== 'products') {
-            return;
-        }
-
-        const instances = new Map<string, Sortable>();
-
-        productListRefs.current.forEach((el, categoryId) => {
-            if (el) {
-                const instance = Sortable.create(el, {
-                    group: 'products', // Allows dragging between lists with the same group name
-                    animation: 150,
-                    handle: '.drag-handle',
-                    ghostClass: 'sortable-ghost',
-                    onEnd: (evt) => {
-                        const { from, to, oldIndex, newIndex } = evt;
-                        if (oldIndex === undefined || newIndex === undefined || !from || !to) {
-                            alert("Ocorreu um erro ao mover o item. Tente novamente.");
-                            return;
-                        }
-
-                        const fromCategoryId = from.dataset.categoryId;
-                        const toCategoryId = to.dataset.categoryId;
-                        if (!fromCategoryId || !toCategoryId) {
-                            alert("Ocorreu um erro de categoria. Tente novamente.");
-                            return;
-                        }
-
-                        // Create a mutable copy of all products
-                        let productsCopy = [...allProducts];
-
-                        // Find the list of products in the source category and identify the moved item
-                        const sourceProducts = productsCopy
-                            .filter(p => p.categoryId === fromCategoryId)
-                            .sort((a, b) => a.orderIndex - b.orderIndex);
-                        
-                        const [movedItem] = sourceProducts.splice(oldIndex, 1);
-                        if (!movedItem) {
-                             alert("Não foi possível encontrar o item movido. Tente novamente.");
-                             return;
-                        }
-
-                        // Update the item's category
-                        movedItem.categoryId = toCategoryId;
-
-                        // Create a new list of all products *without* the moved item
-                        let remainingProducts = productsCopy.filter(p => p.id !== movedItem.id);
-
-                        // Find the destination list from the remaining products
-                        const destinationProducts = remainingProducts
-                            .filter(p => p.categoryId === toCategoryId)
-                            .sort((a, b) => a.orderIndex - b.orderIndex);
-                        
-                        // Insert the moved item into its new position in the destination list
-                        destinationProducts.splice(newIndex, 0, movedItem);
-
-                        // Reconstruct the full list of products
-                        const unaffectedProducts = remainingProducts.filter(p => p.categoryId !== toCategoryId);
-                        
-                        const finalProductList = [...unaffectedProducts, ...destinationProducts];
-
-                        // Re-assign orderIndex to everything to ensure consistency
-                        const reorderedProducts = finalProductList.map((p, index) => ({
-                            ...p,
-                            orderIndex: index,
-                        }));
-                        
-                        onReorderProducts(reorderedProducts);
-                    },
-                });
-                instances.set(categoryId, instance);
-            }
-        });
-
-        return () => {
-            instances.forEach(instance => instance.destroy());
-        };
-    }, [isLoggedIn, activeTab, allProducts, allCategories, onReorderProducts]);
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -304,20 +190,13 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                 {sortedCategories.map(category => (
                                     <div key={category.id}>
                                         <h4 className="text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300">{category.name}</h4>
-                                        <div
-                                            ref={el => { productListRefs.current.set(category.id, el); }}
-                                            className="product-list space-y-3 min-h-[50px]"
-                                            data-category-id={category.id}
-                                        >
+                                        <div className="space-y-3">
                                             {allProducts
                                                 .filter(p => p.categoryId === category.id)
                                                 .sort((a, b) => a.orderIndex - b.orderIndex)
                                                 .map(product => (
-                                                    <div key={product.id} data-id={product.id} className="product-item bg-gray-50 p-3 rounded-lg flex justify-between items-center">
-                                                        <div className="flex items-center gap-4">
-                                                            <i className="fas fa-grip-vertical drag-handle text-gray-400" title="Arraste para reordenar"></i>
-                                                            <p className="font-bold">{product.name}</p>
-                                                        </div>
+                                                    <div key={product.id} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
+                                                        <p className="font-bold">{product.name}</p>
                                                         <div className="flex gap-2">
                                                             <button onClick={() => handleEditProduct(product)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${product.name}`}><i className="fas fa-edit"></i></button>
                                                             <button onClick={() => window.confirm('Tem certeza que deseja excluir este produto?') && onDeleteProduct(product.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${product.name}`}><i className="fas fa-trash"></i></button>
@@ -337,13 +216,10 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                 <h3 className="text-xl font-bold">Gerenciar Categorias</h3>
                                 <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"><i className="fas fa-plus mr-2"></i>Nova Categoria</button>
                             </div>
-                            <div ref={categoryListRef} className="space-y-3">
+                            <div className="space-y-3">
                                 {sortedCategories.map(cat => (
                                     <div key={cat.id} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
-                                        <div className="flex items-center gap-4">
-                                            <i className="fas fa-grip-vertical drag-handle text-gray-400" title="Arraste para reordenar"></i>
-                                            <p className="font-bold">{cat.name}</p>
-                                        </div>
+                                        <p className="font-bold">{cat.name}</p>
                                         <div className="flex gap-2">
                                             <button onClick={() => handleEditCategory(cat)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${cat.name}`}><i className="fas fa-edit"></i></button>
                                             <button onClick={() => window.confirm(`Tem certeza que deseja excluir a categoria "${cat.name}"?`) && onDeleteCategory(cat.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${cat.name}`}><i className="fas fa-trash"></i></button>
