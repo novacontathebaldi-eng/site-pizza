@@ -44,7 +44,7 @@ export const HeroSection: React.FC = () => {
             <div 
                 className="absolute inset-0 bg-cover bg-center" 
                 style={{
-                    backgroundImage: `url(/assets/ambiente-pizzaria.webp)`,
+                    backgroundImage: `url(assets/ambiente-pizzaria.webp)`,
                     opacity: scrollOpacity,
                     transition: 'opacity 0.1s ease-out'
                 }}
