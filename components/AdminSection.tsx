@@ -38,20 +38,19 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
-    // Refs for Sortable.js
     const categoryListRef = useRef<HTMLDivElement>(null);
-    const sortableCategories = useRef<Sortable | null>(null);
     const productListRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
-    const sortableProductInstances = useRef<Map<string, Sortable>>(new Map());
 
-    // Refs to hold current data to avoid stale state in callbacks
     const productsRef = useRef(allProducts);
     const categoriesRef = useRef(allCategories);
 
     useEffect(() => {
         productsRef.current = allProducts;
+    }, [allProducts]);
+
+    useEffect(() => {
         categoriesRef.current = allCategories;
-    }, [allProducts, allCategories]);
+    }, [allCategories]);
 
     useEffect(() => {
         const handleHashChange = () => {
@@ -66,106 +65,107 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         [allCategories]
     );
 
-    // Initialize Sortable.js
+    // Effect for initializing Category Sortable
     useEffect(() => {
-        if (!isLoggedIn) return;
-
-        // Cleanup function to destroy all instances
-        const cleanup = () => {
-            sortableProductInstances.current.forEach(instance => instance.destroy());
-            sortableProductInstances.current.clear();
-            if (sortableCategories.current) {
-                sortableCategories.current.destroy();
-                sortableCategories.current = null;
-            }
-        };
-
-        if (activeTab === 'products') {
-            cleanup();
-            productListRefs.current.forEach((el, categoryId) => {
-                if (el) {
-                    const instance = Sortable.create(el, {
-                        group: 'products',
-                        animation: 150,
-                        handle: '.drag-handle',
-                        ghostClass: 'sortable-ghost',
-                        onEnd: (evt) => {
-                            const { from, to, oldIndex, newIndex, item } = evt;
-                            if (oldIndex === undefined || newIndex === undefined || !from || !to || !item) return;
-
-                            const fromCategoryId = from.dataset.categoryId;
-                            const toCategoryId = to.dataset.categoryId;
-                            
-                            if (!fromCategoryId || !toCategoryId) return;
-
-                            // Create a mutable copy of products grouped by category
-                            const currentProducts = productsRef.current;
-                            const productsByCategory: { [key: string]: Product[] } = {};
-                            
-                            categoriesRef.current.forEach(cat => {
-                                productsByCategory[cat.id] = currentProducts
-                                    .filter(p => p.categoryId === cat.id)
-                                    .sort((a, b) => a.orderIndex - b.orderIndex);
-                            });
-
-                            // Remove item from old category list
-                            const [movedItem] = productsByCategory[fromCategoryId].splice(oldIndex, 1);
-                            
-                            if (!movedItem) {
-                                console.error("Error: Could not find the moved product.");
-                                alert("Erro ao reordenar produtos. Tente novamente.");
-                                return;
-                            }
-                            
-                            // Update category ID if moved to a different category
-                            movedItem.categoryId = toCategoryId;
-
-                            // Add item to new category list
-                            productsByCategory[toCategoryId].splice(newIndex, 0, movedItem);
-
-                            // Flatten the lists back into a single array, respecting category order
-                            let finalProducts: Product[] = [];
-                            sortedCategories.forEach(cat => {
-                                finalProducts.push(...(productsByCategory[cat.id] || []));
-                            });
-                            
-                            // Re-assign global orderIndex to every product
-                            const reorderedProducts = finalProducts.map((p, index) => ({
-                                ...p,
-                                orderIndex: index,
-                            }));
-
-                            onReorderProducts(reorderedProducts);
-                        },
-                    });
-                    sortableProductInstances.current.set(categoryId, instance);
-                }
-            });
+        if (!isLoggedIn || activeTab !== 'categories' || !categoryListRef.current) {
+            return;
         }
 
-        if (activeTab === 'categories') {
-            cleanup();
-            if (categoryListRef.current) {
-                sortableCategories.current = Sortable.create(categoryListRef.current, {
+        const sortable = Sortable.create(categoryListRef.current, {
+            animation: 150,
+            handle: '.drag-handle',
+            ghostClass: 'sortable-ghost',
+            onEnd: (evt) => {
+                if (evt.oldIndex === undefined || evt.newIndex === undefined) return;
+                
+                const currentCategories = [...categoriesRef.current].sort((a, b) => a.order - b.order);
+                const [movedItem] = currentCategories.splice(evt.oldIndex, 1);
+                currentCategories.splice(evt.newIndex, 0, movedItem);
+                
+                const reorderedCategories = currentCategories.map((cat, index) => ({ ...cat, order: index }));
+                onReorderCategories(reorderedCategories);
+            },
+        });
+
+        return () => {
+            sortable.destroy();
+        };
+    }, [isLoggedIn, activeTab, allCategories, onReorderCategories]);
+
+    // Effect for initializing Product Sortables
+    useEffect(() => {
+        if (!isLoggedIn || activeTab !== 'products') {
+            return;
+        }
+
+        const instances = new Map<string, Sortable>();
+
+        productListRefs.current.forEach((el, categoryId) => {
+            if (el) {
+                const instance = Sortable.create(el, {
+                    group: 'products',
                     animation: 150,
                     handle: '.drag-handle',
                     ghostClass: 'sortable-ghost',
                     onEnd: (evt) => {
-                        if (evt.oldIndex === undefined || evt.newIndex === undefined) return;
+                        const { from, to, oldIndex, newIndex } = evt;
+                        if (oldIndex === undefined || newIndex === undefined || !from || !to) {
+                            alert("Erro ao reordenar produtos. Tente novamente.");
+                            return;
+                        }
+
+                        const fromCategoryId = from.dataset.categoryId;
+                        const toCategoryId = to.dataset.categoryId;
+                        if (!fromCategoryId || !toCategoryId) {
+                            alert("Erro ao reordenar produtos. Tente novamente.");
+                            return;
+                        }
+
+                        const currentProducts = [...productsRef.current];
+                        const productsByCat = new Map<string, Product[]>();
                         
-                        const currentCategories = [...categoriesRef.current].sort((a,b)=> a.order - b.order);
-                        const [movedItem] = currentCategories.splice(evt.oldIndex, 1);
-                        currentCategories.splice(evt.newIndex, 0, movedItem);
+                        categoriesRef.current.forEach(cat => {
+                            productsByCat.set(cat.id, 
+                                currentProducts.filter(p => p.categoryId === cat.id).sort((a, b) => a.orderIndex - b.orderIndex)
+                            );
+                        });
+
+                        const fromList = productsByCat.get(fromCategoryId);
+                        if (!fromList) return;
+
+                        const [movedItem] = fromList.splice(oldIndex, 1);
+                        if (!movedItem) {
+                             alert("Erro ao reordenar produtos. Tente novamente.");
+                             return;
+                        }
+
+                        movedItem.categoryId = toCategoryId;
+
+                        const toList = productsByCat.get(toCategoryId);
+                        if (!toList) return;
+                        toList.splice(newIndex, 0, movedItem);
+
+                        let finalProducts: Product[] = [];
+                        categoriesRef.current.sort((a, b) => a.order - b.order).forEach(cat => {
+                            finalProducts.push(...(productsByCat.get(cat.id) || []));
+                        });
+
+                        const reorderedProducts = finalProducts.map((p, index) => ({
+                            ...p,
+                            orderIndex: index,
+                        }));
                         
-                        onReorderCategories(currentCategories);
+                        onReorderProducts(reorderedProducts);
                     },
                 });
+                instances.set(categoryId, instance);
             }
-        }
+        });
 
-        return cleanup;
-    }, [isLoggedIn, activeTab, sortedCategories, onReorderProducts, onReorderCategories]);
-
+        return () => {
+            instances.forEach(instance => instance.destroy());
+        };
+    }, [isLoggedIn, activeTab, allProducts, allCategories, onReorderProducts]);
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -242,7 +242,6 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         }
     };
     
-
     if (!showAdminPanel) return null;
 
     if (!isLoggedIn) {
