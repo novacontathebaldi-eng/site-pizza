@@ -45,6 +45,11 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     useEffect(() => {
         allProductsRef.current = allProducts;
     }, [allProducts]);
+    
+    const sortedCategoriesRef = useRef(allCategories);
+     useEffect(() => {
+        sortedCategoriesRef.current = [...allCategories].sort((a, b) => a.order - b.order);
+    }, [allCategories]);
 
     const productListRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
     const sortableProductInstances = useRef<Map<string, Sortable>>(new Map());
@@ -81,71 +86,70 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             productListRefs.current.forEach((el, categoryId) => {
                 if (el) {
                     const instance = Sortable.create(el, {
-                        group: 'products', // Shared group allows dragging between categories
+                        group: 'products',
                         animation: 150,
                         handle: '.drag-handle',
                         ghostClass: 'sortable-ghost',
                         delay: 100,
                         delayOnTouchOnly: true,
-                        onEnd: () => {
-                            try {
-                                const productsFromState = allProductsRef.current;
-                                const productMap = new Map(productsFromState.map(p => [p.id, p]));
-                                const allProductElements = Array.from(document.querySelectorAll('#admin .product-list .product-item'));
-    
-                                if (allProductElements.length !== productsFromState.length) {
-                                    console.error("DOM count differs from state count. Aborting reorder.", {
-                                        dom: allProductElements.length,
-                                        state: productsFromState.length,
-                                    });
-                                    alert("Erro de sincronização. Por favor, atualize a página.");
-                                    return;
+                        onEnd: (evt) => {
+                            const { from, to, oldIndex, newIndex, item } = evt;
+                            if (oldIndex === undefined || newIndex === undefined) return;
+
+                            const products = allProductsRef.current;
+                            const sortedCategories = sortedCategoriesRef.current;
+                            const fromCategoryId = from.dataset.categoryId;
+                            const toCategoryId = to.dataset.categoryId;
+                            const movedProductId = item.dataset.id;
+                            
+                            // Create a map of products by category for easier manipulation
+                            const productsByCategory: Record<string, Product[]> = {};
+                            products.forEach(p => {
+                                if (!productsByCategory[p.categoryId]) {
+                                    productsByCategory[p.categoryId] = [];
                                 }
-    
-                                const reorderedProducts: Product[] = [];
-                                let errorFound = false;
-    
-                                allProductElements.forEach((itemEl, index) => {
-                                    if (errorFound) return;
-    
-                                    const element = itemEl as HTMLElement;
-                                    const productId = element.dataset.id;
-                                    const newParentList = element.closest('.product-list') as HTMLElement;
-                                    const newCategoryId = newParentList?.dataset.categoryId;
-    
-                                    if (!productId || !newCategoryId) {
-                                        console.error("Missing data attribute on element.", { productId, newCategoryId });
-                                        errorFound = true;
-                                        return;
-                                    }
-    
-                                    const originalProduct = productMap.get(productId);
-    
-                                    if (!originalProduct) {
-                                        console.error(`Product with ID ${productId} not found in state.`);
-                                        errorFound = true;
-                                        return;
-                                    }
-    
-                                    reorderedProducts.push({
-                                        ...originalProduct,
-                                        orderIndex: index,
-                                        categoryId: newCategoryId,
-                                    });
-                                });
-                                
-                                if (errorFound || reorderedProducts.length !== productsFromState.length) {
-                                    console.error("Failed to build the reordered product list. Aborting.");
-                                    alert("Erro ao reordenar produtos. Tente novamente.");
-                                    return;
+                                productsByCategory[p.categoryId].push(p);
+                            });
+
+                            // Ensure all categories are present, even if empty
+                             sortedCategories.forEach(cat => {
+                                if (!productsByCategory[cat.id]) {
+                                    productsByCategory[cat.id] = [];
                                 }
-                                
-                                onReorderProducts(reorderedProducts);
-    
-                            } catch (e) {
-                                console.error("Critical error in onEnd reorder handler:", e);
-                                alert("Ocorreu um erro crítico. Tente novamente.");
+                            });
+
+                            // Get the product that was moved
+                            const sourceCategoryList = productsByCategory[fromCategoryId] || [];
+                            const [movedProduct] = sourceCategoryList.splice(oldIndex, 1);
+                            
+                            if (!movedProduct) {
+                                 console.error("Could not find moved product. This might be a sync issue.");
+                                 alert("Erro ao reordenar. Por favor, atualize a página e tente novamente.");
+                                 return;
                             }
+
+                            // Update its category
+                            movedProduct.categoryId = toCategoryId;
+
+                            // Add it to the new category's list
+                            const destCategoryList = productsByCategory[toCategoryId] || [];
+                            destCategoryList.splice(newIndex, 0, movedProduct);
+                            productsByCategory[toCategoryId] = destCategoryList;
+
+                            // Flatten the map back into a single array based on the sorted category order
+                            let finalProductList: Product[] = [];
+                            sortedCategories.forEach(category => {
+                                const categoryProducts = productsByCategory[category.id] || [];
+                                finalProductList.push(...categoryProducts);
+                            });
+
+                            // Assign the final, correct, global orderIndex to every product
+                            const productsToSave = finalProductList.map((p, index) => ({
+                                ...p,
+                                orderIndex: index,
+                            }));
+                            
+                            onReorderProducts(productsToSave);
                         },
                     });
                     sortableProductInstances.current.set(categoryId, instance);
@@ -164,7 +168,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                     delayOnTouchOnly: true,
                     onEnd: (evt) => {
                         if (evt.oldIndex === undefined || evt.newIndex === undefined) return;
-                        const newCategories = [...allCategories];
+                        const newCategories = [...sortedCategoriesRef.current];
                         const [movedItem] = newCategories.splice(evt.oldIndex, 1);
                         newCategories.splice(evt.newIndex, 0, movedItem);
                         onReorderCategories(newCategories);
@@ -174,7 +178,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         }
         
         return cleanup;
-    }, [isLoggedIn, activeTab, allCategories, onReorderCategories, onReorderProducts]);
+    }, [isLoggedIn, activeTab, allCategories, allProducts, onReorderCategories, onReorderProducts]);
     
     const sortedCategories = useMemo(() => 
         [...allCategories].sort((a, b) => a.order - b.order),
@@ -329,6 +333,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                         >
                                             {allProducts
                                                 .filter(p => p.categoryId === category.id)
+                                                .sort((a,b) => a.orderIndex - b.orderIndex)
                                                 .map(product => (
                                                     <div key={product.id} data-id={product.id} className="product-item bg-gray-50 p-3 rounded-lg flex justify-between items-center">
                                                         <div className="flex items-center gap-4">
