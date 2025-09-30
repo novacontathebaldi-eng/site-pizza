@@ -15,11 +15,11 @@ interface AdminSectionProps {
     onSeedDatabase: () => Promise<void>;
 }
 
-export const AdminSection: React.FC<AdminSectionProps> = ({
-    allProducts, allCategories, isStoreOnline,
+export const AdminSection: React.FC<AdminSectionProps> = ({ 
+    allProducts, allCategories, isStoreOnline, 
     onSaveProduct, onDeleteProduct, onStoreStatusChange,
     onSaveCategory, onDeleteCategory,
-    onSeedDatabase
+    onSeedDatabase 
 }) => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [activeTab, setActiveTab] = useState('status');
@@ -38,18 +38,21 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         const handleHashChange = () => {
             setShowAdminPanel(window.location.hash === '#admin');
         };
+        
         window.addEventListener('hashchange', handleHashChange, false);
-        return () => window.removeEventListener('hashchange', handleHashChange, false);
+        handleHashChange();
+
+        return () => {
+            window.removeEventListener('hashchange', handleHashChange, false);
+        };
     }, []);
     
-    const sortedCategories = useMemo(() =>
+    const sortedCategories = useMemo(() => 
         [...allCategories].sort((a, b) => a.order - b.order),
-        [allCategories]
-    );
+    [allCategories]);
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
-        // NEVER do this in a real app. This is for demonstration purposes only.
         if (email === 'admin@santa.com' && password === 'admin123') {
             setIsLoggedIn(true);
             setError('');
@@ -105,7 +108,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                 store_config: { status: { isOpen: isStoreOnline } },
                 backupDate: new Date().toISOString(),
             };
-
+    
             const jsonString = JSON.stringify(backupData, null, 2);
             const blob = new Blob([jsonString], { type: 'application/json' });
             const href = URL.createObjectURL(blob);
@@ -122,7 +125,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             alert("Falha ao criar o backup.");
         }
     };
-    
+
     if (!showAdminPanel) return null;
 
     if (!isLoggedIn) {
@@ -179,7 +182,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                             </div>
                         </div>
                     )}
-
+                    
                     {activeTab === 'products' && (
                         <div>
                             <div className="flex justify-between items-center mb-4">
@@ -190,19 +193,21 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                 {sortedCategories.map(category => (
                                     <div key={category.id}>
                                         <h4 className="text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300">{category.name}</h4>
-                                        <div className="space-y-3">
+                                        <div className="space-y-3 min-h-[50px]">
                                             {allProducts
                                                 .filter(p => p.categoryId === category.id)
                                                 .sort((a, b) => a.orderIndex - b.orderIndex)
                                                 .map(product => (
                                                     <div key={product.id} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
-                                                        <p className="font-bold">{product.name}</p>
+                                                        <div className="flex items-center gap-4">
+                                                            <p className="font-bold">{product.name}</p>
+                                                        </div>
                                                         <div className="flex gap-2">
                                                             <button onClick={() => handleEditProduct(product)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${product.name}`}><i className="fas fa-edit"></i></button>
                                                             <button onClick={() => window.confirm('Tem certeza que deseja excluir este produto?') && onDeleteProduct(product.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${product.name}`}><i className="fas fa-trash"></i></button>
                                                         </div>
                                                     </div>
-                                                ))}
+                                            ))}
                                         </div>
                                     </div>
                                 ))}
@@ -212,21 +217,23 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
 
                     {activeTab === 'categories' && (
                         <div>
-                            <div className="flex justify-between items-center mb-4">
+                           <div className="flex justify-between items-center mb-4">
                                 <h3 className="text-xl font-bold">Gerenciar Categorias</h3>
                                 <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"><i className="fas fa-plus mr-2"></i>Nova Categoria</button>
                             </div>
-                            <div className="space-y-3">
+                             <div className="space-y-3">
                                 {sortedCategories.map(cat => (
                                     <div key={cat.id} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
-                                        <p className="font-bold">{cat.name}</p>
+                                         <div className="flex items-center gap-4">
+                                            <p className="font-bold">{cat.name}</p>
+                                         </div>
                                         <div className="flex gap-2">
                                             <button onClick={() => handleEditCategory(cat)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${cat.name}`}><i className="fas fa-edit"></i></button>
                                             <button onClick={() => window.confirm(`Tem certeza que deseja excluir a categoria "${cat.name}"?`) && onDeleteCategory(cat.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${cat.name}`}><i className="fas fa-trash"></i></button>
                                         </div>
                                     </div>
                                 ))}
-                            </div>
+                             </div>
                         </div>
                     )}
 
@@ -252,7 +259,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                 </div>
             </div>
 
-            <ProductModal
+            <ProductModal 
                 isOpen={isProductModalOpen}
                 onClose={() => setIsProductModalOpen(false)}
                 onSave={onSaveProduct}
