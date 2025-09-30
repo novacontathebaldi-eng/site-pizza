@@ -21,6 +21,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     });
     
     const [formData, setFormData] = useState<Omit<Product, 'id' | 'active'>>(getInitialFormData());
+    const [showBadgeTooltip, setShowBadgeTooltip] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -91,9 +92,30 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                     {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                                 </select>
                             </div>
-                            <div>
-                                <label className="block text-sm font-semibold mb-1">Badge (opcional)</label>
-                                <input name="badge" value={formData.badge} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" placeholder="Ex: Popular" />
+                            <div className="relative">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <label className="block text-sm font-semibold">Selo de Destaque (opcional)</label>
+                                    <button
+                                        type="button"
+                                        onMouseEnter={() => setShowBadgeTooltip(true)}
+                                        onMouseLeave={() => setShowBadgeTooltip(false)}
+                                        onClick={() => setShowBadgeTooltip(!showBadgeTooltip)}
+                                        className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                                        aria-label="Informações sobre o selo de destaque"
+                                    >
+                                        <i className="fas fa-question-circle"></i>
+                                    </button>
+                                </div>
+                                {showBadgeTooltip && (
+                                    <div 
+                                        style={{ animation: 'fadeInUp 0.2s ease-out' }}
+                                        className="absolute bottom-full left-0 mb-2 w-full max-w-xs bg-gray-800 text-white text-sm rounded-lg p-3 z-10 shadow-lg">
+                                        <p>Um selo para destacar o produto no cardápio. Aparecerá como uma pequena etiqueta na imagem.</p>
+                                        <p className="mt-1 font-semibold">Exemplos: 'Popular', 'Novo', 'Promoção'.</p>
+                                        <div className="absolute left-4 -bottom-1 w-2 h-2 bg-gray-800 rotate-45"></div>
+                                    </div>
+                                )}
+                                <input name="badge" value={formData.badge} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" placeholder="Ex: Novo, Popular" />
                             </div>
                         </div>
                         <div>

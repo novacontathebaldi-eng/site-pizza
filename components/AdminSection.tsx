@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Product, Category } from '../types';
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
-import Sortable from 'sortablejs';
-import { ReactSortable } from 'react-sortablejs';
-
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface AdminSectionProps {
     allProducts: Product[];
@@ -13,17 +13,95 @@ interface AdminSectionProps {
     onSaveProduct: (product: Product) => Promise<void>;
     onDeleteProduct: (productId: string) => Promise<void>;
     onStoreStatusChange: (isOnline: boolean) => Promise<void>;
-    onReorderProducts: (products: Product[]) => Promise<void>;
     onSaveCategory: (category: Category) => Promise<void>;
     onDeleteCategory: (categoryId: string) => Promise<void>;
-    onReorderCategories: (categories: Category[]) => Promise<void>;
+    onReorderProducts: (productsToUpdate: { id: string; orderIndex: number }[]) => Promise<void>;
+    onReorderCategories: (categoriesToUpdate: { id: string; order: number }[]) => Promise<void>;
     onSeedDatabase: () => Promise<void>;
 }
 
+interface SortableProductItemProps {
+    product: Product;
+    onEdit: (product: Product) => void;
+    onDelete: (productId: string) => void;
+}
+
+const SortableProductItem: React.FC<SortableProductItemProps> = ({ product, onEdit, onDelete }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: product.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 10 : 'auto',
+        boxShadow: isDragging ? '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' : 'none',
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
+            <div className="flex items-center gap-4">
+                <button {...attributes} {...listeners} className="cursor-grab touch-none p-2" aria-label="Mover produto">
+                    <i className="fas fa-grip-vertical text-gray-500 hover:text-gray-800"></i>
+                </button>
+                <p className="font-bold">{product.name}</p>
+            </div>
+            <div className="flex gap-2">
+                <button onClick={() => onEdit(product)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${product.name}`}><i className="fas fa-edit"></i></button>
+                <button onClick={() => window.confirm('Tem certeza que deseja excluir este produto?') && onDelete(product.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${product.name}`}><i className="fas fa-trash"></i></button>
+            </div>
+        </div>
+    );
+};
+
+interface SortableCategoryItemProps {
+    category: Category;
+    onEdit: (category: Category) => void;
+    onDelete: (categoryId: string) => void;
+}
+
+const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, onEdit, onDelete }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: category.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 10 : 'auto',
+        boxShadow: isDragging ? '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' : 'none',
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
+            <div className="flex items-center gap-4">
+                <button {...attributes} {...listeners} className="cursor-grab touch-none p-2" aria-label="Mover categoria">
+                    <i className="fas fa-grip-vertical text-gray-500 hover:text-gray-800"></i>
+                </button>
+                <p className="font-bold">{category.name}</p>
+            </div>
+            <div className="flex gap-2">
+                <button onClick={() => onEdit(category)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${category.name}`}><i className="fas fa-edit"></i></button>
+                <button onClick={() => window.confirm(`Tem certeza que deseja excluir a categoria "${category.name}"?`) && onDelete(category.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${category.name}`}><i className="fas fa-trash"></i></button>
+            </div>
+        </div>
+    );
+};
+
 export const AdminSection: React.FC<AdminSectionProps> = ({ 
     allProducts, allCategories, isStoreOnline, 
-    onSaveProduct, onDeleteProduct, onStoreStatusChange, onReorderProducts,
-    onSaveCategory, onDeleteCategory, onReorderCategories,
+    onSaveProduct, onDeleteProduct, onStoreStatusChange,
+    onSaveCategory, onDeleteCategory, onReorderProducts, onReorderCategories,
     onSeedDatabase 
 }) => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -32,34 +110,24 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [showAdminPanel, setShowAdminPanel] = useState(window.location.hash === '#admin');
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    
+    const [localProducts, setLocalProducts] = useState<Product[]>(allProducts);
+    const [localCategories, setLocalCategories] = useState<Category[]>(allCategories);
 
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-
-    const [displayCategories, setDisplayCategories] = useState<Category[]>([]);
-
-    const adminTabs = useMemo(() => [
-        { id: 'status', label: 'Status', icon: 'fas fa-toggle-on' },
-        { id: 'products', label: 'Produtos', icon: 'fas fa-pizza-slice' },
-        { id: 'categories', label: 'Categorias', icon: 'fas fa-tags' },
-        { id: 'data', label: 'Dados', icon: 'fas fa-database' }
-    ], []);
-
-    const activeTabInfo = useMemo(() => adminTabs.find(tab => tab.id === activeTab), [activeTab, adminTabs]);
-
-
-    const sortedCategoriesMemo = useMemo(() => 
-        [...allCategories].sort((a, b) => a.order - b.order),
-    [allCategories]);
+    
+    useEffect(() => {
+        setLocalProducts(allProducts);
+    }, [allProducts]);
 
     useEffect(() => {
-        setDisplayCategories(sortedCategoriesMemo);
-    }, [sortedCategoriesMemo]);
-    
+        setLocalCategories([...allCategories].sort((a, b) => a.order - b.order));
+    }, [allCategories]);
+
     useEffect(() => {
         const handleHashChange = () => {
             setShowAdminPanel(window.location.hash === '#admin');
@@ -72,6 +140,73 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             window.removeEventListener('hashchange', handleHashChange, false);
         };
     }, []);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    const handleProductDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+
+        if (!over || active.id === over.id) {
+            return;
+        }
+
+        const activeProduct = localProducts.find(p => p.id === active.id);
+        const overProduct = localProducts.find(p => p.id === over.id);
+        
+        if (!activeProduct || !overProduct || activeProduct.categoryId !== overProduct.categoryId) {
+            return;
+        }
+
+        const categoryId = activeProduct.categoryId;
+        
+        setLocalProducts((products) => {
+            const categoryProducts = products.filter(p => p.categoryId === categoryId).sort((a, b) => a.orderIndex - b.orderIndex);
+            const oldIndex = categoryProducts.findIndex(p => p.id === active.id);
+            const newIndex = categoryProducts.findIndex(p => p.id === over.id);
+            
+            const reorderedCategoryProducts = arrayMove(categoryProducts, oldIndex, newIndex);
+            
+            const productsToUpdate = reorderedCategoryProducts.map((p, index) => ({
+                id: p.id,
+                orderIndex: index
+            }));
+
+            onReorderProducts(productsToUpdate);
+
+            // Return new state for optimistic update
+            const otherProducts = products.filter(p => p.categoryId !== categoryId);
+            return [...otherProducts, ...reorderedCategoryProducts.map((p, index) => ({ ...p, orderIndex: index }))];
+        });
+    };
+
+    const handleCategoryDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+
+        if (!over || active.id === over.id) {
+            return;
+        }
+
+        setLocalCategories((categories) => {
+            const oldIndex = categories.findIndex(c => c.id === active.id);
+            const newIndex = categories.findIndex(c => c.id === over.id);
+            
+            const reorderedCategories = arrayMove(categories, oldIndex, newIndex);
+            
+            const categoriesToUpdate = reorderedCategories.map((c, index) => ({
+                id: c.id,
+                order: index
+            }));
+
+            onReorderCategories(categoriesToUpdate);
+
+            return reorderedCategories.map((c, index) => ({ ...c, order: index }));
+        });
+    };
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -148,32 +283,6 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         }
     };
 
-    const handleProductReorder = useCallback((reorderedProductsInCategory: Product[], categoryId: string) => {
-        // Create a new, full list of products in the correct visual order.
-        const newFullProductList: Product[] = [];
-        displayCategories.forEach(cat => {
-            if (cat.id === categoryId) {
-                // For the modified category, use the newly reordered list of products.
-                newFullProductList.push(...reorderedProductsInCategory);
-            } else {
-                // For all other categories, add their products from the original source.
-                const productsForCategory = allProducts
-                    .filter(p => p.categoryId === cat.id)
-                    .sort((a, b) => a.orderIndex - b.orderIndex);
-                newFullProductList.push(...productsForCategory);
-            }
-        });
-
-        // Re-assign the global orderIndex to every product to ensure consistency.
-        const reindexedProducts = newFullProductList.map((p, index) => ({
-            ...p,
-            orderIndex: index
-        }));
-
-        onReorderProducts(reindexedProducts);
-    }, [allProducts, displayCategories, onReorderProducts]);
-
-
     if (!showAdminPanel) return null;
 
     if (!isLoggedIn) {
@@ -209,52 +318,24 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                         <button onClick={handleLogout} className="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600 transition-all"><i className="fas fa-sign-out-alt mr-2"></i>Sair</button>
                     </div>
 
-                    <div className="mb-6">
-                        {/* Mobile Dropdown Menu */}
-                        <div className="md:hidden relative">
-                            <button 
-                                onClick={() => setIsDropdownOpen(!isDropdownOpen)} 
-                                className="w-full flex justify-between items-center py-3 px-4 font-semibold text-lg bg-gray-50 border border-gray-200 rounded-lg"
-                                aria-haspopup="true"
-                                aria-expanded={isDropdownOpen}
-                            >
-                                <span>
-                                    <i className={`${activeTabInfo?.icon} mr-3 text-accent w-5 text-center`}></i>
-                                    {activeTabInfo?.label}
-                                </span>
-                                <i className={`fas fa-chevron-down transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}></i>
+                    <div className="border-b border-gray-200 mb-6">
+                        <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
+                            <button onClick={() => setActiveTab('status')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'status' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                <i className="fas fa-store-alt w-5 text-center"></i>
+                                <span>Status</span>
                             </button>
-                            {isDropdownOpen && (
-                                <div className="absolute top-full left-0 w-full bg-white border border-gray-200 rounded-lg mt-1 shadow-lg z-10 animate-fade-in-up">
-                                    {adminTabs.map(tab => (
-                                        <button 
-                                            key={tab.id}
-                                            onClick={() => {
-                                                setActiveTab(tab.id);
-                                                setIsDropdownOpen(false);
-                                            }}
-                                            className={`w-full text-left py-3 px-4 font-semibold flex items-center gap-3 ${activeTab === tab.id ? 'bg-brand-ivory-50 text-accent' : 'text-gray-600 hover:bg-gray-50'}`}
-                                        >
-                                            <i className={`${tab.icon} w-5 text-center`}></i>
-                                            {tab.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Desktop Tabs */}
-                        <div className="hidden md:flex border-b border-gray-200">
-                            {adminTabs.map(tab => (
-                                <button 
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)} 
-                                    className={`py-3 px-6 font-semibold flex items-center gap-2 transition-colors duration-200 ${activeTab === tab.id ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent'}`}
-                                >
-                                    <i className={tab.icon}></i>
-                                    {tab.label}
-                                </button>
-                            ))}
+                            <button onClick={() => setActiveTab('products')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'products' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                <i className="fas fa-pizza-slice w-5 text-center"></i>
+                                <span>Produtos</span>
+                            </button>
+                            <button onClick={() => setActiveTab('categories')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'categories' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                <i className="fas fa-tags w-5 text-center"></i>
+                                <span>Categorias</span>
+                            </button>
+                            <button onClick={() => setActiveTab('data')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'data' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                <i className="fas fa-database w-5 text-center"></i>
+                                <span>Dados</span>
+                            </button>
                         </div>
                     </div>
 
@@ -279,41 +360,32 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                 <h3 className="text-xl font-bold">Gerenciar Produtos</h3>
                                 <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"><i className="fas fa-plus mr-2"></i>Novo Produto</button>
                             </div>
-                            <div className="space-y-6">
-                                {displayCategories.map(category => {
-                                    const categoryProducts = allProducts
-                                        .filter(p => p.categoryId === category.id)
-                                        .sort((a, b) => a.orderIndex - b.orderIndex);
-                                    
-                                    return (
-                                        <div key={category.id}>
-                                            <h4 className="text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300">{category.name}</h4>
-                                            <ReactSortable
-                                                list={categoryProducts}
-                                                setList={(newList) => handleProductReorder(newList, category.id)}
-                                                group={{ name: 'products', pull: false, put: false }}
-                                                animation={200}
-                                                delay={2}
-                                                className="space-y-3 min-h-[50px]"
-                                                handle=".handle"
-                                            >
-                                                {categoryProducts.map((product) => (
-                                                    <div key={product.id} className="bg-gray-50 p-3 rounded-lg flex items-center">
-                                                        <div className="handle cursor-grab text-gray-400 mr-4" aria-label={`Arrastar para reordenar ${product.name}`}>
-                                                            <i className="fas fa-grip-vertical"></i>
-                                                        </div>
-                                                        <p className="font-bold flex-grow">{product.name}</p>
-                                                        <div className="flex items-center gap-2">
-                                                            <button onClick={() => handleEditProduct(product)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${product.name}`}><i className="fas fa-edit"></i></button>
-                                                            <button onClick={() => window.confirm('Tem certeza que deseja excluir este produto?') && onDeleteProduct(product.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${product.name}`}><i className="fas fa-trash"></i></button>
-                                                        </div>
+                             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}>
+                                <div className="space-y-6">
+                                    {localCategories.map(category => {
+                                        const categoryProducts = localProducts
+                                            .filter(p => p.categoryId === category.id)
+                                            .sort((a, b) => a.orderIndex - b.orderIndex);
+                                        return (
+                                            <div key={category.id}>
+                                                <h4 className="text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300">{category.name}</h4>
+                                                <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                                                    <div className="space-y-3 min-h-[50px]">
+                                                        {categoryProducts.map(product => (
+                                                            <SortableProductItem
+                                                                key={product.id}
+                                                                product={product}
+                                                                onEdit={handleEditProduct}
+                                                                onDelete={onDeleteProduct}
+                                                            />
+                                                        ))}
                                                     </div>
-                                                ))}
-                                            </ReactSortable>
-                                        </div>
-                                    )
-                                })}
-                            </div>
+                                                </SortableContext>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </DndContext>
                         </div>
                     )}
 
@@ -323,30 +395,20 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                 <h3 className="text-xl font-bold">Gerenciar Categorias</h3>
                                 <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"><i className="fas fa-plus mr-2"></i>Nova Categoria</button>
                             </div>
-                            <ReactSortable
-                                list={displayCategories}
-                                setList={(newList) => {
-                                    setDisplayCategories(newList);
-                                    onReorderCategories(newList);
-                                }}
-                                animation={200}
-                                delay={2}
-                                className="space-y-3"
-                                handle=".handle"
-                            >
-                                {displayCategories.map((cat) => (
-                                    <div key={cat.id} className="bg-gray-50 p-3 rounded-lg flex items-center">
-                                        <div className="handle cursor-grab text-gray-400 mr-4" aria-label={`Arrastar para reordenar ${cat.name}`}>
-                                            <i className="fas fa-grip-vertical"></i>
-                                        </div>
-                                        <p className="font-bold flex-grow">{cat.name}</p>
-                                        <div className="flex items-center gap-2">
-                                            <button onClick={() => handleEditCategory(cat)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${cat.name}`}><i className="fas fa-edit"></i></button>
-                                            <button onClick={() => window.confirm(`Tem certeza que deseja excluir a categoria "${cat.name}"?`) && onDeleteCategory(cat.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${cat.name}`}><i className="fas fa-trash"></i></button>
-                                        </div>
+                            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
+                                <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                                    <div className="space-y-3">
+                                        {localCategories.map(cat => (
+                                            <SortableCategoryItem
+                                                key={cat.id}
+                                                category={cat}
+                                                onEdit={handleEditCategory}
+                                                onDelete={onDeleteCategory}
+                                            />
+                                        ))}
                                     </div>
-                                ))}
-                            </ReactSortable>
+                                </SortableContext>
+                            </DndContext>
                         </div>
                     )}
 
