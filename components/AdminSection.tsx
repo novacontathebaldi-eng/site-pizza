@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Product, Category } from '../types';
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
@@ -19,11 +19,11 @@ interface AdminSectionProps {
     onSeedDatabase: () => Promise<void>;
 }
 
-export const AdminSection: React.FC<AdminSectionProps> = ({ 
-    allProducts, allCategories, isStoreOnline, 
+export const AdminSection: React.FC<AdminSectionProps> = ({
+    allProducts, allCategories, isStoreOnline,
     onSaveProduct, onDeleteProduct, onStoreStatusChange, onReorderProducts,
     onSaveCategory, onDeleteCategory, onReorderCategories,
-    onSeedDatabase 
+    onSeedDatabase
 }) => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [activeTab, setActiveTab] = useState('status');
@@ -38,39 +38,39 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
+    // Refs for Sortable.js
     const categoryListRef = useRef<HTMLDivElement>(null);
     const sortableCategories = useRef<Sortable | null>(null);
-    
-    const allProductsRef = useRef(allProducts);
-    useEffect(() => {
-        allProductsRef.current = allProducts;
-    }, [allProducts]);
-    
-    const sortedCategoriesRef = useRef(allCategories);
-     useEffect(() => {
-        sortedCategoriesRef.current = [...allCategories].sort((a, b) => a.order - b.order);
-    }, [allCategories]);
-
     const productListRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
     const sortableProductInstances = useRef<Map<string, Sortable>>(new Map());
+
+    // Refs to hold current data to avoid stale state in callbacks
+    const productsRef = useRef(allProducts);
+    const categoriesRef = useRef(allCategories);
+
+    useEffect(() => {
+        productsRef.current = allProducts;
+        categoriesRef.current = allCategories;
+    }, [allProducts, allCategories]);
 
     useEffect(() => {
         const handleHashChange = () => {
             setShowAdminPanel(window.location.hash === '#admin');
         };
-        
         window.addEventListener('hashchange', handleHashChange, false);
-        handleHashChange();
-
-        return () => {
-            window.removeEventListener('hashchange', handleHashChange, false);
-        };
+        return () => window.removeEventListener('hashchange', handleHashChange, false);
     }, []);
+    
+    const sortedCategories = useMemo(() =>
+        [...allCategories].sort((a, b) => a.order - b.order),
+        [allCategories]
+    );
 
-
+    // Initialize Sortable.js
     useEffect(() => {
         if (!isLoggedIn) return;
 
+        // Cleanup function to destroy all instances
         const cleanup = () => {
             sortableProductInstances.current.forEach(instance => instance.destroy());
             sortableProductInstances.current.clear();
@@ -82,7 +82,6 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
 
         if (activeTab === 'products') {
             cleanup();
-            
             productListRefs.current.forEach((el, categoryId) => {
                 if (el) {
                     const instance = Sortable.create(el, {
@@ -90,73 +89,60 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                         animation: 150,
                         handle: '.drag-handle',
                         ghostClass: 'sortable-ghost',
-                        delay: 100,
-                        delayOnTouchOnly: true,
                         onEnd: (evt) => {
                             const { from, to, oldIndex, newIndex, item } = evt;
-                            if (oldIndex === undefined || newIndex === undefined) return;
+                            if (oldIndex === undefined || newIndex === undefined || !from || !to || !item) return;
 
-                            const products = allProductsRef.current;
-                            const sortedCategories = sortedCategoriesRef.current;
                             const fromCategoryId = from.dataset.categoryId;
                             const toCategoryId = to.dataset.categoryId;
-                            const movedProductId = item.dataset.id;
                             
-                            // Create a map of products by category for easier manipulation
-                            const productsByCategory: Record<string, Product[]> = {};
-                            products.forEach(p => {
-                                if (!productsByCategory[p.categoryId]) {
-                                    productsByCategory[p.categoryId] = [];
-                                }
-                                productsByCategory[p.categoryId].push(p);
+                            if (!fromCategoryId || !toCategoryId) return;
+
+                            // Create a mutable copy of products grouped by category
+                            const currentProducts = productsRef.current;
+                            const productsByCategory: { [key: string]: Product[] } = {};
+                            
+                            categoriesRef.current.forEach(cat => {
+                                productsByCategory[cat.id] = currentProducts
+                                    .filter(p => p.categoryId === cat.id)
+                                    .sort((a, b) => a.orderIndex - b.orderIndex);
                             });
 
-                            // Ensure all categories are present, even if empty
-                             sortedCategories.forEach(cat => {
-                                if (!productsByCategory[cat.id]) {
-                                    productsByCategory[cat.id] = [];
-                                }
-                            });
-
-                            // Get the product that was moved
-                            const sourceCategoryList = productsByCategory[fromCategoryId] || [];
-                            const [movedProduct] = sourceCategoryList.splice(oldIndex, 1);
+                            // Remove item from old category list
+                            const [movedItem] = productsByCategory[fromCategoryId].splice(oldIndex, 1);
                             
-                            if (!movedProduct) {
-                                 console.error("Could not find moved product. This might be a sync issue.");
-                                 alert("Erro ao reordenar. Por favor, atualize a página e tente novamente.");
-                                 return;
+                            if (!movedItem) {
+                                console.error("Error: Could not find the moved product.");
+                                alert("Erro ao reordenar produtos. Tente novamente.");
+                                return;
                             }
+                            
+                            // Update category ID if moved to a different category
+                            movedItem.categoryId = toCategoryId;
 
-                            // Update its category
-                            movedProduct.categoryId = toCategoryId;
+                            // Add item to new category list
+                            productsByCategory[toCategoryId].splice(newIndex, 0, movedItem);
 
-                            // Add it to the new category's list
-                            const destCategoryList = productsByCategory[toCategoryId] || [];
-                            destCategoryList.splice(newIndex, 0, movedProduct);
-                            productsByCategory[toCategoryId] = destCategoryList;
-
-                            // Flatten the map back into a single array based on the sorted category order
-                            let finalProductList: Product[] = [];
-                            sortedCategories.forEach(category => {
-                                const categoryProducts = productsByCategory[category.id] || [];
-                                finalProductList.push(...categoryProducts);
+                            // Flatten the lists back into a single array, respecting category order
+                            let finalProducts: Product[] = [];
+                            sortedCategories.forEach(cat => {
+                                finalProducts.push(...(productsByCategory[cat.id] || []));
                             });
-
-                            // Assign the final, correct, global orderIndex to every product
-                            const productsToSave = finalProductList.map((p, index) => ({
+                            
+                            // Re-assign global orderIndex to every product
+                            const reorderedProducts = finalProducts.map((p, index) => ({
                                 ...p,
                                 orderIndex: index,
                             }));
-                            
-                            onReorderProducts(productsToSave);
+
+                            onReorderProducts(reorderedProducts);
                         },
                     });
                     sortableProductInstances.current.set(categoryId, instance);
                 }
             });
         }
-        
+
         if (activeTab === 'categories') {
             cleanup();
             if (categoryListRef.current) {
@@ -164,25 +150,22 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                     animation: 150,
                     handle: '.drag-handle',
                     ghostClass: 'sortable-ghost',
-                    delay: 100,
-                    delayOnTouchOnly: true,
                     onEnd: (evt) => {
                         if (evt.oldIndex === undefined || evt.newIndex === undefined) return;
-                        const newCategories = [...sortedCategoriesRef.current];
-                        const [movedItem] = newCategories.splice(evt.oldIndex, 1);
-                        newCategories.splice(evt.newIndex, 0, movedItem);
-                        onReorderCategories(newCategories);
-                    }
+                        
+                        const currentCategories = [...categoriesRef.current].sort((a,b)=> a.order - b.order);
+                        const [movedItem] = currentCategories.splice(evt.oldIndex, 1);
+                        currentCategories.splice(evt.newIndex, 0, movedItem);
+                        
+                        onReorderCategories(currentCategories);
+                    },
                 });
             }
         }
-        
+
         return cleanup;
-    }, [isLoggedIn, activeTab, allCategories, allProducts, onReorderCategories, onReorderProducts]);
-    
-    const sortedCategories = useMemo(() => 
-        [...allCategories].sort((a, b) => a.order - b.order),
-    [allCategories]);
+    }, [isLoggedIn, activeTab, sortedCategories, onReorderProducts, onReorderCategories]);
+
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -241,7 +224,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                 store_config: { status: { isOpen: isStoreOnline } },
                 backupDate: new Date().toISOString(),
             };
-    
+
             const jsonString = JSON.stringify(backupData, null, 2);
             const blob = new Blob([jsonString], { type: 'application/json' });
             const href = URL.createObjectURL(blob);
@@ -258,6 +241,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             alert("Falha ao criar o backup.");
         }
     };
+    
 
     if (!showAdminPanel) return null;
 
@@ -315,7 +299,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                             </div>
                         </div>
                     )}
-                    
+
                     {activeTab === 'products' && (
                         <div>
                             <div className="flex justify-between items-center mb-4">
@@ -326,14 +310,14 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                 {sortedCategories.map(category => (
                                     <div key={category.id}>
                                         <h4 className="text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300">{category.name}</h4>
-                                        <div 
+                                        <div
                                             ref={el => { productListRefs.current.set(category.id, el); }}
                                             className="product-list space-y-3 min-h-[50px]"
                                             data-category-id={category.id}
                                         >
                                             {allProducts
                                                 .filter(p => p.categoryId === category.id)
-                                                .sort((a,b) => a.orderIndex - b.orderIndex)
+                                                .sort((a, b) => a.orderIndex - b.orderIndex)
                                                 .map(product => (
                                                     <div key={product.id} data-id={product.id} className="product-item bg-gray-50 p-3 rounded-lg flex justify-between items-center">
                                                         <div className="flex items-center gap-4">
@@ -345,7 +329,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                                             <button onClick={() => window.confirm('Tem certeza que deseja excluir este produto?') && onDeleteProduct(product.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${product.name}`}><i className="fas fa-trash"></i></button>
                                                         </div>
                                                     </div>
-                                            ))}
+                                                ))}
                                         </div>
                                     </div>
                                 ))}
@@ -355,24 +339,24 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
 
                     {activeTab === 'categories' && (
                         <div>
-                           <div className="flex justify-between items-center mb-4">
+                            <div className="flex justify-between items-center mb-4">
                                 <h3 className="text-xl font-bold">Gerenciar Categorias</h3>
                                 <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"><i className="fas fa-plus mr-2"></i>Nova Categoria</button>
                             </div>
-                             <div ref={categoryListRef} className="space-y-3">
+                            <div ref={categoryListRef} className="space-y-3">
                                 {sortedCategories.map(cat => (
                                     <div key={cat.id} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
-                                         <div className="flex items-center gap-4">
+                                        <div className="flex items-center gap-4">
                                             <i className="fas fa-grip-vertical drag-handle text-gray-400" title="Arraste para reordenar"></i>
                                             <p className="font-bold">{cat.name}</p>
-                                         </div>
+                                        </div>
                                         <div className="flex gap-2">
                                             <button onClick={() => handleEditCategory(cat)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${cat.name}`}><i className="fas fa-edit"></i></button>
                                             <button onClick={() => window.confirm(`Tem certeza que deseja excluir a categoria "${cat.name}"?`) && onDeleteCategory(cat.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${cat.name}`}><i className="fas fa-trash"></i></button>
                                         </div>
                                     </div>
                                 ))}
-                             </div>
+                            </div>
                         </div>
                     )}
 
@@ -398,7 +382,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                 </div>
             </div>
 
-            <ProductModal 
+            <ProductModal
                 isOpen={isProductModalOpen}
                 onClose={() => setIsProductModalOpen(false)}
                 onSave={onSaveProduct}
