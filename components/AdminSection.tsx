@@ -44,11 +44,6 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     // Refs for product lists grouped by category
     const productListRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
     const sortableProductInstances = useRef<Map<string, Sortable>>(new Map());
-    const allProductsRef = useRef(allProducts);
-
-    useEffect(() => {
-        allProductsRef.current = allProducts;
-    }, [allProducts]);
 
     useEffect(() => {
         const handleHashChange = () => {
@@ -63,53 +58,64 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         };
     }, []);
 
-    const handleProductReorder = useCallback(() => {
-        const allProductElements = Array.from(document.querySelectorAll('.product-list .product-item'));
-        
-        // Safety Check: Ensure the number of rendered products matches our state reference.
-        if (allProductElements.length !== allProductsRef.current.length) {
-            console.error("Mismatch between rendered products and state. Aborting reorder to prevent data corruption.");
-            alert("Erro de sincronização de dados. A reordenação foi cancelada. Por favor, atualize a página e tente novamente.");
-            return;
-        }
-
-        const reorderedProductList: Product[] = [];
-        for (const element of allProductElements) {
-            const productId = (element as HTMLElement).dataset.id;
-            const product = allProductsRef.current.find(p => p.id === productId);
-            if (product) {
-                reorderedProductList.push(product);
-            } else {
-                 console.error(`Product with ID ${productId} exists in the DOM but not in the current state. Aborting.`);
-                 alert("Erro de sincronização grave. A página será recarregada.");
-                 window.location.reload();
-                 return;
-            }
-        }
-    
-        const finalProducts = reorderedProductList.map((p, index) => ({ ...p, orderIndex: index }));
-        onReorderProducts(finalProducts);
-    }, [onReorderProducts]);
 
     useEffect(() => {
         if (!isLoggedIn) return;
 
-        if (activeTab === 'products') {
-            // Cleanup previous instances to avoid memory leaks
+        // Cleanup function to destroy all instances on re-render or component unmount
+        const cleanup = () => {
             sortableProductInstances.current.forEach(instance => instance.destroy());
             sortableProductInstances.current.clear();
+            if (sortableCategories.current) {
+                sortableCategories.current.destroy();
+                sortableCategories.current = null;
+            }
+        };
+
+        if (activeTab === 'products') {
+            cleanup(); // Destroy previous instances before creating new ones
             
             productListRefs.current.forEach((el, categoryId) => {
                 if (el) {
                     const instance = Sortable.create(el, {
-                        // Using a unique group for each category list correctly prevents dragging items between them.
                         group: `products-${categoryId}`,
                         animation: 150,
                         handle: '.drag-handle',
                         ghostClass: 'sortable-ghost',
                         delay: 100,
                         delayOnTouchOnly: true,
-                        onEnd: handleProductReorder,
+                        onEnd: () => {
+                            // This logic now runs with the most up-to-date `allProducts`
+                            // because this entire effect is re-run when `allProducts` changes.
+                            const allProductElements = Array.from(document.querySelectorAll('.product-list .product-item'));
+                            
+                            if (allProductElements.length !== allProducts.length) {
+                                console.error("Mismatch between DOM elements and products state. Aborting reorder.");
+                                alert("Erro de sincronização. Por favor, atualize a página e tente novamente.");
+                                return;
+                            }
+
+                            const reorderedIds = allProductElements
+                                .map(el => (el as HTMLElement).dataset.id)
+                                .filter((id): id is string => !!id);
+                            
+                            const reorderedProductList = reorderedIds.map(id => {
+                                return allProducts.find(p => p.id === id);
+                            }).filter((p): p is Product => !!p);
+
+                            if (reorderedProductList.length !== allProducts.length) {
+                                console.error("Could not map all DOM elements back to products in state. Aborting.");
+                                alert("Erro de mapeamento de dados. A reordenação foi cancelada.");
+                                return;
+                            }
+
+                            const finalProducts = reorderedProductList.map((p, index) => ({
+                                ...p,
+                                orderIndex: index
+                            }));
+
+                            onReorderProducts(finalProducts);
+                        },
                     });
                     sortableProductInstances.current.set(categoryId, instance);
                 }
@@ -117,7 +123,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         }
         
         if (activeTab === 'categories') {
-            if (sortableCategories.current) sortableCategories.current.destroy();
+            cleanup(); // Destroy previous instances
             if (categoryListRef.current) {
                 sortableCategories.current = Sortable.create(categoryListRef.current, {
                     animation: 150,
@@ -136,14 +142,8 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             }
         }
         
-        return () => {
-            sortableProductInstances.current.forEach(instance => instance.destroy());
-            if (sortableCategories.current) sortableCategories.current.destroy();
-        };
-    // CRITICAL FIX: Added allProducts to the dependency array.
-    // This ensures that SortableJS is re-initialized whenever the product list changes,
-    // preventing stale state and DOM inconsistencies that were causing the reorder to fail.
-    }, [isLoggedIn, activeTab, allCategories, allProducts, onReorderCategories, handleProductReorder]);
+        return cleanup;
+    }, [isLoggedIn, activeTab, allCategories, allProducts, onReorderCategories, onReorderProducts]);
     
     const sortedCategories = useMemo(() => 
         [...allCategories].sort((a, b) => a.order - b.order),
