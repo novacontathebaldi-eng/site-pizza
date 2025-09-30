@@ -6,9 +6,9 @@ import { Product, Category } from '../types';
 const initialCategories: Omit<Category, 'id'>[] = [
     { name: 'Pizzas Salgadas', order: 1, active: true },
     { name: 'Pizzas Doces', order: 2, active: true },
-    { name: 'Sobremesas', order: 3, active: true },
-    { name: 'Aperitivos', order: 4, active: true },
-    { name: 'Bebidas', order: 5, active: true }
+    { name: 'Bebidas', order: 3, active: true },
+    { name: 'Sobremesas', order: 4, active: true },
+    { name: 'Aperitivos', order: 5, active: true }
 ];
 
 const initialProducts: Omit<Product, 'id' | 'categoryId'>[] = [
