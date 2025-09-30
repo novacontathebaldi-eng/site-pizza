@@ -81,53 +81,61 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             productListRefs.current.forEach((el, categoryId) => {
                 if (el) {
                     const instance = Sortable.create(el, {
-                        group: 'products', // Shared group to allow dragging between categories
+                        group: 'products', // Shared group allows dragging between categories
                         animation: 150,
                         handle: '.drag-handle',
                         ghostClass: 'sortable-ghost',
                         delay: 100,
                         delayOnTouchOnly: true,
                         onEnd: () => {
-                            const currentProducts = productsRef.current;
-                            const allProductElements = Array.from(document.querySelectorAll('.product-list .product-item'));
-
-                            if (allProductElements.length !== currentProducts.length) {
-                                console.error("Mismatch between DOM elements and products state. Aborting reorder.");
-                                alert("Erro de sincronização. Por favor, atualize a página e tente novamente.");
-                                return;
-                            }
-                            
-                            const updatedProducts = allProductElements.map((el, index) => {
-                                const productId = (el as HTMLElement).dataset.id;
-                                const product = currentProducts.find(p => p.id === productId);
+                            try {
+                                const currentProducts = productsRef.current;
+                                const allProductElements = Array.from(document.querySelectorAll('.product-list .product-item'));
+                        
+                                if (allProductElements.length !== currentProducts.length) {
+                                    console.error("DOM and state mismatch on reorder. Aborting.", {
+                                        domCount: allProductElements.length,
+                                        stateCount: currentProducts.length,
+                                    });
+                                    alert("Erro de sincronização. Por favor, atualize a página e tente novamente.");
+                                    return;
+                                }
+                        
+                                const updatedProducts: Product[] = [];
+                                let errorOccurred = false;
+                        
+                                allProductElements.forEach((el, index) => {
+                                    if (errorOccurred) return;
+                        
+                                    const productId = (el as HTMLElement).dataset.id;
+                                    const product = currentProducts.find(p => p.id === productId);
+                                    const newCategoryId = (el.closest('.product-list') as HTMLElement)?.dataset.categoryId;
+                        
+                                    if (!productId || !product || !newCategoryId) {
+                                        console.error("Error mapping DOM element to product state.", { productId, hasProduct: !!product, newCategoryId });
+                                        errorOccurred = true;
+                                        return;
+                                    }
+                        
+                                    updatedProducts.push({
+                                        ...product,
+                                        orderIndex: index,
+                                        categoryId: newCategoryId,
+                                    });
+                                });
+                        
+                                if (errorOccurred || updatedProducts.length !== currentProducts.length) {
+                                    console.error("An error occurred during product mapping. Reordering aborted.");
+                                    alert("Erro ao processar a nova ordem dos produtos. Tente novamente.");
+                                    return;
+                                }
                                 
-                                if (!product) {
-                                    console.error(`Product with id ${productId} not found in state.`);
-                                    return null;
-                                }
-
-                                const newCategoryId = (el.closest('.product-list') as HTMLElement)?.dataset.categoryId;
-
-                                if (!newCategoryId) {
-                                    console.error(`Could not find category for product ${productId}.`);
-                                    return null;
-                                }
-
-                                return {
-                                    ...product,
-                                    orderIndex: index,
-                                    categoryId: newCategoryId,
-                                };
-                            }).filter((p): p is Product => p !== null);
-
-
-                            if (updatedProducts.length !== currentProducts.length) {
-                                console.error("Could not map all DOM elements back to products in state. Aborting.");
-                                alert("Erro de mapeamento de dados. A reordenação foi cancelada.");
-                                return;
+                                onReorderProducts(updatedProducts);
+                        
+                            } catch (e) {
+                                console.error("Critical error in onEnd handler:", e);
+                                alert("Ocorreu um erro inesperado ao reordenar. Tente novamente.");
                             }
-                            
-                            onReorderProducts(updatedProducts);
                         },
                     });
                     sortableProductInstances.current.set(categoryId, instance);
@@ -156,7 +164,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         }
         
         return cleanup;
-    }, [isLoggedIn, activeTab, allCategories, allProducts, onReorderCategories, onReorderProducts]);
+    }, [isLoggedIn, activeTab, allCategories, onReorderCategories, onReorderProducts]);
     
     const sortedCategories = useMemo(() => 
         [...allCategories].sort((a, b) => a.order - b.order),
