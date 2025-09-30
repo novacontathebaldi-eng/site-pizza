@@ -1,4 +1,6 @@
+
 import React from 'react';
+import logoImg from '../assets/logo.png';
 
 export const Footer: React.FC = () => {
     return (
@@ -7,7 +9,7 @@ export const Footer: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
                     <div className="flex flex-col items-center md:items-start">
                         <div className="flex items-center gap-3 text-2xl font-bold mb-4">
-                           <img src="/assets/logo.png" alt="Santa Sensação Logo" className="h-12" />
+                           <img src={logoImg} alt="Santa Sensação Logo" className="h-12" />
                             <span>Santa Sensação</span>
                         </div>
                         <p className="text-brand-green-300 mb-4">A pizza nº 1 do ES 🏅</p>
