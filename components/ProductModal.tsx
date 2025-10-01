@@ -1,18 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Product, Category } from '../types';
-import * as firebaseService from '../services/firebaseService';
-import { CameraModal } from './CameraModal';
+import { CameraCaptureModal } from './CameraCaptureModal';
 
 interface ProductModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (product: Product) => Promise<void>;
+    onSave: (product: Product, imageFile?: File) => Promise<void>;
     product: Product | null;
     categories: Category[];
 }
 
 export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, product, categories }) => {
-    const getInitialFormData = (): Omit<Product, 'id' | 'active'> => ({
+    const getInitialFormData = useCallback((): Omit<Product, 'id' | 'active'> => ({
         name: '',
         description: '',
         categoryId: categories.length > 0 ? categories[0].id : '',
@@ -20,19 +19,18 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         imageUrl: '',
         badge: '',
         orderIndex: 0,
-    });
+    }), [categories]);
     
-    const [formData, setFormData] = useState(getInitialFormData());
-    const [showBadgeTooltip, setShowBadgeTooltip] = useState(false);
+    const [formData, setFormData] = useState<Omit<Product, 'id' | 'active'>>(getInitialFormData());
     const [imageFile, setImageFile] = useState<File | null>(null);
-    const [imagePreview, setImagePreview] = useState<string>('');
-    const [isUploading, setIsUploading] = useState(false);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [imageInputMethod, setImageInputMethod] = useState<'url' | 'upload'>('upload');
     const [isCameraOpen, setIsCameraOpen] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isUploading, setIsUploading] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
-            setImageFile(null); // Reset file on open
+            setImageFile(null); // Limpa o arquivo anterior ao abrir
             if (product) {
                 setFormData({
                     name: product.name,
@@ -44,19 +42,23 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     orderIndex: product.orderIndex,
                 });
                 setImagePreview(product.imageUrl);
+                setImageInputMethod(product.imageUrl ? 'url' : 'upload');
             } else {
                 setFormData(getInitialFormData());
-                setImagePreview('');
+                setImagePreview(null);
+                setImageInputMethod('upload');
             }
         }
-    }, [product, isOpen, categories]);
+    }, [product, isOpen, categories, getInitialFormData]);
 
     useEffect(() => {
-        if (!imageFile) return;
-        const objectUrl = URL.createObjectURL(imageFile);
-        setImagePreview(objectUrl);
-        return () => URL.revokeObjectURL(objectUrl);
-    }, [imageFile]);
+        // Limpa a URL de preview (blob) para evitar vazamento de memória
+        return () => {
+            if (imagePreview && imagePreview.startsWith('blob:')) {
+                URL.revokeObjectURL(imagePreview);
+            }
+        };
+    }, [imagePreview]);
 
     if (!isOpen) return null;
 
@@ -64,12 +66,6 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        handleChange(e);
-        if (imageFile) setImageFile(null);
-        setImagePreview(e.target.value);
-    };
-    
     const handlePriceChange = (size: string, value: string) => {
         const newPrices = { ...formData.prices };
         if (value) {
@@ -81,38 +77,45 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setImageFile(e.target.files[0]);
-            setFormData(prev => ({ ...prev, imageUrl: '' }));
+        const file = e.target.files?.[0];
+        if (file) {
+            if (imagePreview && imagePreview.startsWith('blob:')) {
+                URL.revokeObjectURL(imagePreview);
+            }
+            setImageFile(file);
+            const previewUrl = URL.createObjectURL(file);
+            setImagePreview(previewUrl);
+            setFormData({ ...formData, imageUrl: '' }); // Limpa o campo de URL
         }
     };
     
-    const handleCapture = (file: File) => {
-        setImageFile(file);
-        setFormData(prev => ({ ...prev, imageUrl: '' }));
+    const handlePhotoCaptured = (imageBlob: Blob) => {
+        const capturedFile = new File([imageBlob], `capture_${new Date().toISOString()}.jpg`, { type: 'image/jpeg' });
+        if (imagePreview && imagePreview.startsWith('blob:')) {
+            URL.revokeObjectURL(imagePreview);
+        }
+        setImageFile(capturedFile);
+        const previewUrl = URL.createObjectURL(capturedFile);
+        setImagePreview(previewUrl);
+        setFormData({ ...formData, imageUrl: '' });
         setIsCameraOpen(false);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsUploading(true);
-        try {
-            let finalImageUrl = formData.imageUrl;
-            if (imageFile) {
-                finalImageUrl = await firebaseService.uploadImage(imageFile);
-            }
+        
+        const finalProduct: Product = {
+            id: product?.id || '',
+            active: product?.active ?? true,
+            ...formData,
+        };
 
-            const finalProduct: Product = {
-                id: product?.id || '',
-                active: product?.active ?? true,
-                ...formData,
-                imageUrl: finalImageUrl,
-            };
-            await onSave(finalProduct);
+        try {
+            await onSave(finalProduct, imageFile || undefined);
             onClose();
         } catch (error) {
-            console.error("Erro ao salvar produto:", error);
-            alert("Falha ao enviar a imagem ou salvar o produto. Tente novamente.");
+            console.error("Falha ao salvar a partir do modal:", error);
         } finally {
             setIsUploading(false);
         }
@@ -128,6 +131,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     </div>
                     <div className="overflow-y-auto p-6">
                         <form onSubmit={handleSubmit} className="space-y-4">
+                            {/* Campos do formulário ... */}
                             <div>
                                 <label className="block text-sm font-semibold mb-1">Nome do Produto *</label>
                                 <input name="name" value={formData.name} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" required />
@@ -143,37 +147,64 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                         {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                                     </select>
                                 </div>
-                                <div className="relative">
+                                <div>
                                     <div className="flex items-center gap-2 mb-1">
-                                        <label className="block text-sm font-semibold">Selo de Destaque (opcional)</label>
-                                        <button type="button" onMouseEnter={() => setShowBadgeTooltip(true)} onMouseLeave={() => setShowBadgeTooltip(false)} onClick={() => setShowBadgeTooltip(!showBadgeTooltip)} className="text-gray-400 hover:text-gray-600 focus:outline-none" aria-label="Informações sobre o selo de destaque"><i className="fas fa-question-circle"></i></button>
+                                        <label htmlFor="badge-input" className="block text-sm font-semibold">Selo de Destaque (opcional)</label>
+                                        <div className="relative group flex items-center">
+                                            <button type="button" tabIndex={0} className="w-5 h-5 bg-gray-200 text-gray-600 rounded-full flex items-center justify-center text-xs font-bold cursor-help focus:outline-none focus:ring-2 focus:ring-accent">?</button>
+                                            <div role="tooltip" className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-64 p-3 bg-gray-800 text-white text-xs rounded-lg shadow-lg z-10 opacity-0 invisible pointer-events-none group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200">
+                                                Use selos para destacar produtos. Ex: "Popular", "Novo", "Promoção".
+                                                <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-x-4 border-x-transparent border-t-[6px] border-t-gray-800"></div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    {showBadgeTooltip && (
-                                        <div style={{ animation: 'fadeInUp 0.2s ease-out' }} className="absolute bottom-full left-0 mb-2 w-full max-w-xs bg-gray-800 text-white text-sm rounded-lg p-3 z-10 shadow-lg">
-                                            <p>Um selo para destacar o produto no cardápio. Aparecerá como uma pequena etiqueta na imagem.</p>
-                                            <p className="mt-1 font-semibold">Exemplos: 'Popular', 'Novo', 'Promoção'.</p>
-                                            <div className="absolute left-4 -bottom-1 w-2 h-2 bg-gray-800 rotate-45"></div>
+                                    <input id="badge-input" name="badge" value={formData.badge} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" placeholder="Ex: Popular" />
+                                </div>
+                            </div>
+
+                            {/* Seção da Imagem */}
+                            <div>
+                                <label className="block text-sm font-semibold mb-2">Imagem do Produto</label>
+                                <div className="p-3 bg-gray-50 rounded-md border">
+                                    <div className="flex justify-center gap-4 mb-3">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="radio" name="imageInputMethod" value="upload" checked={imageInputMethod === 'upload'} onChange={() => setImageInputMethod('upload')} className="form-radio text-accent focus:ring-accent"/>
+                                            <span>Enviar Imagem</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="radio" name="imageInputMethod" value="url" checked={imageInputMethod === 'url'} onChange={() => setImageInputMethod('url')} className="form-radio text-accent focus:ring-accent"/>
+                                            <span>Usar URL</span>
+                                        </label>
+                                    </div>
+
+                                    {imageInputMethod === 'url' ? (
+                                        <div>
+                                            <input name="imageUrl" value={formData.imageUrl} onChange={(e) => { handleChange(e); setImagePreview(e.target.value); setImageFile(null); }} className="w-full px-3 py-2 border rounded-md" placeholder="https://exemplo.com/imagem.jpg" />
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col sm:flex-row items-center gap-4">
+                                            <div className="w-32 h-32 bg-gray-200 rounded-md flex-shrink-0 flex items-center justify-center overflow-hidden">
+                                                {imagePreview ? (
+                                                    <img src={imagePreview} alt="Pré-visualização" className="w-full h-full object-cover"/>
+                                                ) : (
+                                                    <i className="fas fa-image text-4xl text-gray-400"></i>
+                                                )}
+                                            </div>
+                                            <div className="flex flex-col gap-2">
+                                                <label htmlFor="file-upload" className="cursor-pointer bg-white text-accent font-semibold py-2 px-4 rounded-lg border border-accent hover:bg-accent/10 transition-colors text-center">
+                                                    <i className="fas fa-upload mr-2"></i>Escolher arquivo...
+                                                </label>
+                                                <input id="file-upload" type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                                                <button type="button" onClick={() => setIsCameraOpen(true)} className="bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors">
+                                                    <i className="fas fa-camera mr-2"></i>Tirar Foto
+                                                </button>
+                                            </div>
                                         </div>
                                     )}
-                                    <input name="badge" value={formData.badge} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" placeholder="Ex: Novo, Popular" />
                                 </div>
                             </div>
-                             <div>
-                                <label className="block text-sm font-semibold mb-1">Imagem do Produto</label>
-                                <div className="flex items-center gap-4">
-                                    <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center border overflow-hidden">
-                                        {imagePreview ? <img src={imagePreview} alt="Prévia" className="w-full h-full object-cover" /> : <i className="fas fa-image text-3xl text-gray-300"></i>}
-                                    </div>
-                                    <div className="flex-grow space-y-2">
-                                        <input name="imageUrl" value={formData.imageUrl} onChange={handleUrlChange} className="w-full px-3 py-2 border rounded-md text-sm" placeholder="Ou cole uma URL aqui" />
-                                        <div className="flex gap-2">
-                                            <button type="button" onClick={() => fileInputRef.current?.click()} className="flex-1 text-sm bg-gray-200 text-gray-800 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300"><i className="fas fa-upload mr-2"></i>Enviar Arquivo</button>
-                                            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-                                            <button type="button" onClick={() => setIsCameraOpen(true)} className="flex-1 text-sm bg-gray-200 text-gray-800 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300"><i className="fas fa-camera mr-2"></i>Usar Câmera</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            
+                            {/* Preços */}
                             <div>
                                 <label className="block text-sm font-semibold mb-1">Preços *</label>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-gray-50 rounded-md border">
@@ -184,19 +215,35 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                         </div>
                                     ))}
                                 </div>
-                                 <p className="text-xs text-gray-500 mt-1">Deixe o campo em branco para tamanhos não aplicáveis.</p>
+                                <p className="text-xs text-gray-500 mt-1">Deixe o campo em branco para tamanhos não aplicáveis.</p>
                             </div>
+
+                            {/* Botões */}
                             <div className="flex justify-end gap-3 pt-4">
-                                <button type="button" onClick={onClose} disabled={isUploading} className="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 disabled:opacity-50">Cancelar</button>
-                                <button type="submit" disabled={isUploading} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[150px] disabled:bg-opacity-70">
-                                    {isUploading ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-2"></i><span>Salvar Produto</span></>}
+                                <button type="button" onClick={onClose} className="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300" disabled={isUploading}>Cancelar</button>
+                                <button type="submit" className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 flex items-center" disabled={isUploading}>
+                                    {isUploading ? (
+                                        <>
+                                            <i className="fas fa-spinner fa-spin mr-2"></i>
+                                            Salvando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="fas fa-save mr-2"></i>
+                                            Salvar Produto
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </form>
                     </div>
                 </div>
             </div>
-            {isCameraOpen && <CameraModal onCapture={handleCapture} onClose={() => setIsCameraOpen(false)} />}
+            <CameraCaptureModal
+                isOpen={isCameraOpen}
+                onClose={() => setIsCameraOpen(false)}
+                onCapture={handlePhotoCaptured}
+            />
         </>
     );
 };

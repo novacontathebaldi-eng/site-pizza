@@ -1,111 +1,31 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Product, Category, SiteSettings } from '../types';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Product, Category, SiteContent } from '../types';
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
-import { SiteCustomizationTab } from './SiteCustomizationTab';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { ReactSortable } from 'react-sortablejs';
+
 
 interface AdminSectionProps {
     allProducts: Product[];
     allCategories: Category[];
     isStoreOnline: boolean;
-    siteSettings: SiteSettings;
-    onSaveProduct: (product: Product) => Promise<void>;
+    onSaveProduct: (product: Product, imageFile?: File) => Promise<void>;
     onDeleteProduct: (productId: string) => Promise<void>;
     onStoreStatusChange: (isOnline: boolean) => Promise<void>;
+    onReorderProducts: (products: Product[]) => Promise<void>;
     onSaveCategory: (category: Category) => Promise<void>;
     onDeleteCategory: (categoryId: string) => Promise<void>;
-    onReorderProducts: (productsToUpdate: { id: string; orderIndex: number }[]) => Promise<void>;
-    onReorderCategories: (categoriesToUpdate: { id: string; order: number }[]) => Promise<void>;
+    onReorderCategories: (categories: Category[]) => Promise<void>;
     onSeedDatabase: () => Promise<void>;
-    onSaveSiteSettings: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
+    siteContent: SiteContent | null;
+    onSaveSiteContent: (content: SiteContent, imageFiles: { logo?: File; heroBg?: File; aboutImg?: File }) => Promise<void>;
 }
-
-interface SortableProductItemProps {
-    product: Product;
-    onEdit: (product: Product) => void;
-    onDelete: (productId: string) => void;
-}
-
-const SortableProductItem: React.FC<SortableProductItemProps> = ({ product, onEdit, onDelete }) => {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: product.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 10 : 'auto',
-        boxShadow: isDragging ? '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' : 'none',
-    };
-
-    return (
-        <div ref={setNodeRef} style={style} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
-            <div className="flex items-center gap-4">
-                <button {...attributes} {...listeners} className="cursor-grab touch-none p-2" aria-label="Mover produto">
-                    <i className="fas fa-grip-vertical text-gray-500 hover:text-gray-800"></i>
-                </button>
-                <p className="font-bold">{product.name}</p>
-            </div>
-            <div className="flex gap-2">
-                <button onClick={() => onEdit(product)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${product.name}`}><i className="fas fa-edit"></i></button>
-                <button onClick={() => window.confirm('Tem certeza que deseja excluir este produto?') && onDelete(product.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${product.name}`}><i className="fas fa-trash"></i></button>
-            </div>
-        </div>
-    );
-};
-
-interface SortableCategoryItemProps {
-    category: Category;
-    onEdit: (category: Category) => void;
-    onDelete: (categoryId: string) => void;
-}
-
-const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, onEdit, onDelete }) => {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: category.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 10 : 'auto',
-        boxShadow: isDragging ? '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' : 'none',
-    };
-
-    return (
-        <div ref={setNodeRef} style={style} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
-            <div className="flex items-center gap-4">
-                <button {...attributes} {...listeners} className="cursor-grab touch-none p-2" aria-label="Mover categoria">
-                    <i className="fas fa-grip-vertical text-gray-500 hover:text-gray-800"></i>
-                </button>
-                <p className="font-bold">{category.name}</p>
-            </div>
-            <div className="flex gap-2">
-                <button onClick={() => onEdit(category)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${category.name}`}><i className="fas fa-edit"></i></button>
-                <button onClick={() => window.confirm(`Tem certeza que deseja excluir a categoria "${category.name}"?`) && onDelete(category.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${category.name}`}><i className="fas fa-trash"></i></button>
-            </div>
-        </div>
-    );
-};
 
 export const AdminSection: React.FC<AdminSectionProps> = ({ 
-    allProducts, allCategories, isStoreOnline, siteSettings,
-    onSaveProduct, onDeleteProduct, onStoreStatusChange,
-    onSaveCategory, onDeleteCategory, onReorderProducts, onReorderCategories,
-    onSeedDatabase, onSaveSiteSettings
+    allProducts, allCategories, isStoreOnline, 
+    onSaveProduct, onDeleteProduct, onStoreStatusChange, onReorderProducts,
+    onSaveCategory, onDeleteCategory, onReorderCategories,
+    onSeedDatabase, siteContent, onSaveSiteContent
 }) => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [activeTab, setActiveTab] = useState('status');
@@ -113,24 +33,52 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [showAdminPanel, setShowAdminPanel] = useState(window.location.hash === '#admin');
-    
-    const [localProducts, setLocalProducts] = useState<Product[]>(allProducts);
-    const [localCategories, setLocalCategories] = useState<Category[]>(allCategories);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+
+    const [displayCategories, setDisplayCategories] = useState<Category[]>([]);
     
-    useEffect(() => {
-        setLocalProducts(allProducts);
-    }, [allProducts]);
+    // States for Personalização tab
+    const [customizationFormData, setCustomizationFormData] = useState<SiteContent | null>(null);
+    const [imageFiles, setImageFiles] = useState<{ logo?: File; heroBg?: File; aboutImg?: File }>({});
+    const [imagePreviews, setImagePreviews] = useState<{ logo?: string; heroBg?: string; aboutImg?: string }>({});
+    const [isSaving, setIsSaving] = useState(false);
+
+    const adminTabs = useMemo(() => [
+        { id: 'status', label: 'Status', icon: 'fas fa-toggle-on' },
+        { id: 'products', label: 'Produtos', icon: 'fas fa-pizza-slice' },
+        { id: 'categories', label: 'Categorias', icon: 'fas fa-tags' },
+        { id: 'personalizacao', label: 'Personalização', icon: 'fas fa-paint-brush' },
+        { id: 'data', label: 'Dados', icon: 'fas fa-database' }
+    ], []);
+
+    const activeTabInfo = useMemo(() => adminTabs.find(tab => tab.id === activeTab), [activeTab, adminTabs]);
+
+
+    const sortedCategoriesMemo = useMemo(() => 
+        [...allCategories].sort((a, b) => a.order - b.order),
+    [allCategories]);
 
     useEffect(() => {
-        setLocalCategories([...allCategories].sort((a, b) => a.order - b.order));
-    }, [allCategories]);
+        setDisplayCategories(sortedCategoriesMemo);
+    }, [sortedCategoriesMemo]);
 
+    useEffect(() => {
+        if (siteContent) {
+            setCustomizationFormData(siteContent);
+            setImagePreviews({
+                logo: siteContent.logoUrl,
+                heroBg: siteContent.heroBgUrl,
+                aboutImg: siteContent.aboutImgUrl,
+            });
+        }
+    }, [siteContent]);
+    
     useEffect(() => {
         const handleHashChange = () => {
             setShowAdminPanel(window.location.hash === '#admin');
@@ -143,73 +91,6 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             window.removeEventListener('hashchange', handleHashChange, false);
         };
     }, []);
-
-    const sensors = useSensors(
-        useSensor(PointerSensor),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        })
-    );
-
-    const handleProductDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
-
-        if (!over || active.id === over.id) {
-            return;
-        }
-
-        const activeProduct = localProducts.find(p => p.id === active.id);
-        const overProduct = localProducts.find(p => p.id === over.id);
-        
-        if (!activeProduct || !overProduct || activeProduct.categoryId !== overProduct.categoryId) {
-            return;
-        }
-
-        const categoryId = activeProduct.categoryId;
-        
-        setLocalProducts((products) => {
-            const categoryProducts = products.filter(p => p.categoryId === categoryId).sort((a, b) => a.orderIndex - b.orderIndex);
-            const oldIndex = categoryProducts.findIndex(p => p.id === active.id);
-            const newIndex = categoryProducts.findIndex(p => p.id === over.id);
-            
-            const reorderedCategoryProducts = arrayMove(categoryProducts, oldIndex, newIndex);
-            
-            const productsToUpdate = reorderedCategoryProducts.map((p, index) => ({
-                id: p.id,
-                orderIndex: index
-            }));
-
-            onReorderProducts(productsToUpdate);
-
-            // Return new state for optimistic update
-            const otherProducts = products.filter(p => p.categoryId !== categoryId);
-            return [...otherProducts, ...reorderedCategoryProducts.map((p, index) => ({ ...p, orderIndex: index }))];
-        });
-    };
-
-    const handleCategoryDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
-
-        if (!over || active.id === over.id) {
-            return;
-        }
-
-        setLocalCategories((categories) => {
-            const oldIndex = categories.findIndex(c => c.id === active.id);
-            const newIndex = categories.findIndex(c => c.id === over.id);
-            
-            const reorderedCategories = arrayMove(categories, oldIndex, newIndex);
-            
-            const categoriesToUpdate = reorderedCategories.map((c, index) => ({
-                id: c.id,
-                order: index
-            }));
-
-            onReorderCategories(categoriesToUpdate);
-
-            return reorderedCategories.map((c, index) => ({ ...c, order: index }));
-        });
-    };
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -265,10 +146,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             const backupData = {
                 products: allProducts,
                 categories: allCategories,
-                store_config: { 
-                    status: { isOpen: isStoreOnline },
-                    site_settings: siteSettings 
-                },
+                store_config: { status: { isOpen: isStoreOnline }, siteContent },
                 backupDate: new Date().toISOString(),
             };
     
@@ -288,6 +166,198 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             alert("Falha ao criar o backup.");
         }
     };
+
+    const handleProductReorder = useCallback((reorderedProductsInCategory: Product[], categoryId: string) => {
+        const newFullProductList: Product[] = [];
+        displayCategories.forEach(cat => {
+            if (cat.id === categoryId) {
+                newFullProductList.push(...reorderedProductsInCategory);
+            } else {
+                const productsForCategory = allProducts
+                    .filter(p => p.categoryId === cat.id)
+                    .sort((a, b) => a.orderIndex - b.orderIndex);
+                newFullProductList.push(...productsForCategory);
+            }
+        });
+
+        const reindexedProducts = newFullProductList.map((p, index) => ({
+            ...p,
+            orderIndex: index
+        }));
+
+        onReorderProducts(reindexedProducts);
+    }, [allProducts, displayCategories, onReorderProducts]);
+
+    const handleCustomizationFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        if (!customizationFormData) return;
+        setCustomizationFormData({ ...customizationFormData, [e.target.name]: e.target.value });
+    };
+
+    const handleAchievementChange = (index: number, value: string) => {
+        if (!customizationFormData) return;
+        const newAchievements = [...customizationFormData.aboutAchievements] as [string, string, string, string];
+        newAchievements[index] = value;
+        setCustomizationFormData({ ...customizationFormData, aboutAchievements: newAchievements });
+    };
+
+    const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>, imageKey: 'logo' | 'heroBg' | 'aboutImg') => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setImageFiles(prev => ({ ...prev, [imageKey]: file }));
+            const previewUrl = URL.createObjectURL(file);
+            setImagePreviews(prev => ({ ...prev, [imageKey]: previewUrl }));
+            // Clear URL field if a file is chosen
+             if (customizationFormData) {
+                const newFormData = {...customizationFormData};
+                if(imageKey === 'logo') newFormData.logoUrl = '';
+                if(imageKey === 'heroBg') newFormData.heroBgUrl = '';
+                if(imageKey === 'aboutImg') newFormData.aboutImgUrl = '';
+                setCustomizationFormData(newFormData);
+            }
+        }
+    };
+
+    const handleImageUrlChange = (e: React.ChangeEvent<HTMLInputElement>, imageKey: 'logo' | 'heroBg' | 'aboutImg') => {
+        const url = e.target.value;
+        if (!customizationFormData) return;
+        
+        const newFormData = {...customizationFormData};
+        if(imageKey === 'logo') newFormData.logoUrl = url;
+        if(imageKey === 'heroBg') newFormData.heroBgUrl = url;
+        if(imageKey === 'aboutImg') newFormData.aboutImgUrl = url;
+        setCustomizationFormData(newFormData);
+
+        setImagePreviews(prev => ({ ...prev, [imageKey]: url }));
+        // Clear file input if URL is typed
+        setImageFiles(prev => {
+            const newFiles = {...prev};
+            delete newFiles[imageKey];
+            return newFiles;
+        });
+    };
+
+    const handleSaveChanges = async () => {
+        if (!customizationFormData) return;
+        setIsSaving(true);
+        try {
+            await onSaveSiteContent(customizationFormData, imageFiles);
+            alert('Alterações salvas com sucesso!');
+        } catch (error) {
+            // Error is handled in App.tsx
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const renderPersonalizacaoTab = () => {
+        if (!customizationFormData) return <div>Carregando configurações...</div>;
+        
+        const renderImageInput = (label: string, imageKey: 'logo' | 'heroBg' | 'aboutImg') => (
+            <div className="p-4 bg-gray-50 rounded-lg border">
+                <label className="block text-md font-semibold mb-3">{label}</label>
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <div className="w-32 h-32 bg-gray-200 rounded-md flex-shrink-0 flex items-center justify-center overflow-hidden">
+                        {imagePreviews[imageKey] ? (
+                            <img src={imagePreviews[imageKey]} alt={`${label} preview`} className="w-full h-full object-cover" />
+                        ) : (
+                            <i className="fas fa-image text-4xl text-gray-400"></i>
+                        )}
+                    </div>
+                    <div className="flex-grow w-full">
+                        <div className="mb-2">
+                            <label className="block text-xs font-medium mb-1">Enviar Nova Imagem</label>
+                            <input type="file" accept="image/*" onChange={(e) => handleImageFileChange(e, imageKey)} className="text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-ivory-50 file:text-accent hover:file:bg-accent/10 w-full" />
+                        </div>
+                        <div className="flex items-center gap-2 my-2">
+                            <hr className="flex-grow border-t border-gray-300" />
+                            <span className="text-xs text-gray-500">OU</span>
+                            <hr className="flex-grow border-t border-gray-300" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium mb-1">Usar URL Externa</label>
+                            <input type="text" placeholder="https://exemplo.com/imagem.png" value={imageKey === 'logo' ? customizationFormData.logoUrl : imageKey === 'heroBg' ? customizationFormData.heroBgUrl : customizationFormData.aboutImgUrl} onChange={(e) => handleImageUrlChange(e, imageKey)} className="w-full px-3 py-2 border rounded-md text-sm" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+
+        return (
+            <div>
+                <h3 className="text-xl font-bold mb-4">Personalização do Site</h3>
+                <div className="space-y-6">
+                    <div>
+                        <h4 className="text-lg font-semibold mb-3 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300">Identidade Visual</h4>
+                        <div className="space-y-4">
+                            {renderImageInput("Logo", "logo")}
+                            {renderImageInput("Imagem de Fundo (Principal)", "heroBg")}
+                            {renderImageInput("Imagem da Seção 'Sobre Nós'", "aboutImg")}
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 className="text-lg font-semibold mb-3 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300">Textos do Site</h4>
+                        <div className="space-y-4">
+                            <div className="p-4 bg-gray-50 rounded-lg border">
+                                <h5 className="font-semibold mb-2">Cabeçalho e Título da Página</h5>
+                                <div className="space-y-2">
+                                    <div>
+                                        <label className="block text-sm font-semibold mb-1">Título Principal (Ex: Pizzaria Santa Sensação)</label>
+                                        <input type="text" name="headerTitle" value={customizationFormData.headerTitle} onChange={handleCustomizationFormChange} className="w-full px-3 py-2 border rounded-md" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold mb-1">Descrição/Subtítulo (A pizza premiada...)</label>
+                                        <textarea name="headerSubtitle" value={customizationFormData.headerSubtitle} onChange={handleCustomizationFormChange} className="w-full px-3 py-2 border rounded-md" rows={2} />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="p-4 bg-gray-50 rounded-lg border">
+                                <h5 className="font-semibold mb-2">Seção Principal (Hero)</h5>
+                                <div>
+                                    <label className="block text-sm font-semibold mb-1">Texto do Selo (Ex: A pizza nº 1 do ES)</label>
+                                    <input type="text" name="heroBadge" value={customizationFormData.heroBadge} onChange={handleCustomizationFormChange} className="w-full px-3 py-2 border rounded-md" />
+                                </div>
+                            </div>
+
+                            <div className="p-4 bg-gray-50 rounded-lg border">
+                                <h5 className="font-semibold mb-2">Seção "Sobre Nós"</h5>
+                                <div className="space-y-2">
+                                    <div>
+                                        <label className="block text-sm font-semibold mb-1">Título do Selo (Ex: Nossa Conquista)</label>
+                                        <input type="text" name="aboutBadge" value={customizationFormData.aboutBadge} onChange={handleCustomizationFormChange} className="w-full px-3 py-2 border rounded-md" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold mb-1">Título Principal (A Melhor Pizza do Estado...)</label>
+                                        <input type="text" name="aboutTitle" value={customizationFormData.aboutTitle} onChange={handleCustomizationFormChange} className="w-full px-3 py-2 border rounded-md" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold mb-1">Parágrafo Principal</label>
+                                        <textarea name="aboutParagraph" value={customizationFormData.aboutParagraph} onChange={handleCustomizationFormChange} className="w-full px-3 py-2 border rounded-md" rows={4} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold mb-1">Lista de Conquistas</label>
+                                        <div className="space-y-2">
+                                            {customizationFormData.aboutAchievements.map((ach, index) => (
+                                                <input key={index} type="text" value={ach} onChange={(e) => handleAchievementChange(index, e.target.value)} className="w-full px-3 py-2 border rounded-md" />
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="pt-4 border-t mt-6">
+                        <button onClick={handleSaveChanges} disabled={isSaving} className="bg-accent text-white font-semibold py-3 px-6 rounded-lg hover:bg-opacity-90 transition-all flex items-center">
+                            {isSaving ? (<><i className="fas fa-spinner fa-spin mr-2"></i> Salvando...</>) : (<><i className="fas fa-save mr-2"></i> Salvar Alterações</>)}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
 
     if (!showAdminPanel) return null;
 
@@ -324,28 +394,50 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                         <button onClick={handleLogout} className="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600 transition-all"><i className="fas fa-sign-out-alt mr-2"></i>Sair</button>
                     </div>
 
-                    <div className="border-b border-gray-200 mb-6">
-                        <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
-                            <button onClick={() => setActiveTab('status')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'status' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                <i className="fas fa-store-alt w-5 text-center"></i>
-                                <span>Status</span>
+                    <div className="mb-6">
+                        <div className="md:hidden relative">
+                            <button 
+                                onClick={() => setIsDropdownOpen(!isDropdownOpen)} 
+                                className="w-full flex justify-between items-center py-3 px-4 font-semibold text-lg bg-gray-50 border border-gray-200 rounded-lg"
+                                aria-haspopup="true"
+                                aria-expanded={isDropdownOpen}
+                            >
+                                <span>
+                                    <i className={`${activeTabInfo?.icon} mr-3 text-accent w-5 text-center`}></i>
+                                    {activeTabInfo?.label}
+                                </span>
+                                <i className={`fas fa-chevron-down transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}></i>
                             </button>
-                             <button onClick={() => setActiveTab('customization')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'customization' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                <i className="fas fa-paint-brush w-5 text-center"></i>
-                                <span>Personalização</span>
-                            </button>
-                            <button onClick={() => setActiveTab('products')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'products' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                <i className="fas fa-pizza-slice w-5 text-center"></i>
-                                <span>Produtos</span>
-                            </button>
-                            <button onClick={() => setActiveTab('categories')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'categories' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                <i className="fas fa-tags w-5 text-center"></i>
-                                <span>Categorias</span>
-                            </button>
-                            <button onClick={() => setActiveTab('data')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'data' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                <i className="fas fa-database w-5 text-center"></i>
-                                <span>Dados</span>
-                            </button>
+                            {isDropdownOpen && (
+                                <div className="absolute top-full left-0 w-full bg-white border border-gray-200 rounded-lg mt-1 shadow-lg z-10 animate-fade-in-up">
+                                    {adminTabs.map(tab => (
+                                        <button 
+                                            key={tab.id}
+                                            onClick={() => {
+                                                setActiveTab(tab.id);
+                                                setIsDropdownOpen(false);
+                                            }}
+                                            className={`w-full text-left py-3 px-4 font-semibold flex items-center gap-3 ${activeTab === tab.id ? 'bg-brand-ivory-50 text-accent' : 'text-gray-600 hover:bg-gray-50'}`}
+                                        >
+                                            <i className={`${tab.icon} w-5 text-center`}></i>
+                                            {tab.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="hidden md:flex border-b border-gray-200">
+                            {adminTabs.map(tab => (
+                                <button 
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)} 
+                                    className={`py-3 px-6 font-semibold flex items-center gap-2 transition-colors duration-200 ${activeTab === tab.id ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent'}`}
+                                >
+                                    <i className={tab.icon}></i>
+                                    {tab.label}
+                                </button>
+                            ))}
                         </div>
                     </div>
 
@@ -364,45 +456,47 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                         </div>
                     )}
                     
-                    {activeTab === 'customization' && (
-                        <SiteCustomizationTab
-                            settings={siteSettings}
-                            onSave={onSaveSiteSettings}
-                        />
-                    )}
-
                     {activeTab === 'products' && (
                         <div>
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="text-xl font-bold">Gerenciar Produtos</h3>
                                 <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"><i className="fas fa-plus mr-2"></i>Novo Produto</button>
                             </div>
-                             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}>
-                                <div className="space-y-6">
-                                    {localCategories.map(category => {
-                                        const categoryProducts = localProducts
-                                            .filter(p => p.categoryId === category.id)
-                                            .sort((a, b) => a.orderIndex - b.orderIndex);
-                                        return (
-                                            <div key={category.id}>
-                                                <h4 className="text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300">{category.name}</h4>
-                                                <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}>
-                                                    <div className="space-y-3 min-h-[50px]">
-                                                        {categoryProducts.map(product => (
-                                                            <SortableProductItem
-                                                                key={product.id}
-                                                                product={product}
-                                                                onEdit={handleEditProduct}
-                                                                onDelete={onDeleteProduct}
-                                                            />
-                                                        ))}
+                            <div className="space-y-6">
+                                {displayCategories.map(category => {
+                                    const categoryProducts = allProducts
+                                        .filter(p => p.categoryId === category.id)
+                                        .sort((a, b) => a.orderIndex - b.orderIndex);
+                                    
+                                    return (
+                                        <div key={category.id}>
+                                            <h4 className="text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300">{category.name}</h4>
+                                            <ReactSortable
+                                                list={categoryProducts}
+                                                setList={(newList) => handleProductReorder(newList, category.id)}
+                                                group={{ name: 'products', pull: false, put: false }}
+                                                animation={200}
+                                                delay={2}
+                                                className="space-y-3 min-h-[50px]"
+                                                handle=".handle"
+                                            >
+                                                {categoryProducts.map((product) => (
+                                                    <div key={product.id} className="bg-gray-50 p-3 rounded-lg flex items-center">
+                                                        <div className="handle cursor-grab text-gray-400 mr-4" aria-label={`Arrastar para reordenar ${product.name}`}>
+                                                            <i className="fas fa-grip-vertical"></i>
+                                                        </div>
+                                                        <p className="font-bold flex-grow">{product.name}</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <button onClick={() => handleEditProduct(product)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${product.name}`}><i className="fas fa-edit"></i></button>
+                                                            <button onClick={() => window.confirm('Tem certeza que deseja excluir este produto?') && onDeleteProduct(product.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${product.name}`}><i className="fas fa-trash"></i></button>
+                                                        </div>
                                                     </div>
-                                                </SortableContext>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            </DndContext>
+                                                ))}
+                                            </ReactSortable>
+                                        </div>
+                                    )
+                                })}
+                            </div>
                         </div>
                     )}
 
@@ -412,22 +506,34 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                 <h3 className="text-xl font-bold">Gerenciar Categorias</h3>
                                 <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"><i className="fas fa-plus mr-2"></i>Nova Categoria</button>
                             </div>
-                            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
-                                <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                                    <div className="space-y-3">
-                                        {localCategories.map(cat => (
-                                            <SortableCategoryItem
-                                                key={cat.id}
-                                                category={cat}
-                                                onEdit={handleEditCategory}
-                                                onDelete={onDeleteCategory}
-                                            />
-                                        ))}
+                            <ReactSortable
+                                list={displayCategories}
+                                setList={(newList) => {
+                                    setDisplayCategories(newList);
+                                    onReorderCategories(newList);
+                                }}
+                                animation={200}
+                                delay={2}
+                                className="space-y-3"
+                                handle=".handle"
+                            >
+                                {displayCategories.map((cat) => (
+                                    <div key={cat.id} className="bg-gray-50 p-3 rounded-lg flex items-center">
+                                        <div className="handle cursor-grab text-gray-400 mr-4" aria-label={`Arrastar para reordenar ${cat.name}`}>
+                                            <i className="fas fa-grip-vertical"></i>
+                                        </div>
+                                        <p className="font-bold flex-grow">{cat.name}</p>
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={() => handleEditCategory(cat)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${cat.name}`}><i className="fas fa-edit"></i></button>
+                                            <button onClick={() => window.confirm(`Tem certeza que deseja excluir a categoria "${cat.name}"?`) && onDeleteCategory(cat.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${cat.name}`}><i className="fas fa-trash"></i></button>
+                                        </div>
                                     </div>
-                                </SortableContext>
-                            </DndContext>
+                                ))}
+                            </ReactSortable>
                         </div>
                     )}
+                    
+                    {activeTab === 'personalizacao' && renderPersonalizacaoTab()}
 
                     {activeTab === 'data' && (
                         <div>

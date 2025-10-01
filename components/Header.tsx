@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { SiteSettings } from '../types';
-// import logo from '../assets/logo.png'; // No longer needed, using dynamic URL
+import { SiteContent } from '../types';
 
 interface HeaderProps {
     cartItemCount: number;
     onCartClick: () => void;
     activeSection: string;
-    settings: SiteSettings;
+    siteContent: SiteContent | null;
 }
 
-export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, activeSection, settings }) => {
+export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, activeSection, siteContent }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
 
@@ -44,8 +43,8 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, acti
             <div className="container mx-auto px-4">
                 <div className="flex justify-between items-center h-20 relative">
                     <a href="#inicio" onClick={(e) => { e.preventDefault(); scrollToSection('inicio');}} className="flex items-center gap-3 text-xl font-bold">
-                        <img src={settings.logoUrl} alt="Santa Sensação Logo" className="h-14" />
-                        <span className="hidden sm:inline">Santa Sensação</span>
+                        {siteContent?.logoUrl && <img src={siteContent.logoUrl} alt="Santa Sensação Logo" className="h-14" />}
+                        <span className="hidden sm:inline">{siteContent?.headerTitle}</span>
                     </a>
                     
                     <div className="lg:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-bold">

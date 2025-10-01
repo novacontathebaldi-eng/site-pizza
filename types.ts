@@ -38,15 +38,15 @@ export interface OrderDetails {
     notes: string;
 }
 
-export interface SiteSettings {
+export interface SiteContent {
     logoUrl: string;
-    heroSlogan: string;
-    heroTitle: string;
-    heroSubtitle: string;
     heroBgUrl: string;
-    aboutImageUrl: string;
-    aboutTag: string;
+    aboutImgUrl: string;
+    headerTitle: string;
+    headerSubtitle: string;
+    heroBadge: string;
+    aboutBadge: string;
     aboutTitle: string;
-    aboutDescription: string;
-    aboutList: string[];
+    aboutParagraph: string;
+    aboutAchievements: [string, string, string, string];
 }

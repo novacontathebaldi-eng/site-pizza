@@ -1,7 +1,5 @@
-
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Product, Category, CartItem, OrderDetails, SiteSettings } from './types';
+import { Product, Category, CartItem, OrderDetails, SiteContent } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
@@ -14,34 +12,7 @@ import { CheckoutModal } from './components/CheckoutModal';
 import { db } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
-// Static assets for default values
-import defaultLogo from './assets/logo.png';
-import defaultHeroBg from './assets/ambiente-pizzaria.webp';
-import defaultAboutImg from './assets/sobre-imagem.webp';
-
-interface Toast {
-    id: number;
-    message: string;
-    type: 'success' | 'error';
-}
-
-const defaultSiteSettings: SiteSettings = {
-    logoUrl: defaultLogo,
-    heroSlogan: "A pizza nº 1 do ES",
-    heroTitle: "Pizzaria Santa Sensação",
-    heroSubtitle: "A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.",
-    heroBgUrl: defaultHeroBg,
-    aboutImageUrl: defaultAboutImg,
-    aboutTag: "Nossa Conquista",
-    aboutTitle: "A Melhor Pizza do Estado, Assinada por um Mestre",
-    aboutDescription: "Em parceria com o renomado mestre pizzaiolo Luca Lonardi, a Santa Sensação eleva a pizza a um novo patamar. Fomos os grandes vencedores do concurso Panshow 2025, um reconhecimento que celebra nossa dedicação aos ingredientes frescos, massa de fermentação natural e, acima de tudo, a paixão por criar sabores inesquecíveis. Cada pizza que sai do nosso forno a lenha carrega a assinatura de um campeão e a promessa de uma experiência única.",
-    aboutList: [
-        "Vencedora do Panshow 2025",
-        "Assinada pelo Mestre Luca Lonardi",
-        "Ingredientes frescos e selecionados",
-        "Forno a lenha tradicional"
-    ]
-};
+import { collection, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 const App: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
@@ -54,17 +25,26 @@ const App: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [activeSection, setActiveSection] = useState('Início');
     const [activeMenuCategory, setActiveMenuCategory] = useState<string>('');
-    const [toasts, setToasts] = useState<Toast[]>([]);
-    const [siteSettings, setSiteSettings] = useState<SiteSettings>(defaultSiteSettings);
-    
-    const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
-        const id = Date.now();
-        setToasts(prevToasts => [...prevToasts, { id, message, type }]);
-        setTimeout(() => {
-            setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
-        }, 4000);
-    }, []);
+    const [siteContent, setSiteContent] = useState<SiteContent | null>(null);
 
+    const defaultSiteContent: SiteContent = useMemo(() => ({
+        logoUrl: './assets/logo.png',
+        heroBgUrl: './assets/ambiente-pizzaria.webp',
+        aboutImgUrl: './assets/sobre-imagem.webp',
+        headerTitle: "Pizzaria Santa Sensação",
+        headerSubtitle: "A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.",
+        heroBadge: "A pizza nº 1 do ES",
+        aboutBadge: "Nossa Conquista",
+        aboutTitle: "A Melhor Pizza do Estado, Assinada por um Mestre",
+        aboutParagraph: "Em parceria com o renomado mestre pizzaiolo Luca Lonardi, a Santa Sensação eleva a pizza a um novo patamar. Fomos os grandes vencedores do concurso Panshow 2025, um reconhecimento que celebra nossa dedicação aos ingredientes frescos, massa de fermentação natural e, acima de tudo, a paixão por criar sabores inesquecíveis. Cada pizza que sai do nosso forno a lenha carrega a assinatura de um campeão e a promessa de uma experiência única.",
+        aboutAchievements: [
+            "Vencedora do Panshow 2025",
+            "Assinada pelo Mestre Luca Lonardi",
+            "Ingredientes frescos e selecionados",
+            "Forno a lenha tradicional"
+        ]
+    }), []);
+    
     useEffect(() => {
         const savedCart = localStorage.getItem('santaSensacaoCart');
         if (savedCart) {
@@ -108,10 +88,12 @@ const App: React.FC = () => {
         };
     }, []);
 
+    // Effect to set up Firebase listeners. Runs only once on component mount.
     useEffect(() => {
         if (!db) {
             setError("Falha na conexão com o banco de dados. Este é um problema conhecido no ambiente de desenvolvimento atual (sandbox), que bloqueia conexões externas. Seu site funcionará normalmente online. Verifique se as credenciais em services/firebase.ts estão corretas.");
             setIsLoading(false);
+            setSiteContent(defaultSiteContent); // Fallback to defaults
             return;
         }
 
@@ -120,19 +102,10 @@ const App: React.FC = () => {
             setError("Não foi possível conectar ao banco de dados. Este é um problema conhecido no ambiente de desenvolvimento atual (sandbox), que bloqueia conexões externas. Seu site funcionará normalmente online.");
             setIsLoading(false);
         };
-        
-        // Listener for site settings
-        const settingsDocRef = db.doc('store_config/site_settings');
-        const unsubSettings = settingsDocRef.onSnapshot(doc => {
-            if (doc.exists) {
-                setSiteSettings(prev => ({...prev, ...doc.data() as Partial<SiteSettings>}));
-            }
-        }, err => handleConnectionError(err, "site settings"));
-
 
         // Listener for store status
-        const statusDocRef = db.doc('store_config/status');
-        const unsubStatus = statusDocRef.onSnapshot(doc => {
+        const statusDocRef = doc(db, 'store_config', 'status');
+        const unsubStatus = onSnapshot(statusDocRef, doc => {
             const data = doc.data();
             if (data) {
                 setIsStoreOnline(data.isOpen);
@@ -140,32 +113,53 @@ const App: React.FC = () => {
         }, err => handleConnectionError(err, "store status"));
 
         // Listener for categories
-        const categoriesQuery = db.collection('categories').orderBy('order');
-        const unsubCategories = categoriesQuery.onSnapshot(snapshot => {
+        const categoriesQuery = query(collection(db, 'categories'), orderBy('order'));
+        const unsubCategories = onSnapshot(categoriesQuery, snapshot => {
             const fetchedCategories: Category[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
             setCategories(fetchedCategories);
-            if (fetchedCategories.length > 0 && !activeMenuCategory) {
-                setActiveMenuCategory(fetchedCategories[0].id);
-            }
         }, err => handleConnectionError(err, "categories"));
 
         // Listener for products
-        const productsQuery = db.collection('products').orderBy('orderIndex');
-        const unsubProducts = productsQuery.onSnapshot(snapshot => {
+        const productsQuery = query(collection(db, 'products'), orderBy('orderIndex'));
+        const unsubProducts = onSnapshot(productsQuery, snapshot => {
             const fetchedProducts: Product[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
             setProducts(fetchedProducts);
             setIsLoading(false);
             setError(null);
         }, err => handleConnectionError(err, "products"));
 
+        // Listener for site content
+        const contentDocRef = doc(db, 'store_config', 'siteContent');
+        const unsubContent = onSnapshot(contentDocRef, doc => {
+            if (doc.exists()) {
+                setSiteContent(doc.data() as SiteContent);
+            } else {
+                setSiteContent(defaultSiteContent);
+            }
+        }, err => {
+            console.error("Error fetching site content:", err);
+            setSiteContent(defaultSiteContent); // Fallback to defaults on error
+        });
+
+        // Cleanup function to unsubscribe from listeners when component unmounts
         return () => {
-            unsubSettings();
             unsubStatus();
             unsubCategories();
             unsubProducts();
+            unsubContent();
         };
-    }, [activeMenuCategory]);
-    
+    }, [defaultSiteContent]);
+
+    // Effect to set the initial active category for the menu.
+    useEffect(() => {
+        if (categories.length > 0 && !activeMenuCategory) {
+            const firstActiveCategory = categories.find(c => c.active);
+            if(firstActiveCategory) {
+                setActiveMenuCategory(firstActiveCategory.id);
+            }
+        }
+    }, [categories, activeMenuCategory]);
+
     useEffect(() => {
         localStorage.setItem('santaSensacaoCart', JSON.stringify(cart));
     }, [cart]);
@@ -263,114 +257,146 @@ const App: React.FC = () => {
         setIsCartOpen(false);
     };
 
-    const handleSaveProduct = useCallback(async (product: Product) => {
+    const handleSaveProduct = useCallback(async (product: Product, imageFile?: File) => {
         try {
-            const { id, ...dataToSave } = product;
-            if (id) {
-                await firebaseService.updateProduct(id, dataToSave);
-                addToast("Produto atualizado com sucesso!", 'success');
-            } else {
-                await firebaseService.addProduct({ ...dataToSave, orderIndex: products.length });
-                addToast("Produto adicionado com sucesso!", 'success');
+            if (product.id) { // Existing product: UPDATE
+                const productToUpdate = { ...product };
+                if (imageFile) {
+                    productToUpdate.imageUrl = await firebaseService.uploadImage(imageFile, product.id);
+                }
+                await firebaseService.updateProduct(productToUpdate);
+            } else { // New product: CREATE
+                const newProductRef = doc(collection(db!, 'products'));
+                const newId = newProductRef.id;
+
+                let imageUrl = product.imageUrl;
+                if (imageFile) {
+                    imageUrl = await firebaseService.uploadImage(imageFile, newId);
+                }
+
+                const newProduct: Product = {
+                    ...product,
+                    id: newId,
+                    imageUrl: imageUrl,
+                    orderIndex: products.length,
+                };
+                await firebaseService.addProductWithId(newProduct);
             }
         } catch (error) {
             console.error("Failed to save product:", error);
-            addToast("Erro ao salvar produto. Tente novamente.", 'error');
+            alert("Erro ao salvar produto. Tente novamente.");
+            throw error; // Propagate error for the modal to handle loading state
         }
-    }, [products.length, addToast]);
+    }, [products.length]);
     
     const handleDeleteProduct = useCallback(async (productId: string) => {
         try {
             await firebaseService.deleteProduct(productId);
-            addToast("Produto deletado com sucesso!", 'success');
         } catch (error) {
             console.error("Failed to delete product:", error);
-            addToast("Erro ao deletar produto. Tente novamente.", 'error');
+            alert("Erro ao deletar produto. Tente novamente.");
         }
-    }, [addToast]);
+    }, []);
 
     const handleStoreStatusChange = useCallback(async (isOnline: boolean) => {
         try {
             await firebaseService.updateStoreStatus(isOnline);
-            addToast("Status da loja atualizado.", 'success');
         } catch (error) {
             console.error("Failed to update store status:", error);
-            addToast("Erro ao atualizar status da loja.", 'error');
+            alert("Erro ao atualizar status da loja. Tente novamente.");
         }
-    }, [addToast]);
+    }, []);
+
+    const handleReorderProducts = useCallback(async (reorderedProducts: Product[]) => {
+        try {
+            // Identifica apenas os produtos que realmente mudaram de ordem para otimizar a escrita no banco.
+            const changedProducts = reorderedProducts.filter(newProd => {
+                const oldProd = products.find(p => p.id === newProd.id);
+                return !oldProd || oldProd.orderIndex !== newProd.orderIndex;
+            });
+            
+            if (changedProducts.length > 0) {
+                await firebaseService.reorderProducts(changedProducts);
+            }
+        } catch (error) {
+            console.error("Failed to reorder products:", error);
+            alert("Erro ao reordenar produtos. Tente novamente.");
+        }
+    }, [products]);
     
     const handleSaveCategory = useCallback(async (category: Category) => {
         try {
-            const { id, ...dataToSave } = category;
-            if (id) {
-                await firebaseService.updateCategory(id, dataToSave);
-                addToast("Categoria atualizada com sucesso!", 'success');
+            if (category.id) {
+                await firebaseService.updateCategory(category);
             } else {
-                await firebaseService.addCategory({ ...dataToSave, order: categories.length });
-                addToast("Categoria adicionada com sucesso!", 'success');
+                const newCategoryRef = doc(collection(db!, 'categories'));
+                await firebaseService.addCategory({
+                    ...category,
+                    id: newCategoryRef.id,
+                    order: categories.length
+                });
             }
         } catch (error) {
             console.error("Failed to save category:", error);
-            addToast("Erro ao salvar categoria.", 'error');
+            alert("Erro ao salvar categoria. Tente novamente.");
         }
-    }, [categories.length, addToast]);
+    }, [categories.length]);
     
     const handleDeleteCategory = useCallback(async (categoryId: string) => {
         try {
             await firebaseService.deleteCategory(categoryId, products);
-            addToast("Categoria deletada com sucesso!", 'success');
         } catch (error) {
             console.error("Failed to delete category:", error);
-            addToast(`Erro ao deletar categoria: ${error.message}`, 'error');
+            alert(`Erro ao deletar categoria: ${error.message}`);
         }
-    }, [products, addToast]);
+    }, [products]);
 
-    const handleReorderProducts = useCallback(async (productsToUpdate: { id: string; orderIndex: number }[]) => {
+    const handleReorderCategories = useCallback(async (reorderedCategories: Category[]) => {
         try {
-            await firebaseService.updateProductsOrder(productsToUpdate);
-            addToast("Ordem dos produtos atualizada.", 'success');
-        } catch (error) {
-            console.error("Failed to reorder products:", error);
-            addToast("Erro ao reordenar produtos.", 'error');
-        }
-    }, [addToast]);
-
-    const handleReorderCategories = useCallback(async (categoriesToUpdate: { id: string; order: number }[]) => {
-        try {
-            await firebaseService.updateCategoriesOrder(categoriesToUpdate);
-            addToast("Ordem das categorias atualizada.", 'success');
+            // Otimização: atualiza apenas as categorias cuja ordem foi alterada.
+            const categoriesWithNewOrder = reorderedCategories.map((cat, index) => ({ ...cat, order: index }));
+    
+            const changedCategories = categoriesWithNewOrder.filter(newCat => {
+                const oldCat = categories.find(c => c.id === newCat.id);
+                return !oldCat || oldCat.order !== newCat.order;
+            });
+    
+            if (changedCategories.length > 0) {
+                await firebaseService.reorderCategories(changedCategories);
+            }
         } catch (error) {
             console.error("Failed to reorder categories:", error);
-            addToast("Erro ao reordenar categorias.", 'error');
+            alert("Erro ao reordenar categorias. Tente novamente.");
         }
-    }, [addToast]);
+    }, [categories]);
 
-    const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => {
+    const handleSaveSiteContent = useCallback(async (content: SiteContent, imageFiles: { logo?: File; heroBg?: File; aboutImg?: File }) => {
         try {
-            const settingsToUpdate = { ...settings };
+            const updatedContent = { ...content };
 
-            for (const key in files) {
-                const file = files[key];
-                if (file) {
-                    const url = await firebaseService.uploadSiteAsset(file, key);
-                    (settingsToUpdate as any)[`${key}Url`] = url;
-                }
+            if (imageFiles.logo) {
+                updatedContent.logoUrl = await firebaseService.uploadSiteImage(imageFiles.logo, 'logo');
+            }
+            if (imageFiles.heroBg) {
+                updatedContent.heroBgUrl = await firebaseService.uploadSiteImage(imageFiles.heroBg, 'heroBg');
+            }
+            if (imageFiles.aboutImg) {
+                updatedContent.aboutImgUrl = await firebaseService.uploadSiteImage(imageFiles.aboutImg, 'aboutImg');
             }
 
-            await firebaseService.updateSiteSettings(settingsToUpdate);
-            addToast("Personalização do site salva com sucesso!", 'success');
+            await firebaseService.updateSiteContent(updatedContent);
         } catch (error) {
-            console.error("Failed to save site settings:", error);
-            addToast("Erro ao salvar as configurações do site.", 'error');
+            console.error("Failed to save site content:", error);
+            alert("Erro ao salvar as configurações do site. Tente novamente.");
+            throw error;
         }
-    }, [addToast]);
-
+    }, []);
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
 
     return (
         <div className="flex flex-col min-h-screen">
-            <Header cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} activeSection={activeSection} settings={siteSettings} />
+            <Header cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} activeSection={activeSection} siteContent={siteContent} />
             
             <div id="status-banner" className={`bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
                 <i className="fas fa-times-circle mr-2"></i>
@@ -378,7 +404,7 @@ const App: React.FC = () => {
             </div>
 
             <main className="flex-grow">
-                <HeroSection settings={siteSettings} />
+                <HeroSection siteContent={siteContent} />
                 
                 {error && (
                     <div className="container mx-auto px-4 py-8">
@@ -405,26 +431,26 @@ const App: React.FC = () => {
                     />
                 )}
 
-                <AboutSection settings={siteSettings} />
+                <AboutSection siteContent={siteContent} />
                 <ContactSection />
                 <AdminSection 
                     allProducts={products}
                     allCategories={categories}
                     isStoreOnline={isStoreOnline}
-                    siteSettings={siteSettings}
                     onSaveProduct={handleSaveProduct}
                     onDeleteProduct={handleDeleteProduct}
                     onStoreStatusChange={handleStoreStatusChange}
+                    onReorderProducts={handleReorderProducts}
                     onSaveCategory={handleSaveCategory}
                     onDeleteCategory={handleDeleteCategory}
-                    onReorderProducts={handleReorderProducts}
                     onReorderCategories={handleReorderCategories}
                     onSeedDatabase={seedDatabase}
-                    onSaveSiteSettings={handleSaveSiteSettings}
+                    siteContent={siteContent}
+                    onSaveSiteContent={handleSaveSiteContent}
                 />
             </main>
 
-            <Footer />
+            <Footer siteContent={siteContent} />
 
             {cart.length > 0 && (
                 <div className="fixed bottom-5 right-5 z-40">
@@ -447,7 +473,7 @@ const App: React.FC = () => {
                 onUpdateQuantity={handleUpdateCartQuantity}
                 onCheckout={() => {
                     if (!isStoreOnline) {
-                        addToast("A loja está fechada. Não é possível finalizar o pedido.", 'error');
+                        alert("A loja está fechada. Não é possível finalizar o pedido.");
                         return;
                     }
                     setIsCartOpen(false);
@@ -462,34 +488,6 @@ const App: React.FC = () => {
                 cartItems={cart}
                 onConfirmCheckout={handleCheckout}
             />
-            
-            {/* Toast Notification Container */}
-            <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]">
-                <div className="w-full flex flex-col items-center space-y-4 sm:items-end">
-                    {toasts.map((toast) => (
-                        <div
-                            key={toast.id}
-                            className="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden animate-fade-in-up"
-                        >
-                            <div className="p-4">
-                                <div className="flex items-start">
-                                    <div className="flex-shrink-0">
-                                        {toast.type === 'success' ? (
-                                            <i className="fas fa-check-circle h-6 w-6 text-green-500"></i>
-                                        ) : (
-                                            <i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>
-                                        )}
-                                    </div>
-                                    <div className="ml-3 w-0 flex-1 pt-0.5">
-                                        <p className="text-sm font-medium text-gray-900">{toast.message}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
         </div>
     );
 };
