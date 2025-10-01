@@ -35,11 +35,6 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
         [categories]
     );
     
-    const suggestedCategoryName = useMemo(() => {
-        if (!suggestedNextCategoryId) return '';
-        return categories.find(c => c.id === suggestedNextCategoryId)?.name || '';
-    }, [suggestedNextCategoryId, categories]);
-
     const scrollToProductList = () => {
         const productList = document.getElementById('category-product-list');
         if (productList) {
@@ -99,15 +94,15 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
                     </div>
                 </div>
 
-                {suggestedNextCategoryId && suggestedCategoryName && (
-                    <div className="text-center my-6 animate-fade-in-up">
+                {suggestedNextCategoryId && (
+                    <div className="sticky top-[160px] z-20 text-center my-6 animate-fade-in-up">
                         <div className="relative inline-flex items-center group">
                             <button
                                 onClick={handleSuggestionClick}
                                 className="bg-accent text-white font-bold py-3 pl-6 pr-12 rounded-lg shadow-lg transition-all transform hover:scale-105"
                             >
-                                Ótima escolha! Continuar para {suggestedCategoryName}
-                                <i className="fas fa-arrow-right ml-2"></i>
+                                Avançar para a Próxima Etapa
+                                <i className="fas fa-chevron-down ml-2"></i>
                             </button>
                             <button
                                 onClick={() => setSuggestedNextCategoryId(null)}
