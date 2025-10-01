@@ -1,5 +1,4 @@
 
-
 import React, { useMemo } from 'react';
 import { CartItem, Category, Product } from '../types';
 
