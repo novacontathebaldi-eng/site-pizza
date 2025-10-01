@@ -232,10 +232,10 @@ const App: React.FC = () => {
             const nextCategory = sortedActiveCategories[currentCategoryIndex + 1];
             setActiveMenuCategory(nextCategory.id);
             
-            const filtersElement = document.getElementById('menu-filters-container');
-            if (filtersElement) {
+            const productList = document.getElementById('category-product-list');
+            if (productList) {
                 const headerOffset = 160; // main header (80) + sticky filters (80)
-                const elementPosition = filtersElement.getBoundingClientRect().top;
+                const elementPosition = productList.getBoundingClientRect().top;
                 const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
                 
                 window.scrollTo({
@@ -503,6 +503,9 @@ const App: React.FC = () => {
                     setIsCheckoutModalOpen(true);
                 }}
                 isStoreOnline={isStoreOnline}
+                categories={categories}
+                products={products}
+                setActiveCategoryId={setActiveMenuCategory}
             />
 
             <CheckoutModal 

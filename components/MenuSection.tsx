@@ -1,4 +1,5 @@
 
+
 import React, { useMemo } from 'react';
 import { Product, Category } from '../types';
 import { MenuItemCard } from './MenuItemCard';
@@ -32,6 +33,25 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
         [categories]
     );
 
+    const handleCategoryClick = (id: string) => {
+        setActiveCategoryId(id);
+        // Timeout ensures the DOM has updated before we try to scroll
+        setTimeout(() => {
+            const productList = document.getElementById('category-product-list');
+            if (productList) {
+                const headerOffset = 160; // main header (80) + sticky filters (80)
+                const elementPosition = productList.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                
+                window.scrollTo({
+                  top: offsetPosition,
+                  behavior: 'smooth'
+                });
+            }
+        }, 0);
+    };
+
+
     return (
         <section id="cardapio" className="py-20 bg-white">
             <div className="container mx-auto px-4">
@@ -48,7 +68,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
                         {sortedCategories.filter(c => c.active).map(category => (
                             <button 
                                 key={category.id} 
-                                onClick={() => setActiveCategoryId(category.id)}
+                                onClick={() => handleCategoryClick(category.id)}
                                 className={`px-6 py-3 rounded-full font-semibold text-sm transition-all duration-300 flex items-center gap-2
                                     ${activeCategoryId === category.id 
                                         ? 'bg-brand-green-700 text-text-on-dark shadow-md' 
@@ -64,7 +84,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
 
 
                 {filteredProducts.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div id="category-product-list" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {filteredProducts.map(product => (
                             <MenuItemCard 
                                 key={product.id} 

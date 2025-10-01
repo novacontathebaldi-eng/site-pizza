@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import { Product } from '../types';
 
@@ -36,7 +37,7 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
     return (
         <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col overflow-hidden border border-gray-200">
             <div className="relative">
-                <img src={product.imageUrl} alt={product.name} className="w-full h-40 object-cover" />
+                <img src={product.imageUrl} alt={product.name} className="w-full aspect-square object-cover" />
                 {product.badge && (
                     <span className="absolute top-2 right-2 bg-accent text-white px-2 py-0.5 text-xs font-bold rounded-full">{product.badge}</span>
                 )}
@@ -70,7 +71,7 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
                     <button 
                         onClick={handleAddToCart}
                         disabled={!isStoreOnline}
-                        className="bg-accent text-white font-bold py-2 px-3 rounded-lg text-sm transition-all transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        className="bg-accent text-white font-bold py-2 px-4 rounded-lg transition-all transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
                         <i className="fas fa-plus mr-1"></i>
                         Adicionar
