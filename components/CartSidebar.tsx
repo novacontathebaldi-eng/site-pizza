@@ -1,4 +1,5 @@
 
+
 import React, { useMemo } from 'react';
 import { CartItem, Category, Product } from '../types';
 
@@ -30,7 +31,11 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ isOpen, onClose, cartI
         };
         
         const foodCategoryIds = categories
-            .filter(c => c.name.toLowerCase().includes('pizzas salgadas') || c.name.toLowerCase().includes('aperitivos'))
+            .filter(c => 
+                c.name.toLowerCase().includes('pizzas salgadas') || 
+                c.name.toLowerCase().includes('pizzas doces') || 
+                c.name.toLowerCase().includes('aperitivos')
+            )
             .map(c => c.id);
         
         const drinksCategory = findCategoryByKeywords(['bebidas']);
