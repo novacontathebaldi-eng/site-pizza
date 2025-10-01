@@ -236,8 +236,26 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         try {
             await auth.signInWithEmailAndPassword(email, password);
             // onAuthStateChanged will handle setting the user state
-        } catch (err) {
-            setError('Email ou senha incorretos.');
+        } catch (err: any) {
+            console.error("Firebase Auth Error:", err);
+            let friendlyMessage = 'Ocorreu um erro. Tente novamente.';
+            switch (err.code) {
+                case 'auth/user-not-found':
+                    friendlyMessage = 'Nenhum usuário encontrado com este e-mail.';
+                    break;
+                case 'auth/wrong-password':
+                    friendlyMessage = 'A senha está incorreta. Verifique e tente novamente.';
+                    break;
+                case 'auth/invalid-email':
+                    friendlyMessage = 'O formato do e-mail é inválido.';
+                    break;
+                case 'auth/network-request-failed':
+                     friendlyMessage = 'Erro de rede. Verifique sua conexão com a internet.';
+                     break;
+                default:
+                    friendlyMessage = 'Email ou senha incorretos.';
+            }
+            setError(friendlyMessage);
         } finally {
             setIsLoggingIn(false);
         }
