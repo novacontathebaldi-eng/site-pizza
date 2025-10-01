@@ -1,7 +1,5 @@
-
-
-import React, { useMemo } from 'react';
-import { CartItem, Category, Product } from '../types';
+import React from 'react';
+import { CartItem } from '../types';
 
 interface CartSidebarProps {
     isOpen: boolean;
@@ -10,98 +8,11 @@ interface CartSidebarProps {
     onUpdateQuantity: (itemId: string, newQuantity: number) => void;
     onCheckout: () => void;
     isStoreOnline: boolean;
-    categories: Category[];
-    products: Product[];
-    setActiveCategoryId: (id: string) => void;
 }
 
-export const CartSidebar: React.FC<CartSidebarProps> = ({ isOpen, onClose, cartItems, onUpdateQuantity, onCheckout, isStoreOnline, categories, products, setActiveCategoryId }) => {
+export const CartSidebar: React.FC<CartSidebarProps> = ({ isOpen, onClose, cartItems, onUpdateQuantity, onCheckout, isStoreOnline }) => {
     const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-
-    const suggestion = useMemo(() => {
-        if (!products.length || !categories.length || !cartItems.length) {
-            return null;
-        }
-
-        const productMap = new Map(products.map(p => [p.id, p]));
-
-        const findCategoryByKeywords = (keywords: string[]) => {
-            return categories.find(c => keywords.some(kw => c.name.toLowerCase().includes(kw)));
-        };
-        
-        const foodCategoryIds = categories
-            .filter(c => 
-                !c.name.toLowerCase().includes('bebidas') && 
-                !c.name.toLowerCase().includes('sobremesas')
-            )
-            .map(c => c.id);
-        
-        const drinksCategory = findCategoryByKeywords(['bebidas']);
-        const dessertsCategory = findCategoryByKeywords(['sobremesas']);
-
-        let hasFoodItem = false;
-        let hasDrink = false;
-        let hasDessert = false;
-
-        for (const item of cartItems) {
-            const product = productMap.get(item.productId);
-            if (product) {
-                if (foodCategoryIds.includes(product.categoryId)) {
-                    hasFoodItem = true;
-                }
-                if (drinksCategory && product.categoryId === drinksCategory.id) {
-                    hasDrink = true;
-                }
-                if (dessertsCategory && product.categoryId === dessertsCategory.id) {
-                    hasDessert = true;
-                }
-            }
-        }
-
-        // Priority 1: Suggest drinks
-        if (hasFoodItem && !hasDrink && drinksCategory) {
-            return {
-                text: "Que tal uma bebida para acompanhar?",
-                buttonText: "Ver Bebidas",
-                targetCategoryId: drinksCategory.id
-            };
-        }
-
-        // Priority 2: Suggest desserts
-        if (hasFoodItem && !hasDessert && dessertsCategory) {
-             return {
-                text: "Gostaria de uma sobremesa para finalizar?",
-                buttonText: "Ver Sobremesas",
-                targetCategoryId: dessertsCategory.id
-            };
-        }
-
-        return null;
-    }, [cartItems, products, categories]);
-    
-    const handleSuggestionClick = () => {
-        if (suggestion) {
-            onClose();
-            setActiveCategoryId(suggestion.targetCategoryId);
-            
-            // Scroll to menu section after cart animation
-            setTimeout(() => {
-                const menuElement = document.getElementById('cardapio');
-                if (menuElement) {
-                    const headerOffset = 80; // Main header height
-                    const elementPosition = menuElement.getBoundingClientRect().top;
-                    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-                    
-                    window.scrollTo({
-                        top: offsetPosition,
-                        behavior: 'smooth'
-                    });
-                }
-            }, 300); // 300ms to match cart transition duration
-        }
-    };
-
 
     return (
         <>
@@ -148,20 +59,6 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ isOpen, onClose, cartI
 
                 {cartItems.length > 0 && (
                     <div className="p-5 border-t border-gray-200 bg-brand-ivory-50">
-                        {suggestion && (
-                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center mb-4">
-                                <p className="text-sm text-yellow-800 font-medium mb-2">
-                                    <i className="fas fa-lightbulb mr-2"></i>
-                                    {suggestion.text}
-                                </p>
-                                <button
-                                    onClick={handleSuggestionClick}
-                                    className="bg-accent text-white font-bold py-2 px-4 rounded-lg text-sm transition-all transform hover:scale-105"
-                                >
-                                    {suggestion.buttonText}
-                                </button>
-                            </div>
-                        )}
                         <div className="flex justify-between items-center mb-4 text-lg">
                             <span className="font-semibold text-gray-700">Total ({totalItems} {totalItems > 1 ? 'itens' : 'item'}):</span>
                             <span className="font-bold text-2xl text-accent">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
