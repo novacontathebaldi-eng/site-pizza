@@ -1,4 +1,4 @@
-import { collection, writeBatch, doc } from 'firebase/firestore';
+// FIX: Updated Firestore calls to v8 syntax to resolve module import errors.
 import { db } from './firebase';
 import { Product, Category } from '../types';
 
@@ -51,16 +51,16 @@ export const seedDatabase = async () => {
     }
     
     console.log("Iniciando a população do banco de dados...");
-    const batch = writeBatch(db);
+    const batch = db.batch();
 
     // 1. Configuração da Loja
-    const statusRef = doc(db, 'store_config', 'status');
+    const statusRef = db.doc('store_config/status');
     batch.set(statusRef, { isOpen: true });
 
     // 2. Criar Categorias e guardar seus IDs
     const categoryRefs: { [name: string]: string } = {};
     for (const categoryData of initialCategories) {
-        const categoryRef = doc(collection(db, 'categories'));
+        const categoryRef = db.collection('categories').doc();
         batch.set(categoryRef, categoryData);
         categoryRefs[categoryData.name] = categoryRef.id;
     }
@@ -71,7 +71,7 @@ export const seedDatabase = async () => {
         const categoryId = categoryRefs[categoryName];
 
         if (categoryId) {
-            const productRef = doc(collection(db, 'products'));
+            const productRef = db.collection('products').doc();
             batch.set(productRef, { ...productData, categoryId });
         } else {
             console.warn(`Categoria '${categoryName}' não encontrada para o produto '${productData.name}'.`);
