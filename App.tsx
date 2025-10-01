@@ -5,7 +5,7 @@ import { Product, Category, CartItem, OrderDetails, SiteSettings } from './types
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
-import { AboutSection } from './components/AboutSection';
+import { DynamicContentSection } from './components/DynamicContentSection';
 import { ContactSection } from './components/ContactSection';
 import { AdminSection } from './components/AdminSection';
 import { Footer } from './components/Footer';
@@ -31,15 +31,42 @@ const defaultSiteSettings: SiteSettings = {
     heroTitle: "Pizzaria Santa Sensação",
     heroSubtitle: "A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.",
     heroBgUrl: defaultHeroBg,
-    aboutImageUrl: defaultAboutImg,
-    aboutTag: "Nossa Conquista",
-    aboutTitle: "A Melhor Pizza do Estado, Assinada por um Mestre",
-    aboutDescription: "Em parceria com o renomado mestre pizzaiolo Luca Lonardi, a Santa Sensação eleva a pizza a um novo patamar. Fomos os grandes vencedores do concurso Panshow 2025, um reconhecimento que celebra nossa dedicação aos ingredientes frescos, massa de fermentação natural e, acima de tudo, a paixão por criar sabores inesquecíveis. Cada pizza que sai do nosso forno a lenha carrega a assinatura de um campeão e a promessa de uma experiência única.",
-    aboutList: [
-        { icon: "fas fa-award", text: "Vencedora do Panshow 2025" },
-        { icon: "fas fa-user-check", text: "Assinada pelo Mestre Luca Lonardi" },
-        { icon: "fas fa-leaf", text: "Ingredientes frescos e selecionados" },
-        { icon: "fas fa-fire-alt", text: "Forno a lenha tradicional" }
+    contentSections: [
+        {
+            id: 'section-1',
+            order: 0,
+            isVisible: true,
+            imageUrl: defaultAboutImg,
+            tag: "Nossa Conquista",
+            title: "A Melhor Pizza do Estado, Assinada por um Mestre",
+            description: "Em parceria com o renomado mestre pizzaiolo Luca Lonardi, a Santa Sensação eleva a pizza a um novo patamar. Fomos os grandes vencedores do concurso Panshow 2025, um reconhecimento que celebra nossa dedicação aos ingredientes frescos, massa de fermentação natural e, acima de tudo, a paixão por criar sabores inesquecíveis. Cada pizza que sai do nosso forno a lenha carrega a assinatura de um campeão e a promessa de uma experiência única.",
+            list: [
+                { id: 'item-1-1', icon: "fas fa-award", text: "Vencedora do Panshow 2025" },
+                { id: 'item-1-2', icon: "fas fa-user-check", text: "Assinada pelo Mestre Luca Lonardi" },
+                { id: 'item-1-3', icon: "fas fa-leaf", text: "Ingredientes frescos e selecionados" },
+                { id: 'item-1-4', icon: "fas fa-fire-alt", text: "Forno a lenha tradicional" }
+            ]
+        },
+        {
+            id: 'section-2',
+            order: 1,
+            isVisible: true,
+            imageUrl: 'https://picsum.photos/seed/ingredients/800/600',
+            tag: "Qualidade e Tradição",
+            title: "Ingredientes Frescos, Sabor Incomparável",
+            description: "Nossa paixão pela pizza começa na escolha de cada ingrediente. Trabalhamos com produtores locais para garantir o frescor e a qualidade que você sente em cada fatia. Da nossa massa de fermentação lenta aos tomates italianos, tudo é pensado para criar uma experiência única.",
+            list: [
+                { id: 'item-2-1', icon: 'fas fa-bread-slice', text: "Massa de fermentação natural de 48h" },
+                { id: 'item-2-2', icon: 'fas fa-pepper-hot', text: "Tomates italianos San Marzano" },
+                { id: 'item-2-3', icon: 'fas fa-cheese', text: "Mozzarella fresca e queijos selecionados" },
+                { id: 'item-2-4', icon: 'fas fa-leaf', text: "Manjericão e ervas da nossa horta" }
+            ]
+        }
+    ],
+    footerLinks: [
+        { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996500341' },
+        { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/santasensacao.sl' },
+        { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin' }
     ]
 };
 
@@ -125,7 +152,13 @@ const App: React.FC = () => {
         const settingsDocRef = db.doc('store_config/site_settings');
         const unsubSettings = settingsDocRef.onSnapshot(doc => {
             if (doc.exists) {
-                setSiteSettings(prev => ({...prev, ...doc.data() as Partial<SiteSettings>}));
+                 const data = doc.data() as Partial<SiteSettings>;
+                 // Merge fetched data with defaults to ensure all keys exist
+                 setSiteSettings(prev => ({
+                     ...defaultSiteSettings,
+                     ...prev,
+                     ...data
+                 }));
             }
         }, err => handleConnectionError(err, "site settings"));
 
@@ -347,13 +380,23 @@ const App: React.FC = () => {
 
     const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => {
         try {
-            const settingsToUpdate = { ...settings };
+            const settingsToUpdate = JSON.parse(JSON.stringify(settings)); // Deep copy
 
             for (const key in files) {
                 const file = files[key];
                 if (file) {
                     const url = await firebaseService.uploadSiteAsset(file, key);
-                    (settingsToUpdate as any)[`${key}Url`] = url;
+                    
+                    if (key === 'logo') {
+                        settingsToUpdate.logoUrl = url;
+                    } else if (key === 'heroBg') {
+                        settingsToUpdate.heroBgUrl = url;
+                    } else { // It's a content section file, key is the section ID
+                        const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
+                        if (sectionIndex > -1) {
+                            settingsToUpdate.contentSections[sectionIndex].imageUrl = url;
+                        }
+                    }
                 }
             }
 
@@ -404,8 +447,14 @@ const App: React.FC = () => {
                         setActiveCategoryId={setActiveMenuCategory}
                     />
                 )}
-
-                <AboutSection settings={siteSettings} />
+                <div id="sobre">
+                    {siteSettings.contentSections
+                        .filter(section => section.isVisible)
+                        .sort((a, b) => a.order - b.order)
+                        .map((section, index) => (
+                            <DynamicContentSection key={section.id} section={section} order={index} />
+                    ))}
+                </div>
                 <ContactSection />
                 <AdminSection 
                     allProducts={products}
@@ -424,7 +473,7 @@ const App: React.FC = () => {
                 />
             </main>
 
-            <Footer />
+            <Footer settings={siteSettings} />
 
             {cart.length > 0 && (
                 <div className="fixed bottom-5 right-5 z-40">
