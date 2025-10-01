@@ -15,6 +15,8 @@ interface MenuSectionProps {
     setSuggestedNextCategoryId: (id: string | null) => void;
     cartItemCount: number;
     onCartClick: () => void;
+    showFinalizeButtonTrigger: boolean;
+    setShowFinalizeButtonTrigger: (show: boolean) => void;
 }
 
 const categoryIcons: { [key: string]: string } = {
@@ -25,7 +27,13 @@ const categoryIcons: { [key: string]: string } = {
     'aperitivos': 'fas fa-drumstick-bite'
 };
 
-export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, onAddToCart, isStoreOnline, activeCategoryId, setActiveCategoryId, suggestedNextCategoryId, setSuggestedNextCategoryId, cartItemCount, onCartClick }) => {
+export const MenuSection: React.FC<MenuSectionProps> = ({ 
+    categories, products, onAddToCart, isStoreOnline, 
+    activeCategoryId, setActiveCategoryId, 
+    suggestedNextCategoryId, setSuggestedNextCategoryId, 
+    cartItemCount, onCartClick,
+    showFinalizeButtonTrigger, setShowFinalizeButtonTrigger
+}) => {
 
     const filteredProducts = useMemo(() => 
         products.filter(p => p.categoryId === activeCategoryId && p.active),
@@ -46,7 +54,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
         ? sortedActiveCategories[sortedActiveCategories.length - 1].id 
         : null;
 
-    const showFinalizeButton = activeCategoryId === lastCategoryId && cartItemCount > 0 && !suggestedNextCategoryId;
+    const showFinalizeButton = activeCategoryId === lastCategoryId && cartItemCount > 0 && !suggestedNextCategoryId && showFinalizeButtonTrigger;
 
     const scrollToProductList = () => {
         const productList = document.getElementById('category-product-list');
@@ -65,8 +73,9 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
 
     const handleCategoryClick = (id: string) => {
         setActiveCategoryId(id);
-        setSuggestedNextCategoryId(null); // Clear suggestion on manual navigation
-        setTimeout(scrollToProductList, 100); // Small delay to allow UI to update
+        setSuggestedNextCategoryId(null);
+        setShowFinalizeButtonTrigger(false); // Reset trigger on manual navigation
+        setTimeout(scrollToProductList, 100);
     };
 
     const handleSuggestionClick = () => {
@@ -135,7 +144,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
                                     className="bg-accent text-white font-bold py-2 px-6 rounded-lg shadow-lg transition-all transform hover:scale-105"
                                 >
                                     <i className="fas fa-shopping-bag mr-2"></i>
-                                    Finalizar e Ver Pedido
+                                    Ver e Finalizar o Pedido
                                 </button>
                             )}
                         </div>
