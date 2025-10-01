@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface SupportModalProps {
     isOpen: boolean;
@@ -11,6 +11,17 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
     const [subject, setSubject] = useState('Access Difficulty');
     const [customSubject, setCustomSubject] = useState('');
     const [message, setMessage] = useState('');
+
+    useEffect(() => {
+        if (!isOpen) {
+            // Reset form state when modal closes for a better UX
+            setName('');
+            setEmail('');
+            setSubject('Access Difficulty');
+            setCustomSubject('');
+            setMessage('');
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 

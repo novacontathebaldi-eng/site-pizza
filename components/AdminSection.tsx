@@ -409,140 +409,142 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     }
 
     return (
-        <section id="admin" className="py-20 bg-brand-ivory-50">
-            <div className="container mx-auto px-4">
-                <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
-                    <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
-                        <h2 className="text-3xl font-bold text-text-on-light">Painel Administrativo</h2>
-                        <button onClick={handleLogout} className="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600 transition-all"><i className="fas fa-sign-out-alt mr-2"></i>Sair</button>
-                    </div>
-
-                    <div className="border-b border-gray-200 mb-6">
-                        <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
-                            <button onClick={() => setActiveTab('status')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'status' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                <i className="fas fa-store-alt w-5 text-center"></i>
-                                <span>Status</span>
-                            </button>
-                            <button onClick={() => setActiveTab('products')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'products' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                <i className="fas fa-pizza-slice w-5 text-center"></i>
-                                <span>Produtos</span>
-                            </button>
-                            <button onClick={() => setActiveTab('categories')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'categories' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                <i className="fas fa-tags w-5 text-center"></i>
-                                <span>Categorias</span>
-                            </button>
-                             <button onClick={() => setActiveTab('customization')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'customization' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                <i className="fas fa-paint-brush w-5 text-center"></i>
-                                <span>Personalização</span>
-                            </button>
-                            <button onClick={() => setActiveTab('data')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'data' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                <i className="fas fa-database w-5 text-center"></i>
-                                <span>Dados</span>
-                            </button>
+        <>
+            <section id="admin" className="py-20 bg-brand-ivory-50">
+                <div className="container mx-auto px-4">
+                    <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
+                        <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+                            <h2 className="text-3xl font-bold text-text-on-light">Painel Administrativo</h2>
+                            <button onClick={handleLogout} className="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600 transition-all"><i className="fas fa-sign-out-alt mr-2"></i>Sair</button>
                         </div>
-                    </div>
 
-                    {activeTab === 'status' && (
-                        <div>
-                            <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3>
-                            <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg mb-6">
-                                <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" id="store-status-toggle" className="sr-only peer" checked={isStoreOnline} onChange={e => onStoreStatusChange(e.target.checked)} />
-                                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-green-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                                </label>
-                                <span className={`font-semibold text-lg ${isStoreOnline ? 'text-green-600' : 'text-red-600'}`}>
-                                    {isStoreOnline ? 'Aberta para pedidos' : 'Fechada'}
-                                </span>
+                        <div className="border-b border-gray-200 mb-6">
+                            <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
+                                <button onClick={() => setActiveTab('status')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'status' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                    <i className="fas fa-store-alt w-5 text-center"></i>
+                                    <span>Status</span>
+                                </button>
+                                <button onClick={() => setActiveTab('products')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'products' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                    <i className="fas fa-pizza-slice w-5 text-center"></i>
+                                    <span>Produtos</span>
+                                </button>
+                                <button onClick={() => setActiveTab('categories')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'categories' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                    <i className="fas fa-tags w-5 text-center"></i>
+                                    <span>Categorias</span>
+                                </button>
+                                <button onClick={() => setActiveTab('customization')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'customization' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                    <i className="fas fa-paint-brush w-5 text-center"></i>
+                                    <span>Personalização</span>
+                                </button>
+                                <button onClick={() => setActiveTab('data')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'data' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                    <i className="fas fa-database w-5 text-center"></i>
+                                    <span>Dados</span>
+                                </button>
                             </div>
                         </div>
-                    )}
-                    
-                    {activeTab === 'customization' && (
-                        <SiteCustomizationTab
-                            settings={siteSettings}
-                            onSave={onSaveSiteSettings}
-                        />
-                    )}
 
-                    {activeTab === 'products' && (
-                        <div>
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-xl font-bold">Gerenciar Produtos</h3>
-                                <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"><i className="fas fa-plus mr-2"></i>Novo Produto</button>
-                            </div>
-                             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}>
-                                <div className="space-y-6">
-                                    {localCategories.map(category => {
-                                        const categoryProducts = localProducts
-                                            .filter(p => p.categoryId === category.id)
-                                            .sort((a, b) => a.orderIndex - b.orderIndex);
-                                        return (
-                                            <div key={category.id}>
-                                                <h4 className="text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300">{category.name}</h4>
-                                                <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}>
-                                                    <div className="space-y-3 min-h-[50px]">
-                                                        {categoryProducts.map(product => (
-                                                            <SortableProductItem
-                                                                key={product.id}
-                                                                product={product}
-                                                                onEdit={handleEditProduct}
-                                                                onDelete={onDeleteProduct}
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                </SortableContext>
-                                            </div>
-                                        )
-                                    })}
+                        {activeTab === 'status' && (
+                            <div>
+                                <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3>
+                                <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg mb-6">
+                                    <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="store-status-toggle" className="sr-only peer" checked={isStoreOnline} onChange={e => onStoreStatusChange(e.target.checked)} />
+                                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-green-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                                    </label>
+                                    <span className={`font-semibold text-lg ${isStoreOnline ? 'text-green-600' : 'text-red-600'}`}>
+                                        {isStoreOnline ? 'Aberta para pedidos' : 'Fechada'}
+                                    </span>
                                 </div>
-                            </DndContext>
-                        </div>
-                    )}
-
-                    {activeTab === 'categories' && (
-                        <div>
-                           <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-xl font-bold">Gerenciar Categorias</h3>
-                                <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"><i className="fas fa-plus mr-2"></i>Nova Categoria</button>
                             </div>
-                            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
-                                <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                                    <div className="space-y-3">
-                                        {localCategories.map(cat => (
-                                            <SortableCategoryItem
-                                                key={cat.id}
-                                                category={cat}
-                                                onEdit={handleEditCategory}
-                                                onDelete={onDeleteCategory}
-                                            />
-                                        ))}
+                        )}
+                        
+                        {activeTab === 'customization' && (
+                            <SiteCustomizationTab
+                                settings={siteSettings}
+                                onSave={onSaveSiteSettings}
+                            />
+                        )}
+
+                        {activeTab === 'products' && (
+                            <div>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-xl font-bold">Gerenciar Produtos</h3>
+                                    <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"><i className="fas fa-plus mr-2"></i>Novo Produto</button>
+                                </div>
+                                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}>
+                                    <div className="space-y-6">
+                                        {localCategories.map(category => {
+                                            const categoryProducts = localProducts
+                                                .filter(p => p.categoryId === category.id)
+                                                .sort((a, b) => a.orderIndex - b.orderIndex);
+                                            return (
+                                                <div key={category.id}>
+                                                    <h4 className="text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300">{category.name}</h4>
+                                                    <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                                                        <div className="space-y-3 min-h-[50px]">
+                                                            {categoryProducts.map(product => (
+                                                                <SortableProductItem
+                                                                    key={product.id}
+                                                                    product={product}
+                                                                    onEdit={handleEditProduct}
+                                                                    onDelete={onDeleteProduct}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </SortableContext>
+                                                </div>
+                                            )
+                                        })}
                                     </div>
-                                </SortableContext>
-                            </DndContext>
-                        </div>
-                    )}
+                                </DndContext>
+                            </div>
+                        )}
 
-                    {activeTab === 'data' && (
-                        <div>
-                            <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3>
-                            <div className="bg-gray-50 p-4 rounded-lg mb-6 border">
-                                <h4 className="font-semibold text-lg mb-2">Backup</h4>
-                                <p className="text-gray-600 mb-3">Crie um backup de todos os seus produtos, categorias e configurações da loja. O backup será salvo como um arquivo JSON no seu computador.</p>
-                                <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition-all">
-                                    <i className="fas fa-download mr-2"></i>Fazer Backup
-                                </button>
+                        {activeTab === 'categories' && (
+                            <div>
+                            <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-xl font-bold">Gerenciar Categorias</h3>
+                                    <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"><i className="fas fa-plus mr-2"></i>Nova Categoria</button>
+                                </div>
+                                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
+                                    <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                                        <div className="space-y-3">
+                                            {localCategories.map(cat => (
+                                                <SortableCategoryItem
+                                                    key={cat.id}
+                                                    category={cat}
+                                                    onEdit={handleEditCategory}
+                                                    onDelete={onDeleteCategory}
+                                                />
+                                            ))}
+                                        </div>
+                                    </SortableContext>
+                                </DndContext>
                             </div>
-                            <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                                <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa: Popular Banco de Dados</h4>
-                                <p className="text-yellow-700 mb-3">Esta ação irá adicionar os produtos e categorias iniciais ao seu banco de dados. Use apenas uma vez na configuração inicial ou se você limpou o banco de dados. Isso não substituirá itens existentes com o mesmo nome.</p>
-                                <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600 transition-all">
-                                    <i className="fas fa-database mr-2"></i>Popular Banco de Dados
-                                </button>
+                        )}
+
+                        {activeTab === 'data' && (
+                            <div>
+                                <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3>
+                                <div className="bg-gray-50 p-4 rounded-lg mb-6 border">
+                                    <h4 className="font-semibold text-lg mb-2">Backup</h4>
+                                    <p className="text-gray-600 mb-3">Crie um backup de todos os seus produtos, categorias e configurações da loja. O backup será salvo como um arquivo JSON no seu computador.</p>
+                                    <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition-all">
+                                        <i className="fas fa-download mr-2"></i>Fazer Backup
+                                    </button>
+                                </div>
+                                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                                    <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa: Popular Banco de Dados</h4>
+                                    <p className="text-yellow-700 mb-3">Esta ação irá adicionar os produtos e categorias iniciais ao seu banco de dados. Use apenas uma vez na configuração inicial ou se você limpou o banco de dados. Isso não substituirá itens existentes com o mesmo nome.</p>
+                                    <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600 transition-all">
+                                        <i className="fas fa-database mr-2"></i>Popular Banco de Dados
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
-            </div>
+            </section>
 
             <ProductModal 
                 isOpen={isProductModalOpen}
@@ -557,10 +559,10 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                 onSave={onSaveCategory}
                 category={editingCategory}
             />
-             <SupportModal 
+            <SupportModal 
                 isOpen={isSupportModalOpen}
                 onClose={() => setIsSupportModalOpen(false)}
             />
-        </section>
+        </>
     );
 };
