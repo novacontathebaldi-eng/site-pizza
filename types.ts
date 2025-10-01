@@ -37,3 +37,37 @@ export interface OrderDetails {
     changeAmount?: string;
     notes: string;
 }
+
+export interface ContentSectionListItem {
+    id: string;
+    icon: string;
+    text: string;
+}
+
+export interface ContentSection {
+    id: string;
+    order: number;
+    isVisible: boolean;
+    imageUrl: string;
+    tag: string;
+    title: string;
+    description: string;
+    list: ContentSectionListItem[];
+}
+
+export interface FooterLink {
+    id: string;
+    icon: string;
+    text: string;
+    url: string;
+}
+
+export interface SiteSettings {
+    logoUrl: string;
+    heroSlogan: string;
+    heroTitle: string;
+    heroSubtitle: string;
+    heroBgUrl: string;
+    contentSections: ContentSection[];
+    footerLinks: FooterLink[];
+}
