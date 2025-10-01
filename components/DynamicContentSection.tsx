@@ -31,17 +31,18 @@ export const DynamicContentSection: React.FC<DynamicContentSectionProps> = ({ se
         </div>
     );
 
-    const image = (
+    const image = section.imageUrl ? (
         <div className="relative flex items-center justify-center">
             <img src={section.imageUrl} alt={section.title} className="rounded-2xl shadow-xl w-full h-auto object-cover" />
         </div>
-    );
+    ) : null;
 
     return (
         <section id={`content-${section.id}`} className="py-20 bg-brand-ivory-50 odd:bg-white">
             <div className="container mx-auto px-4">
-                <div className="grid lg:grid-cols-2 gap-12 items-center">
-                    {isOrderEven ? (
+                <div className={`grid ${image ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-12 items-center`}>
+                    {/* If there's no image, always render content first. Otherwise, alternate. */}
+                    {!image || isOrderEven ? (
                         <>
                             {content}
                             {image}
