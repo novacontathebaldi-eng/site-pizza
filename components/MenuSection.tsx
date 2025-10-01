@@ -104,7 +104,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
                                     className="bg-accent text-white font-bold py-2 pl-6 pr-12 rounded-lg shadow-lg transition-all transform hover:scale-105"
                                 >
                                     Avançar para a Próxima Etapa
-                                    <i className="fas fa-chevron-down ml-2"></i>
+                                    <i className="fas fa-arrow-right ml-2"></i>
                                 </button>
                                 <button
                                     onClick={() => setSuggestedNextCategoryId(null)}
