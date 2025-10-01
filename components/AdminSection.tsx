@@ -6,6 +6,8 @@ import { SiteCustomizationTab } from './SiteCustomizationTab';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import firebase from 'firebase/compat/app';
+import { auth } from '../services/firebase';
 
 interface AdminSectionProps {
     allProducts: Product[];
@@ -107,7 +109,8 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     onSaveCategory, onDeleteCategory, onReorderProducts, onReorderCategories,
     onSeedDatabase, onSaveSiteSettings
 }) => {
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [user, setUser] = useState<firebase.User | null>(null);
+    const [authLoading, setAuthLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('status');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -130,6 +133,15 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     useEffect(() => {
         setLocalCategories([...allCategories].sort((a, b) => a.order - b.order));
     }, [allCategories]);
+
+    useEffect(() => {
+        if (!auth) return;
+        const unsubscribe = auth.onAuthStateChanged(user => {
+            setUser(user);
+            setAuthLoading(false);
+        });
+        return () => unsubscribe();
+    }, []);
 
     useEffect(() => {
         const handleHashChange = () => {
@@ -211,21 +223,31 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         });
     };
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (email === 'admin@santa.com' && password === 'admin123') {
-            setIsLoggedIn(true);
-            setError('');
-        } else {
+        setError('');
+        if (!auth) {
+            setError('Serviço de autenticação não disponível.');
+            return;
+        }
+        try {
+            await auth.signInWithEmailAndPassword(email, password);
+            // onAuthStateChanged will handle setting the user state
+        } catch (err) {
             setError('Email ou senha incorretos.');
         }
     };
 
-    const handleLogout = () => {
-        setIsLoggedIn(false);
-        setEmail('');
-        setPassword('');
-        window.location.hash = '';
+    const handleLogout = async () => {
+        if (!auth) return;
+        try {
+            await auth.signOut();
+            setEmail('');
+            setPassword('');
+            window.location.hash = '';
+        } catch (error) {
+            console.error("Error signing out: ", error);
+        }
     };
 
     const handleAddNewProduct = () => {
@@ -290,8 +312,18 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     };
 
     if (!showAdminPanel) return null;
+    
+    if (authLoading) {
+        return (
+            <section id="admin" className="py-20 bg-brand-ivory-50">
+                 <div className="text-center">
+                    <i className="fas fa-spinner fa-spin text-4xl text-accent"></i>
+                </div>
+            </section>
+        );
+    }
 
-    if (!isLoggedIn) {
+    if (!user) {
         return (
             <section id="admin" className="py-20 bg-brand-ivory-50">
                 <div className="container mx-auto px-4 max-w-md">
