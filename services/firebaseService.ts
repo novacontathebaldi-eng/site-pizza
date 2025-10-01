@@ -29,7 +29,7 @@ export const addProduct = async (productData: Omit<Product, 'id'>): Promise<void
     await db.collection('products').add(productData);
 };
 
-export const updateProduct = async (productId: string, productData: Omit<Product, 'id' | 'active'>): Promise<void> => {
+export const updateProduct = async (productId: string, productData: Omit<Product, 'id'>): Promise<void> => {
     if (!productId) throw new Error("Product ID is missing for update.");
     if (!db) throw new Error("Firestore is not initialized.");
     const productRef = db.collection('products').doc(productId);
@@ -60,7 +60,7 @@ export const addCategory = async (categoryData: Omit<Category, 'id'>): Promise<v
     await db.collection('categories').add(categoryData);
 };
 
-export const updateCategory = async (categoryId: string, categoryData: Omit<Category, 'id' | 'active' | 'order'>): Promise<void> => {
+export const updateCategory = async (categoryId: string, categoryData: Omit<Category, 'id'>): Promise<void> => {
     if (!categoryId) throw new Error("Category ID is missing for update.");
     if (!db) throw new Error("Firestore is not initialized.");
     const categoryRef = db.collection('categories').doc(categoryId);
@@ -68,13 +68,15 @@ export const updateCategory = async (categoryId: string, categoryData: Omit<Cate
 };
 
 export const deleteCategory = async (categoryId: string, allProducts: Product[]): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
     if (!categoryId) throw new Error("Invalid document reference. Document references must have an even number of segments, but categories has 1.");
+    
     // Safety check: prevent deletion if products are using this category
     const isCategoryInUse = allProducts.some(product => product.categoryId === categoryId);
     if (isCategoryInUse) {
         throw new Error("Não é possível excluir esta categoria, pois ela está sendo usada por um ou mais produtos.");
     }
-    if (!db) throw new Error("Firestore is not initialized.");
+
     const categoryRef = db.collection('categories').doc(categoryId);
     await categoryRef.delete();
 };

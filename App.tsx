@@ -17,6 +17,11 @@ import { seedDatabase } from './services/seed'; // Importar a função de seed
 // FIX: Removed modular imports from 'firebase/firestore' as they are not compatible with the project's Firebase version.
 // The logic is updated to use the v8 namespaced syntax.
 
+interface Toast {
+    id: number;
+    message: string;
+    type: 'success' | 'error';
+}
 
 const App: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
@@ -29,7 +34,16 @@ const App: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [activeSection, setActiveSection] = useState('Início');
     const [activeMenuCategory, setActiveMenuCategory] = useState<string>('');
+    const [toasts, setToasts] = useState<Toast[]>([]);
     
+    const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+        const id = Date.now();
+        setToasts(prevToasts => [...prevToasts, { id, message, type }]);
+        setTimeout(() => {
+            setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
+        }, 4000);
+    }, []);
+
     useEffect(() => {
         const savedCart = localStorage.getItem('santaSensacaoCart');
         if (savedCart) {
@@ -223,83 +237,85 @@ const App: React.FC = () => {
 
     const handleSaveProduct = useCallback(async (product: Product) => {
         try {
-            const productData = { ...product };
-            // FIX: Explicitly delete the 'id' field from the data object to prevent it from being written to Firestore.
-            // This was the root cause of items being corrupted after creation.
-            delete (productData as Partial<Product>).id;
-
-            if (product.id) {
-                await firebaseService.updateProduct(product.id, productData);
+            const { id, ...dataToSave } = product;
+            if (id) {
+                await firebaseService.updateProduct(id, dataToSave);
+                addToast("Produto atualizado com sucesso!", 'success');
             } else {
-                await firebaseService.addProduct({ ...productData, orderIndex: products.length });
+                await firebaseService.addProduct({ ...dataToSave, orderIndex: products.length });
+                addToast("Produto adicionado com sucesso!", 'success');
             }
         } catch (error) {
             console.error("Failed to save product:", error);
-            alert("Erro ao salvar produto. Tente novamente.");
+            addToast("Erro ao salvar produto. Tente novamente.", 'error');
         }
-    }, [products.length]);
+    }, [products.length, addToast]);
     
     const handleDeleteProduct = useCallback(async (productId: string) => {
         try {
             await firebaseService.deleteProduct(productId);
+            addToast("Produto deletado com sucesso!", 'success');
         } catch (error) {
             console.error("Failed to delete product:", error);
-            alert("Erro ao deletar produto. Tente novamente.");
+            addToast("Erro ao deletar produto. Tente novamente.", 'error');
         }
-    }, []);
+    }, [addToast]);
 
     const handleStoreStatusChange = useCallback(async (isOnline: boolean) => {
         try {
             await firebaseService.updateStoreStatus(isOnline);
+            addToast("Status da loja atualizado.", 'success');
         } catch (error) {
             console.error("Failed to update store status:", error);
-            alert("Erro ao atualizar status da loja. Tente novamente.");
+            addToast("Erro ao atualizar status da loja.", 'error');
         }
-    }, []);
+    }, [addToast]);
     
     const handleSaveCategory = useCallback(async (category: Category) => {
         try {
-            const categoryData = { ...category };
-            // FIX: Explicitly delete the 'id' field from the data object to prevent it from being written to Firestore.
-            delete (categoryData as Partial<Category>).id;
-
-            if (category.id) {
-                await firebaseService.updateCategory(category.id, categoryData);
+            const { id, ...dataToSave } = category;
+            if (id) {
+                await firebaseService.updateCategory(id, dataToSave);
+                addToast("Categoria atualizada com sucesso!", 'success');
             } else {
-                await firebaseService.addCategory({ ...categoryData, order: categories.length });
+                await firebaseService.addCategory({ ...dataToSave, order: categories.length });
+                addToast("Categoria adicionada com sucesso!", 'success');
             }
         } catch (error) {
             console.error("Failed to save category:", error);
-            alert("Erro ao salvar categoria. Tente novamente.");
+            addToast("Erro ao salvar categoria.", 'error');
         }
-    }, [categories.length]);
+    }, [categories.length, addToast]);
     
     const handleDeleteCategory = useCallback(async (categoryId: string) => {
         try {
             await firebaseService.deleteCategory(categoryId, products);
+            addToast("Categoria deletada com sucesso!", 'success');
         } catch (error) {
             console.error("Failed to delete category:", error);
-            alert(`Erro ao deletar categoria: ${error.message}`);
+            addToast(`Erro ao deletar categoria: ${error.message}`, 'error');
         }
-    }, [products]);
+    }, [products, addToast]);
 
     const handleReorderProducts = useCallback(async (productsToUpdate: { id: string; orderIndex: number }[]) => {
         try {
             await firebaseService.updateProductsOrder(productsToUpdate);
+            addToast("Ordem dos produtos atualizada.", 'success');
         } catch (error) {
             console.error("Failed to reorder products:", error);
-            alert("Erro ao reordenar produtos. A página pode precisar ser atualizada para refletir a ordem correta.");
+            addToast("Erro ao reordenar produtos.", 'error');
         }
-    }, []);
+    }, [addToast]);
 
     const handleReorderCategories = useCallback(async (categoriesToUpdate: { id: string; order: number }[]) => {
         try {
             await firebaseService.updateCategoriesOrder(categoriesToUpdate);
+            addToast("Ordem das categorias atualizada.", 'success');
         } catch (error) {
             console.error("Failed to reorder categories:", error);
-            alert("Erro ao reordenar categorias. A página pode precisar ser atualizada para refletir a ordem correta.");
+            addToast("Erro ao reordenar categorias.", 'error');
         }
-    }, []);
+    }, [addToast]);
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
 
@@ -380,7 +396,7 @@ const App: React.FC = () => {
                 onUpdateQuantity={handleUpdateCartQuantity}
                 onCheckout={() => {
                     if (!isStoreOnline) {
-                        alert("A loja está fechada. Não é possível finalizar o pedido.");
+                        addToast("A loja está fechada. Não é possível finalizar o pedido.", 'error');
                         return;
                     }
                     setIsCartOpen(false);
@@ -395,6 +411,34 @@ const App: React.FC = () => {
                 cartItems={cart}
                 onConfirmCheckout={handleCheckout}
             />
+            
+            {/* Toast Notification Container */}
+            <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]">
+                <div className="w-full flex flex-col items-center space-y-4 sm:items-end">
+                    {toasts.map((toast) => (
+                        <div
+                            key={toast.id}
+                            className="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden animate-fade-in-up"
+                        >
+                            <div className="p-4">
+                                <div className="flex items-start">
+                                    <div className="flex-shrink-0">
+                                        {toast.type === 'success' ? (
+                                            <i className="fas fa-check-circle h-6 w-6 text-green-500"></i>
+                                        ) : (
+                                            <i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>
+                                        )}
+                                    </div>
+                                    <div className="ml-3 w-0 flex-1 pt-0.5">
+                                        <p className="text-sm font-medium text-gray-900">{toast.message}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
         </div>
     );
 };
