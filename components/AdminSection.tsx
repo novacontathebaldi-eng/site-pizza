@@ -253,7 +253,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                      friendlyMessage = 'Erro de rede. Verifique sua conexão com a internet.';
                      break;
                 default:
-                    friendlyMessage = 'Email ou senha incorretos.';
+                    friendlyMessage = 'Ocorreu um erro inesperado. Verifique se as credenciais estão corretas e tente novamente.';
             }
             setError(friendlyMessage);
         } finally {
