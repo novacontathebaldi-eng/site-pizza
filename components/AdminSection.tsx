@@ -178,34 +178,31 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         if (!over || active.id === over.id) {
             return;
         }
-
-        const activeProduct = localProducts.find(p => p.id === active.id);
-        const overProduct = localProducts.find(p => p.id === over.id);
         
-        if (!activeProduct || !overProduct || activeProduct.categoryId !== overProduct.categoryId) {
+        // The UI presents products grouped by category, but the data model relies on a global `orderIndex`.
+        // The correct approach is to reorder based on the global list.
+        const sortedProducts = [...localProducts].sort((a, b) => a.orderIndex - b.orderIndex);
+
+        const oldIndex = sortedProducts.findIndex(p => p.id === active.id);
+        const newIndex = sortedProducts.findIndex(p => p.id === over.id);
+
+        if (oldIndex === -1 || newIndex === -1) {
+            console.error("Dragged item not found in state. Aborting reorder.");
             return;
         }
-
-        const categoryId = activeProduct.categoryId;
         
-        setLocalProducts((products) => {
-            const categoryProducts = products.filter(p => p.categoryId === categoryId).sort((a, b) => a.orderIndex - b.orderIndex);
-            const oldIndex = categoryProducts.findIndex(p => p.id === active.id);
-            const newIndex = categoryProducts.findIndex(p => p.id === over.id);
-            
-            const reorderedCategoryProducts = arrayMove(categoryProducts, oldIndex, newIndex);
-            
-            const productsToUpdate = reorderedCategoryProducts.map((p, index) => ({
-                id: p.id,
-                orderIndex: index
-            }));
+        // Create the new, reordered state.
+        const reordered = arrayMove(sortedProducts, oldIndex, newIndex);
+        const newState = reordered.map((p, index) => ({ ...p, orderIndex: index }));
+        
+        // Create the payload for Firestore update. This includes all products to ensure indices are sequential.
+        const productsToUpdate = newState.map(p => ({ id: p.id, orderIndex: p.orderIndex }));
+        
+        // Optimistically update the UI.
+        setLocalProducts(newState);
 
-            onReorderProducts(productsToUpdate);
-
-            // Return new state for optimistic update
-            const otherProducts = products.filter(p => p.categoryId !== categoryId);
-            return [...otherProducts, ...reorderedCategoryProducts.map((p, index) => ({ ...p, orderIndex: index }))];
-        });
+        // Call the async function to update the database.
+        onReorderProducts(productsToUpdate);
     };
 
     const handleCategoryDragEnd = (event: DragEndEvent) => {
@@ -215,21 +212,21 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             return;
         }
 
-        setLocalCategories((categories) => {
-            const oldIndex = categories.findIndex(c => c.id === active.id);
-            const newIndex = categories.findIndex(c => c.id === over.id);
-            
-            const reorderedCategories = arrayMove(categories, oldIndex, newIndex);
-            
-            const categoriesToUpdate = reorderedCategories.map((c, index) => ({
-                id: c.id,
-                order: index
-            }));
+        const oldIndex = localCategories.findIndex(c => c.id === active.id);
+        const newIndex = localCategories.findIndex(c => c.id === over.id);
+        
+        // Create new state with reordered and re-indexed items.
+        const reordered = arrayMove(localCategories, oldIndex, newIndex);
+        const newState = reordered.map((c, index) => ({ ...c, order: index }));
+        
+        // Create the payload for the Firestore update.
+        const categoriesToUpdate = newState.map(c => ({ id: c.id, order: c.order }));
 
-            onReorderCategories(categoriesToUpdate);
-
-            return reorderedCategories.map((c, index) => ({ ...c, order: index }));
-        });
+        // Optimistically update the UI state first.
+        setLocalCategories(newState);
+        
+        // Then, call the async function to update the database.
+        onReorderCategories(categoriesToUpdate);
     };
 
     const handleLogin = async (e: React.FormEvent) => {
