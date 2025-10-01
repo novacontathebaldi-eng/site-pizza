@@ -11,6 +11,8 @@ interface MenuSectionProps {
     isStoreOnline: boolean;
     activeCategoryId: string;
     setActiveCategoryId: (id: string) => void;
+    suggestedNextCategoryId: string | null;
+    setSuggestedNextCategoryId: (id: string | null) => void;
 }
 
 const categoryIcons: { [key: string]: string } = {
@@ -21,7 +23,7 @@ const categoryIcons: { [key: string]: string } = {
     'aperitivos': 'fas fa-drumstick-bite'
 };
 
-export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, onAddToCart, isStoreOnline, activeCategoryId, setActiveCategoryId }) => {
+export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, onAddToCart, isStoreOnline, activeCategoryId, setActiveCategoryId, suggestedNextCategoryId, setSuggestedNextCategoryId }) => {
 
     const filteredProducts = useMemo(() => 
         products.filter(p => p.categoryId === activeCategoryId && p.active),
@@ -32,23 +34,38 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
         [...categories].sort((a, b) => a.order - b.order),
         [categories]
     );
+    
+    const suggestedCategoryName = useMemo(() => {
+        if (!suggestedNextCategoryId) return '';
+        return categories.find(c => c.id === suggestedNextCategoryId)?.name || '';
+    }, [suggestedNextCategoryId, categories]);
+
+    const scrollToProductList = () => {
+        const productList = document.getElementById('category-product-list');
+        if (productList) {
+            const headerOffset = 160; // main header (80) + sticky filters (80)
+            const elementPosition = productList.getBoundingClientRect().top;
+            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+            
+            window.scrollTo({
+              top: offsetPosition,
+              behavior: 'smooth'
+            });
+        }
+    };
 
     const handleCategoryClick = (id: string) => {
         setActiveCategoryId(id);
-        // Timeout ensures the DOM has updated before we try to scroll
-        setTimeout(() => {
-            const productList = document.getElementById('category-product-list');
-            if (productList) {
-                const headerOffset = 160; // main header (80) + sticky filters (80)
-                const elementPosition = productList.getBoundingClientRect().top;
-                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-                
-                window.scrollTo({
-                  top: offsetPosition,
-                  behavior: 'smooth'
-                });
-            }
-        }, 0);
+        setSuggestedNextCategoryId(null); // Clear suggestion on manual navigation
+        setTimeout(scrollToProductList, 0);
+    };
+
+    const handleSuggestionClick = () => {
+        if (suggestedNextCategoryId) {
+            setActiveCategoryId(suggestedNextCategoryId);
+            setSuggestedNextCategoryId(null);
+            setTimeout(scrollToProductList, 0);
+        }
     };
 
 
@@ -63,7 +80,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
                     <p className="text-lg text-gray-600 mt-2 max-w-2xl mx-auto">Descubra nossa seleção especial de pizzas artesanais, bebidas e sobremesas.</p>
                 </div>
                 
-                <div id="menu-filters-container" className="sticky top-20 bg-white z-30 py-4 -mx-4 px-4 shadow-sm mb-10">
+                <div id="menu-filters-container" className="sticky top-20 bg-white z-30 py-4 -mx-4 px-4 shadow-sm">
                     <div className="flex justify-center flex-wrap gap-3">
                         {sortedCategories.filter(c => c.active).map(category => (
                             <button 
@@ -82,9 +99,21 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
                     </div>
                 </div>
 
+                {suggestedNextCategoryId && suggestedCategoryName && (
+                    <div className="text-center my-6">
+                        <button
+                            onClick={handleSuggestionClick}
+                            className="bg-accent text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-all transform hover:scale-105 animate-fade-in-up"
+                        >
+                            Ótima escolha! Continuar para {suggestedCategoryName}
+                            <i className="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+                )}
+
 
                 {filteredProducts.length > 0 ? (
-                    <div id="category-product-list" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div id="category-product-list" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pt-4">
                         {filteredProducts.map(product => (
                             <MenuItemCard 
                                 key={product.id} 
@@ -95,7 +124,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
                         ))}
                     </div>
                 ) : (
-                    <div className="text-center py-16">
+                    <div id="category-product-list" className="text-center py-16 pt-4">
                          <i className="fas fa-utensils text-5xl text-gray-300 mb-4"></i>
                         <p className="text-xl text-gray-500">Nenhum item encontrado nesta categoria.</p>
                         <p className="text-gray-400 mt-2">Selecione outra categoria para ver mais delícias!</p>

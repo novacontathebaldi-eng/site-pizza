@@ -83,6 +83,7 @@ const App: React.FC = () => {
     const [activeMenuCategory, setActiveMenuCategory] = useState<string>('');
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [siteSettings, setSiteSettings] = useState<SiteSettings>(defaultSiteSettings);
+    const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
     
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
@@ -224,25 +225,15 @@ const App: React.FC = () => {
             }
         });
         
-        // Guided ordering flow
+        // Guided ordering flow: suggest the next category instead of forcing it.
         const sortedActiveCategories = [...categories].sort((a,b) => a.order - b.order).filter(c => c.active);
         const currentCategoryIndex = sortedActiveCategories.findIndex(c => c.id === product.categoryId);
 
         if (currentCategoryIndex > -1 && currentCategoryIndex < sortedActiveCategories.length - 1) {
             const nextCategory = sortedActiveCategories[currentCategoryIndex + 1];
-            setActiveMenuCategory(nextCategory.id);
-            
-            const productList = document.getElementById('category-product-list');
-            if (productList) {
-                const headerOffset = 160; // main header (80) + sticky filters (80)
-                const elementPosition = productList.getBoundingClientRect().top;
-                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-                
-                window.scrollTo({
-                  top: offsetPosition,
-                  behavior: 'smooth'
-                });
-            }
+            setSuggestedNextCategoryId(nextCategory.id);
+        } else {
+            setSuggestedNextCategoryId(null); // No more categories to suggest
         }
 
     }, [categories]);
@@ -445,6 +436,8 @@ const App: React.FC = () => {
                         isStoreOnline={isStoreOnline}
                         activeCategoryId={activeMenuCategory}
                         setActiveCategoryId={setActiveMenuCategory}
+                        suggestedNextCategoryId={suggestedNextCategoryId}
+                        setSuggestedNextCategoryId={setSuggestedNextCategoryId}
                     />
                 )}
                 <div id="sobre">

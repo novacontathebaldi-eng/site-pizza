@@ -43,26 +43,28 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
                 )}
             </div>
             <div className="p-4 flex flex-col flex-grow">
-                <h3 className="text-lg font-bold text-text-on-light mb-1">{product.name}</h3>
-                <p className="text-gray-500 text-xs flex-grow mb-3 line-clamp-2">{product.description}</p>
-                
-                {sortedSizes.length > 1 && (
-                    <div className="flex flex-wrap gap-1 mb-3">
-                        {sortedSizes.map(size => (
-                            <button
-                                key={size}
-                                onClick={() => setSelectedSize(size)}
-                                className={`px-2 py-1 text-[11px] font-semibold rounded-md border transition-colors ${
-                                    selectedSize === size
-                                        ? 'bg-brand-olive-600 text-white border-brand-olive-600'
-                                        : 'bg-gray-100 text-gray-700 border-gray-300 hover:border-brand-olive-600'
-                                }`}
-                            >
-                                {size}
-                            </button>
-                        ))}
-                    </div>
-                )}
+                <div className="flex-grow">
+                    <h3 className="text-lg font-bold text-text-on-light mb-1">{product.name}</h3>
+                    <p className="text-gray-500 text-xs mb-3 line-clamp-2">{product.description}</p>
+                    
+                    {sortedSizes.length > 1 && (
+                        <div className="flex flex-wrap gap-1 mb-3">
+                            {sortedSizes.map(size => (
+                                <button
+                                    key={size}
+                                    onClick={() => setSelectedSize(size)}
+                                    className={`px-2 py-1 text-[11px] font-semibold rounded-md border transition-colors ${
+                                        selectedSize === size
+                                            ? 'bg-brand-olive-600 text-white border-brand-olive-600'
+                                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:border-brand-olive-600'
+                                    }`}
+                                >
+                                    {size}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
 
                 <div className="mt-auto pt-2 flex justify-between items-center">
                     <span className="text-xl font-bold text-accent">
@@ -71,7 +73,7 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
                     <button 
                         onClick={handleAddToCart}
                         disabled={!isStoreOnline}
-                        className="bg-accent text-white font-bold py-2 px-4 rounded-lg transition-all transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        className="bg-accent text-white font-bold py-2 px-5 rounded-lg transition-all transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
                         <i className="fas fa-plus mr-1"></i>
                         Adicionar
