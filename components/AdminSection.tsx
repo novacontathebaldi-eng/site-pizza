@@ -20,8 +20,8 @@ interface AdminSectionProps {
     onStoreStatusChange: (isOnline: boolean) => Promise<void>;
     onSaveCategory: (category: Category) => Promise<void>;
     onDeleteCategory: (categoryId: string) => Promise<void>;
-    onReorderProducts: (productsToUpdate: { id: string; orderIndex: number }[]) => Promise<void>;
-    onReorderCategories: (categoriesToUpdate: { id: string; order: number }[]) => Promise<void>;
+    onReorderProducts: (reorderedProducts: Product[]) => Promise<void>;
+    onReorderCategories: (reorderedCategories: Category[]) => Promise<void>;
     onSeedDatabase: () => Promise<void>;
     onSaveSiteSettings: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
 }
@@ -176,28 +176,13 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         const { active, over } = event;
     
         if (over && active.id !== over.id) {
-            setLocalProducts((currentProducts) => {
-                const oldIndex = currentProducts.findIndex((p) => p.id === active.id);
-                const newIndex = currentProducts.findIndex((p) => p.id === over.id);
-                
-                if (oldIndex === -1 || newIndex === -1) {
-                    return currentProducts; // Itens não encontrados, não faz nada
-                }
-
-                // 1. Atualiza a UI otimisticamente
-                const reorderedProducts = arrayMove(currentProducts, oldIndex, newIndex);
-    
-                // 2. Prepara e envia a atualização para o backend
-                // Re-indexa a lista inteira para garantir a integridade da ordem global
-                const productsToUpdate = reorderedProducts.map((p, index) => ({
-                    id: p.id,
-                    orderIndex: index,
-                }));
-    
-                onReorderProducts(productsToUpdate);
-    
-                return reorderedProducts; // Retorna o novo estado para a UI
-            });
+            const oldIndex = localProducts.findIndex((p) => p.id === active.id);
+            const newIndex = localProducts.findIndex((p) => p.id === over.id);
+            
+            if (oldIndex !== -1 && newIndex !== -1) {
+                const reorderedProducts = arrayMove(localProducts, oldIndex, newIndex);
+                onReorderProducts(reorderedProducts);
+            }
         }
     };
 
@@ -205,27 +190,13 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         const { active, over } = event;
     
         if (over && active.id !== over.id) {
-            setLocalCategories((currentCategories) => {
-                const oldIndex = currentCategories.findIndex((c) => c.id === active.id);
-                const newIndex = currentCategories.findIndex((c) => c.id === over.id);
-                
-                if (oldIndex === -1 || newIndex === -1) {
-                    return currentCategories;
-                }
-    
-                // 1. Atualiza a UI otimisticamente
-                const reorderedCategories = arrayMove(currentCategories, oldIndex, newIndex);
-    
-                // 2. Prepara e envia a atualização para o backend
-                const categoriesToUpdate = reorderedCategories.map((c, index) => ({
-                    id: c.id,
-                    order: index,
-                }));
-    
-                onReorderCategories(categoriesToUpdate);
-    
-                return reorderedCategories; // Retorna o novo estado para a UI
-            });
+            const oldIndex = localCategories.findIndex((c) => c.id === active.id);
+            const newIndex = localCategories.findIndex((c) => c.id === over.id);
+            
+            if (oldIndex !== -1 && newIndex !== -1) {
+                const reorderedCategories = arrayMove(localCategories, oldIndex, newIndex);
+                onReorderCategories(reorderedCategories);
+            }
         }
     };
 
