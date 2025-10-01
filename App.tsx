@@ -36,10 +36,10 @@ const defaultSiteSettings: SiteSettings = {
     aboutTitle: "A Melhor Pizza do Estado, Assinada por um Mestre",
     aboutDescription: "Em parceria com o renomado mestre pizzaiolo Luca Lonardi, a Santa Sensação eleva a pizza a um novo patamar. Fomos os grandes vencedores do concurso Panshow 2025, um reconhecimento que celebra nossa dedicação aos ingredientes frescos, massa de fermentação natural e, acima de tudo, a paixão por criar sabores inesquecíveis. Cada pizza que sai do nosso forno a lenha carrega a assinatura de um campeão e a promessa de uma experiência única.",
     aboutList: [
-        "Vencedora do Panshow 2025",
-        "Assinada pelo Mestre Luca Lonardi",
-        "Ingredientes frescos e selecionados",
-        "Forno a lenha tradicional"
+        { icon: "fas fa-award", text: "Vencedora do Panshow 2025" },
+        { icon: "fas fa-user-check", text: "Assinada pelo Mestre Luca Lonardi" },
+        { icon: "fas fa-leaf", text: "Ingredientes frescos e selecionados" },
+        { icon: "fas fa-fire-alt", text: "Forno a lenha tradicional" }
     ]
 };
 

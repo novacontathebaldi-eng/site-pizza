@@ -74,9 +74,19 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleListChange = (index: number, value: string) => {
+    const handleListItemChange = (index: number, field: 'icon' | 'text', value: string) => {
         const newList = [...formData.aboutList];
-        newList[index] = value;
+        newList[index] = { ...newList[index], [field]: value };
+        setFormData({ ...formData, aboutList: newList });
+    };
+
+    const handleAddListItem = () => {
+        const newList = [...formData.aboutList, { icon: 'fas fa-check-circle', text: '' }];
+        setFormData({ ...formData, aboutList: newList });
+    };
+    
+    const handleRemoveListItem = (index: number) => {
+        const newList = formData.aboutList.filter((_, i) => i !== index);
         setFormData({ ...formData, aboutList: newList });
     };
 
@@ -161,11 +171,45 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                         </div>
                          <div>
                             <label className="block text-sm font-semibold mb-1">Lista de Conquistas</label>
-                            <div className="space-y-2">
+                            <p className="text-xs text-gray-500 mb-2">
+                                Use classes do Font Awesome para os ícones (ex: <code>fas fa-award</code>).{' '}
+                                <a href="https://fontawesome.com/v6/search?m=free&s=solid" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                    Buscar ícones
+                                </a>
+                            </p>
+                            <div className="space-y-3">
                                 {formData.aboutList.map((item, index) => (
-                                    <input key={index} value={item} onChange={(e) => handleListChange(index, e.target.value)} className="w-full px-3 py-2 border rounded-md" />
+                                    <div key={index} className="flex items-center gap-2">
+                                        <input 
+                                            value={item.icon} 
+                                            onChange={(e) => handleListItemChange(index, 'icon', e.target.value)} 
+                                            className="w-1/3 px-3 py-2 border rounded-md"
+                                            placeholder="Classe do Ícone"
+                                        />
+                                        <input 
+                                            value={item.text} 
+                                            onChange={(e) => handleListItemChange(index, 'text', e.target.value)} 
+                                            className="w-2/3 px-3 py-2 border rounded-md"
+                                            placeholder="Texto da Conquista"
+                                        />
+                                        <button 
+                                            type="button" 
+                                            onClick={() => handleRemoveListItem(index)}
+                                            className="bg-red-500 text-white w-9 h-9 flex-shrink-0 rounded-md hover:bg-red-600 flex items-center justify-center"
+                                            aria-label="Remover item"
+                                        >
+                                            <i className="fas fa-trash"></i>
+                                        </button>
+                                    </div>
                                 ))}
                             </div>
+                            <button 
+                                type="button" 
+                                onClick={handleAddListItem}
+                                className="mt-3 bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600 transition-all text-sm"
+                            >
+                                <i className="fas fa-plus mr-2"></i>Adicionar Item
+                            </button>
                         </div>
                     </div>
                 </div>
