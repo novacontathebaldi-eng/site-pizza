@@ -100,14 +100,23 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
                 </div>
 
                 {suggestedNextCategoryId && suggestedCategoryName && (
-                    <div className="text-center my-6">
-                        <button
-                            onClick={handleSuggestionClick}
-                            className="bg-accent text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-all transform hover:scale-105 animate-fade-in-up"
-                        >
-                            Ótima escolha! Continuar para {suggestedCategoryName}
-                            <i className="fas fa-arrow-right ml-2"></i>
-                        </button>
+                    <div className="text-center my-6 animate-fade-in-up">
+                        <div className="relative inline-flex items-center group">
+                            <button
+                                onClick={handleSuggestionClick}
+                                className="bg-accent text-white font-bold py-3 pl-6 pr-12 rounded-lg shadow-lg transition-all transform hover:scale-105"
+                            >
+                                Ótima escolha! Continuar para {suggestedCategoryName}
+                                <i className="fas fa-arrow-right ml-2"></i>
+                            </button>
+                            <button
+                                onClick={() => setSuggestedNextCategoryId(null)}
+                                className="absolute top-1/2 -translate-y-1/2 right-0 w-10 h-full flex items-center justify-center text-white/70 hover:text-white rounded-r-lg opacity-50 group-hover:opacity-100 transition-opacity"
+                                aria-label="Dispensar sugestão"
+                            >
+                                &times;
+                            </button>
+                        </div>
                     </div>
                 )}
 
