@@ -24,47 +24,81 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ isOpen, onClose, cartI
             return null;
         }
 
-        const savoryPizzaCategory = categories.find(c => c.name.toLowerCase().includes('pizzas salgadas'));
-        const drinksCategory = categories.find(c => c.name.toLowerCase().includes('bebidas'));
-
-        if (!savoryPizzaCategory || !drinksCategory) {
-            return null;
-        }
-
         const productMap = new Map(products.map(p => [p.id, p]));
 
-        let hasSavoryPizza = false;
+        const findCategoryByKeywords = (keywords: string[]) => {
+            return categories.find(c => keywords.some(kw => c.name.toLowerCase().includes(kw)));
+        };
+        
+        const foodCategoryIds = categories
+            .filter(c => c.name.toLowerCase().includes('pizzas salgadas') || c.name.toLowerCase().includes('aperitivos'))
+            .map(c => c.id);
+        
+        const drinksCategory = findCategoryByKeywords(['bebidas']);
+        const dessertsCategory = findCategoryByKeywords(['sobremesas']);
+
+        let hasFoodItem = false;
         let hasDrink = false;
+        let hasDessert = false;
 
         for (const item of cartItems) {
             const product = productMap.get(item.productId);
             if (product) {
-                if (product.categoryId === savoryPizzaCategory.id) {
-                    hasSavoryPizza = true;
+                if (foodCategoryIds.includes(product.categoryId)) {
+                    hasFoodItem = true;
                 }
-                if (product.categoryId === drinksCategory.id) {
+                if (drinksCategory && product.categoryId === drinksCategory.id) {
                     hasDrink = true;
+                }
+                if (dessertsCategory && product.categoryId === dessertsCategory.id) {
+                    hasDessert = true;
                 }
             }
         }
 
-        if (hasSavoryPizza && !hasDrink) {
+        // Priority 1: Suggest drinks
+        if (hasFoodItem && !hasDrink && drinksCategory) {
             return {
-                text: "Sua pizza ficaria ótima com uma bebida! Que tal adicionar uma?",
+                text: "Que tal uma bebida para acompanhar?",
                 buttonText: "Ver Bebidas",
                 targetCategoryId: drinksCategory.id
             };
         }
 
+        // Priority 2: Suggest desserts
+        if (hasFoodItem && !hasDessert && dessertsCategory) {
+             return {
+                text: "Gostaria de uma sobremesa para finalizar?",
+                buttonText: "Ver Sobremesas",
+                targetCategoryId: dessertsCategory.id
+            };
+        }
+
         return null;
     }, [cartItems, products, categories]);
-
+    
     const handleSuggestionClick = () => {
         if (suggestion) {
             onClose();
             setActiveCategoryId(suggestion.targetCategoryId);
+            
+            // Scroll to menu section after cart animation
+            setTimeout(() => {
+                const menuElement = document.getElementById('cardapio');
+                if (menuElement) {
+                    const headerOffset = 80; // Main header height
+                    const elementPosition = menuElement.getBoundingClientRect().top;
+                    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                    
+                    window.scrollTo({
+                        top: offsetPosition,
+                        behavior: 'smooth'
+                    });
+                }
+            }, 300); // 300ms to match cart transition duration
         }
     };
+
 
     return (
         <>
