@@ -32,9 +32,8 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ isOpen, onClose, cartI
         
         const foodCategoryIds = categories
             .filter(c => 
-                c.name.toLowerCase().includes('pizzas salgadas') || 
-                c.name.toLowerCase().includes('pizzas doces') || 
-                c.name.toLowerCase().includes('aperitivos')
+                !c.name.toLowerCase().includes('bebidas') && 
+                !c.name.toLowerCase().includes('sobremesas')
             )
             .map(c => c.id);
         
