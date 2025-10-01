@@ -8,6 +8,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from '@dnd-kit/utilities';
 import firebase from 'firebase/compat/app';
 import { auth } from '../services/firebase';
+import { SupportModal } from './SupportModal';
 
 interface AdminSectionProps {
     allProducts: Product[];
@@ -114,7 +115,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     const [activeTab, setActiveTab] = useState('status');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
+    const [error, setError] = useState<string | React.ReactNode>('');
     const [showAdminPanel, setShowAdminPanel] = useState(window.location.hash === '#admin');
     const [isLoggingIn, setIsLoggingIn] = useState(false);
     
@@ -126,6 +127,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
 
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+    const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     
     useEffect(() => {
         setLocalProducts(allProducts);
@@ -244,13 +246,27 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             // onAuthStateChanged will handle setting the user state
         } catch (err: any) {
             console.error("Firebase Auth Error:", err);
-            let friendlyMessage = 'Ocorreu um erro. Tente novamente.';
+            let friendlyMessage: string | React.ReactNode = 'Ocorreu um erro inesperado. Verifique se as credenciais estão corretas e tente novamente.';
             switch (err.code) {
                 case 'auth/user-not-found':
-                    friendlyMessage = 'Nenhum usuário encontrado com este e-mail.';
-                    break;
                 case 'auth/wrong-password':
-                    friendlyMessage = 'A senha está incorreta. Verifique e tente novamente.';
+                    friendlyMessage = (
+                        <div className="text-center text-sm">
+                            <p className="font-bold">Acesso negado. Por favor, verifique suas credenciais.</p>
+                            <p className="mt-2">O acesso a este painel é restrito a administradores autorizados.</p>
+                            <p className="mt-4">
+                                Se você é um administrador e está com problemas, entre em contato com o suporte técnico em <a href="mailto:th3.suporte@gmail.com" className="font-semibold text-accent hover:underline">th3.suporte@gmail.com</a> ou use o formulário abaixo.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => setIsSupportModalOpen(true)}
+                                className="mt-4 w-full bg-brand-olive-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"
+                            >
+                                <i className="fas fa-envelope mr-2"></i>
+                                Entrar em Contato com o Suporte
+                            </button>
+                        </div>
+                    );
                     break;
                 case 'auth/invalid-email':
                     friendlyMessage = 'O formato do e-mail é inválido.';
@@ -354,31 +370,41 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
 
     if (!user) {
         return (
-            <section id="admin" className="py-20 bg-brand-ivory-50">
-                <div className="container mx-auto px-4 max-w-md">
-                    <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
-                        <h2 className="text-3xl font-bold text-center mb-6 text-text-on-light"><i className="fas fa-shield-alt mr-2"></i>Painel Administrativo</h2>
-                        <form onSubmit={handleLogin}>
-                            <div className="mb-4">
-                                <label className="block text-gray-700 font-semibold mb-2" htmlFor="admin-email">Email</label>
-                                <input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} />
-                            </div>
-                            <div className="mb-6">
-                                <label className="block text-gray-700 font-semibold mb-2" htmlFor="admin-password">Senha</label>
-                                <input id="admin-password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} />
-                            </div>
-                            {error && <p className="text-red-500 text-center mb-4">{error}</p>}
-                            <button type="submit" className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg hover:bg-opacity-90 transition-all flex items-center justify-center disabled:bg-opacity-70" disabled={isLoggingIn}>
-                                {isLoggingIn ? (
-                                    <i className="fas fa-spinner fa-spin"></i>
-                                ) : (
-                                    'Entrar'
+            <>
+                <section id="admin" className="py-20 bg-brand-ivory-50">
+                    <div className="container mx-auto px-4 max-w-md">
+                        <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
+                            <h2 className="text-3xl font-bold text-center mb-6 text-text-on-light"><i className="fas fa-shield-alt mr-2"></i>Painel Administrativo</h2>
+                            <form onSubmit={handleLogin}>
+                                <div className="mb-4">
+                                    <label className="block text-gray-700 font-semibold mb-2" htmlFor="admin-email">Email</label>
+                                    <input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} />
+                                </div>
+                                <div className="mb-6">
+                                    <label className="block text-gray-700 font-semibold mb-2" htmlFor="admin-password">Senha</label>
+                                    <input id="admin-password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} />
+                                </div>
+                                {error && (
+                                    <div className="text-red-600 mb-4 bg-red-50 p-3 rounded-lg border border-red-200">
+                                        {typeof error === 'string' ? <p>{error}</p> : error}
+                                    </div>
                                 )}
-                            </button>
-                        </form>
+                                <button type="submit" className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg hover:bg-opacity-90 transition-all flex items-center justify-center disabled:bg-opacity-70" disabled={isLoggingIn}>
+                                    {isLoggingIn ? (
+                                        <i className="fas fa-spinner fa-spin"></i>
+                                    ) : (
+                                        'Entrar'
+                                    )}
+                                </button>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
+                <SupportModal
+                    isOpen={isSupportModalOpen}
+                    onClose={() => setIsSupportModalOpen(false)}
+                />
+            </>
         );
     }
 
@@ -530,6 +556,10 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                 onClose={() => setIsCategoryModalOpen(false)}
                 onSave={onSaveCategory}
                 category={editingCategory}
+            />
+             <SupportModal 
+                isOpen={isSupportModalOpen}
+                onClose={() => setIsSupportModalOpen(false)}
             />
         </section>
     );
