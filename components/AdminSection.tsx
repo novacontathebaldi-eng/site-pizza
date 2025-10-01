@@ -250,6 +250,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             switch (err.code) {
                 case 'auth/user-not-found':
                 case 'auth/wrong-password':
+                case 'auth/invalid-credential':
                     friendlyMessage = (
                         <div className="text-center text-sm">
                             <p className="font-bold">Acesso negado. Por favor, verifique suas credenciais.</p>
