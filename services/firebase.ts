@@ -28,6 +28,14 @@ try {
     firebase.initializeApp(firebaseConfig);
   }
   db = firebase.firestore();
+
+  // FIX: Force long-polling to prevent WebSocket connection issues in restrictive environments.
+  // This helps ensure a stable connection on browsers like Chrome that might have issues
+  // with WebSockets due to proxies, firewalls, or sandbox restrictions.
+  db.settings({
+    experimentalForceLongPolling: true,
+  });
+
   storage = firebase.storage();
   auth = firebase.auth(); // Initialize auth
   console.log("Firebase inicializado com sucesso. Conectando ao Firestore, Storage e Auth...");
