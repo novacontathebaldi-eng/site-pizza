@@ -13,6 +13,8 @@ interface MenuSectionProps {
     setActiveCategoryId: (id: string) => void;
     suggestedNextCategoryId: string | null;
     setSuggestedNextCategoryId: (id: string | null) => void;
+    cartItemCount: number;
+    onCartClick: () => void;
 }
 
 const categoryIcons: { [key: string]: string } = {
@@ -23,7 +25,7 @@ const categoryIcons: { [key: string]: string } = {
     'aperitivos': 'fas fa-drumstick-bite'
 };
 
-export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, onAddToCart, isStoreOnline, activeCategoryId, setActiveCategoryId, suggestedNextCategoryId, setSuggestedNextCategoryId }) => {
+export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, onAddToCart, isStoreOnline, activeCategoryId, setActiveCategoryId, suggestedNextCategoryId, setSuggestedNextCategoryId, cartItemCount, onCartClick }) => {
 
     const filteredProducts = useMemo(() => 
         products.filter(p => p.categoryId === activeCategoryId && p.active),
@@ -35,6 +37,17 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
         [categories]
     );
     
+    const sortedActiveCategories = useMemo(() => 
+        sortedCategories.filter(c => c.active),
+        [sortedCategories]
+    );
+
+    const lastCategoryId = sortedActiveCategories.length > 0 
+        ? sortedActiveCategories[sortedActiveCategories.length - 1].id 
+        : null;
+
+    const showFinalizeButton = activeCategoryId === lastCategoryId && cartItemCount > 0 && !suggestedNextCategoryId;
+
     const scrollToProductList = () => {
         const productList = document.getElementById('category-product-list');
         const stickyHeader = document.getElementById('sticky-menu-header');
@@ -96,24 +109,35 @@ export const MenuSection: React.FC<MenuSectionProps> = ({ categories, products, 
                         </div>
                     </div>
                     
-                    {suggestedNextCategoryId && (
+                    {(suggestedNextCategoryId || showFinalizeButton) && (
                         <div className="text-center py-3 border-t border-gray-200 animate-fade-in-up">
-                            <div className="relative inline-flex items-center group">
+                            {suggestedNextCategoryId && (
+                                <div className="relative inline-flex items-center group">
+                                    <button
+                                        onClick={handleSuggestionClick}
+                                        className="bg-accent text-white font-bold py-2 pl-6 pr-12 rounded-lg shadow-lg transition-all transform hover:scale-105"
+                                    >
+                                        Avançar para a Próxima Etapa
+                                        <i className="fas fa-arrow-right ml-2"></i>
+                                    </button>
+                                    <button
+                                        onClick={() => setSuggestedNextCategoryId(null)}
+                                        className="absolute top-1/2 -translate-y-1/2 right-0 w-10 h-full flex items-center justify-center text-white/70 hover:text-white rounded-r-lg opacity-50 group-hover:opacity-100 transition-opacity"
+                                        aria-label="Dispensar sugestão"
+                                    >
+                                        &times;
+                                    </button>
+                                </div>
+                            )}
+                            {showFinalizeButton && (
                                 <button
-                                    onClick={handleSuggestionClick}
-                                    className="bg-accent text-white font-bold py-2 pl-6 pr-12 rounded-lg shadow-lg transition-all transform hover:scale-105"
+                                    onClick={onCartClick}
+                                    className="bg-accent text-white font-bold py-2 px-6 rounded-lg shadow-lg transition-all transform hover:scale-105"
                                 >
-                                    Avançar para a Próxima Etapa
-                                    <i className="fas fa-arrow-right ml-2"></i>
+                                    <i className="fas fa-shopping-bag mr-2"></i>
+                                    Finalizar e Ver Pedido
                                 </button>
-                                <button
-                                    onClick={() => setSuggestedNextCategoryId(null)}
-                                    className="absolute top-1/2 -translate-y-1/2 right-0 w-10 h-full flex items-center justify-center text-white/70 hover:text-white rounded-r-lg opacity-50 group-hover:opacity-100 transition-opacity"
-                                    aria-label="Dispensar sugestão"
-                                >
-                                    &times;
-                                </button>
-                            </div>
+                            )}
                         </div>
                     )}
                 </div>

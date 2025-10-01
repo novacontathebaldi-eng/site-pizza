@@ -438,6 +438,8 @@ const App: React.FC = () => {
                         setActiveCategoryId={setActiveMenuCategory}
                         suggestedNextCategoryId={suggestedNextCategoryId}
                         setSuggestedNextCategoryId={setSuggestedNextCategoryId}
+                        cartItemCount={cartTotalItems}
+                        onCartClick={() => setIsCartOpen(true)}
                     />
                 )}
                 <div id="sobre">
