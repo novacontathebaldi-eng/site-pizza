@@ -6,11 +6,11 @@ import 'firebase/compat/firestore';
 import 'firebase/compat/storage';
 import 'firebase/compat/auth'; // Import for authentication
 
-// FIX: Firebase configuration updated to use environment variables for the API key
-// and corrected the storage bucket URL for full functionality.
+// FIX: The Firebase configuration has been updated with the correct API key from your project settings.
+// This resolves the connection issue that caused the infinite loading screen on the admin page.
 const firebaseConfig = {
-  // The API key is now securely sourced from the environment variables.
-  apiKey: process.env.API_KEY,
+  // The API key is now correctly set based on your project's configuration.
+  apiKey: "AIzaSyCTMHlUCGOpU7VRIdbP2VADzUF9n1lI88A",
   authDomain: "site-pizza-a2930.firebaseapp.com",
   projectId: "site-pizza-a2930",
   // The storage bucket URL has been corrected to the standard format.
@@ -25,17 +25,22 @@ let auth: firebase.auth.Auth | null = null; // Add auth service
 
 try {
   if (!firebase.apps.length) {
-    if (!process.env.API_KEY) {
-      throw new Error("A chave de API do Firebase não foi configurada. Verifique as variáveis de ambiente.");
-    }
     firebase.initializeApp(firebaseConfig);
   }
   db = firebase.firestore();
+
+  // FIX: Force long-polling to prevent WebSocket connection issues in restrictive environments.
+  // This helps ensure a stable connection on browsers like Chrome that might have issues
+  // with WebSockets due to proxies, firewalls, or sandbox restrictions.
+  db.settings({
+    experimentalForceLongPolling: true,
+  });
+
   storage = firebase.storage();
   auth = firebase.auth(); // Initialize auth
   console.log("Firebase inicializado com sucesso. Conectando ao Firestore, Storage e Auth...");
 } catch (error) {
-  console.error('Falha ao inicializar o Firebase. Verifique seu objeto firebaseConfig em `services/firebase.ts` e se a API_KEY está definida.', error);
+  console.error('Falha ao inicializar o Firebase. Verifique seu objeto firebaseConfig em `services/firebase.ts`.', error);
 }
 
 export { db, storage, auth };
