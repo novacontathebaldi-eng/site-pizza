@@ -174,40 +174,59 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
 
     const handleProductDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
+    
+        if (over && active.id !== over.id) {
+            setLocalProducts((currentProducts) => {
+                const oldIndex = currentProducts.findIndex((p) => p.id === active.id);
+                const newIndex = currentProducts.findIndex((p) => p.id === over.id);
+                
+                if (oldIndex === -1 || newIndex === -1) {
+                    return currentProducts; // Itens não encontrados, não faz nada
+                }
 
-        if (!over || active.id === over.id) {
-            return;
+                // 1. Atualiza a UI otimisticamente
+                const reorderedProducts = arrayMove(currentProducts, oldIndex, newIndex);
+    
+                // 2. Prepara e envia a atualização para o backend
+                // Re-indexa a lista inteira para garantir a integridade da ordem global
+                const productsToUpdate = reorderedProducts.map((p, index) => ({
+                    id: p.id,
+                    orderIndex: index,
+                }));
+    
+                onReorderProducts(productsToUpdate);
+    
+                return reorderedProducts; // Retorna o novo estado para a UI
+            });
         }
-        
-        const sortedProducts = [...localProducts].sort((a, b) => a.orderIndex - b.orderIndex);
-        const oldIndex = sortedProducts.findIndex(p => p.id === active.id);
-        const newIndex = sortedProducts.findIndex(p => p.id === over.id);
-
-        if (oldIndex === -1 || newIndex === -1) {
-            console.error("Dragged item not found in state. Aborting reorder.");
-            return;
-        }
-        
-        const reordered = arrayMove(sortedProducts, oldIndex, newIndex);
-        const productsToUpdate = reordered.map((p, index) => ({ id: p.id, orderIndex: index }));
-        
-        onReorderProducts(productsToUpdate);
     };
 
     const handleCategoryDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
-
-        if (!over || active.id === over.id) {
-            return;
+    
+        if (over && active.id !== over.id) {
+            setLocalCategories((currentCategories) => {
+                const oldIndex = currentCategories.findIndex((c) => c.id === active.id);
+                const newIndex = currentCategories.findIndex((c) => c.id === over.id);
+                
+                if (oldIndex === -1 || newIndex === -1) {
+                    return currentCategories;
+                }
+    
+                // 1. Atualiza a UI otimisticamente
+                const reorderedCategories = arrayMove(currentCategories, oldIndex, newIndex);
+    
+                // 2. Prepara e envia a atualização para o backend
+                const categoriesToUpdate = reorderedCategories.map((c, index) => ({
+                    id: c.id,
+                    order: index,
+                }));
+    
+                onReorderCategories(categoriesToUpdate);
+    
+                return reorderedCategories; // Retorna o novo estado para a UI
+            });
         }
-
-        const oldIndex = localCategories.findIndex(c => c.id === active.id);
-        const newIndex = localCategories.findIndex(c => c.id === over.id);
-        
-        const reordered = arrayMove(localCategories, oldIndex, newIndex);
-        const categoriesToUpdate = reordered.map((c, index) => ({ id: c.id, order: index }));
-
-        onReorderCategories(categoriesToUpdate);
     };
 
     const handleLogin = async (e: React.FormEvent) => {
