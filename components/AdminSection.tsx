@@ -116,6 +116,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [showAdminPanel, setShowAdminPanel] = useState(window.location.hash === '#admin');
+    const [isLoggingIn, setIsLoggingIn] = useState(false);
     
     const [localProducts, setLocalProducts] = useState<Product[]>(allProducts);
     const [localCategories, setLocalCategories] = useState<Category[]>(allCategories);
@@ -226,8 +227,10 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setIsLoggingIn(true);
         if (!auth) {
             setError('Serviço de autenticação não disponível.');
+            setIsLoggingIn(false);
             return;
         }
         try {
@@ -235,6 +238,8 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
             // onAuthStateChanged will handle setting the user state
         } catch (err) {
             setError('Email ou senha incorretos.');
+        } finally {
+            setIsLoggingIn(false);
         }
     };
 
@@ -332,14 +337,20 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                         <form onSubmit={handleLogin}>
                             <div className="mb-4">
                                 <label className="block text-gray-700 font-semibold mb-2" htmlFor="admin-email">Email</label>
-                                <input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" required />
+                                <input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} />
                             </div>
                             <div className="mb-6">
                                 <label className="block text-gray-700 font-semibold mb-2" htmlFor="admin-password">Senha</label>
-                                <input id="admin-password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" required />
+                                <input id="admin-password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} />
                             </div>
                             {error && <p className="text-red-500 text-center mb-4">{error}</p>}
-                            <button type="submit" className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg hover:bg-opacity-90 transition-all">Entrar</button>
+                            <button type="submit" className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg hover:bg-opacity-90 transition-all flex items-center justify-center disabled:bg-opacity-70" disabled={isLoggingIn}>
+                                {isLoggingIn ? (
+                                    <i className="fas fa-spinner fa-spin"></i>
+                                ) : (
+                                    'Entrar'
+                                )}
+                            </button>
                         </form>
                     </div>
                 </div>
