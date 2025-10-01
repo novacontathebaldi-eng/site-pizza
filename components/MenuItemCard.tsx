@@ -1,6 +1,6 @@
 
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product } from '../types';
 
 interface MenuItemCardProps {
@@ -23,16 +23,45 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
     }, [product.prices]);
 
     const [selectedSize, setSelectedSize] = useState<string>(sortedSizes[0] || '');
+    const [wasAdded, setWasAdded] = useState(false);
+    const timerRef = useRef<number | null>(null);
+
+    // Garante que o tamanho selecionado seja resetado quando o produto mudar (ex: ao filtrar)
+    useEffect(() => {
+        setSelectedSize(sortedSizes[0] || '');
+    }, [product, sortedSizes]);
+
+    // Limpa o timer se o componente for desmontado
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) {
+                clearTimeout(timerRef.current);
+            }
+        };
+    }, []);
     
     const handleAddToCart = () => {
-        if (!isStoreOnline || !selectedSize) return;
+        if (!isStoreOnline || !selectedSize || wasAdded) return;
         const price = product.prices[selectedSize];
         onAddToCart(product, selectedSize, price);
+        setWasAdded(true);
+
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+        }
+
+        timerRef.current = window.setTimeout(() => {
+            setWasAdded(false);
+        }, 1500);
     };
 
     const formatPrice = (price: number) => {
         return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     };
+
+    const buttonClass = wasAdded
+        ? 'bg-green-500 text-white font-bold py-2 px-5 rounded-lg transition-all cursor-default'
+        : 'bg-accent text-white font-bold py-2 px-5 rounded-lg transition-all transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed';
 
     return (
         <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col overflow-hidden border border-gray-200">
@@ -72,11 +101,20 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
                     </span>
                     <button 
                         onClick={handleAddToCart}
-                        disabled={!isStoreOnline}
-                        className="bg-accent text-white font-bold py-2 px-5 rounded-lg transition-all transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        disabled={!isStoreOnline || wasAdded}
+                        className={buttonClass}
                     >
-                        <i className="fas fa-plus mr-1"></i>
-                        Adicionar
+                        {wasAdded ? (
+                            <>
+                                <i className="fas fa-check mr-1"></i>
+                                Adicionado!
+                            </>
+                        ) : (
+                            <>
+                                <i className="fas fa-plus mr-1"></i>
+                                Adicionar
+                            </>
+                        )}
                     </button>
                 </div>
             </div>
