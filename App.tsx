@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Product, Category, CartItem, OrderDetails } from './types';
+import { Product, Category, CartItem, OrderDetails, SiteSettings } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
@@ -13,15 +13,35 @@ import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
 import { db } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
-import { seedDatabase } from './services/seed'; // Importar a função de seed
-// FIX: Removed modular imports from 'firebase/firestore' as they are not compatible with the project's Firebase version.
-// The logic is updated to use the v8 namespaced syntax.
+import { seedDatabase } from './services/seed';
+// Static assets for default values
+import defaultLogo from './assets/logo.png';
+import defaultHeroBg from './assets/ambiente-pizzaria.webp';
+import defaultAboutImg from './assets/sobre-imagem.webp';
 
 interface Toast {
     id: number;
     message: string;
     type: 'success' | 'error';
 }
+
+const defaultSiteSettings: SiteSettings = {
+    logoUrl: defaultLogo,
+    heroSlogan: "A pizza nº 1 do ES",
+    heroTitle: "Pizzaria Santa Sensação",
+    heroSubtitle: "A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.",
+    heroBgUrl: defaultHeroBg,
+    aboutImageUrl: defaultAboutImg,
+    aboutTag: "Nossa Conquista",
+    aboutTitle: "A Melhor Pizza do Estado, Assinada por um Mestre",
+    aboutDescription: "Em parceria com o renomado mestre pizzaiolo Luca Lonardi, a Santa Sensação eleva a pizza a um novo patamar. Fomos os grandes vencedores do concurso Panshow 2025, um reconhecimento que celebra nossa dedicação aos ingredientes frescos, massa de fermentação natural e, acima de tudo, a paixão por criar sabores inesquecíveis. Cada pizza que sai do nosso forno a lenha carrega a assinatura de um campeão e a promessa de uma experiência única.",
+    aboutList: [
+        "Vencedora do Panshow 2025",
+        "Assinada pelo Mestre Luca Lonardi",
+        "Ingredientes frescos e selecionados",
+        "Forno a lenha tradicional"
+    ]
+};
 
 const App: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
@@ -35,6 +55,7 @@ const App: React.FC = () => {
     const [activeSection, setActiveSection] = useState('Início');
     const [activeMenuCategory, setActiveMenuCategory] = useState<string>('');
     const [toasts, setToasts] = useState<Toast[]>([]);
+    const [siteSettings, setSiteSettings] = useState<SiteSettings>(defaultSiteSettings);
     
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
@@ -99,9 +120,17 @@ const App: React.FC = () => {
             setError("Não foi possível conectar ao banco de dados. Este é um problema conhecido no ambiente de desenvolvimento atual (sandbox), que bloqueia conexões externas. Seu site funcionará normalmente online.");
             setIsLoading(false);
         };
+        
+        // Listener for site settings
+        const settingsDocRef = db.doc('store_config/site_settings');
+        const unsubSettings = settingsDocRef.onSnapshot(doc => {
+            if (doc.exists) {
+                setSiteSettings(prev => ({...prev, ...doc.data() as Partial<SiteSettings>}));
+            }
+        }, err => handleConnectionError(err, "site settings"));
+
 
         // Listener for store status
-        // FIX: Updated to Firebase v8 syntax.
         const statusDocRef = db.doc('store_config/status');
         const unsubStatus = statusDocRef.onSnapshot(doc => {
             const data = doc.data();
@@ -111,7 +140,6 @@ const App: React.FC = () => {
         }, err => handleConnectionError(err, "store status"));
 
         // Listener for categories
-        // FIX: Updated to Firebase v8 syntax.
         const categoriesQuery = db.collection('categories').orderBy('order');
         const unsubCategories = categoriesQuery.onSnapshot(snapshot => {
             const fetchedCategories: Category[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
@@ -122,7 +150,6 @@ const App: React.FC = () => {
         }, err => handleConnectionError(err, "categories"));
 
         // Listener for products
-        // FIX: Updated to Firebase v8 syntax.
         const productsQuery = db.collection('products').orderBy('orderIndex');
         const unsubProducts = productsQuery.onSnapshot(snapshot => {
             const fetchedProducts: Product[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
@@ -132,6 +159,7 @@ const App: React.FC = () => {
         }, err => handleConnectionError(err, "products"));
 
         return () => {
+            unsubSettings();
             unsubStatus();
             unsubCategories();
             unsubProducts();
@@ -317,11 +345,32 @@ const App: React.FC = () => {
         }
     }, [addToast]);
 
+    const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => {
+        try {
+            const settingsToUpdate = { ...settings };
+
+            for (const key in files) {
+                const file = files[key];
+                if (file) {
+                    const url = await firebaseService.uploadSiteAsset(file, key);
+                    (settingsToUpdate as any)[`${key}Url`] = url;
+                }
+            }
+
+            await firebaseService.updateSiteSettings(settingsToUpdate);
+            addToast("Personalização do site salva com sucesso!", 'success');
+        } catch (error) {
+            console.error("Failed to save site settings:", error);
+            addToast("Erro ao salvar as configurações do site.", 'error');
+        }
+    }, [addToast]);
+
+
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
 
     return (
         <div className="flex flex-col min-h-screen">
-            <Header cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} activeSection={activeSection} />
+            <Header cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} activeSection={activeSection} settings={siteSettings} />
             
             <div id="status-banner" className={`bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
                 <i className="fas fa-times-circle mr-2"></i>
@@ -329,7 +378,7 @@ const App: React.FC = () => {
             </div>
 
             <main className="flex-grow">
-                <HeroSection />
+                <HeroSection settings={siteSettings} />
                 
                 {error && (
                     <div className="container mx-auto px-4 py-8">
@@ -356,12 +405,13 @@ const App: React.FC = () => {
                     />
                 )}
 
-                <AboutSection />
+                <AboutSection settings={siteSettings} />
                 <ContactSection />
                 <AdminSection 
                     allProducts={products}
                     allCategories={categories}
                     isStoreOnline={isStoreOnline}
+                    siteSettings={siteSettings}
                     onSaveProduct={handleSaveProduct}
                     onDeleteProduct={handleDeleteProduct}
                     onStoreStatusChange={handleStoreStatusChange}
@@ -370,6 +420,7 @@ const App: React.FC = () => {
                     onReorderProducts={handleReorderProducts}
                     onReorderCategories={handleReorderCategories}
                     onSeedDatabase={seedDatabase}
+                    onSaveSiteSettings={handleSaveSiteSettings}
                 />
             </main>
 

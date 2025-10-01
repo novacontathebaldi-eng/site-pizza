@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import heroBg from '../assets/ambiente-pizzaria.webp';
+import { SiteSettings } from '../types';
 
-export const HeroSection: React.FC = () => {
+interface HeroSectionProps {
+    settings: SiteSettings;
+}
+
+export const HeroSection: React.FC<HeroSectionProps> = ({ settings }) => {
     const [scrollOpacity, setScrollOpacity] = useState(1);
 
     useEffect(() => {
@@ -45,7 +49,7 @@ export const HeroSection: React.FC = () => {
             <div 
                 className="absolute inset-0 bg-cover bg-center" 
                 style={{
-                    backgroundImage: `url(${heroBg})`,
+                    backgroundImage: `url(${settings.heroBgUrl})`,
                     opacity: scrollOpacity,
                     transition: 'opacity 0.1s ease-out'
                 }}
@@ -63,13 +67,17 @@ export const HeroSection: React.FC = () => {
             
             <div className="container mx-auto text-center z-10">
                 <div className="inline-block bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 mb-6">
-                    <p className="font-semibold text-sm flex items-center gap-2"><i className="fas fa-award text-brand-gold-600"></i> A pizza nº 1 do ES</p>
+                    <p className="font-semibold text-sm flex items-center gap-2"><i className="fas fa-award text-brand-gold-600"></i> {settings.heroSlogan}</p>
                 </div>
                 <h1 className="text-4xl md:text-6xl font-extrabold mb-4 leading-tight">
-                    Pizzaria <span className="text-brand-gold-600">Santa Sensação</span>
+                    {settings.heroTitle.split(' ').map((word, index, arr) => 
+                        word.toLowerCase() === 'santa' || word.toLowerCase() === 'sensação' 
+                        ? <span key={index} className="text-brand-gold-600">{word} </span> 
+                        : <span key={index}>{word} </span>
+                    )}
                 </h1>
                 <p className="text-lg md:text-xl font-medium text-brand-ivory-50/90 mb-8 max-w-2xl mx-auto">
-                    A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.
+                    {settings.heroSubtitle}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <button onClick={scrollToCardapio} className="bg-brand-gold-600 text-text-on-dark font-bold py-3 px-8 rounded-xl text-lg hover:bg-opacity-90 transition-all transform hover:scale-105">

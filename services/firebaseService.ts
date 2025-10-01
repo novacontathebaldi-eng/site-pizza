@@ -1,6 +1,6 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import { db, storage } from './firebase';
-import { Product, Category } from '../types';
+import { Product, Category, SiteSettings } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -22,6 +22,19 @@ export const uploadImage = async (file: File): Promise<string> => {
     
     return downloadURL;
 };
+
+// Site Asset Upload Function
+export const uploadSiteAsset = async (file: File, assetName: string): Promise<string> => {
+    if (!storage) {
+        throw new Error("Firebase Storage não está inicializado.");
+    }
+    const fileExtension = file.name.split('.').pop();
+    const fileName = `site/${assetName}_${new Date().getTime()}.${fileExtension}`;
+    const storageRef = storage.ref(fileName);
+    const snapshot = await storageRef.put(file);
+    return await snapshot.ref.getDownloadURL();
+};
+
 
 // Product Functions
 export const addProduct = async (productData: Omit<Product, 'id'>): Promise<void> => {
@@ -89,4 +102,11 @@ export const updateCategoriesOrder = async (categoriesToUpdate: { id: string; or
         batch.update(categoryRef, { order: categoryUpdate.order });
     });
     await batch.commit();
+};
+
+// Site Settings Function
+export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const settingsRef = db.doc('store_config/site_settings');
+    await settingsRef.set(settings, { merge: true });
 };
