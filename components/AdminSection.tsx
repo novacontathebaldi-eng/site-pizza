@@ -330,10 +330,6 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                 <i className="fas fa-store-alt w-5 text-center"></i>
                                 <span>Status</span>
                             </button>
-                             <button onClick={() => setActiveTab('customization')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'customization' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                <i className="fas fa-paint-brush w-5 text-center"></i>
-                                <span>Personalização</span>
-                            </button>
                             <button onClick={() => setActiveTab('products')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'products' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
                                 <i className="fas fa-pizza-slice w-5 text-center"></i>
                                 <span>Produtos</span>
@@ -341,6 +337,10 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                             <button onClick={() => setActiveTab('categories')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'categories' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
                                 <i className="fas fa-tags w-5 text-center"></i>
                                 <span>Categorias</span>
+                            </button>
+                             <button onClick={() => setActiveTab('customization')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'customization' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                <i className="fas fa-paint-brush w-5 text-center"></i>
+                                <span>Personalização</span>
                             </button>
                             <button onClick={() => setActiveTab('data')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'data' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
                                 <i className="fas fa-database w-5 text-center"></i>
