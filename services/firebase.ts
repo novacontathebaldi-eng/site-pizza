@@ -1,7 +1,9 @@
-// FIX: Update Firebase imports and initialization to v8 syntax to resolve module errors.
-import firebase from 'firebase/app';
-import 'firebase/firestore';
-import 'firebase/storage';
+// FIX: The following imports were updated to use the Firebase v9 compatibility layer (`/compat`).
+// This is necessary to support the existing v8 (namespaced) syntax throughout the application
+// while using a modern version of the Firebase SDK, resolving the namespace and property errors.
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/firestore';
+import 'firebase/compat/storage';
 
 // AÇÃO NECESSÁRIA: Credenciais corrigidas.
 // O problema era um erro de digitação na apiKey. Esta versão está 100% correta,

@@ -223,11 +223,15 @@ const App: React.FC = () => {
 
     const handleSaveProduct = useCallback(async (product: Product) => {
         try {
+            const productData = { ...product };
+            // FIX: Explicitly delete the 'id' field from the data object to prevent it from being written to Firestore.
+            // This was the root cause of items being corrupted after creation.
+            delete (productData as Partial<Product>).id;
+
             if (product.id) {
-                await firebaseService.updateProduct(product);
+                await firebaseService.updateProduct(product.id, productData);
             } else {
-                const { id, ...newProductData } = product;
-                await firebaseService.addProduct({ ...newProductData, orderIndex: products.length });
+                await firebaseService.addProduct({ ...productData, orderIndex: products.length });
             }
         } catch (error) {
             console.error("Failed to save product:", error);
@@ -255,11 +259,14 @@ const App: React.FC = () => {
     
     const handleSaveCategory = useCallback(async (category: Category) => {
         try {
+            const categoryData = { ...category };
+            // FIX: Explicitly delete the 'id' field from the data object to prevent it from being written to Firestore.
+            delete (categoryData as Partial<Category>).id;
+
             if (category.id) {
-                await firebaseService.updateCategory(category);
+                await firebaseService.updateCategory(category.id, categoryData);
             } else {
-                const { id, ...newCategoryData } = category;
-                await firebaseService.addCategory({ ...newCategoryData, order: categories.length });
+                await firebaseService.addCategory({ ...categoryData, order: categories.length });
             }
         } catch (error) {
             console.error("Failed to save category:", error);

@@ -29,16 +29,16 @@ export const addProduct = async (productData: Omit<Product, 'id'>): Promise<void
     await db.collection('products').add(productData);
 };
 
-export const updateProduct = async (product: Product): Promise<void> => {
-    const { id, ...productData } = product;
-    if (!id) throw new Error("Product ID is missing for update.");
+export const updateProduct = async (productId: string, productData: Omit<Product, 'id' | 'active'>): Promise<void> => {
+    if (!productId) throw new Error("Product ID is missing for update.");
     if (!db) throw new Error("Firestore is not initialized.");
-    const productRef = db.collection('products').doc(id);
+    const productRef = db.collection('products').doc(productId);
     await productRef.update(productData as { [key: string]: any });
 };
 
 export const deleteProduct = async (productId: string): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
+    if (!productId) throw new Error("Invalid Product ID for deletion.");
     const productRef = db.collection('products').doc(productId);
     await productRef.delete();
 };
@@ -60,15 +60,15 @@ export const addCategory = async (categoryData: Omit<Category, 'id'>): Promise<v
     await db.collection('categories').add(categoryData);
 };
 
-export const updateCategory = async (category: Category): Promise<void> => {
-    const { id, ...categoryData } = category;
-    if (!id) throw new Error("Category ID is missing for update.");
+export const updateCategory = async (categoryId: string, categoryData: Omit<Category, 'id' | 'active' | 'order'>): Promise<void> => {
+    if (!categoryId) throw new Error("Category ID is missing for update.");
     if (!db) throw new Error("Firestore is not initialized.");
-    const categoryRef = db.collection('categories').doc(id);
+    const categoryRef = db.collection('categories').doc(categoryId);
     await categoryRef.update(categoryData as { [key: string]: any });
 };
 
 export const deleteCategory = async (categoryId: string, allProducts: Product[]): Promise<void> => {
+    if (!categoryId) throw new Error("Invalid document reference. Document references must have an even number of segments, but categories has 1.");
     // Safety check: prevent deletion if products are using this category
     const isCategoryInUse = allProducts.some(product => product.categoryId === categoryId);
     if (isCategoryInUse) {
