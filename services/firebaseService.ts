@@ -181,9 +181,10 @@ export const savePromotion = async (promotion: PromotionPage): Promise<void> => 
     if (!db) throw new Error("Firestore is not initialized.");
     if (promotion.id) {
         const { id, ...dataToSave } = promotion;
-        await db.collection('promotions').doc(id).update(dataToSave as { [key: string]: any });
+        await db.collection('promotions').doc(id).set(dataToSave, { merge: true });
     } else {
-        await db.collection('promotions').add(promotion);
+        const { id, ...dataToSave } = promotion;
+        await db.collection('promotions').add(dataToSave);
     }
 };
 

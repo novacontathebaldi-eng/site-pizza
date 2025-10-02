@@ -1,12 +1,18 @@
+
 import React from 'react';
 import { PromotionPage, Product } from '../types';
+// FIX: Imported MenuItemCard to display products with full functionality.
+import { MenuItemCard } from './MenuItemCard';
 
+// FIX: Added onAddToCart and isStoreOnline to props to allow adding products to cart.
 interface PromotionSectionProps {
     promotion: PromotionPage;
     allProducts: Product[];
+    onAddToCart: (product: Product, size: string, price: number) => void;
+    isStoreOnline: boolean;
 }
 
-export const PromotionSection: React.FC<PromotionSectionProps> = ({ promotion, allProducts }) => {
+export const PromotionSection: React.FC<PromotionSectionProps> = ({ promotion, allProducts, onAddToCart, isStoreOnline }) => {
     if (!promotion.isVisible) return null;
 
     const featuredProducts = promotion.featuredProductIds
@@ -52,6 +58,7 @@ export const PromotionSection: React.FC<PromotionSectionProps> = ({ promotion, a
         <section id={`promo-${promotion.id}`} className="py-20 bg-white odd:bg-brand-ivory-50">
             <div className="container mx-auto px-4">
                 <div className={`grid ${videoContent ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-12 items-center`}>
+                   {/* FIX: Corrected property name to use 'promotion.layout' which exists on the PromotionPage type after the fix. */}
                    {promotion.layout === 'video-left' ? (
                         <>
                             {videoContent}
@@ -69,22 +76,14 @@ export const PromotionSection: React.FC<PromotionSectionProps> = ({ promotion, a
                      <div className="mt-16">
                         <h3 className="text-2xl font-bold text-center mb-8">Produtos em Destaque</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {/* FIX: Replaced simplified card with MenuItemCard to enable "Add to Cart". */}
                             {featuredProducts.map(product => (
-                                // This is a simplified card, ideally we'd use MenuItemCard if props were available
-                                <div key={product.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col overflow-hidden border border-gray-200">
-                                    <img src={product.imageUrl} alt={product.name} className="w-full h-48 object-cover" />
-                                    <div className="p-4 flex flex-col flex-grow">
-                                        <h4 className="text-lg font-bold">{product.name}</h4>
-                                        <p className="text-gray-500 text-xs mb-3 line-clamp-2 flex-grow">{product.description}</p>
-                                        <div className="mt-auto pt-2 flex justify-between items-center">
-                                            {Object.keys(product.prices).length > 0 && 
-                                                <span className="text-xl font-bold text-accent">
-                                                   A partir de {Object.values(product.prices)[0].toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                </span>
-                                            }
-                                        </div>
-                                    </div>
-                                </div>
+                                <MenuItemCard
+                                    key={product.id}
+                                    product={product}
+                                    onAddToCart={onAddToCart}
+                                    isStoreOnline={isStoreOnline}
+                                />
                             ))}
                         </div>
                     </div>
