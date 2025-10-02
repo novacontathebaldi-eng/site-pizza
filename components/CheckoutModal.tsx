@@ -88,8 +88,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
         ? 'Pagar e Finalizar Pedido'
         : 'Enviar Pedido';
         
-    const submitButtonIcon = (paymentMethod === 'pix' && pixPaymentOption === 'payNow')
-        ? 'fa-shield-alt'
+    const submitButtonIconClass = (paymentMethod === 'pix' && pixPaymentOption === 'payNow')
+        ? 'fab fa-pix'
         : 'fab fa-whatsapp';
 
 
@@ -210,7 +210,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                             disabled={isSubmitDisabled}
                             className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
                         >
-                            <i className={`fas ${submitButtonIcon} mr-2`}></i>
+                            <i className={`${submitButtonIconClass} mr-2`}></i>
                             {submitButtonText}
                         </button>
                     </form>
