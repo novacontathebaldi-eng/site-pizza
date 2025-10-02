@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { CartItem, OrderDetails } from '../types';
 
@@ -31,6 +32,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const [changeAmount, setChangeAmount] = useState('');
     const [notes, setNotes] = useState('');
     const [reservationTime, setReservationTime] = useState('');
+    const [pixPaymentOption, setPixPaymentOption] = useState<'payNow' | 'payLater' | null>(null);
+
 
     const suggestedTimes = getSuggestedTimes();
 
@@ -38,7 +41,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
         if (!isOpen) {
             setName(''); setPhone(''); setOrderType(''); setAddress('');
             setPaymentMethod(''); setChangeNeeded(false); setChangeAmount('');
-            setNotes(''); setReservationTime('');
+            setNotes(''); setReservationTime(''); setPixPaymentOption(null);
         }
     }, [isOpen]);
 
@@ -53,24 +56,42 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
         changeAmount, notes, reservationTime
     });
 
+    const handlePaymentMethodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newMethod = e.target.value as any;
+        setPaymentMethod(newMethod);
+        if (newMethod !== 'pix') {
+            setPixPaymentOption(null);
+        }
+    };
+    
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const details = getOrderDetails();
+
         if (paymentMethod === 'pix') {
-            // For PIX, the form submission is just a gateway to the next step
-            // The actual submission happens via the buttons in the PIX section
-            return; 
+            if (pixPaymentOption === 'payNow') {
+                onInitiatePixPayment(details);
+            } else if (pixPaymentOption === 'payLater') {
+                onConfirmCheckout(details);
+            } else {
+                // This case should be prevented by the disabled button state
+                alert("Por favor, escolha se deseja pagar agora ou depois.");
+            }
+        } else {
+            onConfirmCheckout(details);
         }
-        onConfirmCheckout(details);
     };
     
-    const handlePayLater = () => {
-        onConfirmCheckout(getOrderDetails());
-    };
+    const isSubmitDisabled = paymentMethod === 'pix' && !pixPaymentOption;
+    
+    const submitButtonText = (paymentMethod === 'pix' && pixPaymentOption === 'payNow')
+        ? 'Pagar e Finalizar Pedido'
+        : 'Enviar Pedido';
+        
+    const submitButtonIcon = (paymentMethod === 'pix' && pixPaymentOption === 'payNow')
+        ? 'fa-shield-alt'
+        : 'fab fa-whatsapp';
 
-    const handlePayNow = () => {
-        onInitiatePixPayment(getOrderDetails());
-    };
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
@@ -122,7 +143,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                         )}
                         <div>
                             <label className="block text-sm font-semibold mb-1">Método de Pagamento *</label>
-                            <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as any)} className="w-full px-3 py-2 border rounded-md bg-white" required>
+                            <select value={paymentMethod} onChange={handlePaymentMethodChange} className="w-full px-3 py-2 border rounded-md bg-white" required>
                                 <option value="" disabled>Selecione...</option>
                                 <option value="credit">Cartão de Crédito</option>
                                 <option value="debit">Cartão de Débito</option>
@@ -130,15 +151,27 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                                 <option value="cash">Dinheiro</option>
                             </select>
                         </div>
+                        
                         {paymentMethod === 'pix' && (
                             <div className="p-4 bg-blue-50 rounded-md border border-blue-200 animate-fade-in-up text-center">
-                                <p className="font-semibold mb-3">Você deseja pagar o PIX agora ou na entrega/retirada?</p>
+                                <p className="font-semibold mb-3">Como você prefere pagar com PIX?</p>
                                 <div className="flex justify-center gap-4">
-                                    <button type="button" onClick={handlePayNow} className="bg-accent text-white font-bold py-2 px-6 rounded-lg hover:bg-opacity-90">Pagar Agora</button>
-                                    <button type="button" onClick={handlePayLater} className="bg-gray-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-600">Pagar Depois</button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setPixPaymentOption('payNow')} 
+                                        className={`font-bold py-2 px-6 rounded-lg transition-all border-2 ${pixPaymentOption === 'payNow' ? 'bg-accent text-white border-accent' : 'bg-white text-accent border-accent hover:bg-accent/10'}`}>
+                                        <i className="fas fa-qrcode mr-2"></i>Pagar Agora
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setPixPaymentOption('payLater')} 
+                                        className={`font-bold py-2 px-6 rounded-lg transition-all border-2 ${pixPaymentOption === 'payLater' ? 'bg-gray-600 text-white border-gray-600' : 'bg-white text-gray-600 border-gray-400 hover:bg-gray-100'}`}>
+                                        <i className="fas fa-hand-holding-usd mr-2"></i>Pagar Depois
+                                    </button>
                                 </div>
                             </div>
                         )}
+
                         {paymentMethod === 'cash' && (
                             <div className="p-3 bg-gray-50 rounded-md border animate-fade-in-up">
                                 <label className="flex items-center gap-2">
@@ -172,11 +205,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                             </div>
                         </div>
 
-                        {paymentMethod !== 'pix' && (
-                             <button type="submit" className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all">
-                                <i className="fab fa-whatsapp mr-2"></i>Enviar Pedido
-                            </button>
-                        )}
+                         <button 
+                            type="submit" 
+                            disabled={isSubmitDisabled}
+                            className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
+                        >
+                            <i className={`fas ${submitButtonIcon} mr-2`}></i>
+                            {submitButtonText}
+                        </button>
                     </form>
                 </div>
             </div>
