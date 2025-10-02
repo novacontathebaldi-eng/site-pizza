@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Product, Category, SiteSettings, Order } from '../types';
+import { Product, Category, SiteSettings, Order, OrderStatus } from '../types';
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
 import { SiteCustomizationTab } from './SiteCustomizationTab';
@@ -28,7 +28,7 @@ interface AdminSectionProps {
     onReorderCategories: (categoriesToUpdate: { id: string; order: number }[]) => Promise<void>;
     onSeedDatabase: () => Promise<void>;
     onSaveSiteSettings: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
-    onUpdateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>; // Add order handlers
+    onUpdateOrderStatus: (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => Promise<void>;
     onDeleteOrder: (orderId: string) => Promise<void>;
 }
 
@@ -123,12 +123,14 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
     );
 };
 
-export const AdminSection: React.FC<AdminSectionProps> = ({ 
-    allProducts, allCategories, isStoreOnline, siteSettings, orders,
-    onSaveProduct, onDeleteProduct, onProductStatusChange, onStoreStatusChange,
-    onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
-    onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onDeleteOrder
-}) => {
+export const AdminSection: React.FC<AdminSectionProps> = (props) => {
+    const { 
+        allProducts, allCategories, isStoreOnline, siteSettings, orders,
+        onSaveProduct, onDeleteProduct, onProductStatusChange, onStoreStatusChange,
+        onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
+        onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onDeleteOrder
+    } = props;
+    
     const [user, setUser] = useState<firebase.User | null>(null);
     const [authLoading, setAuthLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('status');
@@ -147,88 +149,55 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
-    
-    useEffect(() => {
-        setLocalProducts(allProducts);
-    }, [allProducts]);
+
+    // State for order management
+    const [orderSearchTerm, setOrderSearchTerm] = useState('');
+    const [orderFilters, setOrderFilters] = useState({ orderType: '', paymentMethod: '' });
+    const [showFilters, setShowFilters] = useState(false);
+    const [activeOrdersTab, setActiveOrdersTab] = useState<OrderStatus>('accepted');
+
+    useEffect(() => setLocalProducts(allProducts), [allProducts]);
+    useEffect(() => setLocalCategories([...allCategories].sort((a, b) => a.order - b.order)), [allCategories]);
 
     useEffect(() => {
-        setLocalCategories([...allCategories].sort((a, b) => a.order - b.order));
-    }, [allCategories]);
-
-    useEffect(() => {
-        // FIX: Handle the case where the Firebase auth service might not initialize.
-        // This prevents the infinite loading spinner if the connection fails.
         if (!auth) {
-            setError("Falha na conexão com o serviço de autenticação. Verifique a configuração do Firebase.");
+            setError("Falha na conexão com o serviço de autenticação.");
             setAuthLoading(false);
             return;
         }
-        const unsubscribe = auth.onAuthStateChanged(user => {
-            setUser(user);
-            setAuthLoading(false);
-        });
+        const unsubscribe = auth.onAuthStateChanged(user => { setUser(user); setAuthLoading(false); });
         return () => unsubscribe();
     }, []);
 
     useEffect(() => {
-        const handleHashChange = () => {
-            setShowAdminPanel(window.location.hash === '#admin');
-        };
-        
+        const handleHashChange = () => setShowAdminPanel(window.location.hash === '#admin');
         window.addEventListener('hashchange', handleHashChange, false);
-        handleHashChange();
-
-        return () => {
-            window.removeEventListener('hashchange', handleHashChange, false);
-        };
+        return () => window.removeEventListener('hashchange', handleHashChange, false);
     }, []);
 
-    const sensors = useSensors(
-        useSensor(PointerSensor),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        })
-    );
+    const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
+    // Reordering handlers remain the same
     const handleProductDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
-
-        if (!over || active.id === over.id) {
-            return;
-        }
-        
+        if (!over || active.id === over.id) return;
         const sortedProducts = [...localProducts].sort((a, b) => a.orderIndex - b.orderIndex);
         const oldIndex = sortedProducts.findIndex(p => p.id === active.id);
         const newIndex = sortedProducts.findIndex(p => p.id === over.id);
-
-        if (oldIndex === -1 || newIndex === -1) {
-            console.error("Dragged item not found in state. Aborting reorder.");
-            return;
-        }
-        
+        if (oldIndex === -1 || newIndex === -1) return;
         const reordered = arrayMove(sortedProducts, oldIndex, newIndex);
-        const productsToUpdate = reordered.map((p, index) => ({ id: p.id, orderIndex: index }));
-        
-        onReorderProducts(productsToUpdate);
+        onReorderProducts(reordered.map((p, index) => ({ id: p.id, orderIndex: index })));
     };
 
     const handleCategoryDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
-
-        if (!over || active.id === over.id) {
-            return;
-        }
-
+        if (!over || active.id === over.id) return;
         const oldIndex = localCategories.findIndex(c => c.id === active.id);
         const newIndex = localCategories.findIndex(c => c.id === over.id);
-        
         const reordered = arrayMove(localCategories, oldIndex, newIndex);
-        const categoriesToUpdate = reordered.map((c, index) => ({ id: c.id, order: index }));
-
-        onReorderCategories(categoriesToUpdate);
+        onReorderCategories(reordered.map((c, index) => ({ id: c.id, order: index })));
     };
-
+    
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -240,365 +209,151 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         }
         try {
             await auth.signInWithEmailAndPassword(email, password);
-            // onAuthStateChanged will handle setting the user state
         } catch (err: any) {
-            console.error("Firebase Auth Error:", err);
-            let friendlyMessage: string | React.ReactNode = 'Ocorreu um erro inesperado. Verifique se as credenciais estão corretas e tente novamente.';
+             let friendlyMessage: string | React.ReactNode = 'Ocorreu um erro inesperado.';
             switch (err.code) {
                 case 'auth/user-not-found':
                 case 'auth/wrong-password':
                 case 'auth/invalid-credential':
-                    friendlyMessage = (
-                        <div className="text-center text-sm">
-                            <p className="font-bold">Acesso negado. Por favor, verifique suas credenciais.</p>
-                            <p className="mt-2">O acesso a este painel é restrito a administradores autorizados.</p>
-                            <p className="mt-4">
-                                Se você é um administrador e está com problemas, entre em contato com o suporte técnico em <a href="mailto:th3.suporte@gmail.com" className="font-semibold text-accent hover:underline">th3.suporte@gmail.com</a> ou use o formulário abaixo.
-                            </p>
-                            <button
-                                type="button"
-                                onClick={() => setIsSupportModalOpen(true)}
-                                className="mt-4 w-full bg-brand-olive-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"
-                            >
-                                <i className="fas fa-envelope mr-2"></i>
-                                Entrar em Contato com o Suporte
-                            </button>
-                        </div>
+                     friendlyMessage = (
+                        <div className="text-center text-sm"><p className="font-bold">Acesso negado.</p><p className="mt-2">Se você é um administrador e está com problemas, entre em contato com o suporte.</p><button type="button" onClick={() => setIsSupportModalOpen(true)} className="mt-4 w-full bg-brand-olive-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-envelope mr-2"></i>Entrar em Contato</button></div>
                     );
                     break;
-                case 'auth/invalid-email':
-                    friendlyMessage = 'O formato do e-mail é inválido.';
-                    break;
-                case 'auth/network-request-failed':
-                     friendlyMessage = 'Erro de rede. Verifique sua conexão com a internet.';
-                     break;
-                default:
-                    friendlyMessage = 'Ocorreu um erro inesperado. Verifique se as credenciais estão corretas e tente novamente.';
+                case 'auth/invalid-email': friendlyMessage = 'O formato do e-mail é inválido.'; break;
+                case 'auth/network-request-failed': friendlyMessage = 'Erro de rede. Verifique sua conexão.'; break;
             }
             setError(friendlyMessage);
         } finally {
             setIsLoggingIn(false);
         }
     };
-
+    
     const handleLogout = async () => {
         if (!auth) return;
-        try {
-            await auth.signOut();
-            setEmail('');
-            setPassword('');
-            window.location.hash = '';
-        } catch (error) {
-            console.error("Error signing out: ", error);
-        }
+        try { await auth.signOut(); setEmail(''); setPassword(''); window.location.hash = ''; }
+        catch (error) { console.error("Error signing out: ", error); }
     };
 
-    const handleAddNewProduct = () => {
-        setEditingProduct(null);
-        setIsProductModalOpen(true);
-    };
+    // Modal handlers
+    const handleAddNewProduct = () => { setEditingProduct(null); setIsProductModalOpen(true); };
+    const handleEditProduct = (p: Product) => { setEditingProduct(p); setIsProductModalOpen(true); };
+    const handleAddNewCategory = () => { setEditingCategory(null); setIsCategoryModalOpen(true); };
+    const handleEditCategory = (c: Category) => { setEditingCategory(c); setIsCategoryModalOpen(true); };
 
-    const handleEditProduct = (product: Product) => {
-        setEditingProduct(product);
-        setIsProductModalOpen(true);
-    };
-
-    const handleAddNewCategory = () => {
-        setEditingCategory(null);
-        setIsCategoryModalOpen(true);
-    };
-
-    const handleEditCategory = (category: Category) => {
-        setEditingCategory(category);
-        setIsCategoryModalOpen(true);
-    };
-
-    const handleSeedDatabase = async () => {
-        if (window.confirm('Você tem certeza que deseja popular o banco de dados? Isso adicionará os produtos e categorias iniciais. Esta ação só deve ser feita uma vez em um banco de dados vazio.')) {
-            try {
-                await onSeedDatabase();
-                alert('Banco de dados populado com sucesso!');
-            } catch (error) {
-                console.error("Failed to seed database:", error);
-                alert("Erro ao popular o banco de dados. Verifique o console para mais detalhes.");
-            }
-        }
-    };
-
-    const handleBackup = () => {
-        try {
-            const backupData = {
-                products: allProducts,
-                categories: allCategories,
-                store_config: { 
-                    status: { isOpen: isStoreOnline },
-                    site_settings: siteSettings 
-                },
-                backupDate: new Date().toISOString(),
-            };
+    // Data management handlers
+    const handleSeedDatabase = async () => { if (window.confirm('Tem certeza? Isso adicionará dados iniciais.')) { try { await onSeedDatabase(); alert('Banco de dados populado!'); } catch (e) { console.error(e); alert("Erro ao popular o banco."); } } };
+    const handleBackup = () => { try { const backupData = { products: allProducts, categories: allCategories, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); alert('Backup concluído!'); } catch (e) { console.error(e); alert("Falha no backup."); } };
     
-            const jsonString = JSON.stringify(backupData, null, 2);
-            const blob = new Blob([jsonString], { type: 'application/json' });
-            const href = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = href;
-            link.download = `santasensacao_backup_${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(href);
-            alert('Backup concluído com sucesso!');
-        } catch (error) {
-            console.error("Backup failed:", error);
-            alert("Falha ao criar o backup.");
-        }
-    };
+    const filteredOrders = useMemo(() => {
+        return orders.filter(order => {
+            const searchTermLower = orderSearchTerm.toLowerCase();
+            const matchesSearch = !searchTermLower ||
+                order.customer.name.toLowerCase().includes(searchTermLower) ||
+                order.customer.phone.toLowerCase().includes(searchTermLower);
+            
+            const matchesOrderType = !orderFilters.orderType || order.customer.orderType === orderFilters.orderType;
+            const matchesPaymentMethod = !orderFilters.paymentMethod || order.paymentMethod === orderFilters.paymentMethod;
 
+            return matchesSearch && matchesOrderType && matchesPaymentMethod;
+        });
+    }, [orders, orderSearchTerm, orderFilters]);
+
+    const pendingOrders = useMemo(() => filteredOrders.filter(o => o.status === 'pending'), [filteredOrders]);
+    const tabOrders = useMemo(() => filteredOrders.filter(o => o.status === activeOrdersTab), [filteredOrders, activeOrdersTab]);
     const pendingOrdersCount = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
 
     if (!showAdminPanel) return null;
-    
-    if (authLoading) {
-        return (
-            <section id="admin" className="py-20 bg-brand-ivory-50">
-                 <div className="text-center">
-                    <i className="fas fa-spinner fa-spin text-4xl text-accent"></i>
-                </div>
-            </section>
-        );
-    }
-
-    if (!user) {
-        return (
-            <>
-                <section id="admin" className="py-20 bg-brand-ivory-50">
-                    <div className="container mx-auto px-4 max-w-md">
-                        <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
-                            <h2 className="text-3xl font-bold text-center mb-6 text-text-on-light"><i className="fas fa-shield-alt mr-2"></i>Painel Administrativo</h2>
-                            <form onSubmit={handleLogin}>
-                                <div className="mb-4">
-                                    <label className="block text-gray-700 font-semibold mb-2" htmlFor="admin-email">Email</label>
-                                    <input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} />
-                                </div>
-                                <div className="mb-6">
-                                    <label className="block text-gray-700 font-semibold mb-2" htmlFor="admin-password">Senha</label>
-                                    <input id="admin-password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} />
-                                </div>
-                                {error && (
-                                    <div className="text-red-600 mb-4 bg-red-50 p-3 rounded-lg border border-red-200">
-                                        {typeof error === 'string' ? <p>{error}</p> : error}
-                                    </div>
-                                )}
-                                <button type="submit" className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg hover:bg-opacity-90 transition-all flex items-center justify-center disabled:bg-opacity-70" disabled={isLoggingIn}>
-                                    {isLoggingIn ? (
-                                        <i className="fas fa-spinner fa-spin"></i>
-                                    ) : (
-                                        'Entrar'
-                                    )}
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                </section>
-                <SupportModal
-                    isOpen={isSupportModalOpen}
-                    onClose={() => setIsSupportModalOpen(false)}
-                />
-            </>
-        );
-    }
+    if (authLoading) return <section id="admin" className="py-20 bg-brand-ivory-50"><div className="text-center"><i className="fas fa-spinner fa-spin text-4xl text-accent"></i></div></section>;
+    if (!user) return (<> <section id="admin" className="py-20 bg-brand-ivory-50"> <div className="container mx-auto px-4 max-w-md"> <div className="bg-white p-8 rounded-2xl shadow-lg border"> <h2 className="text-3xl font-bold text-center mb-6"><i className="fas fa-shield-alt mr-2"></i>Painel</h2> <form onSubmit={handleLogin}> <div className="mb-4"> <label className="block font-semibold mb-2" htmlFor="admin-email">Email</label> <input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> <div className="mb-6"> <label className="block font-semibold mb-2" htmlFor="admin-password">Senha</label> <input id="admin-password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> {error && <div className="text-red-600 mb-4 bg-red-50 p-3 rounded-lg border border-red-200">{error}</div>} <button type="submit" className="w-full bg-accent text-white font-bold py-3 rounded-lg hover:bg-opacity-90 disabled:bg-opacity-70 flex justify-center" disabled={isLoggingIn}>{isLoggingIn ? <i className="fas fa-spinner fa-spin"></i> : 'Entrar'}</button> </form> </div> </div> </section> <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} /> </>);
 
     return (
         <>
             <section id="admin" className="py-20 bg-brand-ivory-50">
                 <div className="container mx-auto px-4">
                     <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
-                        <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
-                            <h2 className="text-3xl font-bold text-text-on-light">Painel Administrativo</h2>
-                            <button onClick={handleLogout} className="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600 transition-all"><i className="fas fa-sign-out-alt mr-2"></i>Sair</button>
-                        </div>
-
-                        <div className="border-b border-gray-200 mb-6">
+                        <div className="flex justify-between items-center mb-6 pb-4 border-b"> <h2 className="text-3xl font-bold">Painel Administrativo</h2> <button onClick={handleLogout} className="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600"><i className="fas fa-sign-out-alt mr-2"></i>Sair</button> </div>
+                        <div className="border-b mb-6">
                             <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
-                                <button onClick={() => setActiveTab('status')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'status' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                    <i className="fas fa-store-alt w-5 text-center"></i>
-                                    <span>Status</span>
-                                </button>
-                                <button onClick={() => setActiveTab('orders')} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'orders' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                    <i className="fas fa-receipt w-5 text-center"></i>
-                                    <span>Pedidos</span>
-                                    {pendingOrdersCount > 0 && (
-                                        <span className="absolute top-1 right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-                                            {pendingOrdersCount}
-                                        </span>
-                                    )}
-                                </button>
-                                <button onClick={() => setActiveTab('products')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'products' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                    <i className="fas fa-pizza-slice w-5 text-center"></i>
-                                    <span>Produtos</span>
-                                </button>
-                                <button onClick={() => setActiveTab('categories')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'categories' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                    <i className="fas fa-tags w-5 text-center"></i>
-                                    <span>Categorias</span>
-                                </button>
-                                <button onClick={() => setActiveTab('customization')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'customization' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                    <i className="fas fa-paint-brush w-5 text-center"></i>
-                                    <span>Personalização</span>
-                                </button>
-                                <button onClick={() => setActiveTab('data')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'data' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                    <i className="fas fa-database w-5 text-center"></i>
-                                    <span>Dados</span>
-                                </button>
+                                {['status', 'orders', 'products', 'categories', 'customization', 'data'].map(tab => {
+                                    const icons: { [key: string]: string } = { status: 'fa-store-alt', orders: 'fa-receipt', products: 'fa-pizza-slice', categories: 'fa-tags', customization: 'fa-paint-brush', data: 'fa-database' };
+                                    const labels: { [key: string]: string } = { status: 'Status', orders: 'Pedidos', products: 'Produtos', categories: 'Categorias', customization: 'Personalização', data: 'Dados' };
+                                    return (
+                                        <button key={tab} onClick={() => setActiveTab(tab)} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === tab ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                            <i className={`fas ${icons[tab]} w-5 text-center`}></i> <span>{labels[tab]}</span>
+                                            {tab === 'orders' && pendingOrdersCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">{pendingOrdersCount}</span>}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 
-                        {activeTab === 'status' && (
-                            <div>
-                                <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3>
-                                <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg mb-6">
-                                    <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" id="store-status-toggle" className="sr-only peer" checked={isStoreOnline} onChange={e => onStoreStatusChange(e.target.checked)} />
-                                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-green-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                                    </label>
-                                    <span className={`font-semibold text-lg ${isStoreOnline ? 'text-green-600' : 'text-red-600'}`}>
-                                        {isStoreOnline ? 'Aberta para pedidos' : 'Fechada'}
-                                    </span>
-                                </div>
-                            </div>
-                        )}
-
+                        {activeTab === 'status' && ( <div> <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3> <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg"> <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer"> <input type="checkbox" id="store-status-toggle" className="sr-only peer" checked={isStoreOnline} onChange={e => onStoreStatusChange(e.target.checked)} /> <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600"></div> </label> <span className={`font-semibold text-lg ${isStoreOnline ? 'text-green-600' : 'text-red-600'}`}>{isStoreOnline ? 'Aberta' : 'Fechada'}</span> </div> </div> )}
+                        
                         {activeTab === 'orders' && (
                              <div>
                                 <h3 className="text-xl font-bold mb-4">Gerenciar Pedidos</h3>
-                                {orders.length > 0 ? (
-                                    <div className="space-y-4">
-                                        {orders.map(order => (
-                                            <OrderCard 
-                                                key={order.id} 
-                                                order={order} 
-                                                onUpdateStatus={onUpdateOrderStatus}
-                                                onDelete={onDeleteOrder}
-                                            />
-                                        ))}
+                                <div className="bg-gray-50 p-3 rounded-lg border mb-4">
+                                    <div className="flex flex-col sm:flex-row gap-3">
+                                        <div className="relative flex-grow">
+                                            <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                            <input type="text" placeholder="Buscar por nome ou telefone..." value={orderSearchTerm} onChange={e => setOrderSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-md" />
+                                        </div>
+                                        <div className="flex-shrink-0 relative">
+                                            <button onClick={() => setShowFilters(!showFilters)} className="w-full sm:w-auto bg-white border rounded-md px-4 py-2 flex items-center justify-center gap-2 hover:bg-gray-100">
+                                                <i className="fas fa-filter"></i> <span className="sm:hidden">Filtros</span>
+                                            </button>
+                                            <div className={`sm:hidden absolute top-full right-0 mt-2 bg-white border rounded-lg shadow-xl p-4 z-10 w-64 ${showFilters ? 'block' : 'hidden'}`}>
+                                                <div className="space-y-4">
+                                                    <div> <label className="block text-sm font-semibold mb-1">Tipo</label> <select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"> <option value="">Todos</option> <option value="delivery">Entrega</option> <option value="pickup">Retirada</option> <option value="local">Consumo Local</option> </select> </div>
+                                                    <div> <label className="block text-sm font-semibold mb-1">Pagamento</label> <select value={orderFilters.paymentMethod} onChange={e => setOrderFilters(f => ({...f, paymentMethod: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"> <option value="">Todos</option> <option value="credit">Crédito</option> <option value="debit">Débito</option> <option value="pix">PIX</option> <option value="cash">Dinheiro</option> </select> </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="hidden sm:flex flex-row gap-3">
+                                            <select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="px-3 py-2 border rounded-md bg-white"> <option value="">Tipo: Todos</option> <option value="delivery">Entrega</option> <option value="pickup">Retirada</option> <option value="local">Consumo Local</option> </select>
+                                            <select value={orderFilters.paymentMethod} onChange={e => setOrderFilters(f => ({...f, paymentMethod: e.target.value}))} className="px-3 py-2 border rounded-md bg-white"> <option value="">Pgto: Todos</option> <option value="credit">Crédito</option> <option value="debit">Débito</option> <option value="pix">PIX</option> <option value="cash">Dinheiro</option> </select>
+                                        </div>
                                     </div>
-                                ) : (
-                                    <div className="text-center py-12 bg-gray-50 rounded-lg">
-                                        <i className="fas fa-receipt text-5xl text-gray-300 mb-4"></i>
-                                        <p className="text-xl text-gray-500">Nenhum pedido encontrado.</p>
-                                        <p className="text-gray-400 mt-2">Novos pedidos aparecerão aqui em tempo real.</p>
+                                </div>
+
+                                {pendingOrders.length > 0 && (
+                                    <div className="mb-6">
+                                        <h4 className="font-bold text-lg mb-2 text-yellow-600">Pendentes</h4>
+                                        <div className="space-y-4">
+                                            {pendingOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onDelete={onDeleteOrder} />)}
+                                        </div>
                                     </div>
                                 )}
+
+                                <div className="border-t pt-4">
+                                    <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide border-b -mx-4 px-2 sm:px-4">
+                                        {(['accepted', 'ready', 'completed', 'cancelled'] as OrderStatus[]).map(status => (
+                                            <button key={status} onClick={() => setActiveOrdersTab(status)} className={`flex-shrink-0 py-2 px-4 font-semibold text-sm ${activeOrdersTab === status ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                                {{accepted: 'Aceitos', ready: 'Prontos/Em Rota', completed: 'Finalizados', cancelled: 'Cancelados'}[status]}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="mt-4 space-y-4">
+                                        {tabOrders.length > 0 ? (
+                                            tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onDelete={onDeleteOrder} />)
+                                        ) : (
+                                            <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         )}
                         
-                        {activeTab === 'customization' && (
-                            <SiteCustomizationTab
-                                settings={siteSettings}
-                                onSave={onSaveSiteSettings}
-                            />
-                        )}
-
-                        {activeTab === 'products' && (
-                            <div>
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-xl font-bold">Gerenciar Produtos</h3>
-                                    <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"><i className="fas fa-plus mr-2"></i>Novo Produto</button>
-                                </div>
-                                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}>
-                                    <div className="space-y-6">
-                                        {localCategories.map(category => {
-                                            const categoryProducts = localProducts
-                                                .filter(p => p.categoryId === category.id)
-                                                .sort((a, b) => a.orderIndex - b.orderIndex);
-                                            return (
-                                                <div key={category.id}>
-                                                    <h4 className={`text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4>
-                                                    <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}>
-                                                        <div className="space-y-3 min-h-[50px]">
-                                                            {categoryProducts.map(product => (
-                                                                <SortableProductItem
-                                                                    key={product.id}
-                                                                    product={product}
-                                                                    isCategoryActive={category.active}
-                                                                    onEdit={handleEditProduct}
-                                                                    onDelete={onDeleteProduct}
-                                                                    onStatusChange={onProductStatusChange}
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                    </SortableContext>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                </DndContext>
-                            </div>
-                        )}
-
-                        {activeTab === 'categories' && (
-                            <div>
-                            <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-xl font-bold">Gerenciar Categorias</h3>
-                                    <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all"><i className="fas fa-plus mr-2"></i>Nova Categoria</button>
-                                </div>
-                                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
-                                    <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                                        <div className="space-y-3">
-                                            {localCategories.map(cat => (
-                                                <SortableCategoryItem
-                                                    key={cat.id}
-                                                    category={cat}
-                                                    onEdit={handleEditCategory}
-                                                    onDelete={onDeleteCategory}
-                                                    onStatusChange={onCategoryStatusChange}
-                                                />
-                                            ))}
-                                        </div>
-                                    </SortableContext>
-                                </DndContext>
-                            </div>
-                        )}
-
-                        {activeTab === 'data' && (
-                            <div>
-                                <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3>
-                                <div className="bg-gray-50 p-4 rounded-lg mb-6 border">
-                                    <h4 className="font-semibold text-lg mb-2">Backup</h4>
-                                    <p className="text-gray-600 mb-3">Crie um backup de todos os seus produtos, categorias e configurações da loja. O backup será salvo como um arquivo JSON no seu computador.</p>
-                                    <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition-all">
-                                        <i className="fas fa-download mr-2"></i>Fazer Backup
-                                    </button>
-                                </div>
-                                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                                    <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa: Popular Banco de Dados</h4>
-                                    <p className="text-yellow-700 mb-3">Esta ação irá adicionar os produtos e categorias iniciais ao seu banco de dados. Use apenas uma vez na configuração inicial ou se você limpou o banco de dados. Isso não substituirá itens existentes com o mesmo nome.</p>
-                                    <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600 transition-all">
-                                        <i className="fas fa-database mr-2"></i>Popular Banco de Dados
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                        {activeTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> )}
+                        {activeTab === 'products' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Produtos</h3> <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Produto</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}> <div className="space-y-6"> {localCategories.map(category => { const categoryProducts = localProducts.filter(p => p.categoryId === category.id).sort((a, b) => a.orderIndex - b.orderIndex); return ( <div key={category.id}> <h4 className={`text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4> <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3 min-h-[50px]"> {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} />)} </div> </SortableContext> </div> ) })} </div> </DndContext> </div> )}
+                        {activeTab === 'categories' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Categorias</h3> <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Categoria</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}> <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localCategories.map(cat => <SortableCategoryItem key={cat.id} category={cat} onEdit={handleEditCategory} onDelete={onDeleteCategory} onStatusChange={onCategoryStatusChange} />)} </div> </SortableContext> </DndContext> </div> )}
+                        {activeTab === 'data' && ( <div> <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus dados.</p> <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados iniciais. Use apenas uma vez.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> )}
                     </div>
                 </div>
             </section>
-
-            <ProductModal 
-                isOpen={isProductModalOpen}
-                onClose={() => setIsProductModalOpen(false)}
-                onSave={onSaveProduct}
-                product={editingProduct}
-                categories={allCategories}
-            />
-            <CategoryModal
-                isOpen={isCategoryModalOpen}
-                onClose={() => setIsCategoryModalOpen(false)}
-                onSave={onSaveCategory}
-                category={editingCategory}
-            />
-            <SupportModal 
-                isOpen={isSupportModalOpen}
-                onClose={() => setIsSupportModalOpen(false)}
-            />
+            <ProductModal isOpen={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} onSave={onSaveProduct} product={editingProduct} categories={allCategories} />
+            <CategoryModal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} onSave={onSaveCategory} category={editingCategory} />
+            <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
         </>
     );
 };

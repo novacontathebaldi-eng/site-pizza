@@ -1,7 +1,7 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
 import { db, storage } from './firebase';
-import { Product, Category, SiteSettings, Order } from '../types';
+import { Product, Category, SiteSettings, Order, OrderStatus } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -128,7 +128,7 @@ export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promi
 };
 
 // Order Management Functions
-export const addOrder = async (orderData: Omit<Order, 'id' | 'createdAt'>): Promise<void> => {
+export const addOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'pickupTimeEstimate'>): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     await db.collection('orders').add({
         ...orderData,
@@ -136,10 +136,10 @@ export const addOrder = async (orderData: Omit<Order, 'id' | 'createdAt'>): Prom
     });
 };
 
-export const updateOrderStatus = async (orderId: string, status: Order['status']): Promise<void> => {
+export const updateOrderStatus = async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     const orderRef = db.collection('orders').doc(orderId);
-    await orderRef.update({ status });
+    await orderRef.update({ status, ...payload });
 };
 
 export const deleteOrder = async (orderId: string): Promise<void> => {

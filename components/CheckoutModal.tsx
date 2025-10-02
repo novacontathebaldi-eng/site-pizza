@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { CartItem, OrderDetails } from '../types';
 
@@ -9,6 +8,18 @@ interface CheckoutModalProps {
     onConfirmCheckout: (details: OrderDetails) => void;
 }
 
+const getSuggestedTimes = () => {
+    const now = new Date();
+    const suggestions = [];
+    for (let i = 1; i <= 4; i++) {
+        const suggestionTime = new Date(now.getTime() + i * 15 * 60000); // Add 15, 30, 45, 60 minutes
+        const hours = suggestionTime.getHours().toString().padStart(2, '0');
+        const minutes = suggestionTime.getMinutes().toString().padStart(2, '0');
+        suggestions.push(`${hours}:${minutes}`);
+    }
+    return suggestions;
+};
+
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout }) => {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
@@ -18,6 +29,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const [changeNeeded, setChangeNeeded] = useState(false);
     const [changeAmount, setChangeAmount] = useState('');
     const [notes, setNotes] = useState('');
+    const [reservationTime, setReservationTime] = useState('');
+
+    const suggestedTimes = getSuggestedTimes();
 
     useEffect(() => {
         if (!isOpen) {
@@ -30,6 +44,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
             setChangeNeeded(false);
             setChangeAmount('');
             setNotes('');
+            setReservationTime('');
         }
     }, [isOpen]);
 
@@ -47,7 +62,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
             paymentMethod: paymentMethod as 'credit' | 'debit' | 'pix' | 'cash',
             changeNeeded: paymentMethod === 'cash' && changeNeeded,
             changeAmount,
-            notes
+            notes,
+            reservationTime
         });
     };
 
@@ -80,9 +96,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                             </select>
                         </div>
                         {orderType === 'delivery' && (
-                            <div>
+                            <div className="animate-fade-in-up">
                                 <label className="block text-sm font-semibold mb-1">Endereço de Entrega *</label>
                                 <textarea value={address} onChange={e => setAddress(e.target.value)} className="w-full px-3 py-2 border rounded-md" rows={2} required />
+                            </div>
+                        )}
+                        {orderType === 'local' && (
+                             <div className="p-3 bg-gray-50 rounded-md border animate-fade-in-up">
+                                 <label className="block text-sm font-semibold mb-2">Horário da Reserva *</label>
+                                 <div className="flex flex-wrap items-center gap-2 mb-2">
+                                    <p className="text-xs text-gray-600">Sugestões:</p>
+                                    {suggestedTimes.map(time => (
+                                        <button type="button" key={time} onClick={() => setReservationTime(time)} className="px-2 py-1 text-xs font-semibold rounded-md bg-accent/20 text-accent hover:bg-accent/30">
+                                            {time}
+                                        </button>
+                                    ))}
+                                 </div>
+                                <input type="text" value={reservationTime} onChange={e => setReservationTime(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Ou digite o horário (ex: 20:30)" required />
                             </div>
                         )}
                         <div>
@@ -96,7 +126,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                             </select>
                         </div>
                         {paymentMethod === 'cash' && (
-                            <div className="p-3 bg-gray-50 rounded-md border">
+                            <div className="p-3 bg-gray-50 rounded-md border animate-fade-in-up">
                                 <label className="flex items-center gap-2">
                                     <input type="checkbox" checked={changeNeeded} onChange={e => setChangeNeeded(e.target.checked)} />
                                     <span>Precisa de troco?</span>

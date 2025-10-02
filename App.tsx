@@ -1,11 +1,5 @@
-
-
-
-
-
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Product, Category, CartItem, OrderDetails, SiteSettings, Order } from './types';
+import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
@@ -146,6 +140,7 @@ const App: React.FC = () => {
         };
     }, []);
 
+    // Main data fetching effect - runs only once
     useEffect(() => {
         if (!db) {
             setError("Falha na conexão com o banco de dados. Este é um problema conhecido no ambiente de desenvolvimento atual (sandbox), que bloqueia conexões externas. Seu site funcionará normalmente online. Verifique se as credenciais em services/firebase.ts estão corretas.");
@@ -159,41 +154,26 @@ const App: React.FC = () => {
             setIsLoading(false);
         };
         
-        // Listener for site settings
         const settingsDocRef = db.doc('store_config/site_settings');
         const unsubSettings = settingsDocRef.onSnapshot(doc => {
             if (doc.exists) {
                  const data = doc.data() as Partial<SiteSettings>;
-                 // Merge fetched data with defaults to ensure all keys exist
-                 setSiteSettings(prev => ({
-                     ...defaultSiteSettings,
-                     ...prev,
-                     ...data
-                 }));
+                 setSiteSettings(prev => ({ ...defaultSiteSettings, ...prev, ...data }));
             }
         }, err => handleConnectionError(err, "site settings"));
 
-
-        // Listener for store status
         const statusDocRef = db.doc('store_config/status');
         const unsubStatus = statusDocRef.onSnapshot(doc => {
             const data = doc.data();
-            if (data) {
-                setIsStoreOnline(data.isOpen);
-            }
+            if (data) setIsStoreOnline(data.isOpen);
         }, err => handleConnectionError(err, "store status"));
 
-        // Listener for categories
         const categoriesQuery = db.collection('categories').orderBy('order');
         const unsubCategories = categoriesQuery.onSnapshot(snapshot => {
             const fetchedCategories: Category[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
             setCategories(fetchedCategories);
-            if (fetchedCategories.length > 0 && !activeMenuCategory) {
-                setActiveMenuCategory(fetchedCategories.filter(c => c.active)[0]?.id || '');
-            }
         }, err => handleConnectionError(err, "categories"));
 
-        // Listener for products
         const productsQuery = db.collection('products').orderBy('orderIndex');
         const unsubProducts = productsQuery.onSnapshot(snapshot => {
             const fetchedProducts: Product[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
@@ -202,7 +182,6 @@ const App: React.FC = () => {
             setError(null);
         }, err => handleConnectionError(err, "products"));
 
-        // Listener for orders
         const ordersQuery = db.collection('orders').orderBy('createdAt', 'desc');
         const unsubOrders = ordersQuery.onSnapshot(snapshot => {
             const fetchedOrders: Order[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
@@ -216,7 +195,17 @@ const App: React.FC = () => {
             unsubProducts();
             unsubOrders();
         };
-    }, [activeMenuCategory]);
+    }, []);
+
+    // Effect to set initial active category - separated for stability
+    useEffect(() => {
+        if (categories.length > 0 && !activeMenuCategory) {
+            const firstActiveCategory = categories.find(c => c.active);
+            if (firstActiveCategory) {
+                setActiveMenuCategory(firstActiveCategory.id);
+            }
+        }
+    }, [categories, activeMenuCategory]);
     
     useEffect(() => {
         localStorage.setItem('santaSensacaoCart', JSON.stringify(cart));
@@ -273,13 +262,13 @@ const App: React.FC = () => {
     const handleCheckout = async (details: OrderDetails) => {
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         
-        // Create order object for database
-        const newOrder: Omit<Order, 'id' | 'createdAt'> = {
+        const newOrder = {
             customer: {
                 name: details.name,
                 phone: details.phone,
                 orderType: details.orderType,
                 address: details.orderType === 'delivery' ? details.address : undefined,
+                reservationTime: details.orderType === 'local' ? details.reservationTime : undefined,
             },
             items: cart,
             total: total,
@@ -287,7 +276,7 @@ const App: React.FC = () => {
             changeNeeded: details.paymentMethod === 'cash' ? details.changeNeeded : undefined,
             changeAmount: details.paymentMethod === 'cash' && details.changeNeeded ? details.changeAmount : undefined,
             notes: details.notes,
-            status: 'pending',
+            status: 'pending' as OrderStatus,
         };
 
         try {
@@ -296,7 +285,6 @@ const App: React.FC = () => {
         } catch (error) {
             console.error("Failed to save order:", error);
             addToast("Erro ao salvar pedido no sistema.", 'error');
-            // We can still proceed to WhatsApp
         }
 
         let message = `*🍕 NOVO PEDIDO - PIZZARIA SANTA SENSAÇÃO 🍕*\n\n`;
@@ -305,10 +293,13 @@ const App: React.FC = () => {
         message += `*Telefone:* ${details.phone}\n`;
         message += `*Tipo de Pedido:* ${details.orderType}\n`;
         if (details.orderType === 'delivery') {
-            message += `*Endereço:* ${details.address}\n\n`;
+            message += `*Endereço:* ${details.address}\n`;
+        }
+        if (details.orderType === 'local' && details.reservationTime) {
+            message += `*Horário da Reserva:* ${details.reservationTime}\n`;
         }
 
-        message += `*🛒 ITENS DO PEDIDO:*\n`;
+        message += `\n*🛒 ITENS DO PEDIDO:*\n`;
         cart.forEach(item => {
             message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2)}\n`;
         });
@@ -469,9 +460,9 @@ const App: React.FC = () => {
         }
     }, [addToast]);
     
-    const handleUpdateOrderStatus = useCallback(async (orderId: string, status: Order['status']) => {
+    const handleUpdateOrderStatus = useCallback(async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => {
         try {
-            await firebaseService.updateOrderStatus(orderId, status);
+            await firebaseService.updateOrderStatus(orderId, status, payload);
             addToast("Status do pedido atualizado!", 'success');
         } catch (error) {
             console.error("Failed to update order status:", error);

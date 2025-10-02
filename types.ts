@@ -36,6 +36,7 @@ export interface OrderDetails {
     changeNeeded: boolean;
     changeAmount?: string;
     notes: string;
+    reservationTime?: string; // Added for dine-in
 }
 
 // New Types for Order Management
@@ -46,6 +47,7 @@ export interface OrderCustomerDetails {
     phone: string;
     orderType: 'delivery' | 'pickup' | 'local';
     address?: string;
+    reservationTime?: string; // Added for dine-in
 }
 
 export interface Order {
@@ -59,6 +61,7 @@ export interface Order {
     notes?: string;
     status: OrderStatus;
     createdAt: any; // Firestore Timestamp
+    pickupTimeEstimate?: string; // Added for pickup
 }
 
 
