@@ -3,7 +3,7 @@ import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } fr
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
 import { SiteCustomizationTab } from './SiteCustomizationTab';
-import { OrderCard } from './OrderCard'; // Import the new OrderCard component
+import { OrderCard } from './OrderCard';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -16,7 +16,7 @@ interface AdminSectionProps {
     allCategories: Category[];
     isStoreOnline: boolean;
     siteSettings: SiteSettings;
-    orders: Order[]; // Add orders prop
+    orders: Order[];
     onSaveProduct: (product: Product) => Promise<void>;
     onDeleteProduct: (productId: string) => Promise<void>;
     onProductStatusChange: (productId: string, active: boolean) => Promise<void>;
@@ -30,7 +30,9 @@ interface AdminSectionProps {
     onSaveSiteSettings: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
     onUpdateOrderStatus: (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => Promise<void>;
     onUpdateOrderPaymentStatus: (orderId: string, paymentStatus: PaymentStatus) => Promise<void>;
+    onUpdateOrderReservationTime: (orderId: string, reservationTime: string) => Promise<void>;
     onDeleteOrder: (orderId: string) => Promise<void>;
+    onPermanentDeleteOrder: (orderId: string) => Promise<void>;
 }
 
 interface SortableProductItemProps {
@@ -129,7 +131,8 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         allProducts, allCategories, isStoreOnline, siteSettings, orders,
         onSaveProduct, onDeleteProduct, onProductStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
-        onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onDeleteOrder
+        onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
+        onDeleteOrder, onPermanentDeleteOrder
     } = props;
     
     const [user, setUser] = useState<firebase.User | null>(null);
@@ -153,9 +156,10 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
     // State for order management
     const [orderSearchTerm, setOrderSearchTerm] = useState('');
-    const [orderFilters, setOrderFilters] = useState({ orderType: '', paymentMethod: '', paymentStatus: '' });
+    const [orderFilters, setOrderFilters] = useState({ orderType: '', paymentMethod: '', paymentStatus: '', orderStatus: '' });
     const [showFilters, setShowFilters] = useState(false);
     const [activeOrdersTab, setActiveOrdersTab] = useState<OrderStatus>('accepted');
+    const [isTrashVisible, setIsTrashVisible] = useState(false);
 
     useEffect(() => setLocalProducts(allProducts), [allProducts]);
     useEffect(() => setLocalCategories([...allCategories].sort((a, b) => a.order - b.order)), [allCategories]);
@@ -178,7 +182,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
     const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
-    // Reordering handlers remain the same
     const handleProductDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
@@ -235,18 +238,20 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         catch (error) { console.error("Error signing out: ", error); }
     };
 
-    // Modal handlers
     const handleAddNewProduct = () => { setEditingProduct(null); setIsProductModalOpen(true); };
     const handleEditProduct = (p: Product) => { setEditingProduct(p); setIsProductModalOpen(true); };
     const handleAddNewCategory = () => { setEditingCategory(null); setIsCategoryModalOpen(true); };
     const handleEditCategory = (c: Category) => { setEditingCategory(c); setIsCategoryModalOpen(true); };
 
-    // Data management handlers
     const handleSeedDatabase = async () => { if (window.confirm('Tem certeza? Isso adicionará dados iniciais.')) { try { await onSeedDatabase(); alert('Banco de dados populado!'); } catch (e) { console.error(e); alert("Erro ao popular o banco."); } } };
     const handleBackup = () => { try { const backupData = { products: allProducts, categories: allCategories, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); alert('Backup concluído!'); } catch (e) { console.error(e); alert("Falha no backup."); } };
     
+    const activeOrders = useMemo(() => orders.filter(o => o.status !== 'deleted'), [orders]);
+    const deletedOrders = useMemo(() => orders.filter(o => o.status === 'deleted'), [orders]);
+
     const filteredOrders = useMemo(() => {
-        return orders.filter(order => {
+        const source = isTrashVisible ? deletedOrders : activeOrders;
+        return source.filter(order => {
             const searchTermLower = orderSearchTerm.toLowerCase();
             const matchesSearch = !searchTermLower ||
                 order.customer.name.toLowerCase().includes(searchTermLower) ||
@@ -255,18 +260,21 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
             const matchesOrderType = !orderFilters.orderType || order.customer.orderType === orderFilters.orderType;
             const matchesPaymentMethod = !orderFilters.paymentMethod || order.paymentMethod === orderFilters.paymentMethod;
             const matchesPaymentStatus = !orderFilters.paymentStatus || order.paymentStatus === orderFilters.paymentStatus;
+            const matchesOrderStatus = !orderFilters.orderStatus || order.status === orderFilters.orderStatus;
 
-            return matchesSearch && matchesOrderType && matchesPaymentMethod && matchesPaymentStatus;
+            return matchesSearch && matchesOrderType && matchesPaymentMethod && matchesPaymentStatus && matchesOrderStatus;
         });
-    }, [orders, orderSearchTerm, orderFilters]);
+    }, [orders, orderSearchTerm, orderFilters, isTrashVisible, activeOrders, deletedOrders]);
 
-    const pendingOrders = useMemo(() => filteredOrders.filter(o => o.status === 'pending'), [filteredOrders]);
-    const tabOrders = useMemo(() => filteredOrders.filter(o => o.status === activeOrdersTab), [filteredOrders, activeOrdersTab]);
+    const getOrderStatusCount = (status: OrderStatus) => filteredOrders.filter(o => o.status === status).length;
     const pendingOrdersCount = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
-
+    const tabOrders = useMemo(() => filteredOrders.filter(o => o.status === activeOrdersTab), [filteredOrders, activeOrdersTab]);
+    
     if (!showAdminPanel) return null;
     if (authLoading) return <section id="admin" className="py-20 bg-brand-ivory-50"><div className="text-center"><i className="fas fa-spinner fa-spin text-4xl text-accent"></i></div></section>;
     if (!user) return (<> <section id="admin" className="py-20 bg-brand-ivory-50"> <div className="container mx-auto px-4 max-w-md"> <div className="bg-white p-8 rounded-2xl shadow-lg border"> <h2 className="text-3xl font-bold text-center mb-6"><i className="fas fa-shield-alt mr-2"></i>Painel</h2> <form onSubmit={handleLogin}> <div className="mb-4"> <label className="block font-semibold mb-2" htmlFor="admin-email">Email</label> <input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> <div className="mb-6"> <label className="block font-semibold mb-2" htmlFor="admin-password">Senha</label> <input id="admin-password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> {error && <div className="text-red-600 mb-4 bg-red-50 p-3 rounded-lg border border-red-200">{error}</div>} <button type="submit" className="w-full bg-accent text-white font-bold py-3 rounded-lg hover:bg-opacity-90 disabled:bg-opacity-70 flex justify-center" disabled={isLoggingIn}>{isLoggingIn ? <i className="fas fa-spinner fa-spin"></i> : 'Entrar'}</button> </form> </div> </div> </section> <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} /> </>);
+
+    const OrderStatusTabs: OrderStatus[] = ['accepted', 'reserved', 'ready', 'completed', 'cancelled'];
 
     return (
         <>
@@ -300,65 +308,63 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                             <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                                             <input type="text" placeholder="Buscar por nome ou telefone..." value={orderSearchTerm} onChange={e => setOrderSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-md" />
                                         </div>
-                                        {/* Desktop Filters */}
                                         <div className="hidden sm:flex items-center gap-3">
                                             <select value={orderFilters.paymentStatus} onChange={e => setOrderFilters(f => ({...f, paymentStatus: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
-                                                <option value="">Status Pgto.</option>
-                                                <option value="paid">Pago</option>
-                                                <option value="pending">Pendente</option>
+                                                <option value="">Status Pgto.</option> <option value="paid">Pago</option> <option value="pending">Pendente</option>
+                                            </select>
+                                            <select value={orderFilters.orderStatus} onChange={e => setOrderFilters(f => ({...f, orderStatus: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
+                                                <option value="">Status Pedido</option> <option value="completed">Finalizado</option> <option value="cancelled">Cancelado</option>
                                             </select>
                                             <select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
-                                                <option value="">Tipo</option>
-                                                <option value="delivery">Entrega</option>
-                                                <option value="pickup">Retirada</option>
-                                                <option value="local">Local</option>
-                                            </select>
-                                            <select value={orderFilters.paymentMethod} onChange={e => setOrderFilters(f => ({...f, paymentMethod: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
-                                                <option value="">Pagamento</option>
-                                                <option value="credit">Crédito</option>
-                                                <option value="debit">Débito</option>
-                                                <option value="pix">PIX</option>
-                                                <option value="cash">Dinheiro</option>
+                                                <option value="">Tipo</option> <option value="delivery">Entrega</option> <option value="pickup">Retirada</option> <option value="local">Local</option>
                                             </select>
                                         </div>
-                                        {/* Mobile Filter Button */}
                                         <div className="sm:hidden flex-shrink-0 relative">
-                                            <button onClick={() => setShowFilters(!showFilters)} className="w-10 h-10 bg-white border rounded-md flex items-center justify-center hover:bg-gray-100">
-                                                <i className="fas fa-filter"></i>
-                                            </button>
+                                            <button onClick={() => setShowFilters(!showFilters)} className="w-10 h-10 bg-white border rounded-md flex items-center justify-center hover:bg-gray-100"><i className="fas fa-filter"></i></button>
                                             <div className={`absolute top-full right-0 mt-2 bg-white border rounded-lg shadow-xl p-4 z-10 w-64 ${showFilters ? 'block' : 'hidden'}`}>
                                                 <div className="space-y-4">
-                                                    <div> <label className="block text-sm font-semibold mb-1">Status Pgto.</label> <select value={orderFilters.paymentStatus} onChange={e => setOrderFilters(f => ({...f, paymentStatus: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"> <option value="">Todos</option> <option value="paid">Pago</option> <option value="pending">Pendente</option> </select> </div>
-                                                    <div> <label className="block text-sm font-semibold mb-1">Tipo</label> <select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"> <option value="">Todos</option> <option value="delivery">Entrega</option> <option value="pickup">Retirada</option> <option value="local">Consumo Local</option> </select> </div>
-                                                    <div> <label className="block text-sm font-semibold mb-1">Pagamento</label> <select value={orderFilters.paymentMethod} onChange={e => setOrderFilters(f => ({...f, paymentMethod: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"> <option value="">Todos</option> <option value="credit">Crédito</option> <option value="debit">Débito</option> <option value="pix">PIX</option> <option value="cash">Dinheiro</option> </select> </div>
+                                                    <div><label className="block text-sm font-semibold mb-1">Status Pgto.</label><select value={orderFilters.paymentStatus} onChange={e => setOrderFilters(f => ({...f, paymentStatus: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"><option value="">Todos</option><option value="paid">Pago</option><option value="pending">Pendente</option></select></div>
+                                                    <div><label className="block text-sm font-semibold mb-1">Status Pedido</label><select value={orderFilters.orderStatus} onChange={e => setOrderFilters(f => ({...f, orderStatus: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"><option value="">Todos</option><option value="completed">Finalizado</option><option value="cancelled">Cancelado</option></select></div>
+                                                    <div><label className="block text-sm font-semibold mb-1">Tipo</label><select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"><option value="">Todos</option><option value="delivery">Entrega</option><option value="pickup">Retirada</option><option value="local">Consumo Local</option></select></div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {pendingOrders.length > 0 && (
+                                {filteredOrders.filter(o => o.status === 'pending').length > 0 && !isTrashVisible && (
                                     <div className="mb-6">
                                         <h4 className="font-bold text-lg mb-2 text-yellow-600">Pendentes</h4>
                                         <div className="space-y-4">
-                                            {pendingOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onDelete={onDeleteOrder} />)}
+                                            {filteredOrders.filter(o => o.status === 'pending').map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />)}
                                         </div>
                                     </div>
                                 )}
 
                                 <div className="border-t pt-4">
-                                    <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide border-b -mx-4 px-2 sm:px-4">
-                                        {(['accepted', 'ready', 'completed', 'cancelled'] as OrderStatus[]).map(status => (
-                                            <button key={status} onClick={() => setActiveOrdersTab(status)} className={`flex-shrink-0 py-2 px-4 font-semibold text-sm ${activeOrdersTab === status ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                                {{accepted: 'Aceitos', ready: 'Prontos/Em Rota', completed: 'Finalizados', cancelled: 'Cancelados'}[status]}
-                                            </button>
-                                        ))}
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide border-b -mx-4 px-2 sm:px-4">
+                                            {!isTrashVisible && OrderStatusTabs.map(status => {
+                                                const count = getOrderStatusCount(status);
+                                                return (
+                                                <button key={status} onClick={() => setActiveOrdersTab(status)} className={`relative flex-shrink-0 py-2 px-4 font-semibold text-sm ${activeOrdersTab === status && !isTrashVisible ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                                    {{accepted: 'Aceitos', reserved: 'Reservas', ready: 'Prontos/Em Rota', completed: 'Finalizados', cancelled: 'Cancelados'}[status]}
+                                                    {count > 0 && <span className="ml-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{count}</span>}
+                                                </button>
+                                                )
+                                            })}
+                                            {isTrashVisible && (<div className="py-2 px-4 font-semibold text-accent"><i className="fas fa-trash-alt mr-2"></i>Lixeira</div>)}
+                                        </div>
+                                        <button onClick={() => setIsTrashVisible(!isTrashVisible)} className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${isTrashVisible ? 'bg-accent text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`} aria-label="Ver lixeira">
+                                            <i className="fas fa-trash-alt"></i>
+                                        </button>
                                     </div>
+
                                     <div className="mt-4 space-y-4">
-                                        {tabOrders.length > 0 ? (
-                                            tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onDelete={onDeleteOrder} />)
+                                        {isTrashVisible ? (
+                                            deletedOrders.length > 0 ? deletedOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>
                                         ) : (
-                                            <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>
+                                            tabOrders.length > 0 ? tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>
                                         )}
                                     </div>
                                 </div>

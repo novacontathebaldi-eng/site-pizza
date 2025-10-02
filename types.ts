@@ -40,7 +40,7 @@ export interface OrderDetails {
 }
 
 // New Types for Order Management
-export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled';
+export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted';
 export type PaymentStatus = 'pending' | 'paid';
 
 export interface OrderCustomerDetails {
@@ -48,7 +48,7 @@ export interface OrderCustomerDetails {
     phone: string;
     orderType: 'delivery' | 'pickup' | 'local';
     address?: string;
-    reservationTime?: string; // Added for dine-in
+    reservationTime?: string;
 }
 
 export interface Order {

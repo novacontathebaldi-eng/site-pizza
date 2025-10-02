@@ -463,13 +463,21 @@ const App: React.FC = () => {
     
     const handleUpdateOrderStatus = useCallback(async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => {
         try {
-            await firebaseService.updateOrderStatus(orderId, status, payload);
+            let finalStatus = status;
+            const order = orders.find(o => o.id === orderId);
+
+            // Logic for dine-in orders
+            if (status === 'accepted' && order?.customer.orderType === 'local') {
+                finalStatus = 'reserved';
+            }
+            
+            await firebaseService.updateOrderStatus(orderId, finalStatus, payload);
             addToast("Status do pedido atualizado!", 'success');
         } catch (error) {
             console.error("Failed to update order status:", error);
             addToast("Erro ao atualizar o status do pedido.", 'error');
         }
-    }, [addToast]);
+    }, [orders, addToast]);
 
     const handleUpdateOrderPaymentStatus = useCallback(async (orderId: string, paymentStatus: PaymentStatus) => {
         try {
@@ -481,14 +489,37 @@ const App: React.FC = () => {
         }
     }, [addToast]);
 
+    const handleUpdateOrderReservationTime = useCallback(async (orderId: string, reservationTime: string) => {
+        try {
+            await firebaseService.updateOrderReservationTime(orderId, reservationTime);
+            addToast("Horário da reserva atualizado!", 'success');
+        } catch (error) {
+            console.error("Failed to update reservation time:", error);
+            addToast("Erro ao atualizar horário da reserva.", 'error');
+        }
+    }, [addToast]);
+
     const handleDeleteOrder = useCallback(async (orderId: string) => {
-        if (window.confirm("Tem certeza que deseja apagar este pedido permanentemente?")) {
+        if (window.confirm("Tem certeza que deseja apagar este pedido? Após apagar, o pedido será enviado para a lixeira 🗑️")) {
+            try {
+                // Instead of deleting, we change the status to 'deleted'
+                await firebaseService.updateOrderStatus(orderId, 'deleted');
+                addToast("Pedido movido para a lixeira.", 'success');
+            } catch (error) {
+                console.error("Failed to move order to trash:", error);
+                addToast("Erro ao mover pedido para a lixeira.", 'error');
+            }
+        }
+    }, [addToast]);
+
+    const handlePermanentDeleteOrder = useCallback(async (orderId: string) => {
+        if (window.confirm("Este pedido será apagado PERMANENTEMENTE. Esta ação não pode ser desfeita. Continuar?")) {
             try {
                 await firebaseService.deleteOrder(orderId);
-                addToast("Pedido apagado com sucesso.", 'success');
+                addToast("Pedido apagado permanentemente.", 'success');
             } catch (error) {
-                console.error("Failed to delete order:", error);
-                addToast("Erro ao apagar o pedido.", 'error');
+                console.error("Failed to permanently delete order:", error);
+                addToast("Erro ao apagar o pedido permanentemente.", 'error');
             }
         }
     }, [addToast]);
@@ -566,7 +597,9 @@ const App: React.FC = () => {
                     onSaveSiteSettings={handleSaveSiteSettings}
                     onUpdateOrderStatus={handleUpdateOrderStatus}
                     onUpdateOrderPaymentStatus={handleUpdateOrderPaymentStatus}
+                    onUpdateOrderReservationTime={handleUpdateOrderReservationTime}
                     onDeleteOrder={handleDeleteOrder}
+                    onPermanentDeleteOrder={handlePermanentDeleteOrder}
                 />
             </main>
 

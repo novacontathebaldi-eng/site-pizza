@@ -148,6 +148,12 @@ export const updateOrderPaymentStatus = async (orderId: string, paymentStatus: P
     await orderRef.update({ paymentStatus });
 };
 
+export const updateOrderReservationTime = async (orderId: string, reservationTime: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const orderRef = db.collection('orders').doc(orderId);
+    await orderRef.update({ 'customer.reservationTime': reservationTime });
+};
+
 export const deleteOrder = async (orderId: string): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     const orderRef = db.collection('orders').doc(orderId);
