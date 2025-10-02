@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, PromotionPage } from '../types';
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
 import { SiteCustomizationTab } from './SiteCustomizationTab';
@@ -10,6 +10,10 @@ import { CSS } from '@dnd-kit/utilities';
 import firebase from 'firebase/compat/app';
 import { auth } from '../services/firebase';
 import { SupportModal } from './SupportModal';
+import { PromotionsTab } from './PromotionsTab';
+import { AudioTab } from './AudioTab';
+import { NotificationsTab } from './NotificationsTab';
+
 
 interface AdminSectionProps {
     allProducts: Product[];
@@ -17,6 +21,7 @@ interface AdminSectionProps {
     isStoreOnline: boolean;
     siteSettings: SiteSettings;
     orders: Order[];
+    promotions: PromotionPage[];
     onSaveProduct: (product: Product) => Promise<void>;
     onDeleteProduct: (productId: string) => Promise<void>;
     onProductStatusChange: (productId: string, active: boolean) => Promise<void>;
@@ -28,14 +33,18 @@ interface AdminSectionProps {
     onReorderProducts: (productsToUpdate: { id: string; orderIndex: number }[]) => Promise<void>;
     onReorderCategories: (categoriesToUpdate: { id: string; order: number }[]) => Promise<void>;
     onSeedDatabase: () => Promise<void>;
-    onSaveSiteSettings: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
+    onSaveSiteSettings: (settings: SiteSettings, files: { [key: string]: File | null }, audioFiles: { [key: string]: File | null }) => Promise<void>;
     onUpdateOrderStatus: (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => Promise<void>;
     onUpdateOrderPaymentStatus: (orderId: string, paymentStatus: PaymentStatus) => Promise<void>;
     onUpdateOrderReservationTime: (orderId: string, reservationTime: string) => Promise<void>;
     onDeleteOrder: (orderId: string) => Promise<void>;
     onPermanentDeleteOrder: (orderId: string) => Promise<void>;
+    onSavePromotion: (promotion: PromotionPage) => Promise<void>;
+    onDeletePromotion: (promotionId: string) => Promise<void>;
+    onReorderPromotions: (promotionsToUpdate: { id: string; order: number }[]) => Promise<void>;
 }
 
+// ... Sortable components remain the same ...
 interface SortableProductItemProps {
     product: Product;
     isCategoryActive: boolean;
@@ -137,18 +146,21 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
     );
 };
 
+
 export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const { 
-        allProducts, allCategories, isStoreOnline, siteSettings, orders,
+        allProducts, allCategories, isStoreOnline, siteSettings, orders, promotions,
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
         onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
-        onDeleteOrder, onPermanentDeleteOrder
+        onDeleteOrder, onPermanentDeleteOrder,
+        onSavePromotion, onDeletePromotion, onReorderPromotions
     } = props;
     
     const [user, setUser] = useState<firebase.User | null>(null);
     const [authLoading, setAuthLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('status');
+    const [activeSettingsTab, setActiveSettingsTab] = useState('audio');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | React.ReactNode>('');
@@ -165,21 +177,14 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
-    // State for order management
     const [orderSearchTerm, setOrderSearchTerm] = useState('');
     const [orderFilters, setOrderFilters] = useState({ orderType: '', paymentMethod: '', paymentStatus: '', orderStatus: '' });
     const [showFilters, setShowFilters] = useState(false);
     const [activeOrdersTab, setActiveOrdersTab] = useState<OrderStatus>('accepted');
     const [isTrashVisible, setIsTrashVisible] = useState(false);
 
-    // State for sound notification
-    const [isSoundEnabled, setIsSoundEnabled] = useState(() => {
-        const saved = localStorage.getItem('soundNotificationEnabled');
-        return saved !== 'false'; // Enabled by default
-    });
     const prevPendingOrdersCount = useRef(0);
-    const audioContextRef = useRef<AudioContext | null>(null);
-
+    const audioRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => setLocalProducts(allProducts), [allProducts]);
     useEffect(() => setLocalCategories([...allCategories].sort((a, b) => a.order - b.order)), [allCategories]);
@@ -202,151 +207,64 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
     const pendingOrdersCount = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
 
-    // Effect for sound notification
     useEffect(() => {
-        const playSound = () => {
-            if (!audioContextRef.current) {
-                try {
-                    audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-                } catch (e) {
-                    console.error("Web Audio API is not supported in this browser.");
-                    return;
+        const playNotificationSound = () => {
+            if (siteSettings.audioSettings?.notificationSound) {
+                if (!audioRef.current) {
+                    audioRef.current = new Audio();
                 }
+                const sound = siteSettings.audioSettings.notificationSound;
+                // Handle default sounds if we decide to package them
+                audioRef.current.src = sound; // Assumes sound is a URL
+                audioRef.current.volume = siteSettings.audioSettings.notificationVolume ?? 0.5;
+                audioRef.current.play().catch(e => console.error("Audio playback failed:", e));
             }
-            const oscillator = audioContextRef.current.createOscillator();
-            const gainNode = audioContextRef.current.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContextRef.current.destination);
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(440, audioContextRef.current.currentTime); // A4 note
-            gainNode.gain.setValueAtTime(0.5, audioContextRef.current.currentTime);
-            oscillator.start();
-            oscillator.stop(audioContextRef.current.currentTime + 0.2);
         };
 
-        if (isSoundEnabled && user && pendingOrdersCount > prevPendingOrdersCount.current) {
-            playSound();
+        const showBrowserNotification = () => {
+             if (siteSettings.notificationSettings?.browserNotificationsEnabled && Notification.permission === 'granted') {
+                new Notification('Novo Pedido Recebido!', {
+                    body: `Você tem um novo pedido pendente de ${orders.find(o => o.status === 'pending')?.customer.name}.`,
+                    icon: '/assets/logo para icones.png', // Make sure this path is correct
+                    tag: 'new-order'
+                });
+                playNotificationSound();
+            }
+        };
+
+        if (user && pendingOrdersCount > prevPendingOrdersCount.current) {
+            playNotificationSound();
+            showBrowserNotification();
         }
         prevPendingOrdersCount.current = pendingOrdersCount;
-    }, [pendingOrdersCount, isSoundEnabled, user]);
+    }, [pendingOrdersCount, user, siteSettings.audioSettings, siteSettings.notificationSettings]);
 
-
-    // Effect for scrolling order tabs into view
-    useEffect(() => {
-        if (activeTab === 'orders') {
-            const tabId = isTrashVisible ? `order-tab-trash` : `order-tab-${activeOrdersTab}`;
-            const activeTabElement = document.getElementById(tabId);
-            
-            if (activeTabElement) {
-                activeTabElement.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'nearest',
-                    inline: 'center'
-                });
-            }
-        }
-    }, [activeOrdersTab, isTrashVisible, activeTab]);
-
-
-    const toggleSound = () => {
-        const newState = !isSoundEnabled;
-        setIsSoundEnabled(newState);
-        localStorage.setItem('soundNotificationEnabled', String(newState));
-         // Initialize AudioContext on user interaction
-        if (newState && !audioContextRef.current) {
-             try {
-                audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-            } catch (e) { console.error("Could not create AudioContext."); }
+    // Effect for scrolling tabs into view
+    const scrollTabIntoView = (tabId: string) => {
+        const activeTabElement = document.getElementById(tabId);
+        if (activeTabElement) {
+            activeTabElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         }
     };
-
+    
+    useEffect(() => scrollTabIntoView(`main-tab-${activeTab}`), [activeTab]);
+    useEffect(() => { if (activeTab === 'orders') scrollTabIntoView(isTrashVisible ? `order-tab-trash` : `order-tab-${activeOrdersTab}`) }, [activeOrdersTab, isTrashVisible, activeTab]);
+    useEffect(() => { if (activeTab === 'settings') scrollTabIntoView(`settings-tab-${activeSettingsTab}`) }, [activeSettingsTab, activeTab]);
 
     const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
-
-    const handleProductDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
-        if (!over || active.id === over.id) return;
-        const sortedProducts = [...localProducts].sort((a, b) => a.orderIndex - b.orderIndex);
-        const oldIndex = sortedProducts.findIndex(p => p.id === active.id);
-        const newIndex = sortedProducts.findIndex(p => p.id === over.id);
-        if (oldIndex === -1 || newIndex === -1) return;
-        const reordered = arrayMove(sortedProducts, oldIndex, newIndex);
-        onReorderProducts(reordered.map((p, index) => ({ id: p.id, orderIndex: index })));
-    };
-
-    const handleCategoryDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
-        if (!over || active.id === over.id) return;
-        const oldIndex = localCategories.findIndex(c => c.id === active.id);
-        const newIndex = localCategories.findIndex(c => c.id === over.id);
-        const reordered = arrayMove(localCategories, oldIndex, newIndex);
-        onReorderCategories(reordered.map((c, index) => ({ id: c.id, order: index })));
-    };
-    
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-        setIsLoggingIn(true);
-        if (!auth) {
-            setError('Serviço de autenticação não disponível.');
-            setIsLoggingIn(false);
-            return;
-        }
-        try {
-            await auth.signInWithEmailAndPassword(email, password);
-        } catch (err: any) {
-             let friendlyMessage: string | React.ReactNode = 'Ocorreu um erro inesperado.';
-            switch (err.code) {
-                case 'auth/user-not-found':
-                case 'auth/wrong-password':
-                case 'auth/invalid-credential':
-                     friendlyMessage = (
-                        <div className="text-center text-sm"><p className="font-bold">Acesso negado.</p><p className="mt-2">Se você é um administrador e está com problemas, entre em contato com o suporte.</p><button type="button" onClick={() => setIsSupportModalOpen(true)} className="mt-4 w-full bg-brand-olive-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-envelope mr-2"></i>Entrar em Contato</button></div>
-                    );
-                    break;
-                case 'auth/invalid-email': friendlyMessage = 'O formato do e-mail é inválido.'; break;
-                case 'auth/network-request-failed': friendlyMessage = 'Erro de rede. Verifique sua conexão.'; break;
-            }
-            setError(friendlyMessage);
-        } finally {
-            setIsLoggingIn(false);
-        }
-    };
-    
-    const handleLogout = async () => {
-        if (!auth) return;
-        try { await auth.signOut(); setEmail(''); setPassword(''); window.location.hash = ''; }
-        catch (error) { console.error("Error signing out: ", error); }
-    };
-
+    const handleProductDragEnd = (event: DragEndEvent) => { const { active, over } = event; if (!over || active.id === over.id) return; const sortedProducts = [...localProducts].sort((a, b) => a.orderIndex - b.orderIndex); const oldIndex = sortedProducts.findIndex(p => p.id === active.id); const newIndex = sortedProducts.findIndex(p => p.id === over.id); if (oldIndex === -1 || newIndex === -1) return; const reordered = arrayMove(sortedProducts, oldIndex, newIndex); onReorderProducts(reordered.map((p, index) => ({ id: p.id, orderIndex: index }))); };
+    const handleCategoryDragEnd = (event: DragEndEvent) => { const { active, over } = event; if (!over || active.id === over.id) return; const oldIndex = localCategories.findIndex(c => c.id === active.id); const newIndex = localCategories.findIndex(c => c.id === over.id); const reordered = arrayMove(localCategories, oldIndex, newIndex); onReorderCategories(reordered.map((c, index) => ({ id: c.id, order: index }))); };
+    const handleLogin = async (e: React.FormEvent) => { e.preventDefault(); setError(''); setIsLoggingIn(true); if (!auth) { setError('Serviço de autenticação não disponível.'); setIsLoggingIn(false); return; } try { await auth.signInWithEmailAndPassword(email, password); } catch (err: any) { let friendlyMessage: string | React.ReactNode = 'Ocorreu um erro inesperado.'; switch (err.code) { case 'auth/user-not-found': case 'auth/wrong-password': case 'auth/invalid-credential': friendlyMessage = ( <div className="text-center text-sm"><p className="font-bold">Acesso negado.</p><p className="mt-2">Se você é um administrador e está com problemas, entre em contato com o suporte.</p><button type="button" onClick={() => setIsSupportModalOpen(true)} className="mt-4 w-full bg-brand-olive-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-envelope mr-2"></i>Entrar em Contato</button></div> ); break; case 'auth/invalid-email': friendlyMessage = 'O formato do e-mail é inválido.'; break; case 'auth/network-request-failed': friendlyMessage = 'Erro de rede. Verifique sua conexão.'; break; } setError(friendlyMessage); } finally { setIsLoggingIn(false); } };
+    const handleLogout = async () => { if (!auth) return; try { await auth.signOut(); setEmail(''); setPassword(''); window.location.hash = ''; } catch (error) { console.error("Error signing out: ", error); } };
     const handleAddNewProduct = () => { setEditingProduct(null); setIsProductModalOpen(true); };
     const handleEditProduct = (p: Product) => { setEditingProduct(p); setIsProductModalOpen(true); };
     const handleAddNewCategory = () => { setEditingCategory(null); setIsCategoryModalOpen(true); };
     const handleEditCategory = (c: Category) => { setEditingCategory(c); setIsCategoryModalOpen(true); };
-
     const handleSeedDatabase = async () => { if (window.confirm('Tem certeza? Isso adicionará dados iniciais.')) { try { await onSeedDatabase(); alert('Banco de dados populado!'); } catch (e) { console.error(e); alert("Erro ao popular o banco."); } } };
-    const handleBackup = () => { try { const backupData = { products: allProducts, categories: allCategories, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); alert('Backup concluído!'); } catch (e) { console.error(e); alert("Falha no backup."); } };
     
     const activeOrders = useMemo(() => orders.filter(o => o.status !== 'deleted'), [orders]);
     const deletedOrders = useMemo(() => orders.filter(o => o.status === 'deleted'), [orders]);
-
-    const filteredOrders = useMemo(() => {
-        const source = isTrashVisible ? deletedOrders : activeOrders;
-        return source.filter(order => {
-            const searchTermLower = orderSearchTerm.toLowerCase();
-            const matchesSearch = !searchTermLower ||
-                order.customer.name.toLowerCase().includes(searchTermLower) ||
-                order.customer.phone.toLowerCase().includes(searchTermLower);
-            
-            const matchesOrderType = !orderFilters.orderType || order.customer.orderType === orderFilters.orderType;
-            const matchesPaymentMethod = !orderFilters.paymentMethod || order.paymentMethod === orderFilters.paymentMethod;
-            const matchesPaymentStatus = !orderFilters.paymentStatus || order.paymentStatus === orderFilters.paymentStatus;
-            const matchesOrderStatus = !orderFilters.orderStatus || order.status === orderFilters.orderStatus;
-
-            return matchesSearch && matchesOrderType && matchesPaymentMethod && matchesPaymentStatus && matchesOrderStatus;
-        });
-    }, [orders, orderSearchTerm, orderFilters, isTrashVisible, activeOrders, deletedOrders]);
-
+    const filteredOrders = useMemo(() => { const source = isTrashVisible ? deletedOrders : activeOrders; return source.filter(order => { const searchTermLower = orderSearchTerm.toLowerCase(); const matchesSearch = !searchTermLower || order.customer.name.toLowerCase().includes(searchTermLower) || order.customer.phone.toLowerCase().includes(searchTermLower); const matchesOrderType = !orderFilters.orderType || order.customer.orderType === orderFilters.orderType; const matchesPaymentMethod = !orderFilters.paymentMethod || order.paymentMethod === orderFilters.paymentMethod; const matchesPaymentStatus = !orderFilters.paymentStatus || order.paymentStatus === orderFilters.paymentStatus; const matchesOrderStatus = !orderFilters.orderStatus || order.status === orderFilters.orderStatus; return matchesSearch && matchesOrderType && matchesPaymentMethod && matchesPaymentStatus && matchesOrderStatus; }); }, [orders, orderSearchTerm, orderFilters, isTrashVisible, activeOrders, deletedOrders]);
     const getOrderStatusCount = (status: OrderStatus) => filteredOrders.filter(o => o.status === status).length;
     const tabOrders = useMemo(() => filteredOrders.filter(o => o.status === activeOrdersTab), [filteredOrders, activeOrdersTab]);
     
@@ -355,6 +273,8 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     if (!user) return (<> <section id="admin" className="py-20 bg-brand-ivory-50"> <div className="container mx-auto px-4 max-w-md"> <div className="bg-white p-8 rounded-2xl shadow-lg border"> <h2 className="text-3xl font-bold text-center mb-6"><i className="fas fa-shield-alt mr-2"></i>Painel</h2> <form onSubmit={handleLogin}> <div className="mb-4"> <label className="block font-semibold mb-2" htmlFor="admin-email">Email</label> <input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> <div className="mb-6"> <label className="block font-semibold mb-2" htmlFor="admin-password">Senha</label> <input id="admin-password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> {error && <div className="text-red-600 mb-4 bg-red-50 p-3 rounded-lg border border-red-200">{error}</div>} <button type="submit" className="w-full bg-accent text-white font-bold py-3 rounded-lg hover:bg-opacity-90 disabled:bg-opacity-70 flex justify-center" disabled={isLoggingIn}>{isLoggingIn ? <i className="fas fa-spinner fa-spin"></i> : 'Entrar'}</button> </form> </div> </div> </section> <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} /> </>);
 
     const OrderStatusTabs: OrderStatus[] = ['accepted', 'reserved', 'ready', 'completed', 'cancelled'];
+    const mainTabs = ['status', 'orders', 'products', 'categories', 'promotions', 'settings'];
+    const settingsTabs = ['audio', 'notifications', 'customization', 'data'];
 
     return (
         <>
@@ -362,25 +282,16 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                 <div className="container mx-auto px-4">
                     <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
                         <div className="flex justify-between items-center mb-6 pb-4 border-b">
-                            <div className="flex items-center gap-4">
-                                <h2 className="text-3xl font-bold">Painel Administrativo</h2>
-                                <button 
-                                    onClick={toggleSound} 
-                                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isSoundEnabled ? 'bg-green-100 text-green-600 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                                    title={isSoundEnabled ? 'Desativar som de notificação' : 'Ativar som de notificação'}
-                                >
-                                    <i className={`fas ${isSoundEnabled ? 'fa-bell' : 'fa-bell-slash'}`}></i>
-                                </button>
-                            </div>
+                            <h2 className="text-3xl font-bold">Painel Administrativo</h2>
                             <button onClick={handleLogout} className="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600"><i className="fas fa-sign-out-alt mr-2"></i>Sair</button>
                         </div>
                         <div className="border-b mb-6">
                             <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
-                                {['status', 'orders', 'products', 'categories', 'customization', 'data'].map(tab => {
-                                    const icons: { [key: string]: string } = { status: 'fa-store-alt', orders: 'fa-receipt', products: 'fa-pizza-slice', categories: 'fa-tags', customization: 'fa-paint-brush', data: 'fa-database' };
-                                    const labels: { [key: string]: string } = { status: 'Status', orders: 'Pedidos', products: 'Produtos', categories: 'Categorias', customization: 'Personalização', data: 'Dados' };
+                                {mainTabs.map(tab => {
+                                    const icons: { [key: string]: string } = { status: 'fa-store-alt', orders: 'fa-receipt', products: 'fa-pizza-slice', categories: 'fa-tags', promotions: 'fa-bullhorn', settings: 'fa-cogs' };
+                                    const labels: { [key: string]: string } = { status: 'Status', orders: 'Pedidos', products: 'Produtos', categories: 'Categorias', promotions: 'Promoções e Anúncios', settings: 'Configurações' };
                                     return (
-                                        <button key={tab} onClick={() => setActiveTab(tab)} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === tab ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                        <button key={tab} id={`main-tab-${tab}`} onClick={() => setActiveTab(tab)} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === tab ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
                                             <i className={`fas ${icons[tab]} w-5 text-center`}></i> <span>{labels[tab]}</span>
                                             {tab === 'orders' && pendingOrdersCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">{pendingOrdersCount}</span>}
                                         </button>
@@ -396,89 +307,46 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                 <h3 className="text-xl font-bold mb-4">Gerenciar Pedidos</h3>
                                 <div className="bg-gray-50 p-3 rounded-lg border mb-4">
                                     <div className="flex flex-nowrap flex-row items-center gap-2 sm:gap-3">
-                                        <div className="relative flex-grow">
-                                            <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                                            <input type="text" placeholder="Buscar por nome ou telefone..." value={orderSearchTerm} onChange={e => setOrderSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-md" />
-                                        </div>
-                                        <div className="hidden sm:flex items-center gap-3">
-                                            <select value={orderFilters.paymentStatus} onChange={e => setOrderFilters(f => ({...f, paymentStatus: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
-                                                <option value="">Status Pgto.</option> <option value="paid">Pago</option> <option value="pending">Pendente</option>
-                                            </select>
-                                            <select value={orderFilters.orderStatus} onChange={e => setOrderFilters(f => ({...f, orderStatus: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
-                                                <option value="">Status Pedido</option> <option value="completed">Finalizado</option> <option value="cancelled">Cancelado</option>
-                                            </select>
-                                            <select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
-                                                <option value="">Tipo</option> <option value="delivery">Entrega</option> <option value="pickup">Retirada</option> <option value="local">Local</option>
-                                            </select>
-                                        </div>
-                                        <div className="sm:hidden flex-shrink-0 relative">
-                                            <button onClick={() => setShowFilters(!showFilters)} className="w-10 h-10 bg-white border rounded-md flex items-center justify-center hover:bg-gray-100"><i className="fas fa-filter"></i></button>
-                                            <div className={`absolute top-full right-0 mt-2 bg-white border rounded-lg shadow-xl p-4 z-10 w-64 ${showFilters ? 'block' : 'hidden'}`}>
-                                                <div className="space-y-4">
-                                                    <div><label className="block text-sm font-semibold mb-1">Status Pgto.</label><select value={orderFilters.paymentStatus} onChange={e => setOrderFilters(f => ({...f, paymentStatus: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"><option value="">Todos</option><option value="paid">Pago</option><option value="pending">Pendente</option></select></div>
-                                                    <div><label className="block text-sm font-semibold mb-1">Status Pedido</label><select value={orderFilters.orderStatus} onChange={e => setOrderFilters(f => ({...f, orderStatus: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"><option value="">Todos</option><option value="completed">Finalizado</option><option value="cancelled">Cancelado</option></select></div>
-                                                    <div><label className="block text-sm font-semibold mb-1">Tipo</label><select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"><option value="">Todos</option><option value="delivery">Entrega</option><option value="pickup">Retirada</option><option value="local">Consumo Local</option></select></div>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        <div className="relative flex-grow"><i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i><input type="text" placeholder="Buscar por nome ou telefone..." value={orderSearchTerm} onChange={e => setOrderSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-md" /></div>
+                                        <div className="hidden sm:flex items-center gap-3"><select value={orderFilters.paymentStatus} onChange={e => setOrderFilters(f => ({...f, paymentStatus: e.target.value}))} className="px-3 py-2 border rounded-md bg-white"><option value="">Status Pgto.</option> <option value="paid">Pago</option> <option value="pending">Pendente</option></select><select value={orderFilters.orderStatus} onChange={e => setOrderFilters(f => ({...f, orderStatus: e.target.value}))} className="px-3 py-2 border rounded-md bg-white"><option value="">Status Pedido</option> <option value="completed">Finalizado</option> <option value="cancelled">Cancelado</option></select><select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="px-3 py-2 border rounded-md bg-white"><option value="">Tipo</option> <option value="delivery">Entrega</option> <option value="pickup">Retirada</option> <option value="local">Local</option></select></div>
+                                        <div className="sm:hidden flex-shrink-0 relative"><button onClick={() => setShowFilters(!showFilters)} className="w-10 h-10 bg-white border rounded-md flex items-center justify-center hover:bg-gray-100"><i className="fas fa-filter"></i></button><div className={`absolute top-full right-0 mt-2 bg-white border rounded-lg shadow-xl p-4 z-10 w-64 ${showFilters ? 'block' : 'hidden'}`}><div className="space-y-4"><div><label className="block text-sm font-semibold mb-1">Status Pgto.</label><select value={orderFilters.paymentStatus} onChange={e => setOrderFilters(f => ({...f, paymentStatus: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"><option value="">Todos</option><option value="paid">Pago</option><option value="pending">Pendente</option></select></div><div><label className="block text-sm font-semibold mb-1">Status Pedido</label><select value={orderFilters.orderStatus} onChange={e => setOrderFilters(f => ({...f, orderStatus: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"><option value="">Todos</option><option value="completed">Finalizado</option><option value="cancelled">Cancelado</option></select></div><div><label className="block text-sm font-semibold mb-1">Tipo</label><select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"><option value="">Todos</option><option value="delivery">Entrega</option><option value="pickup">Retirada</option><option value="local">Consumo Local</option></select></div></div></div></div>
                                     </div>
                                 </div>
-
-                                {filteredOrders.filter(o => o.status === 'pending').length > 0 && !isTrashVisible && (
-                                    <div className="mb-6">
-                                        <h4 className="font-bold text-lg mb-2 text-yellow-600">Pendentes</h4>
-                                        <div className="space-y-4">
-                                            {filteredOrders.filter(o => o.status === 'pending').map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />)}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="border-t pt-4">
-                                    <div>
-                                        <div className="border-b">
-                                            <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
-                                                {!isTrashVisible && OrderStatusTabs.map(status => {
-                                                    const count = getOrderStatusCount(status);
-                                                    const showCounter = count > 0 && !['completed', 'cancelled'].includes(status);
-                                                    return (
-                                                    <button 
-                                                        key={status} 
-                                                        id={`order-tab-${status}`}
-                                                        onClick={() => setActiveOrdersTab(status)} 
-                                                        className={`relative flex-shrink-0 inline-flex items-center gap-2 py-2 px-4 font-semibold text-sm ${activeOrdersTab === status && !isTrashVisible ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}
-                                                    >
-                                                        {{accepted: 'Aceitos', reserved: 'Reservas', ready: 'Prontos/Em Rota', completed: 'Finalizados', cancelled: 'Cancelados'}[status]}
-                                                        {showCounter && <span className="bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{count}</span>}
-                                                    </button>
-                                                    )
-                                                })}
-                                                {isTrashVisible && (<button id="order-tab-trash" className="py-2 px-4 font-semibold text-accent" onClick={() => setIsTrashVisible(true)}><i className="fas fa-trash-alt mr-2"></i>Lixeira</button>)}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-4 space-y-4">
-                                        {isTrashVisible ? (
-                                            deletedOrders.length > 0 ? deletedOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>
-                                        ) : (
-                                            tabOrders.length > 0 ? tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>
-                                        )}
-                                    </div>
-                                    
-                                    <div className="mt-6 pt-6 border-t flex justify-end">
-                                        <button onClick={() => setIsTrashVisible(!isTrashVisible)} className={`flex items-center gap-2 font-semibold py-2 px-4 rounded-lg transition-colors ${isTrashVisible ? 'bg-accent text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`} aria-label="Ver lixeira">
-                                            <i className="fas fa-trash-alt"></i>
-                                            <span>{isTrashVisible ? 'Voltar aos Pedidos' : 'Ver Lixeira'}</span>
-                                        </button>
-                                    </div>
+                                {filteredOrders.filter(o => o.status === 'pending').length > 0 && !isTrashVisible && (<div className="mb-6"><h4 className="font-bold text-lg mb-2 text-yellow-600">Pendentes</h4><div className="space-y-4">{filteredOrders.filter(o => o.status === 'pending').map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />)}</div></div>)}
+                                <div className="border-t pt-4"><div><div className="border-b"><div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">{!isTrashVisible && OrderStatusTabs.map(status => { const count = getOrderStatusCount(status); const showCounter = count > 0 && !['completed', 'cancelled'].includes(status); return (<button key={status} id={`order-tab-${status}`} onClick={() => setActiveOrdersTab(status)} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-2 px-4 font-semibold text-sm ${activeOrdersTab === status && !isTrashVisible ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>{{accepted: 'Aceitos', reserved: 'Reservas', ready: 'Prontos/Em Rota', completed: 'Finalizados', cancelled: 'Cancelados'}[status]}{showCounter && <span className="bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{count}</span>}</button>)})}{isTrashVisible && (<button id="order-tab-trash" className="py-2 px-4 font-semibold text-accent" onClick={() => setIsTrashVisible(true)}><i className="fas fa-trash-alt mr-2"></i>Lixeira</button>)}</div></div></div>
+                                    <div className="mt-4 space-y-4">{isTrashVisible ? (deletedOrders.length > 0 ? deletedOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>) : (tabOrders.length > 0 ? tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>)}</div>
+                                    <div className="mt-6 pt-6 border-t flex justify-end"><button onClick={() => setIsTrashVisible(!isTrashVisible)} className={`flex items-center gap-2 font-semibold py-2 px-4 rounded-lg transition-colors ${isTrashVisible ? 'bg-accent text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`} aria-label="Ver lixeira"><i className="fas fa-trash-alt"></i><span>{isTrashVisible ? 'Voltar aos Pedidos' : 'Ver Lixeira'}</span></button></div>
                                 </div>
                             </div>
                         )}
                         
-                        {activeTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> )}
+                        {activeTab === 'promotions' && <PromotionsTab allProducts={allProducts} promotions={promotions} onSave={onSavePromotion} onDelete={onDeletePromotion} onReorder={onReorderPromotions} />}
+
+                        {activeTab === 'settings' && (
+                            <div>
+                                <div className="border-b mb-6">
+                                    <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
+                                        {settingsTabs.map(tab => {
+                                            const icons: { [key: string]: string } = { audio: 'fa-volume-up', notifications: 'fa-bell', customization: 'fa-paint-brush', data: 'fa-database' };
+                                            const labels: { [key: string]: string } = { audio: 'Áudio', notifications: 'Notificações', customization: 'Personalização', data: 'Dados' };
+                                            return (
+                                                <button key={tab} id={`settings-tab-${tab}`} onClick={() => setActiveSettingsTab(tab)} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeSettingsTab === tab ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                                    <i className={`fas ${icons[tab]} w-5 text-center`}></i> <span>{labels[tab]}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                {activeSettingsTab === 'audio' && <AudioTab settings={siteSettings} onSave={onSaveSiteSettings} />}
+                                {activeSettingsTab === 'notifications' && <NotificationsTab settings={siteSettings} onSave={onSaveSiteSettings} />}
+                                {activeSettingsTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> )}
+                                {activeSettingsTab === 'data' && ( <div><div className="p-4 mb-6 bg-red-50 border-l-4 border-red-500 text-red-800"><p className="font-bold">Atenção: Área Técnica</p><p className="text-sm">As ferramentas nesta seção podem afetar permanentemente o seu banco de dados. Use com cuidado e apenas se tiver conhecimento técnico. Recomenda-se fazer um backup antes de qualquer ação.</p></div><h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus produtos, categorias e configurações.</p> <button onClick={() => { try { const backupData = { products: allProducts, categories: allCategories, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); alert('Backup concluído!'); } catch (e) { console.error(e); alert("Falha no backup."); } }} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados de exemplo. Use apenas em uma instalação nova.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> )}
+                            </div>
+                        )}
+                        
                         {activeTab === 'products' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Produtos</h3> <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Produto</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}> <div className="space-y-6"> {localCategories.map(category => { const categoryProducts = localProducts.filter(p => p.categoryId === category.id).sort((a, b) => a.orderIndex - b.orderIndex); return ( <div key={category.id}> <h4 className={`text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4> <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3 min-h-[50px]"> {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} />)} </div> </SortableContext> </div> ) })} </div> </DndContext> </div> )}
                         {activeTab === 'categories' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Categorias</h3> <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Categoria</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}> <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localCategories.map(cat => <SortableCategoryItem key={cat.id} category={cat} onEdit={handleEditCategory} onDelete={onDeleteCategory} onStatusChange={onCategoryStatusChange} />)} </div> </SortableContext> </DndContext> </div> )}
-                        {activeTab === 'data' && ( <div> <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus dados.</p> <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados iniciais. Use apenas uma vez.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> )}
+
                     </div>
                 </div>
             </section>

@@ -1,7 +1,7 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
 import { db, storage, functions } from './firebase';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, PromotionPage } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -33,6 +33,18 @@ export const uploadSiteAsset = async (file: File, assetName: string): Promise<st
     const fileName = `site/${assetName}_${new Date().getTime()}.${fileExtension}`;
     const storageRef = storage.ref(fileName);
     
+    const snapshot = await storageRef.put(file);
+    return await snapshot.ref.getDownloadURL();
+};
+
+export const uploadAudioFile = async (file: File, audioType: string): Promise<string> => {
+    if (!storage) {
+        throw new Error("Firebase Storage não está inicializado.");
+    }
+    const fileExtension = file.name.split('.').pop();
+    const fileName = `audio/${audioType}_${new Date().getTime()}.${fileExtension}`;
+    const storageRef = storage.ref(fileName);
+
     const snapshot = await storageRef.put(file);
     return await snapshot.ref.getDownloadURL();
 };
@@ -162,6 +174,34 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
     const orderRef = db.collection('orders').doc(orderId);
     await orderRef.delete();
 };
+
+// --- NEW PROMOTION FUNCTIONS ---
+
+export const savePromotion = async (promotion: PromotionPage): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    if (promotion.id) {
+        const { id, ...dataToSave } = promotion;
+        await db.collection('promotions').doc(id).update(dataToSave as { [key: string]: any });
+    } else {
+        await db.collection('promotions').add(promotion);
+    }
+};
+
+export const deletePromotion = async (promotionId: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    await db.collection('promotions').doc(promotionId).delete();
+};
+
+export const updatePromotionsOrder = async (promotionsToUpdate: { id: string; order: number }[]): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const batch = db.batch();
+    promotionsToUpdate.forEach(promoUpdate => {
+        const promoRef = db.collection('promotions').doc(promoUpdate.id);
+        batch.update(promoRef, { order: promoUpdate.order });
+    });
+    await batch.commit();
+};
+
 
 // PIX Payment Function
 export const initiatePixPayment = async (orderId: string): Promise<any> => {
