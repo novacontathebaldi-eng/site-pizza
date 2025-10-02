@@ -30,12 +30,13 @@ interface AdminSectionProps {
 
 interface SortableProductItemProps {
     product: Product;
+    isCategoryActive: boolean;
     onEdit: (product: Product) => void;
     onDelete: (productId: string) => void;
     onStatusChange: (productId: string, active: boolean) => void;
 }
 
-const SortableProductItem: React.FC<SortableProductItemProps> = ({ product, onEdit, onDelete, onStatusChange }) => {
+const SortableProductItem: React.FC<SortableProductItemProps> = ({ product, isCategoryActive, onEdit, onDelete, onStatusChange }) => {
     const {
         attributes,
         listeners,
@@ -52,8 +53,10 @@ const SortableProductItem: React.FC<SortableProductItemProps> = ({ product, onEd
         boxShadow: isDragging ? '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' : 'none',
     };
 
+    const itemOpacityClass = !isCategoryActive || !product.active ? 'opacity-50' : '';
+
     return (
-        <div ref={setNodeRef} style={style} className={`bg-gray-50 p-3 rounded-lg flex justify-between items-center transition-opacity ${!product.active ? 'opacity-50' : ''}`}>
+        <div ref={setNodeRef} style={style} className={`bg-gray-50 p-3 rounded-lg flex justify-between items-center transition-opacity ${itemOpacityClass}`}>
             <div className="flex items-center gap-4">
                 <button {...attributes} {...listeners} className="cursor-grab touch-none p-2" aria-label="Mover produto">
                     <i className="fas fa-grip-vertical text-gray-500 hover:text-gray-800"></i>
@@ -477,6 +480,7 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                                                 <SortableProductItem
                                                                     key={product.id}
                                                                     product={product}
+                                                                    isCategoryActive={category.active}
                                                                     onEdit={handleEditProduct}
                                                                     onDelete={onDeleteProduct}
                                                                     onStatusChange={onProductStatusChange}
