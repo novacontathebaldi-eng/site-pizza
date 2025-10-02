@@ -205,13 +205,13 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
     };
 
     // --- Footer Link Handlers ---
-    const handleFooterLinkChange = (id: string, field: keyof Omit<FooterLink, 'id'>, value: string) => {
+    const handleFooterLinkChange = (id: string, field: keyof Omit<FooterLink, 'id'>, value: string | boolean) => {
         const newLinks = formData.footerLinks.map(link => link.id === id ? { ...link, [field]: value } : link);
         setFormData({ ...formData, footerLinks: newLinks });
     };
 
     const handleAddFooterLink = () => {
-        const newLink: FooterLink = { id: `footer-${Date.now()}`, icon: 'fas fa-link', text: 'Novo Link', url: '#' };
+        const newLink: FooterLink = { id: `footer-${Date.now()}`, icon: 'fas fa-link', text: 'Novo Link', url: '#', isVisible: true };
         setFormData({ ...formData, footerLinks: [...formData.footerLinks, newLink] });
     };
 
@@ -430,14 +430,16 @@ const SortableContentSectionItem: React.FC<{
 // Sortable Item for Footer Links
 const SortableFooterLinkItem: React.FC<{
     link: FooterLink,
-    onChange: (id: string, field: keyof Omit<FooterLink, 'id'>, value: string) => void,
+    onChange: (id: string, field: keyof Omit<FooterLink, 'id'>, value: string | boolean) => void,
     onDelete: (id: string) => void,
 }> = ({ link, onChange, onDelete }) => {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: link.id });
     const style = { transform: CSS.Transform.toString(transform), transition };
     
+    const isVisible = link.isVisible !== false;
+
     return(
-        <div ref={setNodeRef} style={style} className="grid grid-cols-[auto_1fr_auto] gap-3 items-start p-3 bg-white border rounded-lg">
+        <div ref={setNodeRef} style={style} className={`grid grid-cols-[auto_1fr_auto] gap-3 items-start p-3 bg-white border rounded-lg transition-opacity ${!isVisible ? 'opacity-50' : ''}`}>
              <button type="button" {...attributes} {...listeners} className="cursor-grab p-2 text-gray-500 mt-7"><i className="fas fa-grip-vertical"></i></button>
              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                  <div>
@@ -453,7 +455,11 @@ const SortableFooterLinkItem: React.FC<{
                      <input value={link.url} onChange={e => onChange(link.id, 'url', e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="https://..."/>
                  </div>
              </div>
-             <div className="flex items-end h-full">
+             <div className="flex items-center justify-end h-full gap-3 pt-6">
+                 <label className="relative inline-flex items-center cursor-pointer" title={isVisible ? 'Ocultar Link' : 'Exibir Link'}>
+                    <input type="checkbox" checked={isVisible} onChange={e => onChange(link.id, 'isVisible', e.target.checked)} className="sr-only peer" />
+                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                </label>
                 <button type="button" onClick={() => onDelete(link.id)} className="bg-red-500 text-white w-9 h-9 flex-shrink-0 rounded-md hover:bg-red-600 flex items-center justify-center"><i className="fas fa-trash"></i></button>
              </div>
         </div>

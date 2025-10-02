@@ -91,6 +91,7 @@ export interface FooterLink {
     icon: string;
     text: string;
     url: string;
+    isVisible?: boolean;
 }
 
 export interface SiteSettings {
