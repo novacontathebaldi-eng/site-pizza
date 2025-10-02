@@ -1,6 +1,6 @@
 
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { Product, Category } from '../types';
 import { MenuItemCard } from './MenuItemCard';
 
@@ -56,6 +56,19 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
 
     const showFinalizeButton = activeCategoryId === lastCategoryId && cartItemCount > 0 && !suggestedNextCategoryId && showFinalizeButtonTrigger;
 
+    useEffect(() => {
+        if (activeCategoryId) {
+            const activeTabElement = document.getElementById(`category-tab-${activeCategoryId}`);
+            if (activeTabElement) {
+                activeTabElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest',
+                    inline: 'center'
+                });
+            }
+        }
+    }, [activeCategoryId]);
+
     const scrollToProductList = () => {
         const productList = document.getElementById('category-product-list');
         const stickyHeader = document.getElementById('sticky-menu-header');
@@ -104,6 +117,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                             {sortedCategories.filter(c => c.active).map(category => (
                                 <button 
                                     key={category.id} 
+                                    id={`category-tab-${category.id}`}
                                     onClick={() => handleCategoryClick(category.id)}
                                     className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors
                                         ${activeCategoryId === category.id 
