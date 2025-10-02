@@ -67,7 +67,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                         <p><strong>Nome:</strong> {customer.name}</p>
                         <p><strong>Telefone:</strong> {customer.phone}</p>
                         <p><strong>Pedido:</strong> {customer.orderType}</p>
-                        {customer.orderType === 'delivery' && <p><strong>Endereço:</strong> {customer.address}</p>}
+                        {customer.orderType === 'delivery' && customer.address && <p><strong>Endereço:</strong> {customer.address}</p>}
                         {customer.orderType === 'local' && customer.reservationTime && <p><strong>Reserva:</strong> {customer.reservationTime}</p>}
                         {customer.orderType === 'pickup' && pickupTimeEstimate && <p><strong>Retirada:</strong> <span className="font-bold text-accent">{pickupTimeEstimate}</span></p>}
                     </div>

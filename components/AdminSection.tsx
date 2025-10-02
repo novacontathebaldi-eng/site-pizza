@@ -295,7 +295,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                              <div>
                                 <h3 className="text-xl font-bold mb-4">Gerenciar Pedidos</h3>
                                 <div className="bg-gray-50 p-3 rounded-lg border mb-4">
-                                    <div className="flex flex-row items-center gap-2 sm:gap-3">
+                                    <div className="flex flex-nowrap flex-row items-center gap-2 sm:gap-3">
                                         <div className="relative flex-grow">
                                             <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                                             <input type="text" placeholder="Buscar por nome ou telefone..." value={orderSearchTerm} onChange={e => setOrderSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-md" />
