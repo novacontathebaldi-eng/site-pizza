@@ -65,11 +65,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
         setIsEditingTime(false);
     };
 
-    const isArchived = status === 'completed' || status === 'cancelled' || status === 'deleted';
+    const isArchived = status === 'completed' || status === 'cancelled';
 
     return (
         <>
-            <div className={`bg-white rounded-lg shadow-md border-l-4 ${config.color} overflow-hidden transition-opacity ${isArchived ? 'opacity-70' : ''}`}>
+            <div className={`bg-white rounded-lg shadow-md border-l-4 ${config.color} overflow-hidden transition-opacity ${isArchived || status === 'deleted' ? 'opacity-70' : ''}`}>
                 <div className="p-4">
                     <div className="flex justify-between items-start mb-4">
                         <div>
@@ -157,9 +157,24 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 <button onClick={() => onUpdateStatus(id, 'cancelled')} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Cancelar</button>
                             </>
                         ) : (
-                            <div className="flex flex-wrap items-center justify-end gap-2 w-full">
-                                <button onClick={() => onUpdateStatus(id, 'pending')} className="bg-gray-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-600"><i className="fas fa-undo mr-2"></i>Reverter p/ Pendente</button>
-                                <button onClick={() => onDelete(id)} className="text-red-500 font-semibold py-2 px-3 rounded-lg text-xs hover:bg-red-50"><i className="fas fa-trash mr-2"></i>Mover para Lixeira</button>
+                            <div className="flex flex-wrap items-center justify-end gap-4 w-full">
+                                <div className="flex items-center gap-2">
+                                    <label htmlFor={`status-select-${order.id}`} className="text-sm font-semibold text-gray-700 whitespace-nowrap">Alterar status:</label>
+                                    <select
+                                        id={`status-select-${order.id}`}
+                                        value={order.status}
+                                        onChange={(e) => onUpdateStatus(id, e.target.value as OrderStatus)}
+                                        className="px-3 py-2 border rounded-md bg-white text-sm focus:ring-accent focus:border-accent"
+                                    >
+                                        <option value="pending">Pendente</option>
+                                        <option value="accepted">Aceito</option>
+                                        <option value="reserved">Reserva</option>
+                                        <option value="ready">Pronto/Em Rota</option>
+                                        <option value="completed">Finalizado</option>
+                                        <option value="cancelled">Cancelado</option>
+                                    </select>
+                                </div>
+                                <button onClick={() => onDelete(id)} className="text-red-500 font-semibold py-2 px-3 rounded-lg text-xs hover:bg-red-50"><i className="fas fa-trash mr-2"></i>Mover p/ Lixeira</button>
                             </div>
                         )}
                     </div>

@@ -358,11 +358,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                 {isTrashVisible && (<div className="py-2 px-4 font-semibold text-accent"><i className="fas fa-trash-alt mr-2"></i>Lixeira</div>)}
                                             </div>
                                         </div>
-                                        <div className="flex justify-end pt-2">
-                                            <button onClick={() => setIsTrashVisible(!isTrashVisible)} className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${isTrashVisible ? 'bg-accent text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`} aria-label="Ver lixeira">
-                                                <i className="fas fa-trash-alt"></i>
-                                            </button>
-                                        </div>
                                     </div>
 
                                     <div className="mt-4 space-y-4">
@@ -371,6 +366,13 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                         ) : (
                                             tabOrders.length > 0 ? tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>
                                         )}
+                                    </div>
+                                    
+                                    <div className="mt-6 pt-6 border-t flex justify-end">
+                                        <button onClick={() => setIsTrashVisible(!isTrashVisible)} className={`flex items-center gap-2 font-semibold py-2 px-4 rounded-lg transition-colors ${isTrashVisible ? 'bg-accent text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`} aria-label="Ver lixeira">
+                                            <i className="fas fa-trash-alt"></i>
+                                            <span>{isTrashVisible ? 'Voltar aos Pedidos' : 'Ver Lixeira'}</span>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
