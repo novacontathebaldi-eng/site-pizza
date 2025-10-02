@@ -231,6 +231,23 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     }, [pendingOrdersCount, isSoundEnabled, user]);
 
 
+    // Effect for scrolling order tabs into view
+    useEffect(() => {
+        if (activeTab === 'orders') {
+            const tabId = isTrashVisible ? `order-tab-trash` : `order-tab-${activeOrdersTab}`;
+            const activeTabElement = document.getElementById(tabId);
+            
+            if (activeTabElement) {
+                activeTabElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest',
+                    inline: 'center'
+                });
+            }
+        }
+    }, [activeOrdersTab, isTrashVisible, activeTab]);
+
+
     const toggleSound = () => {
         const newState = !isSoundEnabled;
         setIsSoundEnabled(newState);
@@ -424,13 +441,18 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                     const count = getOrderStatusCount(status);
                                                     const showCounter = count > 0 && !['completed', 'cancelled'].includes(status);
                                                     return (
-                                                    <button key={status} onClick={() => setActiveOrdersTab(status)} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-2 px-4 font-semibold text-sm ${activeOrdersTab === status && !isTrashVisible ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                                    <button 
+                                                        key={status} 
+                                                        id={`order-tab-${status}`}
+                                                        onClick={() => setActiveOrdersTab(status)} 
+                                                        className={`relative flex-shrink-0 inline-flex items-center gap-2 py-2 px-4 font-semibold text-sm ${activeOrdersTab === status && !isTrashVisible ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}
+                                                    >
                                                         {{accepted: 'Aceitos', reserved: 'Reservas', ready: 'Prontos/Em Rota', completed: 'Finalizados', cancelled: 'Cancelados'}[status]}
                                                         {showCounter && <span className="bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{count}</span>}
                                                     </button>
                                                     )
                                                 })}
-                                                {isTrashVisible && (<div className="py-2 px-4 font-semibold text-accent"><i className="fas fa-trash-alt mr-2"></i>Lixeira</div>)}
+                                                {isTrashVisible && (<button id="order-tab-trash" className="py-2 px-4 font-semibold text-accent" onClick={() => setIsTrashVisible(true)}><i className="fas fa-trash-alt mr-2"></i>Lixeira</button>)}
                                             </div>
                                         </div>
                                     </div>
