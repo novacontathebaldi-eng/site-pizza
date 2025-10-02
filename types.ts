@@ -41,6 +41,7 @@ export interface OrderDetails {
 
 // New Types for Order Management
 export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled';
+export type PaymentStatus = 'pending' | 'paid';
 
 export interface OrderCustomerDetails {
     name: string;
@@ -60,6 +61,7 @@ export interface Order {
     changeAmount?: string;
     notes?: string;
     status: OrderStatus;
+    paymentStatus: PaymentStatus; // New field for payment status
     createdAt: any; // Firestore Timestamp
     pickupTimeEstimate?: string; // Added for pickup
 }

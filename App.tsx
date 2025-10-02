@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus } from './types';
+import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
@@ -277,6 +277,7 @@ const App: React.FC = () => {
             changeAmount: details.paymentMethod === 'cash' && details.changeNeeded ? details.changeAmount : undefined,
             notes: details.notes,
             status: 'pending' as OrderStatus,
+            paymentStatus: 'pending' as PaymentStatus,
         };
 
         try {
@@ -470,6 +471,16 @@ const App: React.FC = () => {
         }
     }, [addToast]);
 
+    const handleUpdateOrderPaymentStatus = useCallback(async (orderId: string, paymentStatus: PaymentStatus) => {
+        try {
+            await firebaseService.updateOrderPaymentStatus(orderId, paymentStatus);
+            addToast("Status de pagamento atualizado!", 'success');
+        } catch (error) {
+            console.error("Failed to update order payment status:", error);
+            addToast("Erro ao atualizar o status de pagamento.", 'error');
+        }
+    }, [addToast]);
+
     const handleDeleteOrder = useCallback(async (orderId: string) => {
         if (window.confirm("Tem certeza que deseja apagar este pedido permanentemente?")) {
             try {
@@ -554,6 +565,7 @@ const App: React.FC = () => {
                     onSeedDatabase={seedDatabase}
                     onSaveSiteSettings={handleSaveSiteSettings}
                     onUpdateOrderStatus={handleUpdateOrderStatus}
+                    onUpdateOrderPaymentStatus={handleUpdateOrderPaymentStatus}
                     onDeleteOrder={handleDeleteOrder}
                 />
             </main>

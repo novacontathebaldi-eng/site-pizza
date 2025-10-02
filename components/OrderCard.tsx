@@ -1,9 +1,10 @@
 import React from 'react';
-import { Order, OrderStatus } from '../types';
+import { Order, OrderStatus, PaymentStatus } from '../types';
 
 interface OrderCardProps {
     order: Order;
     onUpdateStatus: (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => void;
+    onUpdatePaymentStatus: (orderId: string, paymentStatus: PaymentStatus) => void;
     onDelete: (orderId: string) => void;
 }
 
@@ -15,8 +16,8 @@ const statusConfig: { [key in OrderStatus]: { text: string; icon: string; color:
     cancelled: { text: 'Cancelado', icon: 'fas fa-times-circle', color: 'border-red-500' },
 };
 
-export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onDelete }) => {
-    const { id, customer, items, total, paymentMethod, changeNeeded, changeAmount, notes, status, createdAt, pickupTimeEstimate } = order;
+export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onDelete }) => {
+    const { id, customer, items, total, paymentMethod, changeNeeded, changeAmount, notes, status, paymentStatus, createdAt, pickupTimeEstimate } = order;
     const config = statusConfig[status];
 
     const formatTimestamp = (timestamp: any): string => {
@@ -34,6 +35,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onD
             payload = { pickupTimeEstimate: `~${formattedTime}` };
         }
         onUpdateStatus(id, 'accepted', payload);
+    };
+    
+    const handleTogglePaymentStatus = () => {
+        const newStatus = paymentStatus === 'pending' ? 'paid' : 'pending';
+        onUpdatePaymentStatus(id, newStatus);
     };
 
     const isArchived = status === 'completed' || status === 'cancelled';
@@ -68,6 +74,12 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onD
                     <div className="bg-gray-50 p-3 rounded-md">
                          <h4 className="font-bold mb-2"><i className="fas fa-credit-card mr-2"></i>Pagamento</h4>
                         <p><strong>Método:</strong> {paymentMethod}</p>
+                        <p>
+                            <strong>Status Pgto:</strong>
+                            <span className={`font-bold ml-1 ${paymentStatus === 'paid' ? 'text-green-600' : 'text-yellow-600'}`}>
+                                {paymentStatus === 'paid' ? 'Pago' : 'Pendente'}
+                            </span>
+                        </p>
                         {paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {changeNeeded ? `para R$ ${changeAmount}` : 'Não precisa'}</p> )}
                         {notes && <p className="mt-2 pt-2 border-t"><strong>Obs:</strong> {notes}</p>}
                     </div>
@@ -88,11 +100,18 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onD
                 <div className="flex flex-wrap items-center justify-end gap-2 mt-4 pt-4 border-t">
                     {!isArchived ? (
                         <>
-                            {status === 'pending' && <button onClick={handleAccept} className="bg-green-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-green-600"><i className="fas fa-check mr-2"></i>Aceitar Pedido</button>}
-                            {status === 'accepted' && <button onClick={() => onUpdateStatus(id, 'pending')} className="bg-yellow-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-yellow-600"><i className="fas fa-undo mr-2"></i>Reverter p/ Pendente</button>}
-                            {status === 'accepted' && <button onClick={() => onUpdateStatus(id, 'ready')} className="bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-blue-600"><i className="fas fa-box-open mr-2"></i>Marcar como Pronto</button>}
-                            {status === 'ready' && <button onClick={() => onUpdateStatus(id, 'completed')} className="bg-purple-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-purple-600"><i className="fas fa-flag-checkered mr-2"></i>Finalizar Pedido</button>}
+                            {paymentStatus === 'pending' ? (
+                                <button onClick={handleTogglePaymentStatus} className="bg-orange-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-orange-500"><i className="fas fa-dollar-sign mr-2"></i>Marcar como Pago</button>
+                            ) : (
+                                <button onClick={handleTogglePaymentStatus} className="bg-green-600 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-green-700"><i className="fas fa-check mr-2"></i>Pago</button>
+                            )}
+
                             <div className="flex-grow"></div>
+
+                            {status === 'pending' && <button onClick={handleAccept} className="bg-green-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-green-600"><i className="fas fa-check mr-2"></i>Aceitar</button>}
+                            {status === 'accepted' && <button onClick={() => onUpdateStatus(id, 'pending')} className="bg-yellow-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-yellow-600"><i className="fas fa-undo mr-2"></i>Reverter</button>}
+                            {status === 'accepted' && <button onClick={() => onUpdateStatus(id, 'ready')} className="bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-blue-600"><i className="fas fa-box-open mr-2"></i>Pronto</button>}
+                            {status === 'ready' && <button onClick={() => onUpdateStatus(id, 'completed')} className="bg-purple-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-purple-600"><i className="fas fa-flag-checkered mr-2"></i>Finalizar</button>}
                             <button onClick={() => onUpdateStatus(id, 'cancelled')} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Cancelar</button>
                         </>
                     ) : (

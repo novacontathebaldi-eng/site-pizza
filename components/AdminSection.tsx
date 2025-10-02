@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Product, Category, SiteSettings, Order, OrderStatus } from '../types';
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
 import { SiteCustomizationTab } from './SiteCustomizationTab';
@@ -29,6 +29,7 @@ interface AdminSectionProps {
     onSeedDatabase: () => Promise<void>;
     onSaveSiteSettings: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
     onUpdateOrderStatus: (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => Promise<void>;
+    onUpdateOrderPaymentStatus: (orderId: string, paymentStatus: PaymentStatus) => Promise<void>;
     onDeleteOrder: (orderId: string) => Promise<void>;
 }
 
@@ -128,7 +129,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         allProducts, allCategories, isStoreOnline, siteSettings, orders,
         onSaveProduct, onDeleteProduct, onProductStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
-        onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onDeleteOrder
+        onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onDeleteOrder
     } = props;
     
     const [user, setUser] = useState<firebase.User | null>(null);
@@ -152,7 +153,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
     // State for order management
     const [orderSearchTerm, setOrderSearchTerm] = useState('');
-    const [orderFilters, setOrderFilters] = useState({ orderType: '', paymentMethod: '' });
+    const [orderFilters, setOrderFilters] = useState({ orderType: '', paymentMethod: '', paymentStatus: '' });
     const [showFilters, setShowFilters] = useState(false);
     const [activeOrdersTab, setActiveOrdersTab] = useState<OrderStatus>('accepted');
 
@@ -253,8 +254,9 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
             
             const matchesOrderType = !orderFilters.orderType || order.customer.orderType === orderFilters.orderType;
             const matchesPaymentMethod = !orderFilters.paymentMethod || order.paymentMethod === orderFilters.paymentMethod;
+            const matchesPaymentStatus = !orderFilters.paymentStatus || order.paymentStatus === orderFilters.paymentStatus;
 
-            return matchesSearch && matchesOrderType && matchesPaymentMethod;
+            return matchesSearch && matchesOrderType && matchesPaymentMethod && matchesPaymentStatus;
         });
     }, [orders, orderSearchTerm, orderFilters]);
 
@@ -293,25 +295,44 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                              <div>
                                 <h3 className="text-xl font-bold mb-4">Gerenciar Pedidos</h3>
                                 <div className="bg-gray-50 p-3 rounded-lg border mb-4">
-                                    <div className="flex flex-col sm:flex-row gap-3">
+                                    <div className="flex flex-row items-center gap-2 sm:gap-3">
                                         <div className="relative flex-grow">
                                             <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                                             <input type="text" placeholder="Buscar por nome ou telefone..." value={orderSearchTerm} onChange={e => setOrderSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-md" />
                                         </div>
-                                        <div className="flex-shrink-0 relative">
-                                            <button onClick={() => setShowFilters(!showFilters)} className="w-full sm:w-auto bg-white border rounded-md px-4 py-2 flex items-center justify-center gap-2 hover:bg-gray-100">
-                                                <i className="fas fa-filter"></i> <span className="sm:hidden">Filtros</span>
+                                        {/* Desktop Filters */}
+                                        <div className="hidden sm:flex items-center gap-3">
+                                            <select value={orderFilters.paymentStatus} onChange={e => setOrderFilters(f => ({...f, paymentStatus: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
+                                                <option value="">Status Pgto.</option>
+                                                <option value="paid">Pago</option>
+                                                <option value="pending">Pendente</option>
+                                            </select>
+                                            <select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
+                                                <option value="">Tipo</option>
+                                                <option value="delivery">Entrega</option>
+                                                <option value="pickup">Retirada</option>
+                                                <option value="local">Local</option>
+                                            </select>
+                                            <select value={orderFilters.paymentMethod} onChange={e => setOrderFilters(f => ({...f, paymentMethod: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
+                                                <option value="">Pagamento</option>
+                                                <option value="credit">Crédito</option>
+                                                <option value="debit">Débito</option>
+                                                <option value="pix">PIX</option>
+                                                <option value="cash">Dinheiro</option>
+                                            </select>
+                                        </div>
+                                        {/* Mobile Filter Button */}
+                                        <div className="sm:hidden flex-shrink-0 relative">
+                                            <button onClick={() => setShowFilters(!showFilters)} className="w-10 h-10 bg-white border rounded-md flex items-center justify-center hover:bg-gray-100">
+                                                <i className="fas fa-filter"></i>
                                             </button>
-                                            <div className={`sm:hidden absolute top-full right-0 mt-2 bg-white border rounded-lg shadow-xl p-4 z-10 w-64 ${showFilters ? 'block' : 'hidden'}`}>
+                                            <div className={`absolute top-full right-0 mt-2 bg-white border rounded-lg shadow-xl p-4 z-10 w-64 ${showFilters ? 'block' : 'hidden'}`}>
                                                 <div className="space-y-4">
+                                                    <div> <label className="block text-sm font-semibold mb-1">Status Pgto.</label> <select value={orderFilters.paymentStatus} onChange={e => setOrderFilters(f => ({...f, paymentStatus: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"> <option value="">Todos</option> <option value="paid">Pago</option> <option value="pending">Pendente</option> </select> </div>
                                                     <div> <label className="block text-sm font-semibold mb-1">Tipo</label> <select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"> <option value="">Todos</option> <option value="delivery">Entrega</option> <option value="pickup">Retirada</option> <option value="local">Consumo Local</option> </select> </div>
                                                     <div> <label className="block text-sm font-semibold mb-1">Pagamento</label> <select value={orderFilters.paymentMethod} onChange={e => setOrderFilters(f => ({...f, paymentMethod: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"> <option value="">Todos</option> <option value="credit">Crédito</option> <option value="debit">Débito</option> <option value="pix">PIX</option> <option value="cash">Dinheiro</option> </select> </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div className="hidden sm:flex flex-row gap-3">
-                                            <select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="px-3 py-2 border rounded-md bg-white"> <option value="">Tipo: Todos</option> <option value="delivery">Entrega</option> <option value="pickup">Retirada</option> <option value="local">Consumo Local</option> </select>
-                                            <select value={orderFilters.paymentMethod} onChange={e => setOrderFilters(f => ({...f, paymentMethod: e.target.value}))} className="px-3 py-2 border rounded-md bg-white"> <option value="">Pgto: Todos</option> <option value="credit">Crédito</option> <option value="debit">Débito</option> <option value="pix">PIX</option> <option value="cash">Dinheiro</option> </select>
                                         </div>
                                     </div>
                                 </div>
@@ -320,7 +341,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                     <div className="mb-6">
                                         <h4 className="font-bold text-lg mb-2 text-yellow-600">Pendentes</h4>
                                         <div className="space-y-4">
-                                            {pendingOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onDelete={onDeleteOrder} />)}
+                                            {pendingOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onDelete={onDeleteOrder} />)}
                                         </div>
                                     </div>
                                 )}
@@ -335,7 +356,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                     </div>
                                     <div className="mt-4 space-y-4">
                                         {tabOrders.length > 0 ? (
-                                            tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onDelete={onDeleteOrder} />)
+                                            tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onDelete={onDeleteOrder} />)
                                         ) : (
                                             <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>
                                         )}
