@@ -57,6 +57,12 @@ export const updateProductStatus = async (productId: string, active: boolean): P
     await productRef.update({ active });
 };
 
+export const updateProductStockStatus = async (productId: string, stockStatus: 'available' | 'out_of_stock'): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const productRef = db.collection('products').doc(productId);
+    await productRef.update({ stockStatus });
+};
+
 export const deleteProduct = async (productId: string): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     if (!productId) throw new Error("Invalid Product ID for deletion.");
