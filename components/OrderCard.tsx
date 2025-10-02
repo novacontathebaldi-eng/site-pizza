@@ -157,7 +157,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 <button onClick={() => onUpdateStatus(id, 'cancelled')} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Cancelar</button>
                             </>
                         ) : (
-                            <div className="flex items-center gap-4">
+                            <div className="flex flex-wrap items-center justify-end gap-2 w-full">
+                                <button onClick={() => onUpdateStatus(id, 'pending')} className="bg-gray-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-600"><i className="fas fa-undo mr-2"></i>Reverter p/ Pendente</button>
                                 <button onClick={() => onDelete(id)} className="text-red-500 font-semibold py-2 px-3 rounded-lg text-xs hover:bg-red-50"><i className="fas fa-trash mr-2"></i>Mover para Lixeira</button>
                             </div>
                         )}

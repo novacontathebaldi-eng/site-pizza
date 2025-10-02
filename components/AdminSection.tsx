@@ -342,22 +342,27 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                 )}
 
                                 <div className="border-t pt-4">
-                                    <div className="flex justify-between items-center">
-                                        <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide border-b -mx-4 px-2 sm:px-4">
-                                            {!isTrashVisible && OrderStatusTabs.map(status => {
-                                                const count = getOrderStatusCount(status);
-                                                return (
-                                                <button key={status} onClick={() => setActiveOrdersTab(status)} className={`relative flex-shrink-0 py-2 px-4 font-semibold text-sm ${activeOrdersTab === status && !isTrashVisible ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                                    {{accepted: 'Aceitos', reserved: 'Reservas', ready: 'Prontos/Em Rota', completed: 'Finalizados', cancelled: 'Cancelados'}[status]}
-                                                    {count > 0 && <span className="ml-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{count}</span>}
-                                                </button>
-                                                )
-                                            })}
-                                            {isTrashVisible && (<div className="py-2 px-4 font-semibold text-accent"><i className="fas fa-trash-alt mr-2"></i>Lixeira</div>)}
+                                    <div>
+                                        <div className="border-b">
+                                            <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
+                                                {!isTrashVisible && OrderStatusTabs.map(status => {
+                                                    const count = getOrderStatusCount(status);
+                                                    const showCounter = count > 0 && !['completed', 'cancelled'].includes(status);
+                                                    return (
+                                                    <button key={status} onClick={() => setActiveOrdersTab(status)} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-2 px-4 font-semibold text-sm ${activeOrdersTab === status && !isTrashVisible ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                                        {{accepted: 'Aceitos', reserved: 'Reservas', ready: 'Prontos/Em Rota', completed: 'Finalizados', cancelled: 'Cancelados'}[status]}
+                                                        {showCounter && <span className="bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{count}</span>}
+                                                    </button>
+                                                    )
+                                                })}
+                                                {isTrashVisible && (<div className="py-2 px-4 font-semibold text-accent"><i className="fas fa-trash-alt mr-2"></i>Lixeira</div>)}
+                                            </div>
                                         </div>
-                                        <button onClick={() => setIsTrashVisible(!isTrashVisible)} className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${isTrashVisible ? 'bg-accent text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`} aria-label="Ver lixeira">
-                                            <i className="fas fa-trash-alt"></i>
-                                        </button>
+                                        <div className="flex justify-end pt-2">
+                                            <button onClick={() => setIsTrashVisible(!isTrashVisible)} className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${isTrashVisible ? 'bg-accent text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`} aria-label="Ver lixeira">
+                                                <i className="fas fa-trash-alt"></i>
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div className="mt-4 space-y-4">
