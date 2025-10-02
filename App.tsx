@@ -261,7 +261,48 @@ const App: React.FC = () => {
 
     const handleCheckout = async (details: OrderDetails) => {
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+        // --- FIX: Open WhatsApp immediately to avoid pop-up blockers ---
+        const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumir no local' };
+        const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
+
+        let message = `*🍕 NOVO PEDIDO - PIZZARIA SANTA SENSAÇÃO 🍕*\n\n`;
+        message += `*👤 DADOS DO CLIENTE:*\n`;
+        message += `*Nome:* ${details.name}\n`;
+        message += `*Telefone:* ${details.phone}\n`;
+        message += `*Tipo de Pedido:* ${orderTypeMap[details.orderType]}\n`;
+        if (details.orderType === 'delivery') {
+            message += `*Endereço:* ${details.address}\n`;
+        }
+        if (details.orderType === 'local' && details.reservationTime) {
+            message += `*Horário da Reserva:* ${details.reservationTime}\n`;
+        }
+
+        message += `\n*🛒 ITENS DO PEDIDO:*\n`;
+        cart.forEach(item => {
+            message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2).replace('.', ',')}\n`;
+        });
+        message += `\n*💰 TOTAL: R$ ${total.toFixed(2).replace('.', ',')}*\n\n`;
         
+        message += `*💳 PAGAMENTO:*\n`;
+        message += `*Forma:* ${paymentMethodMap[details.paymentMethod]}\n`;
+        if (details.paymentMethod === 'cash') {
+            if (details.changeNeeded) {
+                message += `*Precisa de troco para:* R$ ${details.changeAmount}\n`;
+            } else {
+                message += `*Não precisa de troco.*\n`;
+            }
+        }
+        if (details.notes) {
+            message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
+        }
+
+        message += `\n_Pedido gerado pelo nosso site._`;
+        
+        const whatsappUrl = `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+        
+        // --- Perform background tasks after opening WhatsApp ---
         const newOrder = {
             customer: {
                 name: details.name,
@@ -287,42 +328,6 @@ const App: React.FC = () => {
             console.error("Failed to save order:", error);
             addToast("Erro ao salvar pedido no sistema.", 'error');
         }
-
-        let message = `*🍕 NOVO PEDIDO - PIZZARIA SANTA SENSAÇÃO 🍕*\n\n`;
-        message += `*👤 DADOS DO CLIENTE:*\n`;
-        message += `*Nome:* ${details.name}\n`;
-        message += `*Telefone:* ${details.phone}\n`;
-        message += `*Tipo de Pedido:* ${details.orderType}\n`;
-        if (details.orderType === 'delivery') {
-            message += `*Endereço:* ${details.address}\n`;
-        }
-        if (details.orderType === 'local' && details.reservationTime) {
-            message += `*Horário da Reserva:* ${details.reservationTime}\n`;
-        }
-
-        message += `\n*🛒 ITENS DO PEDIDO:*\n`;
-        cart.forEach(item => {
-            message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2)}\n`;
-        });
-        message += `\n*💰 TOTAL: R$ ${total.toFixed(2)}*\n\n`;
-        
-        message += `*💳 PAGAMENTO:*\n`;
-        message += `*Forma:* ${details.paymentMethod}\n`;
-        if (details.paymentMethod === 'cash') {
-            if (details.changeNeeded) {
-                message += `*Precisa de troco para:* R$ ${details.changeAmount}\n`;
-            } else {
-                message += `*Não precisa de troco.*\n`;
-            }
-        }
-        if (details.notes) {
-            message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
-        }
-
-        message += `\n_Pedido gerado pelo nosso site._`;
-        
-        const whatsappUrl = `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
-        window.open(whatsappUrl, '_blank');
         
         setCart([]);
         setIsCheckoutModalOpen(false);
