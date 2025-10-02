@@ -1,6 +1,7 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
+import firebase from 'firebase/compat/app';
 import { db, storage } from './firebase';
-import { Product, Category, SiteSettings } from '../types';
+import { Product, Category, SiteSettings, Order } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -124,4 +125,25 @@ export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promi
     if (!db) throw new Error("Firestore is not initialized.");
     const settingsRef = db.doc('store_config/site_settings');
     await settingsRef.set(settings, { merge: true });
+};
+
+// Order Management Functions
+export const addOrder = async (orderData: Omit<Order, 'id' | 'createdAt'>): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    await db.collection('orders').add({
+        ...orderData,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+};
+
+export const updateOrderStatus = async (orderId: string, status: Order['status']): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const orderRef = db.collection('orders').doc(orderId);
+    await orderRef.update({ status });
+};
+
+export const deleteOrder = async (orderId: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const orderRef = db.collection('orders').doc(orderId);
+    await orderRef.delete();
 };

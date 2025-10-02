@@ -5,7 +5,7 @@
 
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Product, Category, CartItem, OrderDetails, SiteSettings } from './types';
+import { Product, Category, CartItem, OrderDetails, SiteSettings, Order } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
@@ -81,6 +81,7 @@ const defaultSiteSettings: SiteSettings = {
 const App: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [orders, setOrders] = useState<Order[]>([]);
     const [isStoreOnline, setIsStoreOnline] = useState<boolean>(true);
     const [cart, setCart] = useState<CartItem[]>([]);
     const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
@@ -201,11 +202,19 @@ const App: React.FC = () => {
             setError(null);
         }, err => handleConnectionError(err, "products"));
 
+        // Listener for orders
+        const ordersQuery = db.collection('orders').orderBy('createdAt', 'desc');
+        const unsubOrders = ordersQuery.onSnapshot(snapshot => {
+            const fetchedOrders: Order[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+            setOrders(fetchedOrders);
+        }, err => handleConnectionError(err, "orders"));
+
         return () => {
             unsubSettings();
             unsubStatus();
             unsubCategories();
             unsubProducts();
+            unsubOrders();
         };
     }, [activeMenuCategory]);
     
@@ -261,8 +270,35 @@ const App: React.FC = () => {
         });
     }, []);
 
-    const handleCheckout = (details: OrderDetails) => {
-        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2);
+    const handleCheckout = async (details: OrderDetails) => {
+        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        
+        // Create order object for database
+        const newOrder: Omit<Order, 'id' | 'createdAt'> = {
+            customer: {
+                name: details.name,
+                phone: details.phone,
+                orderType: details.orderType,
+                address: details.orderType === 'delivery' ? details.address : undefined,
+            },
+            items: cart,
+            total: total,
+            paymentMethod: details.paymentMethod,
+            changeNeeded: details.paymentMethod === 'cash' ? details.changeNeeded : undefined,
+            changeAmount: details.paymentMethod === 'cash' && details.changeNeeded ? details.changeAmount : undefined,
+            notes: details.notes,
+            status: 'pending',
+        };
+
+        try {
+            await firebaseService.addOrder(newOrder);
+            addToast("Pedido salvo no sistema!", 'success');
+        } catch (error) {
+            console.error("Failed to save order:", error);
+            addToast("Erro ao salvar pedido no sistema.", 'error');
+            // We can still proceed to WhatsApp
+        }
+
         let message = `*🍕 NOVO PEDIDO - PIZZARIA SANTA SENSAÇÃO 🍕*\n\n`;
         message += `*👤 DADOS DO CLIENTE:*\n`;
         message += `*Nome:* ${details.name}\n`;
@@ -276,7 +312,7 @@ const App: React.FC = () => {
         cart.forEach(item => {
             message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2)}\n`;
         });
-        message += `\n*💰 TOTAL: R$ ${total}*\n\n`;
+        message += `\n*💰 TOTAL: R$ ${total.toFixed(2)}*\n\n`;
         
         message += `*💳 PAGAMENTO:*\n`;
         message += `*Forma:* ${details.paymentMethod}\n`;
@@ -432,6 +468,28 @@ const App: React.FC = () => {
             addToast("Erro ao salvar as configurações do site.", 'error');
         }
     }, [addToast]);
+    
+    const handleUpdateOrderStatus = useCallback(async (orderId: string, status: Order['status']) => {
+        try {
+            await firebaseService.updateOrderStatus(orderId, status);
+            addToast("Status do pedido atualizado!", 'success');
+        } catch (error) {
+            console.error("Failed to update order status:", error);
+            addToast("Erro ao atualizar o status do pedido.", 'error');
+        }
+    }, [addToast]);
+
+    const handleDeleteOrder = useCallback(async (orderId: string) => {
+        if (window.confirm("Tem certeza que deseja apagar este pedido permanentemente?")) {
+            try {
+                await firebaseService.deleteOrder(orderId);
+                addToast("Pedido apagado com sucesso.", 'success');
+            } catch (error) {
+                console.error("Failed to delete order:", error);
+                addToast("Erro ao apagar o pedido.", 'error');
+            }
+        }
+    }, [addToast]);
 
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
@@ -492,6 +550,7 @@ const App: React.FC = () => {
                     allCategories={categories}
                     isStoreOnline={isStoreOnline}
                     siteSettings={siteSettings}
+                    orders={orders}
                     onSaveProduct={handleSaveProduct}
                     onDeleteProduct={handleDeleteProduct}
                     onProductStatusChange={handleProductStatusChange}
@@ -503,6 +562,8 @@ const App: React.FC = () => {
                     onReorderCategories={handleReorderCategories}
                     onSeedDatabase={seedDatabase}
                     onSaveSiteSettings={handleSaveSiteSettings}
+                    onUpdateOrderStatus={handleUpdateOrderStatus}
+                    onDeleteOrder={handleDeleteOrder}
                 />
             </main>
 

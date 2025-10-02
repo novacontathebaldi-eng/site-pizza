@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Product, Category, SiteSettings } from '../types';
+import { Product, Category, SiteSettings, Order } from '../types';
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
 import { SiteCustomizationTab } from './SiteCustomizationTab';
+import { OrderCard } from './OrderCard'; // Import the new OrderCard component
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -15,6 +16,7 @@ interface AdminSectionProps {
     allCategories: Category[];
     isStoreOnline: boolean;
     siteSettings: SiteSettings;
+    orders: Order[]; // Add orders prop
     onSaveProduct: (product: Product) => Promise<void>;
     onDeleteProduct: (productId: string) => Promise<void>;
     onProductStatusChange: (productId: string, active: boolean) => Promise<void>;
@@ -26,6 +28,8 @@ interface AdminSectionProps {
     onReorderCategories: (categoriesToUpdate: { id: string; order: number }[]) => Promise<void>;
     onSeedDatabase: () => Promise<void>;
     onSaveSiteSettings: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
+    onUpdateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>; // Add order handlers
+    onDeleteOrder: (orderId: string) => Promise<void>;
 }
 
 interface SortableProductItemProps {
@@ -120,10 +124,10 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
 };
 
 export const AdminSection: React.FC<AdminSectionProps> = ({ 
-    allProducts, allCategories, isStoreOnline, siteSettings,
+    allProducts, allCategories, isStoreOnline, siteSettings, orders,
     onSaveProduct, onDeleteProduct, onProductStatusChange, onStoreStatusChange,
     onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
-    onSeedDatabase, onSaveSiteSettings
+    onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onDeleteOrder
 }) => {
     const [user, setUser] = useState<firebase.User | null>(null);
     const [authLoading, setAuthLoading] = useState(true);
@@ -350,6 +354,8 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
         }
     };
 
+    const pendingOrdersCount = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
+
     if (!showAdminPanel) return null;
     
     if (authLoading) {
@@ -418,6 +424,15 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                     <i className="fas fa-store-alt w-5 text-center"></i>
                                     <span>Status</span>
                                 </button>
+                                <button onClick={() => setActiveTab('orders')} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'orders' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                    <i className="fas fa-receipt w-5 text-center"></i>
+                                    <span>Pedidos</span>
+                                    {pendingOrdersCount > 0 && (
+                                        <span className="absolute top-1 right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                                            {pendingOrdersCount}
+                                        </span>
+                                    )}
+                                </button>
                                 <button onClick={() => setActiveTab('products')} className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === 'products' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
                                     <i className="fas fa-pizza-slice w-5 text-center"></i>
                                     <span>Produtos</span>
@@ -449,6 +464,30 @@ export const AdminSection: React.FC<AdminSectionProps> = ({
                                         {isStoreOnline ? 'Aberta para pedidos' : 'Fechada'}
                                     </span>
                                 </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'orders' && (
+                             <div>
+                                <h3 className="text-xl font-bold mb-4">Gerenciar Pedidos</h3>
+                                {orders.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {orders.map(order => (
+                                            <OrderCard 
+                                                key={order.id} 
+                                                order={order} 
+                                                onUpdateStatus={onUpdateOrderStatus}
+                                                onDelete={onDeleteOrder}
+                                            />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-12 bg-gray-50 rounded-lg">
+                                        <i className="fas fa-receipt text-5xl text-gray-300 mb-4"></i>
+                                        <p className="text-xl text-gray-500">Nenhum pedido encontrado.</p>
+                                        <p className="text-gray-400 mt-2">Novos pedidos aparecerão aqui em tempo real.</p>
+                                    </div>
+                                )}
                             </div>
                         )}
                         

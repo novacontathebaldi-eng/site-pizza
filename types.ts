@@ -38,6 +38,30 @@ export interface OrderDetails {
     notes: string;
 }
 
+// New Types for Order Management
+export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled';
+
+export interface OrderCustomerDetails {
+    name: string;
+    phone: string;
+    orderType: 'delivery' | 'pickup' | 'local';
+    address?: string;
+}
+
+export interface Order {
+    id: string;
+    customer: OrderCustomerDetails;
+    items: CartItem[];
+    total: number;
+    paymentMethod: 'credit' | 'debit' | 'pix' | 'cash';
+    changeNeeded?: boolean;
+    changeAmount?: string;
+    notes?: string;
+    status: OrderStatus;
+    createdAt: any; // Firestore Timestamp
+}
+
+
 export interface ContentSectionListItem {
     id: string;
     icon: string;
