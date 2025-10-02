@@ -6,13 +6,14 @@ interface CheckoutModalProps {
     onClose: () => void;
     cartItems: CartItem[];
     onConfirmCheckout: (details: OrderDetails) => void;
+    onInitiatePixPayment: (details: OrderDetails) => void;
 }
 
 const getSuggestedTimes = () => {
     const now = new Date();
     const suggestions = [];
     for (let i = 1; i <= 4; i++) {
-        const suggestionTime = new Date(now.getTime() + i * 15 * 60000); // Add 15, 30, 45, 60 minutes
+        const suggestionTime = new Date(now.getTime() + i * 15 * 60000);
         const hours = suggestionTime.getHours().toString().padStart(2, '0');
         const minutes = suggestionTime.getMinutes().toString().padStart(2, '0');
         suggestions.push(`${hours}:${minutes}`);
@@ -20,7 +21,7 @@ const getSuggestedTimes = () => {
     return suggestions;
 };
 
-export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout }) => {
+export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, onInitiatePixPayment }) => {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [orderType, setOrderType] = useState<'delivery' | 'pickup' | 'local' | ''>('');
@@ -35,16 +36,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
 
     useEffect(() => {
         if (!isOpen) {
-            // Reset form on close
-            setName('');
-            setPhone('');
-            setOrderType('');
-            setAddress('');
-            setPaymentMethod('');
-            setChangeNeeded(false);
-            setChangeAmount('');
-            setNotes('');
-            setReservationTime('');
+            setName(''); setPhone(''); setOrderType(''); setAddress('');
+            setPaymentMethod(''); setChangeNeeded(false); setChangeAmount('');
+            setNotes(''); setReservationTime('');
         }
     }, [isOpen]);
 
@@ -52,19 +46,30 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
 
     const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
+    const getOrderDetails = (): OrderDetails => ({
+        name, phone, orderType: orderType as 'delivery' | 'pickup' | 'local',
+        address, paymentMethod: paymentMethod as 'credit' | 'debit' | 'pix' | 'cash',
+        changeNeeded: paymentMethod === 'cash' && changeNeeded,
+        changeAmount, notes, reservationTime
+    });
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onConfirmCheckout({
-            name,
-            phone,
-            orderType: orderType as 'delivery' | 'pickup' | 'local',
-            address,
-            paymentMethod: paymentMethod as 'credit' | 'debit' | 'pix' | 'cash',
-            changeNeeded: paymentMethod === 'cash' && changeNeeded,
-            changeAmount,
-            notes,
-            reservationTime
-        });
+        const details = getOrderDetails();
+        if (paymentMethod === 'pix') {
+            // For PIX, the form submission is just a gateway to the next step
+            // The actual submission happens via the buttons in the PIX section
+            return; 
+        }
+        onConfirmCheckout(details);
+    };
+    
+    const handlePayLater = () => {
+        onConfirmCheckout(getOrderDetails());
+    };
+
+    const handlePayNow = () => {
+        onInitiatePixPayment(getOrderDetails());
     };
 
     return (
@@ -125,6 +130,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                                 <option value="cash">Dinheiro</option>
                             </select>
                         </div>
+                        {paymentMethod === 'pix' && (
+                            <div className="p-4 bg-blue-50 rounded-md border border-blue-200 animate-fade-in-up text-center">
+                                <p className="font-semibold mb-3">Você deseja pagar o PIX agora ou na entrega/retirada?</p>
+                                <div className="flex justify-center gap-4">
+                                    <button type="button" onClick={handlePayNow} className="bg-accent text-white font-bold py-2 px-6 rounded-lg hover:bg-opacity-90">Pagar Agora</button>
+                                    <button type="button" onClick={handlePayLater} className="bg-gray-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-600">Pagar Depois</button>
+                                </div>
+                            </div>
+                        )}
                         {paymentMethod === 'cash' && (
                             <div className="p-3 bg-gray-50 rounded-md border animate-fade-in-up">
                                 <label className="flex items-center gap-2">
@@ -158,9 +172,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                             </div>
                         </div>
 
-                        <button type="submit" className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all">
-                            <i className="fab fa-whatsapp mr-2"></i>Enviar Pedido
-                        </button>
+                        {paymentMethod !== 'pix' && (
+                             <button type="submit" className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all">
+                                <i className="fab fa-whatsapp mr-2"></i>Enviar Pedido
+                            </button>
+                        )}
                     </form>
                 </div>
             </div>

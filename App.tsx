@@ -9,6 +9,7 @@ import { AdminSection } from './components/AdminSection';
 import { Footer } from './components/Footer';
 import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
+import { PixPaymentModal } from './components/PixPaymentModal';
 import { db } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
@@ -88,6 +89,7 @@ const App: React.FC = () => {
     const [siteSettings, setSiteSettings] = useState<SiteSettings>(defaultSiteSettings);
     const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
+    const [payingOrder, setPayingOrder] = useState<Order | null>(null);
     
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
@@ -104,14 +106,13 @@ const App: React.FC = () => {
         }
     }, []);
 
-    // Observer for active section title
     useEffect(() => {
         const sectionIds = ['inicio', 'cardapio', 'sobre', 'contato'];
         const sectionElements = sectionIds.map(id => document.getElementById(id));
         
         const observerOptions = {
             root: null,
-            rootMargin: '-80px 0px -60% 0px', // Focus on the top part of the viewport, below the header
+            rootMargin: '-80px 0px -60% 0px',
             threshold: 0
         };
 
@@ -140,17 +141,16 @@ const App: React.FC = () => {
         };
     }, []);
 
-    // Main data fetching effect - runs only once
     useEffect(() => {
         if (!db) {
-            setError("Falha na conexão com o banco de dados. Este é um problema conhecido no ambiente de desenvolvimento atual (sandbox), que bloqueia conexões externas. Seu site funcionará normalmente online. Verifique se as credenciais em services/firebase.ts estão corretas.");
+            setError("Falha na conexão com o banco de dados.");
             setIsLoading(false);
             return;
         }
 
         const handleConnectionError = (err: Error, context: string) => {
             console.error(`Error fetching ${context}:`, err);
-            setError("Não foi possível conectar ao banco de dados. Este é um problema conhecido no ambiente de desenvolvimento atual (sandbox), que bloqueia conexões externas. Seu site funcionará normalmente online.");
+            setError("Não foi possível conectar ao banco de dados.");
             setIsLoading(false);
         };
         
@@ -197,7 +197,6 @@ const App: React.FC = () => {
         };
     }, []);
 
-    // Effect to set initial active category - separated for stability
     useEffect(() => {
         if (categories.length > 0 && !activeMenuCategory) {
             const firstActiveCategory = categories.find(c => c.active);
@@ -259,14 +258,14 @@ const App: React.FC = () => {
         });
     }, []);
 
-    const handleCheckout = async (details: OrderDetails) => {
-        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
-        // --- FIX: Open WhatsApp immediately to avoid pop-up blockers ---
+    const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, isPaid: boolean) => {
         const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumir no local' };
         const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
 
         let message = `*🍕 NOVO PEDIDO - PIZZARIA SANTA SENSAÇÃO 🍕*\n\n`;
+        if (isPaid) {
+            message += `*✅ JÁ PAGO VIA PIX PELO SITE*\n\n`;
+        }
         message += `*👤 DADOS DO CLIENTE:*\n`;
         message += `*Nome:* ${details.name}\n`;
         message += `*Telefone:* ${details.phone}\n`;
@@ -277,16 +276,14 @@ const App: React.FC = () => {
         if (details.orderType === 'local' && details.reservationTime) {
             message += `*Horário da Reserva:* ${details.reservationTime}\n`;
         }
-
         message += `\n*🛒 ITENS DO PEDIDO:*\n`;
-        cart.forEach(item => {
+        currentCart.forEach(item => {
             message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2).replace('.', ',')}\n`;
         });
         message += `\n*💰 TOTAL: R$ ${total.toFixed(2).replace('.', ',')}*\n\n`;
-        
         message += `*💳 PAGAMENTO:*\n`;
         message += `*Forma:* ${paymentMethodMap[details.paymentMethod]}\n`;
-        if (details.paymentMethod === 'cash') {
+        if (!isPaid && details.paymentMethod === 'cash') {
             if (details.changeNeeded) {
                 message += `*Precisa de troco para:* R$ ${details.changeAmount}\n`;
             } else {
@@ -296,29 +293,21 @@ const App: React.FC = () => {
         if (details.notes) {
             message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
         }
-
         message += `\n_Pedido gerado pelo nosso site._`;
-        
-        const whatsappUrl = `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
+        return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
+    };
+    
+    const handleCheckout = async (details: OrderDetails) => {
+        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const whatsappUrl = generateWhatsAppMessage(details, cart, total, false);
         window.open(whatsappUrl, '_blank');
         
-        // --- Perform background tasks after opening WhatsApp ---
         const newOrder = {
-            customer: {
-                name: details.name,
-                phone: details.phone,
-                orderType: details.orderType,
-                address: details.orderType === 'delivery' ? details.address : '',
-                reservationTime: details.orderType === 'local' ? details.reservationTime : '',
-            },
-            items: cart,
-            total: total,
-            paymentMethod: details.paymentMethod,
+            customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.orderType === 'delivery' ? details.address : '', reservationTime: details.orderType === 'local' ? details.reservationTime : '', },
+            items: cart, total, paymentMethod: details.paymentMethod,
             changeNeeded: details.paymentMethod === 'cash' ? details.changeNeeded : false,
             changeAmount: details.paymentMethod === 'cash' && details.changeNeeded ? details.changeAmount : '',
-            notes: details.notes || '',
-            status: 'pending' as OrderStatus,
-            paymentStatus: 'pending' as PaymentStatus,
+            notes: details.notes || '', status: 'pending' as OrderStatus, paymentStatus: 'pending' as PaymentStatus,
         };
 
         try {
@@ -333,6 +322,41 @@ const App: React.FC = () => {
         setIsCheckoutModalOpen(false);
         setIsCartOpen(false);
     };
+
+    const handleInitiatePixPayment = async (details: OrderDetails) => {
+        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
+            customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.orderType === 'delivery' ? details.address : '', reservationTime: details.orderType === 'local' ? details.reservationTime : '', },
+            items: cart, total, paymentMethod: 'pix',
+            notes: details.notes || '', status: 'pending' as OrderStatus, paymentStatus: 'pending' as PaymentStatus,
+        };
+
+        try {
+            const docRef = await firebaseService.addOrder(newOrderData);
+            const createdOrder: Order = { ...newOrderData, id: docRef.id, createdAt: new Date() }; // Create a temporary full order object
+            addToast("Pedido pré-salvo, aguardando pagamento.", 'success');
+            setIsCheckoutModalOpen(false);
+            setPayingOrder(createdOrder);
+        } catch (error) {
+            console.error("Failed to pre-save order:", error);
+            addToast("Erro ao iniciar pagamento. Tente novamente.", 'error');
+        }
+    };
+
+    const handlePixPaymentSuccess = (paidOrder: Order) => {
+        const details: OrderDetails = {
+            name: paidOrder.customer.name, phone: paidOrder.customer.phone, orderType: paidOrder.customer.orderType,
+            address: paidOrder.customer.address || '', paymentMethod: 'pix', changeNeeded: false,
+            notes: paidOrder.notes || '', reservationTime: paidOrder.customer.reservationTime || ''
+        };
+        const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, true);
+        window.open(whatsappUrl, '_blank');
+
+        setCart([]);
+        setPayingOrder(null);
+        setIsCartOpen(false);
+    };
+
 
     const handleSaveProduct = useCallback(async (product: Product) => {
         try {
@@ -400,7 +424,7 @@ const App: React.FC = () => {
         try {
             await firebaseService.deleteCategory(categoryId, products);
             addToast("Categoria deletada com sucesso!", 'success');
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to delete category:", error);
             addToast(`Erro ao deletar categoria: ${error.message}`, 'error');
         }
@@ -471,7 +495,6 @@ const App: React.FC = () => {
             let finalStatus = status;
             const order = orders.find(o => o.id === orderId);
 
-            // Logic for dine-in orders
             if (status === 'accepted' && order?.customer.orderType === 'local') {
                 finalStatus = 'reserved';
             }
@@ -507,7 +530,6 @@ const App: React.FC = () => {
     const handleDeleteOrder = useCallback(async (orderId: string) => {
         if (window.confirm("Tem certeza que deseja apagar este pedido? Após apagar, o pedido será enviado para a lixeira 🗑️")) {
             try {
-                // Instead of deleting, we change the status to 'deleted'
                 await firebaseService.updateOrderStatus(orderId, 'deleted');
                 addToast("Pedido movido para a lixeira.", 'success');
             } catch (error) {
@@ -648,9 +670,14 @@ const App: React.FC = () => {
                 onClose={() => setIsCheckoutModalOpen(false)}
                 cartItems={cart}
                 onConfirmCheckout={handleCheckout}
+                onInitiatePixPayment={handleInitiatePixPayment}
+            />
+             <PixPaymentModal
+                order={payingOrder}
+                onClose={() => setPayingOrder(null)}
+                onPaymentSuccess={handlePixPaymentSuccess}
             />
             
-            {/* Toast Notification Container */}
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]">
                 <div className="w-full flex flex-col items-center space-y-4 sm:items-end">
                     {toasts.map((toast) => (

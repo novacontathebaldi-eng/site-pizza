@@ -64,6 +64,7 @@ export interface Order {
     paymentStatus: PaymentStatus; // New field for payment status
     createdAt: any; // Firestore Timestamp
     pickupTimeEstimate?: string; // Added for pickup
+    pixChargeId?: string; // To store the InfinitePay transaction ID
 }
 
 

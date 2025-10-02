@@ -1,6 +1,6 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
-import { db, storage } from './firebase';
+import { db, storage, functions } from './firebase';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
@@ -18,7 +18,6 @@ export const uploadImage = async (file: File): Promise<string> => {
     const fileName = `products/${new Date().getTime()}_${Math.random().toString(36).substring(2, 9)}.${fileExtension}`;
     const storageRef = storage.ref(fileName);
 
-    // FIX: Reverted to the simpler put() method from the user's working old version.
     const snapshot = await storageRef.put(file);
     const downloadURL = await snapshot.ref.getDownloadURL();
     
@@ -34,7 +33,6 @@ export const uploadSiteAsset = async (file: File, assetName: string): Promise<st
     const fileName = `site/${assetName}_${new Date().getTime()}.${fileExtension}`;
     const storageRef = storage.ref(fileName);
     
-    // FIX: Reverted to the simpler put() method for consistency and to ensure it works.
     const snapshot = await storageRef.put(file);
     return await snapshot.ref.getDownloadURL();
 };
@@ -98,9 +96,8 @@ export const updateCategoryStatus = async (categoryId: string, active: boolean):
 
 export const deleteCategory = async (categoryId: string, allProducts: Product[]): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    if (!categoryId) throw new Error("Invalid document reference. Document references must have an even number of segments, but categories has 1.");
+    if (!categoryId) throw new Error("Invalid document reference.");
     
-    // Safety check: prevent deletion if products are using this category
     const isCategoryInUse = allProducts.some(product => product.categoryId === categoryId);
     if (isCategoryInUse) {
         throw new Error("Não é possível excluir esta categoria, pois ela está sendo usada por um ou mais produtos.");
@@ -128,9 +125,9 @@ export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promi
 };
 
 // Order Management Functions
-export const addOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'pickupTimeEstimate'>): Promise<void> => {
+export const addOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'pickupTimeEstimate'>): Promise<firebase.firestore.DocumentReference> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    await db.collection('orders').add({
+    return db.collection('orders').add({
         ...orderData,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
@@ -158,4 +155,19 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     const orderRef = db.collection('orders').doc(orderId);
     await orderRef.delete();
+};
+
+// PIX Payment Function
+export const initiatePixPayment = async (orderId: string): Promise<any> => {
+    if (!functions) {
+        throw new Error("Firebase Functions is not initialized.");
+    }
+    const generatePixCharge = functions.httpsCallable('generatePixCharge');
+    try {
+        const result = await generatePixCharge({ orderId });
+        return result.data;
+    } catch (error) {
+        console.error("Error calling generatePixCharge function:", error);
+        throw new Error("Não foi possível gerar a cobrança PIX. Tente novamente.");
+    }
 };
