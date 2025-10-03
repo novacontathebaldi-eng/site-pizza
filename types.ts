@@ -141,6 +141,6 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
-    audioSettings?: AudioSettings;
-    notificationSettings?: NotificationSettings;
+    audioSettings: AudioSettings;
+    notificationSettings: NotificationSettings;
 }

@@ -84,7 +84,7 @@ const PromotionBlock: React.FC<{ promotion: Promotion; allProducts: Product[]; o
         case 'mediaFull_textOverlay':
             return (
                 <div className="relative flex items-center justify-center rounded-2xl shadow-xl overflow-hidden min-h-[400px] text-white p-8 text-center">
-                    {Media && React.cloneElement(Media, { className: 'absolute inset-0 w-full h-full object-cover z-0' })}
+                    {Media && React.cloneElement(Media as React.ReactElement<any>, { className: 'absolute inset-0 w-full h-full object-cover z-0' })}
                     <div className="absolute inset-0 bg-black/60 z-10"></div>
                     <div className="relative z-20">
                         {Content}

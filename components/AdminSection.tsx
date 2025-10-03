@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, Promotion, AnnouncementAudio } from '../types';
 import { ProductModal } from './ProductModal';
@@ -11,6 +10,9 @@ import { CSS } from '@dnd-kit/utilities';
 import firebase from 'firebase/compat/app';
 import { auth } from '../services/firebase';
 import { SupportModal } from './SupportModal';
+import { PromotionModal } from './PromotionModal';
+import { AudioSettingsTab } from './AudioSettingsTab';
+import { NotificationSettingsTab } from './NotificationSettingsTab';
 
 interface AdminSectionProps {
     allProducts: Product[];
@@ -44,8 +46,6 @@ interface AdminSectionProps {
     onDeletePromotion: (promotionId: string) => Promise<void>;
     onReorderPromotions: (promosToUpdate: { id: string; order: number }[]) => Promise<void>;
 }
-
-// ... Sortable components (Product, Category) remain the same
 
 export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const { 
@@ -204,7 +204,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const handleEditPromotion = (p: Promotion) => { setEditingPromotion(p); setIsPromotionModalOpen(true); };
 
 
-    const handleSeedDatabase = async () => { if (window.confirm('Tem certeza? Isso adicionará dados iniciais.')) { try { await onSeedDatabase(); alert('Banco de dados populado!'); } catch (e) { console.error(e); alert("Erro ao popular o banco."); } } };
+    const handleSeedDatabase = async () => { if (window.confirm('Tem certeza? Isso recriará todos os dados iniciais e não deve ser usado em um site em produção.')) { try { await onSeedDatabase(); alert('Banco de dados populado!'); } catch (e) { console.error(e); alert("Erro ao popular o banco."); } } };
     const handleBackup = () => { try { const backupData = { products: allProducts, categories: allCategories, promotions: promotions, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); alert('Backup concluído!'); } catch (e) { console.error(e); alert("Falha no backup."); } };
     
     const activeOrders = useMemo(() => orders.filter(o => o.status !== 'deleted'), [orders]);
@@ -216,11 +216,14 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
             const searchTermLower = orderSearchTerm.toLowerCase();
             const matchesSearch = !searchTermLower ||
                 order.customer.name.toLowerCase().includes(searchTermLower) ||
-                order.customer.phone.toLowerCase().includes(searchTermLower);
+                order.customer.phone.toLowerCase().includes(searchTermLower) ||
+                order.id.toLowerCase().includes(searchTermLower);
             
             const matchesOrderType = !orderFilters.orderType || order.customer.orderType === orderFilters.orderType;
             const matchesPaymentMethod = !orderFilters.paymentMethod || order.paymentMethod === orderFilters.paymentMethod;
             const matchesPaymentStatus = !orderFilters.paymentStatus || order.paymentStatus === orderFilters.paymentStatus;
+            
+            // This filter should only apply if we are NOT in a specific status tab
             const matchesOrderStatus = !orderFilters.orderStatus || order.status === orderFilters.orderStatus;
 
             return matchesSearch && matchesOrderType && matchesPaymentMethod && matchesPaymentStatus && matchesOrderStatus;
@@ -234,9 +237,8 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     if (authLoading) return <section id="admin" className="py-20 bg-brand-ivory-50"><div className="text-center"><i className="fas fa-spinner fa-spin text-4xl text-accent"></i></div></section>;
     if (!user) return (<> <section id="admin" className="py-20 bg-brand-ivory-50"> <div className="container mx-auto px-4 max-w-md"> <div className="bg-white p-8 rounded-2xl shadow-lg border"> <h2 className="text-3xl font-bold text-center mb-6"><i className="fas fa-shield-alt mr-2"></i>Painel</h2> <form onSubmit={handleLogin}> <div className="mb-4"> <label className="block font-semibold mb-2" htmlFor="admin-email">Email</label> <input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> <div className="mb-6"> <label className="block font-semibold mb-2" htmlFor="admin-password">Senha</label> <input id="admin-password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> {error && <div className="text-red-600 mb-4 bg-red-50 p-3 rounded-lg border border-red-200">{error}</div>} <button type="submit" className="w-full bg-accent text-white font-bold py-3 rounded-lg hover:bg-opacity-90 disabled:bg-opacity-70 flex justify-center" disabled={isLoggingIn}>{isLoggingIn ? <i className="fas fa-spinner fa-spin"></i> : 'Entrar'}</button> </form> </div> </div> </section> <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} /> </>);
 
-    const OrderStatusTabs: OrderStatus[] = ['accepted', 'reserved', 'ready', 'completed', 'cancelled'];
+    const OrderStatusTabs: OrderStatus[] = ['pending', 'accepted', 'reserved', 'ready', 'completed', 'cancelled'];
     
-    // FIX: Correctly implemented SortableProductItem to return JSX, resolving the error where it returned 'void'.
     const SortableProductItem: React.FC<{
         product: Product;
         isCategoryActive: boolean;
@@ -277,7 +279,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
             </div>
         );
     };
-    // FIX: Correctly implemented SortableCategoryItem to return JSX, resolving the error where it returned 'void'.
     const SortableCategoryItem: React.FC<{
         category: Category;
         onEdit: (category: Category) => void;
@@ -307,6 +308,33 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         );
     };
 
+    const SortablePromotionItem: React.FC<{ promotion: Promotion }> = ({ promotion }) => {
+        const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: promotion.id });
+        const style = { transform: CSS.Transform.toString(transform), transition };
+
+        return (
+             <div ref={setNodeRef} style={style} className={`flex items-center gap-4 p-3 rounded-lg ${!promotion.active ? 'bg-gray-100 opacity-60' : 'bg-white'}`}>
+                <button type="button" {...attributes} {...listeners} className="cursor-grab p-2 text-gray-400 hover:text-gray-600">
+                    <i className="fas fa-grip-vertical"></i>
+                </button>
+                 <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center border overflow-hidden flex-shrink-0">
+                    {promotion.imageUrl ? <img src={promotion.imageUrl} alt="Prévia" className="w-full h-full object-cover" /> : <i className="fas fa-bullhorn text-3xl text-gray-300"></i>}
+                </div>
+                <div className="flex-grow">
+                    <p className="font-bold">{promotion.title}</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    <label className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" checked={promotion.active} onChange={e => onSavePromotion({ ...promotion, active: e.target.checked }, null)} className="sr-only peer" />
+                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600"></div>
+                    </label>
+                    <button type="button" onClick={() => handleEditPromotion(promotion)} className="w-9 h-9 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center hover:bg-blue-200"><i className="fas fa-pen"></i></button>
+                    <button type="button" onClick={() => window.confirm(`Tem certeza que quer deletar "${promotion.title}"?`) && onDeletePromotion(promotion.id)} className="w-9 h-9 bg-red-100 text-red-600 rounded-full flex items-center justify-center hover:bg-red-200"><i className="fas fa-trash"></i></button>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <>
             <section id="admin" className="py-20 bg-brand-ivory-50">
@@ -320,7 +348,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                             <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
                                 {['status', 'orders', 'products', 'categories', 'promotions', 'settings'].map(tab => {
                                     const icons: { [key: string]: string } = { status: 'fa-store-alt', orders: 'fa-receipt', products: 'fa-pizza-slice', categories: 'fa-tags', promotions: 'fa-bullhorn', settings: 'fa-cogs' };
-                                    const labels: { [key: string]: string } = { status: 'Status', orders: 'Pedidos', products: 'Produtos', categories: 'Categorias', promotions: 'Promoções', settings: 'Configurações' };
+                                    const labels: { [key: string]: string } = { status: 'Status', orders: 'Pedidos', products: 'Produtos', categories: 'Categorias', promotions: 'Promoções e Anúncios', settings: 'Configurações' };
                                     return (
                                         <button key={tab} onClick={() => setActiveTab(tab)} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === tab ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
                                             <i className={`fas ${icons[tab]} w-5 text-center`}></i> <span>{labels[tab]}</span>
@@ -333,11 +361,109 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
                         {activeTab === 'status' && ( <div> <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3> <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg"> <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer"> <input type="checkbox" id="store-status-toggle" className="sr-only peer" checked={isStoreOnline} onChange={e => onStoreStatusChange(e.target.checked)} /> <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600"></div> </label> <span className={`font-semibold text-lg ${isStoreOnline ? 'text-green-600' : 'text-red-600'}`}>{isStoreOnline ? 'Aberta' : 'Fechada'}</span> </div> </div> )}
                         
-                        {activeTab === 'orders' && ( <div>{/* Order management JSX from original file... */}</div> )}
-                        
-                        {activeTab === 'settings' && ( <div>{/* Settings Tab Content here */}</div> )}
+                        {activeTab === 'orders' && ( 
+                            <div>
+                                <h3 className="text-xl font-bold mb-4">Gerenciar Pedidos</h3>
+                                 <div className="mb-4 p-4 bg-gray-50 rounded-lg border">
+                                    <div className="flex flex-wrap items-center gap-4">
+                                        <div className="relative flex-grow">
+                                            <input type="text" placeholder="Buscar por cliente, telefone ou ID..." value={orderSearchTerm} onChange={e => setOrderSearchTerm(e.target.value)} className="w-full px-4 py-2 border rounded-lg pl-10" />
+                                            <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                        </div>
+                                        <button onClick={() => setShowFilters(!showFilters)} className="bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">
+                                            <i className="fas fa-filter mr-2"></i>Filtros
+                                        </button>
+                                    </div>
+                                    {showFilters && (
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 animate-fade-in-up">
+                                            {/* Filter selects here */}
+                                        </div>
+                                    )}
+                                </div>
 
-                        {activeTab === 'promotions' && ( <div>{/* Promotions Tab Content here */}</div> )}
+                                <div className="border-b mb-4">
+                                    <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
+                                        {OrderStatusTabs.map(status => {
+                                             const labels: { [key in OrderStatus]?: string } = { pending: 'Pendentes', accepted: 'Aceitos', reserved: 'Reservas', ready: 'Prontos', completed: 'Finalizados', cancelled: 'Cancelados' };
+                                             if (!labels[status]) return null;
+                                             const count = getOrderStatusCount(status);
+                                            return (
+                                                <button key={status} id={`order-tab-${status}`} onClick={() => { setActiveOrdersTab(status); setIsTrashVisible(false); }} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-2 px-4 font-semibold text-sm ${activeOrdersTab === status && !isTrashVisible ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>
+                                                   {labels[status]} {count > 0 && <span className="bg-gray-200 text-gray-600 text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{count}</span>}
+                                                </button>
+                                            )
+                                        })}
+                                        <button id="order-tab-trash" onClick={() => setIsTrashVisible(true)} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-2 px-4 font-semibold text-sm ${isTrashVisible ? 'border-b-2 border-red-500 text-red-500' : 'text-gray-500'}`}>
+                                           <i className="fas fa-trash-alt"></i> Lixeira {deletedOrders.length > 0 && <span className="bg-gray-200 text-gray-600 text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{deletedOrders.length}</span>}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    {(isTrashVisible ? deletedOrders : tabOrders).length > 0 ? (
+                                        (isTrashVisible ? deletedOrders : tabOrders).map(order => (
+                                            <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-10 bg-gray-50 rounded-lg">
+                                            <i className="fas fa-inbox text-4xl text-gray-300"></i>
+                                            <p className="mt-4 font-semibold text-gray-500">Nenhum pedido encontrado nesta categoria.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div> 
+                        )}
+                        
+                        {activeTab === 'settings' && ( 
+                             <div>
+                                <h3 className="text-xl font-bold mb-4">Configurações</h3>
+                                <div className="border-b mb-6">
+                                    <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
+                                        {['audio', 'notifications', 'personalization', 'data'].map(tab => {
+                                            const labels: { [key: string]: string } = { audio: 'Áudio', notifications: 'Notificações', personalization: 'Personalização', data: 'Dados' };
+                                            return (
+                                                <button key={tab} onClick={() => setActiveSettingsTab(tab)} className={`flex-shrink-0 py-2 px-4 font-semibold text-sm ${activeSettingsTab === tab ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>
+                                                    {labels[tab]}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                {activeSettingsTab === 'audio' && <AudioSettingsTab settings={siteSettings} onSave={onSaveSiteSettings} />}
+                                {activeSettingsTab === 'notifications' && <NotificationSettingsTab settings={siteSettings} onSave={onSaveSiteSettings} />}
+                                {activeSettingsTab === 'personalization' && <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} />}
+                                {activeSettingsTab === 'data' && (
+                                    <div>
+                                        <div className="p-4 mb-6 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
+                                            <h4 className="font-bold"><i className="fas fa-exclamation-triangle mr-2"></i>Área Técnica - Ações Perigosas</h4>
+                                            <p className="text-sm mt-2">Atenção: As funcionalidades nesta seção são destinadas a usuários técnicos e podem impactar permanentemente o seu site. A opção 'Fazer Backup' é segura e recomendada. A opção 'Popular Banco' recriará todos os dados iniciais e não deve ser usada em um site em produção.</p>
+                                        </div>
+                                        <div className="flex gap-4">
+                                            <button onClick={handleBackup} className="bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600"><i className="fas fa-download mr-2"></i>Fazer Backup</button>
+                                            <button onClick={handleSeedDatabase} className="bg-orange-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-orange-600"><i className="fas fa-database mr-2"></i>Popular Banco</button>
+                                        </div>
+                                    </div>
+                                )}
+                             </div>
+                        )}
+
+                        {activeTab === 'promotions' && ( 
+                            <div>
+                                <h3 className="text-xl font-bold mb-4">Gerenciar Promoções e Anúncios</h3>
+                                <div className="flex justify-between items-center mb-4">
+                                    <p className="text-gray-600">Arraste os itens para reordenar.</p>
+                                    <button onClick={handleAddNewPromotion} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
+                                        <i className="fas fa-plus mr-2"></i>Adicionar Anúncio
+                                    </button>
+                                </div>
+                                <div className="space-y-2 bg-gray-50 p-2 rounded-lg">
+                                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handlePromotionDragEnd}>
+                                        <SortableContext items={localPromotions.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                                            {localPromotions.map(p => <SortablePromotionItem key={p.id} promotion={p} />)}
+                                        </SortableContext>
+                                    </DndContext>
+                                </div>
+                            </div>
+                         )}
 
                         {activeTab === 'products' && ( 
                             <div>
@@ -401,7 +527,13 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
             </section>
             <ProductModal isOpen={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} onSave={onSaveProduct} product={editingProduct} categories={allCategories} />
             <CategoryModal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} onSave={onSaveCategory} category={editingCategory} />
-            {/* PromotionModal will be rendered here */}
+            <PromotionModal 
+                isOpen={isPromotionModalOpen} 
+                onClose={() => setIsPromotionModalOpen(false)}
+                onSave={onSavePromotion}
+                promotion={editingPromotion}
+                allProducts={allProducts}
+            />
             <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
         </>
     );
