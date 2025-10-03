@@ -19,7 +19,7 @@ export interface Category {
 }
 
 export interface CartItem {
-    id: string;
+    id:string;
     productId: string;
     name: string;
     size: string;
@@ -96,6 +96,43 @@ export interface FooterLink {
     isVisible?: boolean;
 }
 
+export interface AnnouncementAudio {
+    id: string;
+    name: string;
+    url: string;
+}
+
+export interface AudioSettings {
+    notificationSound: string;
+    notificationVolume: number;
+    backgroundMusicEnabled: boolean;
+    backgroundMusic: string;
+    backgroundMusicVolume: number;
+    backgroundMusicLoop: boolean;
+    announcementAudios: AnnouncementAudio[];
+}
+
+export interface NotificationSettings {
+    enabled: boolean;
+    notifyOnNewOrder: boolean;
+    position: 'top-right' | 'bottom-left';
+    duration: number; // in seconds
+}
+
+export interface Promotion {
+    id: string;
+    order: number;
+    active: boolean;
+    title: string;
+    description: string;
+    layout: 'textLeft_mediaRight' | 'mediaLeft_textRight' | 'mediaFull_textOverlay' | 'productGridOnly';
+    includeMedia: boolean;
+    videoUrl?: string;
+    imageUrl?: string;
+    includeProducts: boolean;
+    productIds: string[];
+}
+
 export interface SiteSettings {
     logoUrl: string;
     heroSlogan: string;
@@ -104,4 +141,6 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
+    audioSettings?: AudioSettings;
+    notificationSettings?: NotificationSettings;
 }

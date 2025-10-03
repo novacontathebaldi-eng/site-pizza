@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus } from './types';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, Promotion } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
 import { DynamicContentSection } from './components/DynamicContentSection';
+import { PromotionsSection } from './components/PromotionsSection';
 import { ContactSection } from './components/ContactSection';
 import { AdminSection } from './components/AdminSection';
 import { Footer } from './components/Footer';
@@ -20,8 +21,9 @@ import defaultAboutImg from './assets/sobre-imagem.webp';
 
 interface Toast {
     id: number;
-    message: string;
-    type: 'success' | 'error';
+    message: React.ReactNode;
+    type: 'success' | 'error' | 'info';
+    duration?: number;
 }
 
 const defaultSiteSettings: SiteSettings = {
@@ -70,13 +72,29 @@ const defaultSiteSettings: SiteSettings = {
         { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996500341', isVisible: true },
         { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/santasensacao.sl', isVisible: true },
         { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin', isVisible: true }
-    ]
+    ],
+    audioSettings: {
+        notificationSound: '/assets/audio/sino.mp3',
+        notificationVolume: 0.8,
+        backgroundMusicEnabled: false,
+        backgroundMusic: '',
+        backgroundMusicVolume: 0.5,
+        backgroundMusicLoop: true,
+        announcementAudios: [],
+    },
+    notificationSettings: {
+        enabled: true,
+        notifyOnNewOrder: true,
+        position: 'top-right',
+        duration: 8
+    }
 };
 
 const App: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
+    const [promotions, setPromotions] = useState<Promotion[]>([]);
     const [isStoreOnline, setIsStoreOnline] = useState<boolean>(true);
     const [cart, setCart] = useState<CartItem[]>([]);
     const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
@@ -90,13 +108,20 @@ const App: React.FC = () => {
     const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
     const [payingOrder, setPayingOrder] = useState<Order | null>(null);
+
+    // Lifted state from AdminSection
+    const [activeAdminTab, setActiveAdminTab] = useState('status');
+    const [activeOrdersTab, setActiveOrdersTab] = useState<OrderStatus>('accepted');
+    const prevPendingOrderIds = useRef<Set<string>>(new Set());
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
     
-    const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+    const addToast = useCallback((message: React.ReactNode, type: 'success' | 'error' | 'info' = 'success', duration: number = 4000) => {
         const id = Date.now();
-        setToasts(prevToasts => [...prevToasts, { id, message, type }]);
+        setToasts(prevToasts => [...prevToasts, { id, message, type, duration }]);
         setTimeout(() => {
             setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
-        }, 4000);
+        }, duration);
     }, []);
 
     useEffect(() => {
@@ -107,7 +132,7 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        const sectionIds = ['inicio', 'cardapio', 'sobre', 'contato'];
+        const sectionIds = ['inicio', 'cardapio', 'promocoes', 'sobre', 'contato'];
         const sectionElements = sectionIds.map(id => document.getElementById(id));
         
         const observerOptions = {
@@ -122,6 +147,7 @@ const App: React.FC = () => {
                     const idToTitle: { [key: string]: string } = {
                         'inicio': 'Início',
                         'cardapio': 'Cardápio',
+                        'promocoes': 'Promoções',
                         'sobre': 'Sobre Nós',
                         'contato': 'Contato'
                     };
@@ -139,7 +165,7 @@ const App: React.FC = () => {
                 if (el) observer.unobserve(el);
             });
         };
-    }, []);
+    }, [promotions]); // Re-run when promotions are loaded
 
     useEffect(() => {
         if (!db) {
@@ -178,14 +204,20 @@ const App: React.FC = () => {
         const unsubProducts = productsQuery.onSnapshot(snapshot => {
             const fetchedProducts: Product[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
             setProducts(fetchedProducts);
-            setIsLoading(false);
-            setError(null);
         }, err => handleConnectionError(err, "products"));
+
+        const promotionsQuery = db.collection('promotions').orderBy('order');
+        const unsubPromotions = promotionsQuery.onSnapshot(snapshot => {
+            const fetchedPromotions: Promotion[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Promotion));
+            setPromotions(fetchedPromotions);
+        }, err => handleConnectionError(err, "promotions"));
 
         const ordersQuery = db.collection('orders').orderBy('createdAt', 'desc');
         const unsubOrders = ordersQuery.onSnapshot(snapshot => {
             const fetchedOrders: Order[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
             setOrders(fetchedOrders);
+            setIsLoading(false);
+            setError(null);
         }, err => handleConnectionError(err, "orders"));
 
         return () => {
@@ -194,8 +226,56 @@ const App: React.FC = () => {
             unsubCategories();
             unsubProducts();
             unsubOrders();
+            unsubPromotions();
         };
     }, []);
+
+    // New Order Notification Logic
+    useEffect(() => {
+        const currentPendingOrders = orders.filter(o => o.status === 'pending');
+        const currentPendingIds = new Set(currentPendingOrders.map(o => o.id));
+
+        if (prevPendingOrderIds.current.size > 0) { // Avoid notification on initial load
+            const newOrders = currentPendingOrders.filter(o => !prevPendingOrderIds.current.has(o.id));
+            if (newOrders.length > 0 && siteSettings.notificationSettings?.enabled && siteSettings.notificationSettings?.notifyOnNewOrder) {
+                const newOrder = newOrders[0]; // Notify for the first new one
+                const totalItems = newOrder.items.reduce((sum, item) => sum + item.quantity, 0);
+
+                const toastMessage = (
+                    <div>
+                        <p className="font-bold"><i className="fas fa-receipt mr-2"></i>Novo Pedido Recebido!</p>
+                        <p className="text-sm">Cliente: {newOrder.customer.name}</p>
+                        <p className="text-sm">Itens: {totalItems}</p>
+                        <button 
+                            onClick={() => {
+                                setActiveAdminTab('orders');
+                                setActiveOrdersTab('pending');
+                                // Scroll to admin section
+                                document.getElementById('admin')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className="mt-2 w-full text-center bg-accent text-white font-semibold py-1 px-3 rounded-md text-sm hover:bg-opacity-80">
+                            Ver Pedido
+                        </button>
+                    </div>
+                );
+                
+                addToast(toastMessage, 'info', (siteSettings.notificationSettings.duration || 8) * 1000);
+                
+                // Play sound
+                if (siteSettings.audioSettings?.notificationSound) {
+                    if (!audioRef.current) {
+                        audioRef.current = new Audio();
+                    }
+                    audioRef.current.src = siteSettings.audioSettings.notificationSound;
+                    audioRef.current.volume = siteSettings.audioSettings.notificationVolume ?? 0.8;
+                    audioRef.current.play().catch(e => console.error("Error playing sound:", e));
+                }
+            }
+        }
+
+        prevPendingOrderIds.current = currentPendingIds;
+    }, [orders, siteSettings, addToast]);
+
 
     useEffect(() => {
         if (categories.length > 0 && !activeMenuCategory) {
@@ -477,16 +557,29 @@ const App: React.FC = () => {
             for (const key in files) {
                 const file = files[key];
                 if (file) {
-                    const url = await firebaseService.uploadSiteAsset(file, key);
-                    
-                    if (key === 'logo') {
-                        settingsToUpdate.logoUrl = url;
-                    } else if (key === 'heroBg') {
-                        settingsToUpdate.heroBgUrl = url;
-                    } else { // It's a content section file, key is the section ID
-                        const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
-                        if (sectionIndex > -1) {
-                            settingsToUpdate.contentSections[sectionIndex].imageUrl = url;
+                    let url;
+                    if (file.type.startsWith('audio/')) {
+                         url = await firebaseService.uploadSiteAudio(file, key);
+                         const audioId = key.split('-')[1]; // e.g., key is 'audio-168...
+                         const audioIndex = settingsToUpdate.audioSettings.announcementAudios.findIndex((a: any) => a.id === audioId);
+                         if(audioIndex > -1) {
+                             settingsToUpdate.audioSettings.announcementAudios[audioIndex].url = url;
+                         }
+                    } else {
+                         url = await firebaseService.uploadSiteAsset(file, key);
+                         if (key === 'logo') {
+                            settingsToUpdate.logoUrl = url;
+                        } else if (key === 'heroBg') {
+                            settingsToUpdate.heroBgUrl = url;
+                        } else if (key.startsWith('notificationSound')) {
+                            settingsToUpdate.audioSettings.notificationSound = url;
+                        } else if (key.startsWith('backgroundMusic')) {
+                            settingsToUpdate.audioSettings.backgroundMusic = url;
+                        } else { // It's a content section file, key is the section ID
+                            const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
+                            if (sectionIndex > -1) {
+                                settingsToUpdate.contentSections[sectionIndex].imageUrl = url;
+                            }
                         }
                     }
                 }
@@ -561,6 +654,50 @@ const App: React.FC = () => {
         }
     }, [addToast]);
 
+    // Promotion Handlers
+    const handleSavePromotion = useCallback(async (promotion: Promotion, imageFile: File | null) => {
+        try {
+            let finalImageUrl = promotion.imageUrl;
+            if (imageFile) {
+                finalImageUrl = await firebaseService.uploadSiteAsset(imageFile, `promo-${promotion.id || Date.now()}`);
+            }
+
+            const promoToSave: Promotion = { ...promotion, imageUrl: finalImageUrl };
+            const { id, ...dataToSave } = promoToSave;
+
+            if (id) {
+                await firebaseService.updatePromotion(id, dataToSave);
+                addToast("Promoção atualizada com sucesso!", 'success');
+            } else {
+                await firebaseService.addPromotion({ ...dataToSave, order: promotions.length });
+                addToast("Promoção adicionada com sucesso!", 'success');
+            }
+        } catch (error) {
+            console.error("Failed to save promotion:", error);
+            addToast("Erro ao salvar promoção.", 'error');
+        }
+    }, [promotions.length, addToast]);
+
+    const handleDeletePromotion = useCallback(async (promotionId: string) => {
+        try {
+            await firebaseService.deletePromotion(promotionId);
+            addToast("Promoção deletada com sucesso!", 'success');
+        } catch (error) {
+            console.error("Failed to delete promotion:", error);
+            addToast("Erro ao deletar promoção.", 'error');
+        }
+    }, [addToast]);
+    
+    const handleReorderPromotions = useCallback(async (promosToUpdate: { id: string; order: number }[]) => {
+        try {
+            await firebaseService.updatePromotionsOrder(promosToUpdate);
+            addToast("Ordem das promoções atualizada.", 'success');
+        } catch (error) {
+            console.error("Failed to reorder promotions:", error);
+            addToast("Erro ao reordenar promoções.", 'error');
+        }
+    }, [addToast]);
+
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
 
@@ -591,6 +728,7 @@ const App: React.FC = () => {
                         <p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p>
                     </div>
                 ) : !error && (
+                    <>
                     <MenuSection 
                         categories={categories} 
                         products={products} 
@@ -605,6 +743,12 @@ const App: React.FC = () => {
                         showFinalizeButtonTrigger={showFinalizeButtonTrigger}
                         setShowFinalizeButtonTrigger={setShowFinalizeButtonTrigger}
                     />
+                    <PromotionsSection 
+                        promotions={promotions}
+                        products={products}
+                        onAddToCart={handleAddToCart}
+                    />
+                    </>
                 )}
                 <div id="sobre">
                     {siteSettings.contentSections
@@ -621,6 +765,11 @@ const App: React.FC = () => {
                     isStoreOnline={isStoreOnline}
                     siteSettings={siteSettings}
                     orders={orders}
+                    promotions={promotions}
+                    activeTab={activeAdminTab}
+                    setActiveTab={setActiveAdminTab}
+                    activeOrdersTab={activeOrdersTab}
+                    setActiveOrdersTab={setActiveOrdersTab}
                     onSaveProduct={handleSaveProduct}
                     onDeleteProduct={handleDeleteProduct}
                     onProductStatusChange={handleProductStatusChange}
@@ -638,6 +787,9 @@ const App: React.FC = () => {
                     onUpdateOrderReservationTime={handleUpdateOrderReservationTime}
                     onDeleteOrder={handleDeleteOrder}
                     onPermanentDeleteOrder={handlePermanentDeleteOrder}
+                    onSavePromotion={handleSavePromotion}
+                    onDeletePromotion={handleDeletePromotion}
+                    onReorderPromotions={handleReorderPromotions}
                 />
             </main>
 
@@ -689,24 +841,26 @@ const App: React.FC = () => {
                 onPaymentSuccess={handlePixPaymentSuccess}
             />
             
-            <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]">
-                <div className="w-full flex flex-col items-center space-y-4 sm:items-end">
+            <div aria-live="assertive" className={`fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 z-[100] ${siteSettings.notificationSettings?.position === 'bottom-left' ? 'sm:items-end' : 'sm:items-start'}`}>
+                <div className={`w-full flex flex-col items-center space-y-4 ${siteSettings.notificationSettings?.position === 'bottom-left' ? 'sm:items-start' : 'sm:items-end'}`}>
                     {toasts.map((toast) => (
                         <div
                             key={toast.id}
                             className="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden animate-fade-in-up"
                         >
-                            <div className="p-4">
+                             <div className={`p-4 border-l-4 ${toast.type === 'success' ? 'border-green-500' : toast.type === 'error' ? 'border-red-500' : 'border-blue-500'}`}>
                                 <div className="flex items-start">
                                     <div className="flex-shrink-0">
-                                        {toast.type === 'success' ? (
-                                            <i className="fas fa-check-circle h-6 w-6 text-green-500"></i>
-                                        ) : (
-                                            <i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>
-                                        )}
+                                        {toast.type === 'success' && <i className="fas fa-check-circle h-6 w-6 text-green-500"></i>}
+                                        {toast.type === 'error' && <i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>}
+                                        {toast.type === 'info' && <i className="fas fa-info-circle h-6 w-6 text-blue-500"></i>}
                                     </div>
-                                    <div className="ml-3 w-0 flex-1 pt-0.5">
-                                        <p className="text-sm font-medium text-gray-900">{toast.message}</p>
+                                    <div className="ml-3 w-0 flex-1">
+                                        {typeof toast.message === 'string' ? (
+                                            <p className="text-sm font-medium text-gray-900 pt-1">{toast.message}</p>
+                                        ) : (
+                                            <div className="text-sm text-gray-900">{toast.message}</div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
