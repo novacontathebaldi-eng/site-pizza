@@ -19,7 +19,7 @@ export interface Category {
 }
 
 export interface CartItem {
-    id:string;
+    id: string;
     productId: string;
     name: string;
     size: string;
@@ -37,10 +37,9 @@ export interface OrderDetails {
     changeNeeded: boolean;
     changeAmount?: string;
     notes: string;
-    reservationTime?: string; // Added for dine-in
+    reservationTime?: string;
 }
 
-// New Types for Order Management
 export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted';
 export type PaymentStatus = 'pending' | 'paid';
 
@@ -62,12 +61,11 @@ export interface Order {
     changeAmount?: string;
     notes?: string;
     status: OrderStatus;
-    paymentStatus: PaymentStatus; // New field for payment status
-    createdAt: any; // Firestore Timestamp
-    pickupTimeEstimate?: string; // Added for pickup
-    pixChargeId?: string; // To store the InfinitePay transaction ID
+    paymentStatus: PaymentStatus;
+    createdAt: any;
+    pickupTimeEstimate?: string;
+    pixChargeId?: string;
 }
-
 
 export interface ContentSectionListItem {
     id: string;
@@ -96,41 +94,30 @@ export interface FooterLink {
     isVisible?: boolean;
 }
 
-export interface AnnouncementAudio {
-    id: string;
-    name: string;
-    url: string;
-}
-
 export interface AudioSettings {
     notificationSound: string;
     notificationVolume: number;
-    backgroundMusicEnabled: boolean;
     backgroundMusic: string;
-    backgroundMusicVolume: number;
-    backgroundMusicLoop: boolean;
-    announcementAudios: AnnouncementAudio[];
+    backgroundVolume: number;
 }
 
 export interface NotificationSettings {
-    enabled: boolean;
-    notifyOnNewOrder: boolean;
-    position: 'top-right' | 'bottom-left';
-    duration: number; // in seconds
+    browserNotificationsEnabled: boolean;
 }
 
-export interface Promotion {
+export interface PromotionPage {
     id: string;
     order: number;
-    active: boolean;
+    isVisible: boolean;
     title: string;
-    description: string;
-    layout: 'textLeft_mediaRight' | 'mediaLeft_textRight' | 'mediaFull_textOverlay' | 'productGridOnly';
-    includeMedia: boolean;
-    videoUrl?: string;
-    imageUrl?: string;
-    includeProducts: boolean;
-    productIds: string[];
+    text: string;
+    videoUrl: string;
+    componentOrder: ('video' | 'text' | 'products')[];
+    featuredProductIds: string[];
+    isTitleVisible: boolean;
+    isTextVisible: boolean;
+    isVideoVisible: boolean;
+    isProductsVisible: boolean;
 }
 
 export interface SiteSettings {
@@ -141,6 +128,7 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
-    audioSettings: AudioSettings;
-    notificationSettings: NotificationSettings;
+    promotionSectionPosition: 'above' | 'below';
+    audioSettings?: AudioSettings;
+    notificationSettings?: NotificationSettings;
 }
