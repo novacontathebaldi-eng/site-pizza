@@ -45,7 +45,9 @@ const App: React.FC = () => {
     const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
     
     const prevPendingOrdersCount = useRef(0);
-    const notificationAudioRef = useRef<HTMLAudioElement | null>(null);
+    // FIX: Initialize the audio element directly in the ref. This ensures a single,
+    // persistent audio player exists for the entire app lifecycle, preventing it from being null.
+    const notificationAudioRef = useRef<HTMLAudioElement>(new Audio());
     const isAudioUnlocked = useRef(false);
 
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
@@ -191,12 +193,10 @@ const App: React.FC = () => {
             // Function to play sound, relies on the audio context being unlocked
             const playSound = () => {
                 if (isAudioUnlocked.current && siteSettings.audioSettings?.notificationSound) {
-                    if (!notificationAudioRef.current) {
-                        notificationAudioRef.current = new Audio();
-                    }
-                    notificationAudioRef.current.src = siteSettings.audioSettings.notificationSound;
-                    notificationAudioRef.current.volume = siteSettings.audioSettings.notificationVolume ?? 0.5;
-                    notificationAudioRef.current.play().catch(e => console.error("Real-time audio playback failed:", e));
+                    const player = notificationAudioRef.current;
+                    player.src = siteSettings.audioSettings.notificationSound;
+                    player.volume = siteSettings.audioSettings.notificationVolume ?? 0.5;
+                    player.play().catch(e => console.error("Real-time audio playback failed:", e));
                 }
             };
 
@@ -204,9 +204,6 @@ const App: React.FC = () => {
             const showBrowserNotification = () => {
                 if (siteSettings.notificationSettings?.browserNotificationsEnabled && Notification.permission === 'granted') {
                     const newOrder = orders.find(o => o.status === 'pending');
-                    // FIX: The 'renotify' property is deprecated and causes a TypeScript error.
-                    // The 'tag' property ensures that new notifications replace old ones.
-                    // The separate audio notification handles getting the user's attention.
                     new Notification('Novo Pedido Recebido!', {
                         body: `Você tem um novo pedido de ${newOrder?.customer.name || 'um cliente'}.`,
                         icon: '/assets/logo para icones.png',

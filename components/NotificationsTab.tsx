@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { SiteSettings } from '../types';
-import { messaging } from '../services/firebase';
-import * as firebaseService from '../services/firebaseService';
 
 interface NotificationsTabProps {
     settings: SiteSettings;
@@ -12,52 +10,28 @@ export const NotificationsTab: React.FC<NotificationsTabProps> = ({ settings, on
     const [notificationSettings, setNotificationSettings] = useState(settings.notificationSettings!);
     const [permissionStatus, setPermissionStatus] = useState(Notification.permission);
     const [isSaving, setIsSaving] = useState(false);
-    const [isSubscribing, setIsSubscribing] = useState(false);
-    const [isSupported, setIsSupported] = useState(false);
-    
+
     useEffect(() => {
-        setIsSupported('Notification' in window && 'serviceWorker' in navigator && messaging !== null);
         setNotificationSettings(settings.notificationSettings!);
     }, [settings]);
 
-    const requestPermissionAndSubscribe = async () => {
-        if (!isSupported || !messaging) {
-            alert("As notificações push não são suportadas neste navegador.");
-            return;
-        }
-        setIsSubscribing(true);
-        try {
-            const currentToken = await messaging.getToken({ vapidKey: 'BGE3yS8b06g81179YJ2-dFE98w-fD1RkE2fFzOa1B8w1B8w1B8w1B8w1B8w1B8w1B8w1B8w1B8w' });
-            if (currentToken) {
-                await firebaseService.saveFcmToken(currentToken);
-                setPermissionStatus('granted');
-                setNotificationSettings(prev => ({ ...prev, browserNotificationsEnabled: true }));
-                alert("Notificações ativadas com sucesso!");
-                 new Notification('Santa Sensação', {
-                    body: 'Ótimo! As notificações push estão ativadas.',
+    const handleRequestPermission = () => {
+        Notification.requestPermission().then(status => {
+            setPermissionStatus(status);
+            if (status === 'granted') {
+                setNotificationSettings(prev => ({...prev, browserNotificationsEnabled: true }));
+                new Notification('Santa Sensação', {
+                    body: 'Ótimo! As notificações do navegador estão ativadas.',
                     icon: '/assets/logo para icones.png'
                 });
-            } else {
-                setPermissionStatus(Notification.permission);
-                alert("Permissão de notificação necessária. Por favor, aceite a solicitação do navegador.");
             }
-        } catch (err) {
-            console.error('An error occurred while retrieving token. ', err);
-            setPermissionStatus(Notification.permission);
-            if (Notification.permission === 'denied') {
-                alert("As notificações foram bloqueadas. Você precisa permitir nas configurações do seu navegador.");
-            } else {
-                alert("Não foi possível ativar as notificações. Tente novamente.");
-            }
-        } finally {
-            setIsSubscribing(false);
-        }
+        });
     };
     
     const handleToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
         const isEnabled = e.target.checked;
         if (permissionStatus !== 'granted' && isEnabled) {
-            alert('Você precisa permitir as notificações no navegador primeiro clicando no botão "Habilitar Notificações".');
+            alert('Você precisa permitir as notificações no navegador primeiro.');
             e.target.checked = false;
             return;
         }
@@ -88,13 +62,7 @@ export const NotificationsTab: React.FC<NotificationsTabProps> = ({ settings, on
     return (
         <form onSubmit={handleSubmit} className="space-y-8 animate-fade-in-up">
              <div>
-                <h3 className="text-xl font-bold mb-4">Notificações Push no Navegador</h3>
-                 {!isSupported && (
-                     <div className="p-4 mb-4 bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800">
-                         <p className="font-bold">Navegador Incompatível</p>
-                         <p className="text-sm">Seu navegador atual não suporta notificações push, que são necessárias para receber alertas com o site fechado.</p>
-                     </div>
-                 )}
+                <h3 className="text-xl font-bold mb-4">Notificações no Navegador</h3>
                 <div className="p-4 bg-gray-50 rounded-lg border space-y-4">
                     <div className="flex justify-between items-center">
                         <span className="font-semibold">Status da Permissão:</span>
@@ -104,11 +72,11 @@ export const NotificationsTab: React.FC<NotificationsTabProps> = ({ settings, on
                         </span>
                     </div>
 
-                    {permissionStatus === 'default' && isSupported && (
+                    {permissionStatus === 'default' && (
                         <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-md">
-                             <p className="text-blue-800 mb-3">Para receber alertas de novos pedidos mesmo com o site fechado, você precisa autorizar as notificações push.</p>
-                            <button type="button" onClick={requestPermissionAndSubscribe} disabled={isSubscribing} className="bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600 disabled:bg-blue-300">
-                                {isSubscribing ? <><i className="fas fa-spinner fa-spin mr-2"></i>Aguardando...</> : <><i className="fas fa-bell mr-2"></i>Habilitar Notificações</>}
+                             <p className="text-blue-800 mb-3">Para receber alertas de novos pedidos, você precisa autorizar as notificações no navegador.</p>
+                            <button type="button" onClick={handleRequestPermission} className="bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600">
+                                <i className="fas fa-bell mr-2"></i>Habilitar Notificações
                             </button>
                         </div>
                     )}
@@ -121,7 +89,7 @@ export const NotificationsTab: React.FC<NotificationsTabProps> = ({ settings, on
 
                     <div className="flex justify-between items-center pt-4 border-t">
                         <label htmlFor="enable-notifications-toggle" className="font-semibold cursor-pointer">
-                            Receber notificações push de novos pedidos
+                            Ativar notificações de novos pedidos
                         </label>
                         <div className="relative inline-flex items-center cursor-pointer">
                             <input 
