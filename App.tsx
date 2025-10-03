@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, PromotionPage } from './types';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, Promotion } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
 import { DynamicContentSection } from './components/DynamicContentSection';
+import { PromotionsSection } from './components/PromotionsSection';
 import { ContactSection } from './components/ContactSection';
 import { AdminSection } from './components/AdminSection';
 import { Footer } from './components/Footer';
@@ -13,21 +14,87 @@ import { PixPaymentModal } from './components/PixPaymentModal';
 import { db } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
-import { PromotionSection } from './components/PromotionSection';
-import { ImagePreloader } from './components/ImagePreloader';
-import { defaultSiteSettings } from './services/defaultSettings';
+// Static assets for default values
+import defaultLogo from './assets/logo.png';
+import defaultHeroBg from './assets/ambiente-pizzaria.webp';
+import defaultAboutImg from './assets/sobre-imagem.webp';
 
 interface Toast {
     id: number;
-    message: string;
-    type: 'success' | 'error';
+    message: React.ReactNode;
+    type: 'success' | 'error' | 'info';
+    duration?: number;
 }
+
+const defaultSiteSettings: SiteSettings = {
+    logoUrl: defaultLogo,
+    heroSlogan: "A pizza nº 1 do ES",
+    heroTitle: "Pizzaria Santa Sensação",
+    heroSubtitle: "A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.",
+    heroBgUrl: defaultHeroBg,
+    contentSections: [
+        {
+            id: 'section-1',
+            order: 0,
+            isVisible: true,
+            isTagVisible: true,
+            tagIcon: "fas fa-award",
+            imageUrl: defaultAboutImg,
+            tag: "Nossa Conquista",
+            title: "A Melhor Pizza do Estado, Assinada por um Mestre",
+            description: "Em parceria com o renomado mestre pizzaiolo Luca Lonardi, a Santa Sensação eleva a pizza a um novo patamar. Fomos os grandes vencedores do concurso Panshow 2025, um reconhecimento que celebra nossa dedicação aos ingredientes frescos, massa de fermentação natural e, acima de tudo, a paixão por criar sabores inesquecíveis. Cada pizza que sai do nosso forno a lenha carrega a assinatura de um campeão e a promessa de uma experiência única.",
+            list: [
+                { id: 'item-1-1', icon: "fas fa-award", text: "Vencedora do Panshow 2025" },
+                { id: 'item-1-2', icon: "fas fa-user-check", text: "Assinada pelo Mestre Luca Lonardi" },
+                { id: 'item-1-3', icon: "fas fa-leaf", text: "Ingredientes frescos e selecionados" },
+                { id: 'item-1-4', icon: "fas fa-fire-alt", text: "Forno a lenha tradicional" }
+            ]
+        },
+        {
+            id: 'section-2',
+            order: 1,
+            isVisible: true,
+            isTagVisible: true,
+            tagIcon: 'fas fa-seedling',
+            imageUrl: 'https://picsum.photos/seed/ingredients/800/600',
+            tag: "Qualidade e Tradição",
+            title: "Ingredientes Frescos, Sabor Incomparável",
+            description: "Nossa paixão pela pizza começa na escolha de cada ingrediente. Trabalhamos com produtores locais para garantir o frescor e a qualidade que você sente em cada fatia. Da nossa massa de fermentação lenta aos tomates italianos, tudo é pensado para criar uma experiência única.",
+            list: [
+                { id: 'item-2-1', icon: 'fas fa-bread-slice', text: "Massa de fermentação natural de 48h" },
+                { id: 'item-2-2', icon: 'fas fa-pepper-hot', text: "Tomates italianos San Marzano" },
+                { id: 'item-2-3', icon: 'fas fa-cheese', text: "Mozzarella fresca e queijos selecionados" },
+                { id: 'item-2-4', icon: 'fas fa-leaf', text: "Manjericão e ervas da nossa horta" }
+            ]
+        }
+    ],
+    footerLinks: [
+        { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996500341', isVisible: true },
+        { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/santasensacao.sl', isVisible: true },
+        { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin', isVisible: true }
+    ],
+    audioSettings: {
+        notificationSound: '/assets/audio/sino.mp3',
+        notificationVolume: 0.8,
+        backgroundMusicEnabled: false,
+        backgroundMusic: '',
+        backgroundMusicVolume: 0.5,
+        backgroundMusicLoop: true,
+        announcementAudios: [],
+    },
+    notificationSettings: {
+        enabled: true,
+        notifyOnNewOrder: true,
+        position: 'top-right',
+        duration: 8
+    }
+};
 
 const App: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
-    const [promotions, setPromotions] = useState<PromotionPage[]>([]);
+    const [promotions, setPromotions] = useState<Promotion[]>([]);
     const [isStoreOnline, setIsStoreOnline] = useState<boolean>(true);
     const [cart, setCart] = useState<CartItem[]>([]);
     const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
@@ -41,13 +108,20 @@ const App: React.FC = () => {
     const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
     const [payingOrder, setPayingOrder] = useState<Order | null>(null);
+
+    // Lifted state from AdminSection
+    const [activeAdminTab, setActiveAdminTab] = useState('status');
+    const [activeOrdersTab, setActiveOrdersTab] = useState<OrderStatus>('accepted');
+    const prevPendingOrderIds = useRef<Set<string>>(new Set());
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
     
-    const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+    const addToast = useCallback((message: React.ReactNode, type: 'success' | 'error' | 'info' = 'success', duration: number = 4000) => {
         const id = Date.now();
-        setToasts(prevToasts => [...prevToasts, { id, message, type }]);
+        setToasts(prevToasts => [...prevToasts, { id, message, type, duration }]);
         setTimeout(() => {
             setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
-        }, 4000);
+        }, duration);
     }, []);
 
     useEffect(() => {
@@ -58,7 +132,7 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        const sectionIds = ['inicio', 'promocoes', 'cardapio', 'sobre', 'contato'];
+        const sectionIds = ['inicio', 'cardapio', 'promocoes', 'sobre', 'contato'];
         const sectionElements = sectionIds.map(id => document.getElementById(id));
         
         const observerOptions = {
@@ -72,8 +146,8 @@ const App: React.FC = () => {
                 if (entry.isIntersecting) {
                     const idToTitle: { [key: string]: string } = {
                         'inicio': 'Início',
-                        'promocoes': 'Promoções',
                         'cardapio': 'Cardápio',
+                        'promocoes': 'Promoções',
                         'sobre': 'Sobre Nós',
                         'contato': 'Contato'
                     };
@@ -91,7 +165,7 @@ const App: React.FC = () => {
                 if (el) observer.unobserve(el);
             });
         };
-    }, [promotions]);
+    }, [promotions]); // Re-run when promotions are loaded
 
     useEffect(() => {
         if (!db) {
@@ -110,15 +184,7 @@ const App: React.FC = () => {
         const unsubSettings = settingsDocRef.onSnapshot(doc => {
             if (doc.exists) {
                  const data = doc.data() as Partial<SiteSettings>;
-                 setSiteSettings(prev => ({
-                    ...defaultSiteSettings,
-                    ...prev,
-                    ...data,
-                    audioSettings: { ...defaultSiteSettings.audioSettings, ...prev.audioSettings, ...data.audioSettings },
-                    notificationSettings: { ...defaultSiteSettings.notificationSettings, ...prev.notificationSettings, ...data.notificationSettings },
-                 }));
-            } else {
-                firebaseService.updateSiteSettings(defaultSiteSettings);
+                 setSiteSettings(prev => ({ ...defaultSiteSettings, ...prev, ...data }));
             }
         }, err => handleConnectionError(err, "site settings"));
 
@@ -140,22 +206,19 @@ const App: React.FC = () => {
             setProducts(fetchedProducts);
         }, err => handleConnectionError(err, "products"));
 
+        const promotionsQuery = db.collection('promotions').orderBy('order');
+        const unsubPromotions = promotionsQuery.onSnapshot(snapshot => {
+            const fetchedPromotions: Promotion[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Promotion));
+            setPromotions(fetchedPromotions);
+        }, err => handleConnectionError(err, "promotions"));
+
         const ordersQuery = db.collection('orders').orderBy('createdAt', 'desc');
         const unsubOrders = ordersQuery.onSnapshot(snapshot => {
             const fetchedOrders: Order[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
             setOrders(fetchedOrders);
+            setIsLoading(false);
+            setError(null);
         }, err => handleConnectionError(err, "orders"));
-
-        const promotionsQuery = db.collection('promotions').orderBy('order');
-        const unsubPromotions = promotionsQuery.onSnapshot(snapshot => {
-            const fetchedPromotions: PromotionPage[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PromotionPage));
-            setPromotions(fetchedPromotions);
-        }, err => handleConnectionError(err, "promotions"));
-
-        const unsubLoader = productsQuery.onSnapshot(() => {
-             setIsLoading(false);
-             setError(null);
-        });
 
         return () => {
             unsubSettings();
@@ -164,9 +227,55 @@ const App: React.FC = () => {
             unsubProducts();
             unsubOrders();
             unsubPromotions();
-            unsubLoader();
         };
     }, []);
+
+    // New Order Notification Logic
+    useEffect(() => {
+        const currentPendingOrders = orders.filter(o => o.status === 'pending');
+        const currentPendingIds = new Set(currentPendingOrders.map(o => o.id));
+
+        if (prevPendingOrderIds.current.size > 0) { // Avoid notification on initial load
+            const newOrders = currentPendingOrders.filter(o => !prevPendingOrderIds.current.has(o.id));
+            if (newOrders.length > 0 && siteSettings.notificationSettings?.enabled && siteSettings.notificationSettings?.notifyOnNewOrder) {
+                const newOrder = newOrders[0]; // Notify for the first new one
+                const totalItems = newOrder.items.reduce((sum, item) => sum + item.quantity, 0);
+
+                const toastMessage = (
+                    <div>
+                        <p className="font-bold"><i className="fas fa-receipt mr-2"></i>Novo Pedido Recebido!</p>
+                        <p className="text-sm">Cliente: {newOrder.customer.name}</p>
+                        <p className="text-sm">Itens: {totalItems}</p>
+                        <button 
+                            onClick={() => {
+                                setActiveAdminTab('orders');
+                                setActiveOrdersTab('pending');
+                                // Scroll to admin section
+                                document.getElementById('admin')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className="mt-2 w-full text-center bg-accent text-white font-semibold py-1 px-3 rounded-md text-sm hover:bg-opacity-80">
+                            Ver Pedido
+                        </button>
+                    </div>
+                );
+                
+                addToast(toastMessage, 'info', (siteSettings.notificationSettings.duration || 8) * 1000);
+                
+                // Play sound
+                if (siteSettings.audioSettings?.notificationSound) {
+                    if (!audioRef.current) {
+                        audioRef.current = new Audio();
+                    }
+                    audioRef.current.src = siteSettings.audioSettings.notificationSound;
+                    audioRef.current.volume = siteSettings.audioSettings.notificationVolume ?? 0.8;
+                    audioRef.current.play().catch(e => console.error("Error playing sound:", e));
+                }
+            }
+        }
+
+        prevPendingOrderIds.current = currentPendingIds;
+    }, [orders, siteSettings, addToast]);
+
 
     useEffect(() => {
         if (categories.length > 0 && !activeMenuCategory) {
@@ -304,7 +413,7 @@ const App: React.FC = () => {
 
         try {
             const docRef = await firebaseService.addOrder(newOrderData);
-            const createdOrder: Order = { ...newOrderData, id: docRef.id, createdAt: new Date() };
+            const createdOrder: Order = { ...newOrderData, id: docRef.id, createdAt: new Date() }; // Create a temporary full order object
             addToast("Pedido pré-salvo, aguardando pagamento.", 'success');
             setIsCheckoutModalOpen(false);
             setPayingOrder(createdOrder);
@@ -327,6 +436,7 @@ const App: React.FC = () => {
         setPayingOrder(null);
         setIsCartOpen(false);
     }, []);
+
 
     const handleSaveProduct = useCallback(async (product: Product) => {
         try {
@@ -440,80 +550,46 @@ const App: React.FC = () => {
         }
     }, [addToast]);
 
-    const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }, audioFiles: { [key: string]: File | null }) => {
+    const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => {
         try {
-            const settingsToUpdate = JSON.parse(JSON.stringify(settings)); 
+            const settingsToUpdate = JSON.parse(JSON.stringify(settings)); // Deep copy
 
             for (const key in files) {
                 const file = files[key];
                 if (file) {
-                    const url = await firebaseService.uploadSiteAsset(file, key);
-                    
-                    if (key === 'logo') settingsToUpdate.logoUrl = url;
-                    else if (key === 'heroBg') settingsToUpdate.heroBgUrl = url;
-                    else { 
-                        const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
-                        if (sectionIndex > -1) settingsToUpdate.contentSections[sectionIndex].imageUrl = url;
+                    let url;
+                    if (file.type.startsWith('audio/')) {
+                         url = await firebaseService.uploadSiteAudio(file, key);
+                         const audioId = key.split('-')[1]; // e.g., key is 'audio-168...
+                         const audioIndex = settingsToUpdate.audioSettings.announcementAudios.findIndex((a: any) => a.id === audioId);
+                         if(audioIndex > -1) {
+                             settingsToUpdate.audioSettings.announcementAudios[audioIndex].url = url;
+                         }
+                    } else {
+                         url = await firebaseService.uploadSiteAsset(file, key);
+                         if (key === 'logo') {
+                            settingsToUpdate.logoUrl = url;
+                        } else if (key === 'heroBg') {
+                            settingsToUpdate.heroBgUrl = url;
+                        } else if (key.startsWith('notificationSound')) {
+                            settingsToUpdate.audioSettings.notificationSound = url;
+                        } else if (key.startsWith('backgroundMusic')) {
+                            settingsToUpdate.audioSettings.backgroundMusic = url;
+                        } else { // It's a content section file, key is the section ID
+                            const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
+                            if (sectionIndex > -1) {
+                                settingsToUpdate.contentSections[sectionIndex].imageUrl = url;
+                            }
+                        }
                     }
-                }
-            }
-            
-            for (const key in audioFiles) {
-                const file = audioFiles[key];
-                if(file) {
-                    const url = await firebaseService.uploadAudioFile(file, key);
-                    if(key === 'notificationSound') settingsToUpdate.audioSettings.notificationSound = url;
-                    if(key === 'backgroundMusic') settingsToUpdate.audioSettings.backgroundMusic = url;
                 }
             }
 
             await firebaseService.updateSiteSettings(settingsToUpdate);
-            addToast("Configurações do site salvas com sucesso!", 'success');
+            addToast("Personalização do site salva com sucesso!", 'success');
         } catch (error) {
             console.error("Failed to save site settings:", error);
             addToast("Erro ao salvar as configurações do site.", 'error');
-        }
-    }, [addToast]);
-    
-    const handleSavePromotion = useCallback(async (promotion: PromotionPage) => {
-        try {
-            await firebaseService.savePromotion(promotion);
-            addToast("Promoção salva com sucesso!", 'success');
-        } catch (error) {
-            console.error("Failed to save promotion:", error);
-            addToast("Erro ao salvar promoção.", 'error');
-        }
-    }, [addToast]);
-
-    const handleDeletePromotion = useCallback(async (promotionId: string) => {
-        try {
-            await firebaseService.deletePromotion(promotionId);
-            addToast("Promoção deletada com sucesso!", 'success');
-        } catch (error) {
-            console.error("Failed to delete promotion:", error);
-            addToast("Erro ao deletar promoção.", 'error');
-        }
-    }, [addToast]);
-
-    const handleReorderPromotions = useCallback(async (promotionsToUpdate: { id: string; order: number }[]) => {
-        try {
-            await firebaseService.updatePromotionsOrder(promotionsToUpdate);
-            addToast("Ordem das promoções atualizada.", 'success');
-        } catch (error) {
-            console.error("Failed to reorder promotions:", error);
-            addToast("Erro ao reordenar promoções.", 'error');
-        }
-    }, [addToast]);
-
-    const handleRestoreDefaults = useCallback(async () => {
-        if (window.confirm("Tem certeza que deseja restaurar todas as configurações para o padrão original? Isso afetará a aparência, os links e as configurações de áudio/notificação.")) {
-            try {
-                await firebaseService.restoreDefaultSettings();
-                addToast("Configurações restauradas para o padrão.", 'success');
-            } catch (error) {
-                console.error("Failed to restore default settings:", error);
-                addToast("Erro ao restaurar as configurações.", 'error');
-            }
         }
     }, [addToast]);
     
@@ -578,23 +654,55 @@ const App: React.FC = () => {
         }
     }, [addToast]);
 
+    // Promotion Handlers
+    const handleSavePromotion = useCallback(async (promotion: Promotion, imageFile: File | null) => {
+        try {
+            let finalImageUrl = promotion.imageUrl;
+            if (imageFile) {
+                finalImageUrl = await firebaseService.uploadSiteAsset(imageFile, `promo-${promotion.id || Date.now()}`);
+            }
+
+            const promoToSave: Promotion = { ...promotion, imageUrl: finalImageUrl };
+            const { id, ...dataToSave } = promoToSave;
+
+            if (id) {
+                await firebaseService.updatePromotion(id, dataToSave);
+                addToast("Promoção atualizada com sucesso!", 'success');
+            } else {
+                await firebaseService.addPromotion({ ...dataToSave, order: promotions.length });
+                addToast("Promoção adicionada com sucesso!", 'success');
+            }
+        } catch (error: any) {
+            console.error("Failed to save promotion:", error);
+            addToast(`Erro ao salvar promoção: ${error.message || 'Erro desconhecido'}`, 'error');
+        }
+    }, [promotions.length, addToast]);
+
+    const handleDeletePromotion = useCallback(async (promotionId: string) => {
+        try {
+            await firebaseService.deletePromotion(promotionId);
+            addToast("Promoção deletada com sucesso!", 'success');
+        } catch (error: any) {
+            console.error("Failed to delete promotion:", error);
+            addToast(`Erro ao deletar promoção: ${error.message || 'Erro desconhecido'}`, 'error');
+        }
+    }, [addToast]);
+    
+    const handleReorderPromotions = useCallback(async (promosToUpdate: { id: string; order: number }[]) => {
+        try {
+            await firebaseService.updatePromotionsOrder(promosToUpdate);
+            addToast("Ordem das promoções atualizada.", 'success');
+        } catch (error) {
+            console.error("Failed to reorder promotions:", error);
+            addToast("Erro ao reordenar promoções.", 'error');
+        }
+    }, [addToast]);
+
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
-    
-    const promotionPages = useMemo(() => promotions.filter(p => p.isVisible).sort((a, b) => a.order - b.order), [promotions]);
-    const imagePreloadList = useMemo(() => {
-        const productImages = products.map(p => p.imageUrl);
-        const promotionProductImages = promotions.flatMap(promo => 
-            promo.featuredProductIds
-                .map(id => products.find(p => p.id === id)?.imageUrl)
-                .filter((url): url is string => !!url)
-        );
-        return [...new Set([...productImages, ...promotionProductImages])];
-    }, [products, promotions]);
 
     return (
         <div className="flex flex-col min-h-screen">
-            <ImagePreloader imageUrls={imagePreloadList} />
             <Header cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} activeSection={activeSection} settings={siteSettings} />
             
             <div id="status-banner" className={`bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
@@ -621,11 +729,6 @@ const App: React.FC = () => {
                     </div>
                 ) : !error && (
                     <>
-                    <div id="promocoes">
-                        {siteSettings.promotionSectionPosition === 'above' && promotionPages.map(promo => (
-                            <PromotionSection key={promo.id} promotion={promo} allProducts={products} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} />
-                        ))}
-                    </div>
                     <MenuSection 
                         categories={categories} 
                         products={products} 
@@ -640,11 +743,11 @@ const App: React.FC = () => {
                         showFinalizeButtonTrigger={showFinalizeButtonTrigger}
                         setShowFinalizeButtonTrigger={setShowFinalizeButtonTrigger}
                     />
-                     <div id="promocoes-below">
-                         {siteSettings.promotionSectionPosition !== 'above' && promotionPages.map(promo => (
-                            <PromotionSection key={promo.id} promotion={promo} allProducts={products} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} />
-                        ))}
-                    </div>
+                    <PromotionsSection 
+                        promotions={promotions}
+                        products={products}
+                        onAddToCart={handleAddToCart}
+                    />
                     </>
                 )}
                 <div id="sobre">
@@ -663,6 +766,10 @@ const App: React.FC = () => {
                     siteSettings={siteSettings}
                     orders={orders}
                     promotions={promotions}
+                    activeTab={activeAdminTab}
+                    setActiveTab={setActiveAdminTab}
+                    activeOrdersTab={activeOrdersTab}
+                    setActiveOrdersTab={setActiveOrdersTab}
                     onSaveProduct={handleSaveProduct}
                     onDeleteProduct={handleDeleteProduct}
                     onProductStatusChange={handleProductStatusChange}
@@ -683,7 +790,6 @@ const App: React.FC = () => {
                     onSavePromotion={handleSavePromotion}
                     onDeletePromotion={handleDeletePromotion}
                     onReorderPromotions={handleReorderPromotions}
-                    onRestoreDefaults={handleRestoreDefaults}
                 />
             </main>
 
@@ -735,24 +841,26 @@ const App: React.FC = () => {
                 onPaymentSuccess={handlePixPaymentSuccess}
             />
             
-            <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]">
-                <div className="w-full flex flex-col items-center space-y-4 sm:items-end">
+            <div aria-live="assertive" className={`fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 z-[100] ${siteSettings.notificationSettings?.position === 'bottom-left' ? 'sm:items-end' : 'sm:items-start'}`}>
+                <div className={`w-full flex flex-col items-center space-y-4 ${siteSettings.notificationSettings?.position === 'bottom-left' ? 'sm:items-start' : 'sm:items-end'}`}>
                     {toasts.map((toast) => (
                         <div
                             key={toast.id}
                             className="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden animate-fade-in-up"
                         >
-                            <div className="p-4">
+                             <div className={`p-4 border-l-4 ${toast.type === 'success' ? 'border-green-500' : toast.type === 'error' ? 'border-red-500' : 'border-blue-500'}`}>
                                 <div className="flex items-start">
                                     <div className="flex-shrink-0">
-                                        {toast.type === 'success' ? (
-                                            <i className="fas fa-check-circle h-6 w-6 text-green-500"></i>
-                                        ) : (
-                                            <i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>
-                                        )}
+                                        {toast.type === 'success' && <i className="fas fa-check-circle h-6 w-6 text-green-500"></i>}
+                                        {toast.type === 'error' && <i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>}
+                                        {toast.type === 'info' && <i className="fas fa-info-circle h-6 w-6 text-blue-500"></i>}
                                     </div>
-                                    <div className="ml-3 w-0 flex-1 pt-0.5">
-                                        <p className="text-sm font-medium text-gray-900">{toast.message}</p>
+                                    <div className="ml-3 w-0 flex-1">
+                                        {typeof toast.message === 'string' ? (
+                                            <p className="text-sm font-medium text-gray-900 pt-1">{toast.message}</p>
+                                        ) : (
+                                            <div className="text-sm text-gray-900">{toast.message}</div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
