@@ -4,6 +4,8 @@ import { SiteSettings } from '../types';
 interface AudioTabProps {
     settings: SiteSettings;
     onSave: (settings: SiteSettings, files: {}, audioFiles: { [key: string]: File | null }) => Promise<void>;
+    notificationAudioRef: React.MutableRefObject<HTMLAudioElement | null>;
+    onUnlockAudio: () => void;
 }
 
 const defaultSounds = [
@@ -14,7 +16,7 @@ const defaultSounds = [
     { name: 'Padrão 5 (Digital)', value: '/assets/audio/notification5.mp3' },
 ];
 
-export const AudioTab: React.FC<AudioTabProps> = ({ settings, onSave }) => {
+export const AudioTab: React.FC<AudioTabProps> = ({ settings, onSave, notificationAudioRef, onUnlockAudio }) => {
     const [audioSettings, setAudioSettings] = useState(settings.audioSettings!);
     const [audioFiles, setAudioFiles] = useState<{ [key: string]: File | null }>({
         notificationSound: null,
@@ -23,20 +25,32 @@ export const AudioTab: React.FC<AudioTabProps> = ({ settings, onSave }) => {
     const [isSaving, setIsSaving] = useState(false);
     const [playingType, setPlayingType] = useState<'notification' | 'background' | null>(null);
     
-    const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+    // This component now uses a local player ONLY for background music previews.
+    // Notification sounds are handled by the shared ref from App.tsx.
+    const backgroundAudioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
         setAudioSettings(settings.audioSettings!);
-        if (!audioPlayerRef.current) {
-            audioPlayerRef.current = new Audio();
-            audioPlayerRef.current.onended = () => setPlayingType(null);
-            audioPlayerRef.current.onpause = () => setPlayingType(null);
+        
+        // Setup shared notification player
+        if (notificationAudioRef.current) {
+            notificationAudioRef.current.onended = () => setPlayingType(null);
+            notificationAudioRef.current.onpause = () => setPlayingType(null);
         }
+
+        // Setup local background music player
+        if (!backgroundAudioPlayerRef.current) {
+            backgroundAudioPlayerRef.current = new Audio();
+            backgroundAudioPlayerRef.current.onended = () => setPlayingType(null);
+            backgroundAudioPlayerRef.current.onpause = () => setPlayingType(null);
+        }
+
         return () => {
-            audioPlayerRef.current?.pause();
+            notificationAudioRef.current?.pause();
+            backgroundAudioPlayerRef.current?.pause();
             setPlayingType(null);
         };
-    }, [settings]);
+    }, [settings, notificationAudioRef]);
 
     const handleChange = (field: keyof typeof audioSettings, value: any) => {
         setAudioSettings(prev => ({ ...prev, [field]: value }));
@@ -45,7 +59,8 @@ export const AudioTab: React.FC<AudioTabProps> = ({ settings, onSave }) => {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'notificationSound' | 'backgroundMusic') => {
         const file = e.target.files?.[0];
         if (file) {
-            audioPlayerRef.current?.pause();
+            notificationAudioRef.current?.pause();
+            backgroundAudioPlayerRef.current?.pause();
             setAudioFiles(prev => ({ ...prev, [field]: file }));
             const fileUrl = URL.createObjectURL(file);
             setAudioSettings(prev => ({...prev, [field]: fileUrl}));
@@ -53,26 +68,36 @@ export const AudioTab: React.FC<AudioTabProps> = ({ settings, onSave }) => {
     };
 
     const toggleTestSound = (type: 'notification' | 'background') => {
-        const player = audioPlayerRef.current;
+        // This first user interaction is CRITICAL to unlock audio playback in the browser
+        onUnlockAudio();
+
+        const isNotification = type === 'notification';
+        const player = isNotification ? notificationAudioRef.current : backgroundAudioPlayerRef.current;
         if (!player) return;
 
-        const soundUrl = type === 'notification' ? audioSettings.notificationSound : audioSettings.backgroundMusic;
-        const volume = type === 'notification' ? audioSettings.notificationVolume : audioSettings.backgroundVolume;
+        const soundUrl = isNotification ? audioSettings.notificationSound : audioSettings.backgroundMusic;
+        const volume = isNotification ? audioSettings.notificationVolume : audioSettings.backgroundVolume;
 
         if (!soundUrl) return;
 
-        // If clicking the button of the sound that is already playing, pause it.
         if (playingType === type) {
             player.pause();
         } else {
-            // If another sound is playing or no sound is playing, start the new sound.
+            // Stop any other sound that might be playing
+            if (playingType) {
+                 (isNotification ? backgroundAudioPlayerRef.current : notificationAudioRef.current)?.pause();
+            }
+            if (!isNotification && backgroundAudioPlayerRef.current) {
+                 backgroundAudioPlayerRef.current.loop = true;
+            }
+            
             player.src = soundUrl;
             player.volume = volume;
             player.play()
                 .then(() => setPlayingType(type))
                 .catch(err => {
                     console.error("Error playing audio:", err);
-                    alert("Não foi possível tocar o áudio. Pode ser necessário interagir com a página primeiro.");
+                    alert("Não foi possível tocar o áudio. Seu navegador pode estar bloqueando a reprodução automática.");
                     setPlayingType(null);
                 });
         }
@@ -81,7 +106,8 @@ export const AudioTab: React.FC<AudioTabProps> = ({ settings, onSave }) => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
-        audioPlayerRef.current?.pause();
+        notificationAudioRef.current?.pause();
+        backgroundAudioPlayerRef.current?.pause();
         const settingsToSave = { ...settings, audioSettings };
         await onSave(settingsToSave, {}, audioFiles);
         setAudioFiles({ notificationSound: null, backgroundMusic: null });

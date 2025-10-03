@@ -1,11 +1,38 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { ContentSection, ContentSectionListItem } from '../types';
+
+interface ImageUploaderProps {
+    label: string;
+    previewUrl: string;
+    onFileChange: (file: File) => void;
+    onUrlChange: (url: string) => void;
+    currentUrl: string;
+}
+
+const ImageUploader: React.FC<ImageUploaderProps> = ({ label, previewUrl, onFileChange, onUrlChange, currentUrl }) => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    return (
+        <div>
+            <label className="block text-sm font-semibold mb-1">{label}</label>
+            <div className="flex items-center gap-4">
+                <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center border overflow-hidden flex-shrink-0">
+                    {previewUrl ? <img src={previewUrl} alt="Prévia" className="w-full h-full object-cover" /> : <i className="fas fa-image text-3xl text-gray-300"></i>}
+                </div>
+                <div className="flex-grow space-y-2">
+                    <input value={currentUrl} onChange={(e) => onUrlChange(e.target.value)} className="w-full px-3 py-2 border rounded-md text-sm" placeholder="Ou cole uma URL aqui" />
+                    <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full text-sm bg-gray-200 text-gray-800 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300"><i className="fas fa-upload mr-2"></i>Enviar Arquivo</button>
+                    <input type="file" accept="image/*" ref={fileInputRef} onChange={(e) => e.target.files && onFileChange(e.target.files[0])} className="hidden" />
+                </div>
+            </div>
+        </div>
+    );
+};
 
 interface ContentSectionModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (section: ContentSection) => void;
+    onSave: (section: ContentSection, file: File | null) => void;
     section: ContentSection | null;
 }
 
@@ -21,17 +48,30 @@ export const ContentSectionModal: React.FC<ContentSectionModalProps> = ({ isOpen
     });
     
     const [formData, setFormData] = useState<ContentSection>(section || { ...getInitialState(), id: '', order: 0, isVisible: true });
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState('');
 
     useEffect(() => {
         if (isOpen) {
+            setImageFile(null);
             if (section) {
                 setFormData(section);
+                setPreviewUrl(section.imageUrl);
             } else {
-                // For new sections, create a unique temp ID
-                setFormData({ ...getInitialState(), id: `new_${Date.now()}`, order: 99, isVisible: true });
+                const newSection = { ...getInitialState(), id: `new_${Date.now()}`, order: 99, isVisible: true };
+                setFormData(newSection);
+                setPreviewUrl(newSection.imageUrl);
             }
         }
     }, [section, isOpen]);
+    
+    useEffect(() => {
+        if (!imageFile) return;
+        const objectUrl = URL.createObjectURL(imageFile);
+        setPreviewUrl(objectUrl);
+        return () => URL.revokeObjectURL(objectUrl);
+    }, [imageFile]);
+
 
     if (!isOpen) return null;
 
@@ -60,8 +100,19 @@ export const ContentSectionModal: React.FC<ContentSectionModalProps> = ({ isOpen
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(formData);
+        onSave(formData, imageFile);
         onClose();
+    };
+    
+    const handleFileChangeForUploader = (file: File) => {
+        setImageFile(file);
+        setFormData(prev => ({ ...prev, imageUrl: '' }));
+    };
+
+    const handleUrlChangeForUploader = (url: string) => {
+        setImageFile(null);
+        setPreviewUrl(url);
+        setFormData(prev => ({ ...prev, imageUrl: url }));
     };
 
     return ReactDOM.createPortal(
@@ -77,6 +128,13 @@ export const ContentSectionModal: React.FC<ContentSectionModalProps> = ({ isOpen
                             <label className="block text-sm font-semibold mb-1">Título</label>
                             <input name="title" value={formData.title} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" required />
                         </div>
+                         <ImageUploader
+                            label="Imagem da Seção"
+                            previewUrl={previewUrl}
+                            onFileChange={handleFileChangeForUploader}
+                            onUrlChange={handleUrlChangeForUploader}
+                            currentUrl={formData.imageUrl}
+                        />
                         <div>
                             <label className="block text-sm font-semibold mb-1">Descrição</label>
                             <textarea name="description" value={formData.description} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" rows={4} />

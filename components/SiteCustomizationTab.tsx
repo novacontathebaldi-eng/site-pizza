@@ -45,8 +45,8 @@ const SortableContentSectionItem: React.FC<{ section: ContentSection; onEdit: ()
             <div className="flex items-center gap-4"><button {...attributes} {...listeners} className="cursor-grab touch-none p-2"><i className="fas fa-grip-vertical text-gray-500"></i></button><p className="font-bold">{section.title}</p></div>
             <div className="flex items-center gap-4">
                 <label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" checked={section.isVisible} onChange={onToggle} className="sr-only peer" /><div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600"></div></label>
-                <button onClick={onEdit} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600"><i className="fas fa-edit"></i></button>
-                <button onClick={onDelete} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600"><i className="fas fa-trash"></i></button>
+                <button type="button" onClick={onEdit} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600"><i className="fas fa-edit"></i></button>
+                <button type="button" onClick={onDelete} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600"><i className="fas fa-trash"></i></button>
             </div>
         </div>
     );
@@ -60,8 +60,8 @@ const SortableFooterLinkItem: React.FC<{ link: FooterLink; onEdit: () => void; o
             <div className="flex items-center gap-4"><button {...attributes} {...listeners} className="cursor-grab p-2"><i className="fas fa-grip-vertical text-gray-500"></i></button><p className="font-bold"><i className={`${link.icon} mr-2`}></i>{link.text}</p></div>
             <div className="flex items-center gap-4">
                 <label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" checked={link.isVisible !== false} onChange={onToggle} className="sr-only peer" /><div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600"></div></label>
-                <button onClick={onEdit} className="bg-blue-500 text-white w-8 h-8 rounded-md"><i className="fas fa-edit"></i></button>
-                <button onClick={onDelete} className="bg-red-500 text-white w-8 h-8 rounded-md"><i className="fas fa-trash"></i></button>
+                <button type="button" onClick={onEdit} className="bg-blue-500 text-white w-8 h-8 rounded-md"><i className="fas fa-edit"></i></button>
+                <button type="button" onClick={onDelete} className="bg-red-500 text-white w-8 h-8 rounded-md"><i className="fas fa-trash"></i></button>
             </div>
         </div>
     );
@@ -122,18 +122,35 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
     const handleToggleSection = (sectionId: string) => setFormData(prev => ({ ...prev, contentSections: prev.contentSections.map(s => s.id === sectionId ? { ...s, isVisible: !s.isVisible } : s)}));
     const handleDeleteSection = (sectionId: string) => { if(window.confirm("Tem certeza?")) { setFormData(prev => ({ ...prev, contentSections: prev.contentSections.filter(s => s.id !== sectionId)})) }};
     const handleEditSection = (section: ContentSection) => { setEditingSection(section); setIsSectionModalOpen(true); };
-    const handleSaveSection = (section: ContentSection) => { setFormData(prev => ({...prev, contentSections: prev.contentSections.map(s => s.id === section.id ? section : s)})); };
+    const handleSaveSection = (section: ContentSection, file: File | null) => {
+        setFormData(prev => ({...prev, contentSections: prev.contentSections.map(s => s.id === section.id ? section : s)}));
+        if (file) {
+            setFiles(prev => ({ ...prev, [section.id]: file }));
+            setPreviews(prev => ({ ...prev, [section.id]: URL.createObjectURL(file) }));
+        } else {
+             setPreviews(prev => ({ ...prev, [section.id]: section.imageUrl }));
+        }
+    };
     
     const handleToggleLink = (linkId: string) => setFormData(prev => ({ ...prev, footerLinks: prev.footerLinks.map(l => l.id === linkId ? { ...l, isVisible: !(l.isVisible !== false) } : l)}));
     const handleDeleteLink = (linkId: string) => { if(window.confirm("Tem certeza?")) { setFormData(prev => ({ ...prev, footerLinks: prev.footerLinks.filter(l => l.id !== linkId)})) }};
     const handleEditLink = (link: FooterLink) => { setEditingLink(link); setIsLinkModalOpen(true); };
-    const handleSaveLink = (link: FooterLink) => { setFormData(prev => ({...prev, footerLinks: prev.footerLinks.map(l => l.id === link.id ? link : l)})); };
+    const handleAddNewLink = () => { setEditingLink(null); setIsLinkModalOpen(true); };
+    const handleSaveLink = (link: FooterLink) => {
+        const isNew = !formData.footerLinks.some(l => l.id === link.id);
+        if (isNew) {
+            setFormData(prev => ({ ...prev, footerLinks: [...prev.footerLinks, link] }));
+        } else {
+            setFormData(prev => ({ ...prev, footerLinks: prev.footerLinks.map(l => l.id === link.id ? link : l) }));
+        }
+    };
 
     const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
     
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
+        // The onSave prop from App.tsx should only be called here.
         await onSave(formData, files, {});
         setFiles({});
         setIsSaving(false);
@@ -179,6 +196,9 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                         </div>
                     </SortableContext>
                  </DndContext>
+                 <div className="pt-2">
+                    <button type="button" onClick={handleAddNewLink} className="text-sm bg-blue-500 text-white font-semibold py-1 px-3 rounded-lg hover:bg-blue-600"><i className="fas fa-plus mr-2"></i>Adicionar Link</button>
+                 </div>
             </div>
 
             <div className="flex justify-end pt-4">

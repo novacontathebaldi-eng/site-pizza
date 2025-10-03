@@ -22,6 +22,8 @@ interface AdminSectionProps {
     siteSettings: SiteSettings;
     orders: Order[];
     promotions: PromotionPage[];
+    notificationAudioRef: React.MutableRefObject<HTMLAudioElement | null>;
+    onUnlockAudio: () => void;
     onSaveProduct: (product: Product) => Promise<void>;
     onDeleteProduct: (productId: string) => Promise<void>;
     onProductStatusChange: (productId: string, active: boolean) => Promise<void>;
@@ -151,6 +153,7 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
 export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const { 
         allProducts, allCategories, isStoreOnline, siteSettings, orders, promotions,
+        notificationAudioRef, onUnlockAudio,
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
         onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
@@ -184,9 +187,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const [activeOrdersTab, setActiveOrdersTab] = useState<OrderStatus>('accepted');
     const [isTrashVisible, setIsTrashVisible] = useState(false);
 
-    const prevPendingOrdersCount = useRef(0);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
-
     useEffect(() => setLocalProducts(allProducts), [allProducts]);
     useEffect(() => setLocalCategories([...allCategories].sort((a, b) => a.order - b.order)), [allCategories]);
 
@@ -207,38 +207,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     }, []);
 
     const pendingOrdersCount = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
-
-    useEffect(() => {
-        const playNotificationSound = () => {
-            if (siteSettings.audioSettings?.notificationSound) {
-                if (!audioRef.current) {
-                    audioRef.current = new Audio();
-                }
-                const sound = siteSettings.audioSettings.notificationSound;
-                // Handle default sounds if we decide to package them
-                audioRef.current.src = sound; // Assumes sound is a URL
-                audioRef.current.volume = siteSettings.audioSettings.notificationVolume ?? 0.5;
-                audioRef.current.play().catch(e => console.error("Audio playback failed:", e));
-            }
-        };
-
-        const showBrowserNotification = () => {
-             if (siteSettings.notificationSettings?.browserNotificationsEnabled && Notification.permission === 'granted') {
-                new Notification('Novo Pedido Recebido!', {
-                    body: `Você tem um novo pedido pendente de ${orders.find(o => o.status === 'pending')?.customer.name}.`,
-                    icon: '/assets/logo para icones.png', // Make sure this path is correct
-                    tag: 'new-order'
-                });
-                playNotificationSound();
-            }
-        };
-
-        if (user && pendingOrdersCount > prevPendingOrdersCount.current) {
-            playNotificationSound();
-            showBrowserNotification();
-        }
-        prevPendingOrdersCount.current = pendingOrdersCount;
-    }, [pendingOrdersCount, user, siteSettings.audioSettings, siteSettings.notificationSettings]);
 
     // Effect for scrolling tabs into view
     const scrollTabIntoView = (tabId: string) => {
@@ -338,7 +306,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                         })}
                                     </div>
                                 </div>
-                                {activeSettingsTab === 'audio' && <AudioTab settings={siteSettings} onSave={onSaveSiteSettings} />}
+                                {activeSettingsTab === 'audio' && <AudioTab settings={siteSettings} onSave={onSaveSiteSettings} notificationAudioRef={notificationAudioRef} onUnlockAudio={onUnlockAudio} />}
                                 {activeSettingsTab === 'notifications' && <NotificationsTab settings={siteSettings} onSave={onSaveSiteSettings} />}
                                 {activeSettingsTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> )}
                                 {activeSettingsTab === 'data' && ( <div><div className="p-4 mb-6 bg-red-50 border-l-4 border-red-500 text-red-800"><p className="font-bold">Atenção: Área Técnica</p><p className="text-sm">As ferramentas nesta seção podem afetar permanentemente o seu banco de dados. Use com cuidado e apenas se tiver conhecimento técnico. Recomenda-se fazer um backup antes de qualquer ação.</p></div><h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus produtos, categorias e configurações.</p> <button onClick={() => { try { const backupData = { products: allProducts, categories: allCategories, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); alert('Backup concluído!'); } catch (e) { console.error(e); alert("Falha no backup."); } }} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados de exemplo. Use apenas em uma instalação nova.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div>
