@@ -8,12 +8,13 @@ interface AudioTabProps {
     onUnlockAudio: () => void;
 }
 
+// Updated to use the new notification sound files from the assets folder.
 const defaultSounds = [
-    { name: 'Padrão 1 (Ding)', value: '/assets/audio/notification1.mp3' },
-    { name: 'Padrão 2 (Plin)', value: '/assets/audio/notification2.mp3' },
-    { name: 'Padrão 3 (Sino)', value: '/assets/audio/notification3.mp3' },
-    { name: 'Padrão 4 (Alerta Curto)', value: '/assets/audio/notification4.mp3' },
-    { name: 'Padrão 5 (Digital)', value: '/assets/audio/notification5.mp3' },
+    { name: 'Padrão 1', value: '/assets/audio/notf1.mp3' },
+    { name: 'Padrão 2', value: '/assets/audio/notf2.mp3' },
+    { name: 'Padrão 3', value: '/assets/audio/notf3.mp3' },
+    { name: 'Padrão 4', value: '/assets/audio/notf4.mp3' },
+    { name: 'Padrão 5', value: '/assets/audio/notf5.mp3' },
 ];
 
 export const AudioTab: React.FC<AudioTabProps> = ({ settings, onSave, notificationAudioRef, onUnlockAudio }) => {
@@ -24,33 +25,39 @@ export const AudioTab: React.FC<AudioTabProps> = ({ settings, onSave, notificati
     });
     const [isSaving, setIsSaving] = useState(false);
     const [playingType, setPlayingType] = useState<'notification' | 'background' | null>(null);
+    const [audioUnlocked, setAudioUnlocked] = useState(false);
     
-    // This component now uses a local player ONLY for background music previews.
-    // Notification sounds are handled by the shared ref from App.tsx.
     const backgroundAudioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
         setAudioSettings(settings.audioSettings!);
         
-        // Setup shared notification player
-        if (notificationAudioRef.current) {
-            notificationAudioRef.current.onended = () => setPlayingType(null);
-            notificationAudioRef.current.onpause = () => setPlayingType(null);
-        }
+        const setupPlayer = (player: HTMLAudioElement | null, type: 'notification' | 'background') => {
+            if (player) {
+                const onEnd = () => { if (playingType === type) setPlayingType(null); };
+                player.addEventListener('ended', onEnd);
+                player.addEventListener('pause', onEnd);
+                return () => {
+                    player.removeEventListener('ended', onEnd);
+                    player.removeEventListener('pause', onEnd);
+                };
+            }
+        };
 
-        // Setup local background music player
+        const cleanupNotification = setupPlayer(notificationAudioRef.current, 'notification');
+        
         if (!backgroundAudioPlayerRef.current) {
             backgroundAudioPlayerRef.current = new Audio();
-            backgroundAudioPlayerRef.current.onended = () => setPlayingType(null);
-            backgroundAudioPlayerRef.current.onpause = () => setPlayingType(null);
         }
+        const cleanupBackground = setupPlayer(backgroundAudioPlayerRef.current, 'background');
 
         return () => {
+            cleanupNotification?.();
+            cleanupBackground?.();
             notificationAudioRef.current?.pause();
             backgroundAudioPlayerRef.current?.pause();
-            setPlayingType(null);
         };
-    }, [settings, notificationAudioRef]);
+    }, [settings, notificationAudioRef, playingType]);
 
     const handleChange = (field: keyof typeof audioSettings, value: any) => {
         setAudioSettings(prev => ({ ...prev, [field]: value }));
@@ -68,8 +75,10 @@ export const AudioTab: React.FC<AudioTabProps> = ({ settings, onSave, notificati
     };
 
     const toggleTestSound = (type: 'notification' | 'background') => {
-        // This first user interaction is CRITICAL to unlock audio playback in the browser
-        onUnlockAudio();
+        if (!audioUnlocked) {
+            onUnlockAudio();
+            setAudioUnlocked(true);
+        }
 
         const isNotification = type === 'notification';
         const player = isNotification ? notificationAudioRef.current : backgroundAudioPlayerRef.current;
@@ -80,12 +89,12 @@ export const AudioTab: React.FC<AudioTabProps> = ({ settings, onSave, notificati
 
         if (!soundUrl) return;
 
-        if (playingType === type) {
+        if (playingType === type && !player.paused) {
             player.pause();
+            setPlayingType(null);
         } else {
-            // Stop any other sound that might be playing
             if (playingType) {
-                 (isNotification ? backgroundAudioPlayerRef.current : notificationAudioRef.current)?.pause();
+                (isNotification ? backgroundAudioPlayerRef.current : notificationAudioRef.current)?.pause();
             }
             if (!isNotification && backgroundAudioPlayerRef.current) {
                  backgroundAudioPlayerRef.current.loop = true;
@@ -97,7 +106,7 @@ export const AudioTab: React.FC<AudioTabProps> = ({ settings, onSave, notificati
                 .then(() => setPlayingType(type))
                 .catch(err => {
                     console.error("Error playing audio:", err);
-                    alert("Não foi possível tocar o áudio. Seu navegador pode estar bloqueando a reprodução automática.");
+                    alert("Não foi possível tocar o áudio. Pode ser necessário interagir com a página primeiro.");
                     setPlayingType(null);
                 });
         }
@@ -116,6 +125,12 @@ export const AudioTab: React.FC<AudioTabProps> = ({ settings, onSave, notificati
 
     return (
         <form onSubmit={handleSubmit} className="space-y-8 animate-fade-in-up">
+            {!audioUnlocked && (
+                <div className="p-4 mb-6 bg-blue-50 border-l-4 border-blue-500 text-blue-800">
+                    <p className="font-bold"><i className="fas fa-info-circle mr-2"></i>Ação Necessária</p>
+                    <p className="text-sm">Para que os sons de notificação funcionem (especialmente no celular), clique em um dos botões <i className="fas fa-play"></i> para ativar o áudio no seu navegador.</p>
+                </div>
+            )}
             <div>
                 <h3 className="text-xl font-bold mb-4">Áudio de Notificação de Pedido</h3>
                 <div className="p-4 bg-gray-50 rounded-lg border space-y-4">

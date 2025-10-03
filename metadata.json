@@ -1,5 +1,7 @@
 {
   "name": "Clean React Starter",
   "description": "A clean and minimal React development environment with TypeScript and Tailwind CSS, ready for you to start building your application.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "push-notifications"
+  ]
 }

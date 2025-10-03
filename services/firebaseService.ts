@@ -177,3 +177,13 @@ export const initiatePixPayment = async (orderId: string): Promise<any> => {
         throw new Error("Não foi possível gerar la cobrança PIX. Tente novamente.");
     }
 };
+
+// New function to save the FCM token
+export const saveFcmToken = async (token: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    // Use the token as the document ID to prevent duplicates.
+    // The document can be empty or store additional info like the user ID or timestamp.
+    await db.collection('fcmTokens').doc(token).set({
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+};
