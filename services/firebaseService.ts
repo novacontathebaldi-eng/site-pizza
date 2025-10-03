@@ -142,15 +142,14 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
     await db.collection('orders').doc(orderId).delete();
 };
 
-export const savePromotion = async (promotion: PromotionPage): Promise<void> => {
+export const addPromotion = async (promotionData: Omit<PromotionPage, 'id'>): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    if (promotion.id) {
-        const { id, ...dataToSave } = promotion;
-        await db.collection('promotions').doc(id).set(dataToSave, { merge: true });
-    } else {
-        const { id, ...dataToSave } = promotion;
-        await db.collection('promotions').add(dataToSave);
-    }
+    await db.collection('promotions').add(promotionData);
+};
+
+export const updatePromotion = async (promotionId: string, promotionData: Omit<PromotionPage, 'id'>): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    await db.collection('promotions').doc(promotionId).update(promotionData as { [key: string]: any });
 };
 
 export const deletePromotion = async (promotionId: string): Promise<void> => {
@@ -175,6 +174,6 @@ export const initiatePixPayment = async (orderId: string): Promise<any> => {
         return result.data;
     } catch (error) {
         console.error("Error calling generatePixCharge function:", error);
-        throw new Error("Não foi possível gerar a cobrança PIX. Tente novamente.");
+        throw new Error("Não foi possível gerar la cobrança PIX. Tente novamente.");
     }
 };

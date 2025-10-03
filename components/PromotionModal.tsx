@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import ReactDOM from 'react-dom';
 import { PromotionPage, Product } from '../types';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -45,7 +46,10 @@ export const PromotionModal: React.FC<PromotionModalProps> = ({ isOpen, onSave, 
 
     useEffect(() => {
         if (isOpen) {
-            setFormData(promotion ? { ...promotion } : getInitialState());
+            // FIX: Safely merge promotion data with defaults to prevent crashes
+            // when properties like arrays are missing from Firestore data.
+            const initialState = getInitialState();
+            setFormData(promotion ? { ...initialState, ...promotion } : initialState);
             setSearchTerm('');
         }
     }, [promotion, isOpen]);
@@ -91,8 +95,9 @@ export const PromotionModal: React.FC<PromotionModalProps> = ({ isOpen, onSave, 
     };
 
     if (!isOpen) return null;
-
-    return (
+    
+    // FIX: Use React Portal to render the modal at the root level, preventing CSS stacking issues.
+    return ReactDOM.createPortal(
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
                 <div className="flex justify-between items-center p-5 border-b"><h2 className="text-2xl font-bold">{promotion ? 'Editar' : 'Nova'} Promoção</h2><button onClick={onClose} className="text-2xl">&times;</button></div>
@@ -121,10 +126,10 @@ export const PromotionModal: React.FC<PromotionModalProps> = ({ isOpen, onSave, 
                                 <div className="p-3 bg-gray-50 rounded-lg border">
                                     <h4 className="font-semibold mb-2">Visibilidade dos Componentes</h4>
                                     <div className="space-y-2 text-sm">
-                                        <label className="flex items-center gap-2"><input type="checkbox" checked={formData.isTitleVisible} onChange={() => handleToggle('isTitleVisible')} /> Mostrar Título</label>
-                                        <label className="flex items-center gap-2"><input type="checkbox" checked={formData.isTextVisible} onChange={() => handleToggle('isTextVisible')} /> Mostrar Texto</label>
-                                        <label className="flex items-center gap-2"><input type="checkbox" checked={formData.isVideoVisible} onChange={() => handleToggle('isVideoVisible')} /> Mostrar Vídeo</label>
-                                        <label className="flex items-center gap-2"><input type="checkbox" checked={formData.isProductsVisible} onChange={() => handleToggle('isProductsVisible')} /> Mostrar Produtos</label>
+                                        <label className="flex items-center gap-2"><input type="checkbox" checked={!!formData.isTitleVisible} onChange={() => handleToggle('isTitleVisible')} /> Mostrar Título</label>
+                                        <label className="flex items-center gap-2"><input type="checkbox" checked={!!formData.isTextVisible} onChange={() => handleToggle('isTextVisible')} /> Mostrar Texto</label>
+                                        <label className="flex items-center gap-2"><input type="checkbox" checked={!!formData.isVideoVisible} onChange={() => handleToggle('isVideoVisible')} /> Mostrar Vídeo</label>
+                                        <label className="flex items-center gap-2"><input type="checkbox" checked={!!formData.isProductsVisible} onChange={() => handleToggle('isProductsVisible')} /> Mostrar Produtos</label>
                                     </div>
                                 </div>
                                
@@ -160,6 +165,7 @@ export const PromotionModal: React.FC<PromotionModalProps> = ({ isOpen, onSave, 
                     </form>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

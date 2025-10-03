@@ -62,7 +62,11 @@ export const PromotionsTab: React.FC<PromotionsTabProps> = ({ promotions, allPro
     };
     const handleAddNew = () => { setEditingPromotion(null); setIsModalOpen(true); };
     const handleEdit = (promo: PromotionPage) => { setEditingPromotion(promo); setIsModalOpen(true); };
-    const handleDelete = (id: string) => { if (window.confirm(`Tem certeza que deseja apagar esta promoção? Esta ação não pode ser desfeita.`)) onDelete(id); };
+    const handleDelete = (id: string) => { 
+        if (window.confirm(`Tem certeza que deseja apagar esta promoção? Esta ação não pode ser desfeita.`)) {
+            onDelete(id); 
+        }
+    };
     const handleToggleVisibility = (promo: PromotionPage) => {
         onSave({ ...promo, isVisible: !promo.isVisible });
     };

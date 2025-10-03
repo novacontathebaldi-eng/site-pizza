@@ -525,13 +525,19 @@ const App: React.FC = () => {
     
     const handleSavePromotion = useCallback(async (promotion: PromotionPage) => {
         try {
-            await firebaseService.savePromotion(promotion);
-            addToast("Promoção salva com sucesso!", 'success');
+            const { id, ...dataToSave } = promotion;
+            if (id) {
+                await firebaseService.updatePromotion(id, dataToSave);
+                addToast("Promoção atualizada com sucesso!", 'success');
+            } else {
+                await firebaseService.addPromotion({ ...dataToSave, order: promotions.length });
+                addToast("Promoção adicionada com sucesso!", 'success');
+            }
         } catch (error) {
             console.error("Failed to save promotion:", error);
             addToast("Erro ao salvar promoção.", 'error');
         }
-    }, [addToast]);
+    }, [promotions.length, addToast]);
 
     const handleDeletePromotion = useCallback(async (promotionId: string) => {
         try {

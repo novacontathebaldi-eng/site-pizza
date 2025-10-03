@@ -3,15 +3,13 @@ import { SiteSettings, ContentSection, FooterLink, ContentSectionListItem } from
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { ContentSectionModal } from './ContentSectionModal';
+import { FooterLinkModal } from './FooterLinkModal';
 
 interface SiteCustomizationTabProps {
     settings: SiteSettings;
     onSave: (settings: SiteSettings, files: { [key: string]: File | null }, audioFiles: { [key: string]: File | null }) => Promise<void>;
 }
-
-const IconInput: React.FC<{ value: string; onChange: (value: string) => void }> = ({ value, onChange }) => (
-    <input value={value} onChange={(e) => onChange(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Ex: fas fa-star" />
-);
 
 const ImageUploader: React.FC<{
     label: string;
@@ -74,7 +72,9 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
     const [files, setFiles] = useState<{ [key: string]: File | null }>({});
     const [previews, setPreviews] = useState<{ [key: string]: string }>({});
     const [editingSection, setEditingSection] = useState<ContentSection | null>(null);
+    const [isSectionModalOpen, setIsSectionModalOpen] = useState(false);
     const [editingLink, setEditingLink] = useState<FooterLink | null>(null);
+    const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -119,25 +119,15 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
         }
     };
     
-    // Handlers for Content Section items
-    const handleToggleSection = (sectionId: string) => {
-        setFormData(prev => ({ ...prev, contentSections: prev.contentSections.map(s => s.id === sectionId ? { ...s, isVisible: !s.isVisible } : s)}));
-    };
-    const handleDeleteSection = (sectionId: string) => {
-        if(window.confirm("Tem certeza que deseja apagar esta seção de conteúdo?")) {
-            setFormData(prev => ({ ...prev, contentSections: prev.contentSections.filter(s => s.id !== sectionId)}));
-        }
-    };
-
-    // Handlers for Footer Link items
-    const handleToggleLink = (linkId: string) => {
-        setFormData(prev => ({ ...prev, footerLinks: prev.footerLinks.map(l => l.id === linkId ? { ...l, isVisible: !(l.isVisible !== false) } : l)}));
-    };
-    const handleDeleteLink = (linkId: string) => {
-        if(window.confirm("Tem certeza que deseja apagar este link do rodapé?")) {
-            setFormData(prev => ({ ...prev, footerLinks: prev.footerLinks.filter(l => l.id !== linkId)}));
-        }
-    };
+    const handleToggleSection = (sectionId: string) => setFormData(prev => ({ ...prev, contentSections: prev.contentSections.map(s => s.id === sectionId ? { ...s, isVisible: !s.isVisible } : s)}));
+    const handleDeleteSection = (sectionId: string) => { if(window.confirm("Tem certeza?")) { setFormData(prev => ({ ...prev, contentSections: prev.contentSections.filter(s => s.id !== sectionId)})) }};
+    const handleEditSection = (section: ContentSection) => { setEditingSection(section); setIsSectionModalOpen(true); };
+    const handleSaveSection = (section: ContentSection) => { setFormData(prev => ({...prev, contentSections: prev.contentSections.map(s => s.id === section.id ? section : s)})); };
+    
+    const handleToggleLink = (linkId: string) => setFormData(prev => ({ ...prev, footerLinks: prev.footerLinks.map(l => l.id === linkId ? { ...l, isVisible: !(l.isVisible !== false) } : l)}));
+    const handleDeleteLink = (linkId: string) => { if(window.confirm("Tem certeza?")) { setFormData(prev => ({ ...prev, footerLinks: prev.footerLinks.filter(l => l.id !== linkId)})) }};
+    const handleEditLink = (link: FooterLink) => { setEditingLink(link); setIsLinkModalOpen(true); };
+    const handleSaveLink = (link: FooterLink) => { setFormData(prev => ({...prev, footerLinks: prev.footerLinks.map(l => l.id === link.id ? link : l)})); };
 
     const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
     
@@ -150,6 +140,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
     };
 
     return (
+        <>
         <form onSubmit={handleSubmit} className="space-y-8 animate-fade-in-up">
             <div className="p-4 bg-gray-50 rounded-lg border">
                 <h3 className="text-xl font-bold mb-4">Aparência Geral</h3>
@@ -170,7 +161,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                     <SortableContext items={formData.contentSections.map(s => s.id)} strategy={verticalListSortingStrategy}>
                         <div className="space-y-2">
                         {formData.contentSections.map(section => (
-                            <SortableContentSectionItem key={section.id} section={section} onEdit={() => { alert('Funcionalidade de edição em desenvolvimento.')}} onDelete={() => handleDeleteSection(section.id)} onToggle={() => handleToggleSection(section.id)} />
+                            <SortableContentSectionItem key={section.id} section={section} onEdit={() => handleEditSection(section)} onDelete={() => handleDeleteSection(section.id)} onToggle={() => handleToggleSection(section.id)} />
                         ))}
                         </div>
                     </SortableContext>
@@ -183,7 +174,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                     <SortableContext items={formData.footerLinks.map(l => l.id)} strategy={verticalListSortingStrategy}>
                         <div className="space-y-2">
                         {formData.footerLinks.map(link => (
-                           <SortableFooterLinkItem key={link.id} link={link} onEdit={() => {alert('Funcionalidade de edição em desenvolvimento.')}} onDelete={() => handleDeleteLink(link.id)} onToggle={() => handleToggleLink(link.id)} />
+                           <SortableFooterLinkItem key={link.id} link={link} onEdit={() => handleEditLink(link)} onDelete={() => handleDeleteLink(link.id)} onToggle={() => handleToggleLink(link.id)} />
                         ))}
                         </div>
                     </SortableContext>
@@ -197,5 +188,8 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                 </button>
             </div>
         </form>
+        <ContentSectionModal isOpen={isSectionModalOpen} onClose={() => setIsSectionModalOpen(false)} section={editingSection} onSave={handleSaveSection} />
+        <FooterLinkModal isOpen={isLinkModalOpen} onClose={() => setIsLinkModalOpen(false)} link={editingLink} onSave={handleSaveLink} />
+        </>
     );
 };
