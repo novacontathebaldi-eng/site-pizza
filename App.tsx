@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, PromotionPage } from './types';
 import { Header } from './components/Header';
@@ -58,7 +59,7 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        const sectionIds = ['inicio', 'promocoes', 'cardapio', 'sobre', 'contato'];
+        const sectionIds = ['inicio', 'cardapio', 'sobre', 'contato'];
         const sectionElements = sectionIds.map(id => document.getElementById(id));
         
         const observerOptions = {
@@ -72,7 +73,6 @@ const App: React.FC = () => {
                 if (entry.isIntersecting) {
                     const idToTitle: { [key: string]: string } = {
                         'inicio': 'Início',
-                        'promocoes': 'Promoções',
                         'cardapio': 'Cardápio',
                         'sobre': 'Sobre Nós',
                         'contato': 'Contato'
@@ -91,7 +91,7 @@ const App: React.FC = () => {
                 if (el) observer.unobserve(el);
             });
         };
-    }, [promotions]);
+    }, []);
 
     useEffect(() => {
         if (!db) {
@@ -110,6 +110,7 @@ const App: React.FC = () => {
         const unsubSettings = settingsDocRef.onSnapshot(doc => {
             if (doc.exists) {
                  const data = doc.data() as Partial<SiteSettings>;
+                 // Deep merge to ensure nested objects like audioSettings are not overwritten entirely
                  setSiteSettings(prev => ({
                     ...defaultSiteSettings,
                     ...prev,
@@ -118,6 +119,7 @@ const App: React.FC = () => {
                     notificationSettings: { ...defaultSiteSettings.notificationSettings, ...prev.notificationSettings, ...data.notificationSettings },
                  }));
             } else {
+                // If no settings exist in DB, save the default ones
                 firebaseService.updateSiteSettings(defaultSiteSettings);
             }
         }, err => handleConnectionError(err, "site settings"));
@@ -304,7 +306,7 @@ const App: React.FC = () => {
 
         try {
             const docRef = await firebaseService.addOrder(newOrderData);
-            const createdOrder: Order = { ...newOrderData, id: docRef.id, createdAt: new Date() };
+            const createdOrder: Order = { ...newOrderData, id: docRef.id, createdAt: new Date() }; // Create a temporary full order object
             addToast("Pedido pré-salvo, aguardando pagamento.", 'success');
             setIsCheckoutModalOpen(false);
             setPayingOrder(createdOrder);
@@ -327,6 +329,7 @@ const App: React.FC = () => {
         setPayingOrder(null);
         setIsCartOpen(false);
     }, []);
+
 
     const handleSaveProduct = useCallback(async (product: Product) => {
         try {
@@ -475,6 +478,7 @@ const App: React.FC = () => {
         }
     }, [addToast]);
     
+    // --- Handlers for new Promotion features ---
     const handleSavePromotion = useCallback(async (promotion: PromotionPage) => {
         try {
             await firebaseService.savePromotion(promotion);
@@ -508,7 +512,7 @@ const App: React.FC = () => {
     const handleRestoreDefaults = useCallback(async () => {
         if (window.confirm("Tem certeza que deseja restaurar todas as configurações para o padrão original? Isso afetará a aparência, os links e as configurações de áudio/notificação.")) {
             try {
-                await firebaseService.restoreDefaultSettings();
+                await firebaseService.updateSiteSettings(defaultSiteSettings);
                 addToast("Configurações restauradas para o padrão.", 'success');
             } catch (error) {
                 console.error("Failed to restore default settings:", error);
@@ -621,11 +625,10 @@ const App: React.FC = () => {
                     </div>
                 ) : !error && (
                     <>
-                    <div id="promocoes">
-                        {siteSettings.promotionSectionPosition === 'above' && promotionPages.map(promo => (
-                            <PromotionSection key={promo.id} promotion={promo} allProducts={products} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} />
-                        ))}
-                    </div>
+                    {siteSettings.promotionSectionPosition === 'above' && promotionPages.map(promo => (
+                        // FIX: Added isStoreOnline prop to PromotionSection to allow child components to check store status.
+                        <PromotionSection key={promo.id} promotion={promo} allProducts={products} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} />
+                    ))}
                     <MenuSection 
                         categories={categories} 
                         products={products} 
@@ -640,11 +643,10 @@ const App: React.FC = () => {
                         showFinalizeButtonTrigger={showFinalizeButtonTrigger}
                         setShowFinalizeButtonTrigger={setShowFinalizeButtonTrigger}
                     />
-                     <div id="promocoes-below">
-                         {siteSettings.promotionSectionPosition !== 'above' && promotionPages.map(promo => (
-                            <PromotionSection key={promo.id} promotion={promo} allProducts={products} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} />
-                        ))}
-                    </div>
+                     {siteSettings.promotionSectionPosition !== 'above' && promotionPages.map(promo => (
+                        // FIX: Added isStoreOnline prop to PromotionSection to allow child components to check store status.
+                        <PromotionSection key={promo.id} promotion={promo} allProducts={products} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} />
+                    ))}
                     </>
                 )}
                 <div id="sobre">
@@ -683,6 +685,7 @@ const App: React.FC = () => {
                     onSavePromotion={handleSavePromotion}
                     onDeletePromotion={handleDeletePromotion}
                     onReorderPromotions={handleReorderPromotions}
+                    // FIX: Passed onRestoreDefaults handler to AdminSection to match its props interface.
                     onRestoreDefaults={handleRestoreDefaults}
                 />
             </main>

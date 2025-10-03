@@ -1,3 +1,4 @@
+
 export interface Product {
     id: string;
     name: string;
@@ -94,11 +95,13 @@ export interface FooterLink {
     isVisible?: boolean;
 }
 
+// --- NEW TYPES FOR NEW FEATURES ---
+
 export interface AudioSettings {
-    notificationSound: string;
-    notificationVolume: number;
-    backgroundMusic: string;
-    backgroundVolume: number;
+    notificationSound: string; // URL or 'default-1', 'default-2', etc.
+    notificationVolume: number; // 0 to 1
+    backgroundMusic: string; // URL
+    backgroundVolume: number; // 0 to 1
 }
 
 export interface NotificationSettings {
@@ -112,13 +115,16 @@ export interface PromotionPage {
     title: string;
     text: string;
     videoUrl: string;
-    componentOrder: ('video' | 'text' | 'products')[];
     featuredProductIds: string[];
+    // FIX: Replaced 'componentOrder' with 'layout' to match component implementations.
+    layout: 'video-left' | 'video-right';
+    // Visibility toggles for each element
     isTitleVisible: boolean;
     isTextVisible: boolean;
     isVideoVisible: boolean;
     isProductsVisible: boolean;
 }
+
 
 export interface SiteSettings {
     logoUrl: string;
@@ -129,6 +135,7 @@ export interface SiteSettings {
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
     promotionSectionPosition: 'above' | 'below';
+    // New settings integrated
     audioSettings?: AudioSettings;
     notificationSettings?: NotificationSettings;
 }
