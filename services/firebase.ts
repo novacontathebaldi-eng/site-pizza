@@ -16,7 +16,7 @@ const firebaseConfig = {
   projectId: "site-pizza-a2930",
   // FIX: Reverted storage bucket URL to the one from the user's working old version.
   // This is the primary fix for the file upload issue.
-  storageBucket: "site-pizza-a2930.appspot.com",
+  storageBucket: "site-pizza-a2930.firebasestorage.app",
   messagingSenderId: "914255031241",
   appId: "1:914255031241:web:84ae273b22cb7d04499618"
 };
@@ -35,7 +35,7 @@ try {
   storage = firebase.storage();
   auth = firebase.auth();
   functions = firebase.functions();
-
+  
   // Keep db settings
   db.settings({
     experimentalForceLongPolling: true,

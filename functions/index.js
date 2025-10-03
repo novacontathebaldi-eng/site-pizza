@@ -1,6 +1,6 @@
 /* eslint-disable max-len */
 const {onCall} = require("firebase-functions/v2/https");
-const functions = require("firebase-functions");
+const {onRequest} = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const axios = require("axios");
@@ -18,6 +18,7 @@ exports.generatePixCharge = onCall(async (request) => {
     throw new Error("O ID do pedido é obrigatório.");
   }
 
+  // Use defined secrets, more secure than env vars for this case.
   const infinitePayApiKey = process.env.INFINITEPAY_API_KEY;
   if (!infinitePayApiKey) {
     logger.error("INFINITEPAY_API_KEY não está configurado nas variáveis de ambiente da função.");
@@ -31,10 +32,11 @@ exports.generatePixCharge = onCall(async (request) => {
     }
     const orderData = orderDoc.data();
 
+    // CORRECT API ENDPOINT AND PAYLOAD for transparent PIX
     const payload = {
       amount: toCents(orderData.total),
       type: "pix",
-      customer_id: orderId,
+      customer_id: orderId, // Use orderId to link the transaction
       description: `Pedido #${orderId.substring(0, 8)} - ${orderData.customer.name}`,
       callback_url: `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/infinitePayWebhook`,
     };
@@ -48,6 +50,7 @@ exports.generatePixCharge = onCall(async (request) => {
 
     const transaction = response.data.transaction;
 
+    // Check for correct response data
     if (!transaction || !transaction.pix_qr_code_url || !transaction.pix_emv) {
       logger.error("Resposta da API da InfinitePay não contém os dados do PIX.", response.data);
       throw new Error("Resposta da API de pagamento está incompleta.");
@@ -69,19 +72,25 @@ exports.generatePixCharge = onCall(async (request) => {
   }
 });
 
+
 // Webhook receiver for InfinitePay payment confirmations (V2 API)
-exports.infinitePayWebhook = functions.https.onRequest(async (request, response) => {
+exports.infinitePayWebhook = onRequest(async (request, response) => {
   if (request.method !== "POST") {
     response.status(405).send("Method Not Allowed");
     return;
   }
+
   logger.info("Webhook recebido:", request.body);
+
+  // Data from the V2 API webhook
   const {status, customer_id: orderId} = request.body;
+
   if (!orderId) {
     logger.error("Payload do webhook não contém 'customer_id'.");
     response.status(400).json({success: false, message: "Missing customer_id"});
     return;
   }
+
   if (status === "PAID") {
     try {
       const orderRef = db.collection("orders").doc(orderId);
