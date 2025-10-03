@@ -119,6 +119,26 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
         }
     };
     
+    // Handlers for Content Section items
+    const handleToggleSection = (sectionId: string) => {
+        setFormData(prev => ({ ...prev, contentSections: prev.contentSections.map(s => s.id === sectionId ? { ...s, isVisible: !s.isVisible } : s)}));
+    };
+    const handleDeleteSection = (sectionId: string) => {
+        if(window.confirm("Tem certeza que deseja apagar esta seção de conteúdo?")) {
+            setFormData(prev => ({ ...prev, contentSections: prev.contentSections.filter(s => s.id !== sectionId)}));
+        }
+    };
+
+    // Handlers for Footer Link items
+    const handleToggleLink = (linkId: string) => {
+        setFormData(prev => ({ ...prev, footerLinks: prev.footerLinks.map(l => l.id === linkId ? { ...l, isVisible: !(l.isVisible !== false) } : l)}));
+    };
+    const handleDeleteLink = (linkId: string) => {
+        if(window.confirm("Tem certeza que deseja apagar este link do rodapé?")) {
+            setFormData(prev => ({ ...prev, footerLinks: prev.footerLinks.filter(l => l.id !== linkId)}));
+        }
+    };
+
     const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
     
     const handleSubmit = async (e: React.FormEvent) => {
@@ -150,7 +170,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                     <SortableContext items={formData.contentSections.map(s => s.id)} strategy={verticalListSortingStrategy}>
                         <div className="space-y-2">
                         {formData.contentSections.map(section => (
-                            <SortableContentSectionItem key={section.id} section={section} onEdit={() => {}} onDelete={() => {}} onToggle={() => {}} />
+                            <SortableContentSectionItem key={section.id} section={section} onEdit={() => { alert('Funcionalidade de edição em desenvolvimento.')}} onDelete={() => handleDeleteSection(section.id)} onToggle={() => handleToggleSection(section.id)} />
                         ))}
                         </div>
                     </SortableContext>
@@ -163,7 +183,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                     <SortableContext items={formData.footerLinks.map(l => l.id)} strategy={verticalListSortingStrategy}>
                         <div className="space-y-2">
                         {formData.footerLinks.map(link => (
-                           <SortableFooterLinkItem key={link.id} link={link} onEdit={() => {}} onDelete={() => {}} onToggle={() => {}} />
+                           <SortableFooterLinkItem key={link.id} link={link} onEdit={() => {alert('Funcionalidade de edição em desenvolvimento.')}} onDelete={() => handleDeleteLink(link.id)} onToggle={() => handleToggleLink(link.id)} />
                         ))}
                         </div>
                     </SortableContext>

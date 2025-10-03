@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, PromotionPage } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
@@ -10,7 +10,7 @@ import { Footer } from './components/Footer';
 import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
 import { PixPaymentModal } from './components/PixPaymentModal';
-import { db } from './services/firebase';
+import { db, auth } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
 import { PromotionSection } from './components/PromotionSection';
@@ -41,13 +41,26 @@ const App: React.FC = () => {
     const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
     const [payingOrder, setPayingOrder] = useState<Order | null>(null);
+    const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
     
+    const prevPendingOrdersCount = useRef(0);
+    const notificationAudioRef = useRef<HTMLAudioElement | null>(null);
+
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
         setToasts(prevToasts => [...prevToasts, { id, message, type }]);
         setTimeout(() => {
             setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
         }, 4000);
+    }, []);
+
+    useEffect(() => {
+        if (auth) {
+            const unsubscribe = auth.onAuthStateChanged(user => {
+                setIsAdminLoggedIn(!!user);
+            });
+            return () => unsubscribe();
+        }
     }, []);
 
     useEffect(() => {
@@ -167,6 +180,41 @@ const App: React.FC = () => {
             unsubLoader();
         };
     }, []);
+    
+    // New Order Notification Effect
+    useEffect(() => {
+        const pendingOrdersCount = orders.filter(o => o.status === 'pending').length;
+
+        if (isAdminLoggedIn && pendingOrdersCount > prevPendingOrdersCount.current) {
+            const playSound = () => {
+                if (siteSettings.audioSettings?.notificationSound) {
+                    if (!notificationAudioRef.current) {
+                        notificationAudioRef.current = new Audio();
+                    }
+                    notificationAudioRef.current.src = siteSettings.audioSettings.notificationSound;
+                    notificationAudioRef.current.volume = siteSettings.audioSettings.notificationVolume ?? 0.5;
+                    notificationAudioRef.current.play().catch(e => console.error("Audio playback failed automatically:", e));
+                }
+            };
+
+            const showBrowserNotification = () => {
+                if (siteSettings.notificationSettings?.browserNotificationsEnabled && Notification.permission === 'granted') {
+                    const newOrder = orders.find(o => o.status === 'pending');
+                    new Notification('Novo Pedido Recebido!', {
+                        body: `Você tem um novo pedido de ${newOrder?.customer.name || 'um cliente'}.`,
+                        icon: '/assets/logo para icones.png',
+                        tag: 'new-order'
+                    });
+                }
+            };
+            
+            playSound();
+            showBrowserNotification();
+        }
+
+        prevPendingOrdersCount.current = pendingOrdersCount;
+    }, [orders, isAdminLoggedIn, siteSettings]);
+
 
     useEffect(() => {
         if (categories.length > 0 && !activeMenuCategory) {
@@ -581,7 +629,10 @@ const App: React.FC = () => {
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
     
-    const promotionPages = useMemo(() => promotions.filter(p => p.isVisible).sort((a, b) => a.order - b.order), [promotions]);
+    const visiblePromotions = useMemo(() => promotions.filter(p => p.isVisible).sort((a, b) => a.order - b.order), [promotions]);
+    const promotionsAboveMenu = useMemo(() => visiblePromotions.filter(p => p.position === 'above'), [visiblePromotions]);
+    const promotionsBelowMenu = useMemo(() => visiblePromotions.filter(p => p.position !== 'above'), [visiblePromotions]);
+
     const imagePreloadList = useMemo(() => {
         const productImages = products.map(p => p.imageUrl);
         const promotionProductImages = promotions.flatMap(promo => 
@@ -622,7 +673,7 @@ const App: React.FC = () => {
                 ) : !error && (
                     <>
                     <div id="promocoes">
-                        {siteSettings.promotionSectionPosition === 'above' && promotionPages.map(promo => (
+                        {promotionsAboveMenu.map(promo => (
                             <PromotionSection key={promo.id} promotion={promo} allProducts={products} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} />
                         ))}
                     </div>
@@ -641,7 +692,7 @@ const App: React.FC = () => {
                         setShowFinalizeButtonTrigger={setShowFinalizeButtonTrigger}
                     />
                      <div id="promocoes-below">
-                         {siteSettings.promotionSectionPosition !== 'above' && promotionPages.map(promo => (
+                         {promotionsBelowMenu.map(promo => (
                             <PromotionSection key={promo.id} promotion={promo} allProducts={products} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} />
                         ))}
                     </div>

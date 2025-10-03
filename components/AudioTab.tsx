@@ -21,12 +21,23 @@ export const AudioTab: React.FC<AudioTabProps> = ({ settings, onSave }) => {
         backgroundMusic: null,
     });
     const [isSaving, setIsSaving] = useState(false);
+    const [isPlaying, setIsPlaying] = useState< 'notification' | 'background' | null >(null);
     
-    const audioPlayerRef = useRef<HTMLAudioElement>(new Audio());
+    const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
         setAudioSettings(settings.audioSettings!);
+        // Setup audio player
+        if (!audioPlayerRef.current) {
+            audioPlayerRef.current = new Audio();
+            audioPlayerRef.current.onended = () => setIsPlaying(null);
+        }
+        return () => { // Cleanup on unmount
+            audioPlayerRef.current?.pause();
+            setIsPlaying(null);
+        };
     }, [settings]);
+
 
     const handleChange = (field: keyof typeof audioSettings, value: any) => {
         setAudioSettings(prev => ({ ...prev, [field]: value }));
@@ -35,33 +46,55 @@ export const AudioTab: React.FC<AudioTabProps> = ({ settings, onSave }) => {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'notificationSound' | 'backgroundMusic') => {
         const file = e.target.files?.[0];
         if (file) {
+            audioPlayerRef.current?.pause();
+            setIsPlaying(null);
             setAudioFiles(prev => ({ ...prev, [field]: file }));
-            // Preview the sound
             const fileUrl = URL.createObjectURL(file);
             setAudioSettings(prev => ({...prev, [field]: fileUrl}));
         }
     };
 
-    const playTestSound = () => {
+    const toggleTestSound = (type: 'notification' | 'background') => {
         const player = audioPlayerRef.current;
-        const soundUrl = audioSettings.notificationSound;
-        
+        if (!player) return;
+
+        // If another sound is playing, stop it first
+        if (isPlaying && isPlaying !== type) {
+            player.pause();
+        }
+
+        // If the clicked sound is already playing, pause it
+        if (isPlaying === type) {
+            player.pause();
+            setIsPlaying(null);
+            return;
+        }
+
+        // Otherwise, play the new sound
+        const soundUrl = type === 'notification' ? audioSettings.notificationSound : audioSettings.backgroundMusic;
+        const volume = type === 'notification' ? audioSettings.notificationVolume : audioSettings.backgroundVolume;
+
         if (!soundUrl) return;
 
         player.src = soundUrl;
-        player.volume = audioSettings.notificationVolume;
-        player.play().catch(err => {
-            console.error("Error playing audio:", err);
-            alert("Não foi possível tocar o áudio. A interação do usuário pode ser necessária.");
-        });
+        player.volume = volume;
+        player.play()
+            .then(() => setIsPlaying(type))
+            .catch(err => {
+                console.error("Error playing audio:", err);
+                alert("Não foi possível tocar o áudio. A interação do usuário pode ser necessária.");
+                setIsPlaying(null);
+            });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
+        audioPlayerRef.current?.pause();
+        setIsPlaying(null);
         const settingsToSave = { ...settings, audioSettings };
         await onSave(settingsToSave, {}, audioFiles);
-        setAudioFiles({ notificationSound: null, backgroundMusic: null }); // Reset files after save
+        setAudioFiles({ notificationSound: null, backgroundMusic: null });
         setIsSaving(false);
     };
 
@@ -86,7 +119,9 @@ export const AudioTab: React.FC<AudioTabProps> = ({ settings, onSave }) => {
                                 </optgroup>
                                  <option value="" disabled>Ou envie um arquivo</option>
                             </select>
-                            <button type="button" onClick={playTestSound} className="bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg hover:bg-blue-600" aria-label="Testar som"><i className="fas fa-play"></i></button>
+                            <button type="button" onClick={() => toggleTestSound('notification')} className="bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg hover:bg-blue-600 w-12" aria-label="Testar som">
+                                <i className={`fas ${isPlaying === 'notification' ? 'fa-pause' : 'fa-play'}`}></i>
+                            </button>
                         </div>
                     </div>
                     <div>
@@ -111,10 +146,15 @@ export const AudioTab: React.FC<AudioTabProps> = ({ settings, onSave }) => {
              <div>
                 <h3 className="text-xl font-bold mb-4">Música de Fundo (Opcional)</h3>
                 <div className="p-4 bg-gray-50 rounded-lg border space-y-4">
-                     <div>
-                        <label htmlFor="background-music-upload" className="block text-sm font-semibold mb-1">Enviar Música de Fundo (MP3, WAV)</label>
-                        <input type="file" id="background-music-upload" accept="audio/mpeg,audio/wav" onChange={(e) => handleFileChange(e, 'backgroundMusic')} className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent/20 file:text-accent hover:file:bg-accent/30" />
-                        {audioSettings.backgroundMusic && <p className="text-xs text-gray-500 mt-1">Música atual: {audioSettings.backgroundMusic.split('/').pop()}</p>}
+                     <div className="flex items-end gap-2">
+                        <div className="flex-grow">
+                            <label htmlFor="background-music-upload" className="block text-sm font-semibold mb-1">Enviar Música de Fundo (MP3, WAV)</label>
+                            <input type="file" id="background-music-upload" accept="audio/mpeg,audio/wav" onChange={(e) => handleFileChange(e, 'backgroundMusic')} className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent/20 file:text-accent hover:file:bg-accent/30" />
+                            {audioSettings.backgroundMusic && <p className="text-xs text-gray-500 mt-1">Música atual: {audioSettings.backgroundMusic.split('/').pop()}</p>}
+                        </div>
+                        <button type="button" onClick={() => toggleTestSound('background')} className="bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg hover:bg-blue-600 w-12 h-10" aria-label="Testar música de fundo" disabled={!audioSettings.backgroundMusic}>
+                            <i className={`fas ${isPlaying === 'background' ? 'fa-pause' : 'fa-play'}`}></i>
+                        </button>
                     </div>
                      <div>
                          <label htmlFor="background-volume" className="block text-sm font-semibold mb-1">Volume da Música de Fundo ({Math.round(audioSettings.backgroundVolume * 100)}%)</label>

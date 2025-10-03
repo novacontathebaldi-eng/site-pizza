@@ -28,12 +28,13 @@ export const NotificationsTab: React.FC<NotificationsTabProps> = ({ settings, on
         });
     };
     
-    const handleToggle = () => {
-        if (permissionStatus !== 'granted') {
+    const handleToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const isEnabled = e.target.checked;
+        if (permissionStatus !== 'granted' && isEnabled) {
             alert('Você precisa permitir as notificações no navegador primeiro.');
             return;
         }
-        setNotificationSettings(prev => ({ ...prev, browserNotificationsEnabled: !prev.browserNotificationsEnabled }));
+        setNotificationSettings(prev => ({ ...prev, browserNotificationsEnabled: isEnabled }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {

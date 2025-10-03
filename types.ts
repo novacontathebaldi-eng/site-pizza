@@ -118,6 +118,7 @@ export interface PromotionPage {
     isTextVisible: boolean;
     isVideoVisible: boolean;
     isProductsVisible: boolean;
+    position: 'above' | 'below';
 }
 
 export interface SiteSettings {
@@ -128,7 +129,6 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
-    promotionSectionPosition: 'above' | 'below';
     audioSettings?: AudioSettings;
     notificationSettings?: NotificationSettings;
 }

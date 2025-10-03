@@ -9,7 +9,6 @@ export const defaultSiteSettings: SiteSettings = {
     heroTitle: "Pizzaria Santa Sensação",
     heroSubtitle: "A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.",
     heroBgUrl: defaultHeroBg,
-    promotionSectionPosition: 'below',
     contentSections: [
         {
             id: 'section-1',
@@ -35,7 +34,7 @@ export const defaultSiteSettings: SiteSettings = {
         { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin', isVisible: true }
     ],
     audioSettings: {
-        notificationSound: 'default-1',
+        notificationSound: '/assets/audio/notification2.mp3',
         notificationVolume: 0.5,
         backgroundMusic: '',
         backgroundVolume: 0.2,

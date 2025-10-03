@@ -38,6 +38,7 @@ export const PromotionModal: React.FC<PromotionModalProps> = ({ isOpen, onSave, 
         componentOrder: ['video', 'text', 'products'],
         featuredProductIds: [],
         isTitleVisible: true, isTextVisible: true, isVideoVisible: true, isProductsVisible: true,
+        position: 'below',
     });
     const [formData, setFormData] = useState(getInitialState());
     const [searchTerm, setSearchTerm] = useState('');
@@ -57,6 +58,9 @@ export const PromotionModal: React.FC<PromotionModalProps> = ({ isOpen, onSave, 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
+    const handleRadioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData(prev => ({...prev, position: e.target.value as 'above' | 'below' }));
+    }
     const handleToggle = (field: keyof PromotionPage) => {
         setFormData(prev => ({ ...prev, [field]: !prev[field] }));
     };
@@ -97,10 +101,23 @@ export const PromotionModal: React.FC<PromotionModalProps> = ({ isOpen, onSave, 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-4">
                                 <div><label className="block text-sm font-semibold mb-1">Título da Página</label><input name="title" value={formData.title} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" required /></div>
-                                <div><label className="block text-sm font-semibold mb-1">Texto/Descrição</label><textarea name="text" value={formData.text} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" rows={4} /></div>
                                 <div><label className="block text-sm font-semibold mb-1">URL do Vídeo (YouTube)</label><input name="videoUrl" value={formData.videoUrl} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" placeholder="https://www.youtube.com/watch?v=..." /></div>
+                                <div className="p-3 bg-gray-50 rounded-lg border">
+                                    <h4 className="font-semibold mb-2">Posição da Página</h4>
+                                    <div className="flex gap-4">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="radio" name="position" value="above" checked={formData.position === 'above'} onChange={handleRadioChange} className="form-radio text-accent" />
+                                            Acima do Cardápio
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="radio" name="position" value="below" checked={formData.position === 'below'} onChange={handleRadioChange} className="form-radio text-accent" />
+                                            Abaixo do Cardápio
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
                             <div className="space-y-4">
+                                <div><label className="block text-sm font-semibold mb-1">Texto/Descrição</label><textarea name="text" value={formData.text} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" rows={4} /></div>
                                 <div className="p-3 bg-gray-50 rounded-lg border">
                                     <h4 className="font-semibold mb-2">Visibilidade dos Componentes</h4>
                                     <div className="space-y-2 text-sm">
@@ -110,19 +127,22 @@ export const PromotionModal: React.FC<PromotionModalProps> = ({ isOpen, onSave, 
                                         <label className="flex items-center gap-2"><input type="checkbox" checked={formData.isProductsVisible} onChange={() => handleToggle('isProductsVisible')} /> Mostrar Produtos</label>
                                     </div>
                                 </div>
-                                <div className="p-3 bg-gray-50 rounded-lg border">
-                                    <h4 className="font-semibold mb-2">Ordem dos Componentes</h4>
-                                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                                        <SortableContext items={formData.componentOrder} strategy={verticalListSortingStrategy}>
-                                            <div className="space-y-2">
-                                                {formData.componentOrder.map(id => {
-                                                    const comp = componentOptions.find(c => c.id === id)!;
-                                                    return <SortableComponentItem key={id} id={comp.id} name={comp.name} icon={comp.icon} />;
-                                                })}
-                                            </div>
-                                        </SortableContext>
-                                    </DndContext>
-                                </div>
+                               
+                            </div>
+                        </div>
+                         <div>
+                            <h4 className="font-semibold mb-2">Ordem dos Componentes</h4>
+                            <div className="p-3 bg-gray-50 rounded-lg border">
+                                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                                    <SortableContext items={formData.componentOrder} strategy={verticalListSortingStrategy}>
+                                        <div className="space-y-2">
+                                            {formData.componentOrder.map(id => {
+                                                const comp = componentOptions.find(c => c.id === id)!;
+                                                return <SortableComponentItem key={id} id={comp.id} name={comp.name} icon={comp.icon} />;
+                                            })}
+                                        </div>
+                                    </SortableContext>
+                                </DndContext>
                             </div>
                         </div>
                         <div>

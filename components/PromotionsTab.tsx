@@ -45,21 +45,11 @@ export const PromotionsTab: React.FC<PromotionsTabProps> = ({ promotions, allPro
     const [localPromotions, setLocalPromotions] = useState<PromotionPage[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingPromotion, setEditingPromotion] = useState<PromotionPage | null>(null);
-    const [position, setPosition] = useState(siteSettings.promotionSectionPosition || 'below');
 
     useEffect(() => {
         setLocalPromotions([...promotions].sort((a, b) => a.order - b.order));
     }, [promotions]);
     
-    useEffect(() => {
-        setPosition(siteSettings.promotionSectionPosition || 'below');
-    }, [siteSettings]);
-
-    const handlePositionChange = (newPosition: 'above' | 'below') => {
-        setPosition(newPosition);
-        onSaveSettings({ ...siteSettings, promotionSectionPosition: newPosition }, {}, {});
-    };
-
     const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
@@ -72,7 +62,7 @@ export const PromotionsTab: React.FC<PromotionsTabProps> = ({ promotions, allPro
     };
     const handleAddNew = () => { setEditingPromotion(null); setIsModalOpen(true); };
     const handleEdit = (promo: PromotionPage) => { setEditingPromotion(promo); setIsModalOpen(true); };
-    const handleDelete = (id: string) => { if (window.confirm('Tem certeza que deseja apagar esta promoção?')) onDelete(id); };
+    const handleDelete = (id: string) => { if (window.confirm(`Tem certeza que deseja apagar esta promoção? Esta ação não pode ser desfeita.`)) onDelete(id); };
     const handleToggleVisibility = (promo: PromotionPage) => {
         onSave({ ...promo, isVisible: !promo.isVisible });
     };
@@ -80,21 +70,8 @@ export const PromotionsTab: React.FC<PromotionsTabProps> = ({ promotions, allPro
     return (
         <div className="animate-fade-in-up">
             <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold">Gerenciar Promoções</h3>
-                <button onClick={handleAddNew} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Promoção</button>
-            </div>
-            <div className="p-4 bg-gray-50 rounded-lg border mb-6">
-                <h4 className="font-semibold mb-2">Posição da Seção de Promoções</h4>
-                <div className="flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="promo-position" value="above" checked={position === 'above'} onChange={() => handlePositionChange('above')} className="form-radio text-accent" />
-                        Acima do Cardápio
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="promo-position" value="below" checked={position === 'below'} onChange={() => handlePositionChange('below')} className="form-radio text-accent" />
-                        Abaixo do Cardápio
-                    </label>
-                </div>
+                <h3 className="text-xl font-bold">Gerenciar Páginas de Promoção</h3>
+                <button onClick={handleAddNew} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Página</button>
             </div>
             
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -111,7 +88,7 @@ export const PromotionsTab: React.FC<PromotionsTabProps> = ({ promotions, allPro
                         )) : (
                             <div className="text-center py-12 text-gray-500">
                                 <i className="fas fa-bullhorn text-4xl mb-3"></i>
-                                <p>Nenhuma promoção criada ainda.</p>
+                                <p>Nenhuma página de promoção criada ainda.</p>
                             </div>
                         )}
                     </div>
