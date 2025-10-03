@@ -1,4 +1,3 @@
-
 export interface Product {
     id: string;
     name: string;
@@ -98,7 +97,7 @@ export interface FooterLink {
 // --- NEW TYPES FOR NEW FEATURES ---
 
 export interface AudioSettings {
-    notificationSound: string; // URL or 'default-1', 'default-2', etc.
+    notificationSound: string; // URL or 'default-1', 'default-2'
     notificationVolume: number; // 0 to 1
     backgroundMusic: string; // URL
     backgroundVolume: number; // 0 to 1
@@ -115,9 +114,8 @@ export interface PromotionPage {
     title: string;
     text: string;
     videoUrl: string;
-    featuredProductIds: string[];
-    // FIX: Replaced 'componentOrder' with 'layout' to match component implementations.
     layout: 'video-left' | 'video-right';
+    featuredProductIds: string[];
     // Visibility toggles for each element
     isTitleVisible: boolean;
     isTextVisible: boolean;
@@ -134,7 +132,6 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
-    promotionSectionPosition: 'above' | 'below';
     // New settings integrated
     audioSettings?: AudioSettings;
     notificationSettings?: NotificationSettings;

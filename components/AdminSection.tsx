@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, PromotionPage } from '../types';
 import { ProductModal } from './ProductModal';
@@ -43,8 +42,6 @@ interface AdminSectionProps {
     onSavePromotion: (promotion: PromotionPage) => Promise<void>;
     onDeletePromotion: (promotionId: string) => Promise<void>;
     onReorderPromotions: (promotionsToUpdate: { id: string; order: number }[]) => Promise<void>;
-    // FIX: Added onRestoreDefaults to props interface to match what's passed from App.
-    onRestoreDefaults: () => Promise<void>;
 }
 
 // ... Sortable components remain the same ...
@@ -157,7 +154,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
         onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
         onDeleteOrder, onPermanentDeleteOrder,
-        onSavePromotion, onDeletePromotion, onReorderPromotions, onRestoreDefaults
+        onSavePromotion, onDeletePromotion, onReorderPromotions
     } = props;
     
     const [user, setUser] = useState<firebase.User | null>(null);
@@ -343,13 +340,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                 {activeSettingsTab === 'audio' && <AudioTab settings={siteSettings} onSave={onSaveSiteSettings} />}
                                 {activeSettingsTab === 'notifications' && <NotificationsTab settings={siteSettings} onSave={onSaveSiteSettings} />}
                                 {activeSettingsTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> )}
-                                {activeSettingsTab === 'data' && ( <div><div className="p-4 mb-6 bg-red-50 border-l-4 border-red-500 text-red-800"><p className="font-bold">Atenção: Área Técnica</p><p className="text-sm">As ferramentas nesta seção podem afetar permanentemente o seu banco de dados. Use com cuidado e apenas se tiver conhecimento técnico. Recomenda-se fazer um backup antes de qualquer ação.</p></div><h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus produtos, categorias e configurações.</p> <button onClick={() => { try { const backupData = { products: allProducts, categories: allCategories, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); alert('Backup concluído!'); } catch (e) { console.error(e); alert("Falha no backup."); } }} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados de exemplo. Use apenas em uma instalação nova.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div>
-                                <div className="bg-red-50 p-4 rounded-lg border border-red-200 mt-4">
-                                    <h4 className="font-semibold text-lg mb-2 text-red-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Irreversível</h4>
-                                    <p className="text-red-700 mb-3">Restaura todas as configurações de aparência, links e áudio para o padrão de fábrica. Esta ação não pode ser desfeita.</p>
-                                    <button onClick={onRestoreDefaults} className="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600"><i className="fas fa-undo mr-2"></i>Restaurar Padrões</button>
-                                </div>
-                                </div> )}
+                                {activeSettingsTab === 'data' && ( <div><div className="p-4 mb-6 bg-red-50 border-l-4 border-red-500 text-red-800"><p className="font-bold">Atenção: Área Técnica</p><p className="text-sm">As ferramentas nesta seção podem afetar permanentemente o seu banco de dados. Use com cuidado e apenas se tiver conhecimento técnico. Recomenda-se fazer um backup antes de qualquer ação.</p></div><h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus produtos, categorias e configurações.</p> <button onClick={() => { try { const backupData = { products: allProducts, categories: allCategories, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); alert('Backup concluído!'); } catch (e) { console.error(e); alert("Falha no backup."); } }} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados de exemplo. Use apenas em uma instalação nova.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> )}
                             </div>
                         )}
                         

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, PromotionPage } from './types';
 import { Header } from './components/Header';
@@ -14,15 +13,57 @@ import { PixPaymentModal } from './components/PixPaymentModal';
 import { db } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
+import defaultLogo from './assets/logo.png';
+import defaultHeroBg from './assets/ambiente-pizzaria.webp';
+import defaultAboutImg from './assets/sobre-imagem.webp';
 import { PromotionSection } from './components/PromotionSection';
-import { ImagePreloader } from './components/ImagePreloader';
-import { defaultSiteSettings } from './services/defaultSettings';
 
 interface Toast {
     id: number;
     message: string;
     type: 'success' | 'error';
 }
+
+const defaultSiteSettings: SiteSettings = {
+    logoUrl: defaultLogo,
+    heroSlogan: "A pizza nº 1 do ES",
+    heroTitle: "Pizzaria Santa Sensação",
+    heroSubtitle: "A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.",
+    heroBgUrl: defaultHeroBg,
+    contentSections: [
+        {
+            id: 'section-1',
+            order: 0,
+            isVisible: true,
+            isTagVisible: true,
+            tagIcon: "fas fa-award",
+            imageUrl: defaultAboutImg,
+            tag: "Nossa Conquista",
+            title: "A Melhor Pizza do Estado, Assinada por um Mestre",
+            description: "Em parceria com o renomado mestre pizzaiolo Luca Lonardi, a Santa Sensação eleva a pizza a um novo patamar. Fomos os grandes vencedores do concurso Panshow 2025, um reconhecimento que celebra nossa dedicação aos ingredientes frescos, massa de fermentação natural e, acima de tudo, a paixão por criar sabores inesquecíveis. Cada pizza que sai do nosso forno a lenha carrega a assinatura de um campeão e a promessa de uma experiência única.",
+            list: [
+                { id: 'item-1-1', icon: "fas fa-award", text: "Vencedora do Panshow 2025" },
+                { id: 'item-1-2', icon: "fas fa-user-check", text: "Assinada pelo Mestre Luca Lonardi" },
+                { id: 'item-1-3', icon: "fas fa-leaf", text: "Ingredientes frescos e selecionados" },
+                { id: 'item-1-4', icon: "fas fa-fire-alt", text: "Forno a lenha tradicional" }
+            ]
+        },
+    ],
+    footerLinks: [
+        { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996500341', isVisible: true },
+        { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/santasensacao.sl', isVisible: true },
+        { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin', isVisible: true }
+    ],
+    audioSettings: {
+        notificationSound: 'default-1',
+        notificationVolume: 0.5,
+        backgroundMusic: '',
+        backgroundVolume: 0.2,
+    },
+    notificationSettings: {
+        browserNotificationsEnabled: false,
+    }
+};
 
 const App: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
@@ -110,17 +151,7 @@ const App: React.FC = () => {
         const unsubSettings = settingsDocRef.onSnapshot(doc => {
             if (doc.exists) {
                  const data = doc.data() as Partial<SiteSettings>;
-                 // Deep merge to ensure nested objects like audioSettings are not overwritten entirely
-                 setSiteSettings(prev => ({
-                    ...defaultSiteSettings,
-                    ...prev,
-                    ...data,
-                    audioSettings: { ...defaultSiteSettings.audioSettings, ...prev.audioSettings, ...data.audioSettings },
-                    notificationSettings: { ...defaultSiteSettings.notificationSettings, ...prev.notificationSettings, ...data.notificationSettings },
-                 }));
-            } else {
-                // If no settings exist in DB, save the default ones
-                firebaseService.updateSiteSettings(defaultSiteSettings);
+                 setSiteSettings(prev => ({ ...defaultSiteSettings, ...prev, ...data }));
             }
         }, err => handleConnectionError(err, "site settings"));
 
@@ -154,6 +185,7 @@ const App: React.FC = () => {
             setPromotions(fetchedPromotions);
         }, err => handleConnectionError(err, "promotions"));
 
+        // Only set loading to false after the primary data (products) is fetched.
         const unsubLoader = productsQuery.onSnapshot(() => {
              setIsLoading(false);
              setError(null);
@@ -508,18 +540,6 @@ const App: React.FC = () => {
             addToast("Erro ao reordenar promoções.", 'error');
         }
     }, [addToast]);
-
-    const handleRestoreDefaults = useCallback(async () => {
-        if (window.confirm("Tem certeza que deseja restaurar todas as configurações para o padrão original? Isso afetará a aparência, os links e as configurações de áudio/notificação.")) {
-            try {
-                await firebaseService.updateSiteSettings(defaultSiteSettings);
-                addToast("Configurações restauradas para o padrão.", 'success');
-            } catch (error) {
-                console.error("Failed to restore default settings:", error);
-                addToast("Erro ao restaurar as configurações.", 'error');
-            }
-        }
-    }, [addToast]);
     
     const handleUpdateOrderStatus = useCallback(async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => {
         try {
@@ -584,21 +604,9 @@ const App: React.FC = () => {
 
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
-    
-    const promotionPages = useMemo(() => promotions.filter(p => p.isVisible).sort((a, b) => a.order - b.order), [promotions]);
-    const imagePreloadList = useMemo(() => {
-        const productImages = products.map(p => p.imageUrl);
-        const promotionProductImages = promotions.flatMap(promo => 
-            promo.featuredProductIds
-                .map(id => products.find(p => p.id === id)?.imageUrl)
-                .filter((url): url is string => !!url)
-        );
-        return [...new Set([...productImages, ...promotionProductImages])];
-    }, [products, promotions]);
 
     return (
         <div className="flex flex-col min-h-screen">
-            <ImagePreloader imageUrls={imagePreloadList} />
             <Header cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} activeSection={activeSection} settings={siteSettings} />
             
             <div id="status-banner" className={`bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
@@ -625,10 +633,6 @@ const App: React.FC = () => {
                     </div>
                 ) : !error && (
                     <>
-                    {siteSettings.promotionSectionPosition === 'above' && promotionPages.map(promo => (
-                        // FIX: Added isStoreOnline prop to PromotionSection to allow child components to check store status.
-                        <PromotionSection key={promo.id} promotion={promo} allProducts={products} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} />
-                    ))}
                     <MenuSection 
                         categories={categories} 
                         products={products} 
@@ -643,9 +647,8 @@ const App: React.FC = () => {
                         showFinalizeButtonTrigger={showFinalizeButtonTrigger}
                         setShowFinalizeButtonTrigger={setShowFinalizeButtonTrigger}
                     />
-                     {siteSettings.promotionSectionPosition !== 'above' && promotionPages.map(promo => (
-                        // FIX: Added isStoreOnline prop to PromotionSection to allow child components to check store status.
-                        <PromotionSection key={promo.id} promotion={promo} allProducts={products} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} />
+                    {promotions.filter(p => p.isVisible).sort((a,b) => a.order - b.order).map(promo => (
+                        <PromotionSection key={promo.id} promotion={promo} allProducts={products} />
                     ))}
                     </>
                 )}
@@ -685,8 +688,6 @@ const App: React.FC = () => {
                     onSavePromotion={handleSavePromotion}
                     onDeletePromotion={handleDeletePromotion}
                     onReorderPromotions={handleReorderPromotions}
-                    // FIX: Passed onRestoreDefaults handler to AdminSection to match its props interface.
-                    onRestoreDefaults={handleRestoreDefaults}
                 />
             </main>
 
