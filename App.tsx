@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, PromotionPage } from './types';
+import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
@@ -13,10 +13,10 @@ import { PixPaymentModal } from './components/PixPaymentModal';
 import { db } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
+// Static assets for default values
 import defaultLogo from './assets/logo.png';
 import defaultHeroBg from './assets/ambiente-pizzaria.webp';
 import defaultAboutImg from './assets/sobre-imagem.webp';
-import { PromotionSection } from './components/PromotionSection';
 
 interface Toast {
     id: number;
@@ -48,28 +48,35 @@ const defaultSiteSettings: SiteSettings = {
                 { id: 'item-1-4', icon: "fas fa-fire-alt", text: "Forno a lenha tradicional" }
             ]
         },
+        {
+            id: 'section-2',
+            order: 1,
+            isVisible: true,
+            isTagVisible: true,
+            tagIcon: 'fas fa-seedling',
+            imageUrl: 'https://picsum.photos/seed/ingredients/800/600',
+            tag: "Qualidade e Tradição",
+            title: "Ingredientes Frescos, Sabor Incomparável",
+            description: "Nossa paixão pela pizza começa na escolha de cada ingrediente. Trabalhamos com produtores locais para garantir o frescor e a qualidade que você sente em cada fatia. Da nossa massa de fermentação lenta aos tomates italianos, tudo é pensado para criar uma experiência única.",
+            list: [
+                { id: 'item-2-1', icon: 'fas fa-bread-slice', text: "Massa de fermentação natural de 48h" },
+                { id: 'item-2-2', icon: 'fas fa-pepper-hot', text: "Tomates italianos San Marzano" },
+                { id: 'item-2-3', icon: 'fas fa-cheese', text: "Mozzarella fresca e queijos selecionados" },
+                { id: 'item-2-4', icon: 'fas fa-leaf', text: "Manjericão e ervas da nossa horta" }
+            ]
+        }
     ],
     footerLinks: [
         { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996500341', isVisible: true },
         { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/santasensacao.sl', isVisible: true },
         { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin', isVisible: true }
-    ],
-    audioSettings: {
-        notificationSound: 'default-1',
-        notificationVolume: 0.5,
-        backgroundMusic: '',
-        backgroundVolume: 0.2,
-    },
-    notificationSettings: {
-        browserNotificationsEnabled: false,
-    }
+    ]
 };
 
 const App: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
-    const [promotions, setPromotions] = useState<PromotionPage[]>([]);
     const [isStoreOnline, setIsStoreOnline] = useState<boolean>(true);
     const [cart, setCart] = useState<CartItem[]>([]);
     const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
@@ -171,6 +178,8 @@ const App: React.FC = () => {
         const unsubProducts = productsQuery.onSnapshot(snapshot => {
             const fetchedProducts: Product[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
             setProducts(fetchedProducts);
+            setIsLoading(false);
+            setError(null);
         }, err => handleConnectionError(err, "products"));
 
         const ordersQuery = db.collection('orders').orderBy('createdAt', 'desc');
@@ -179,26 +188,12 @@ const App: React.FC = () => {
             setOrders(fetchedOrders);
         }, err => handleConnectionError(err, "orders"));
 
-        const promotionsQuery = db.collection('promotions').orderBy('order');
-        const unsubPromotions = promotionsQuery.onSnapshot(snapshot => {
-            const fetchedPromotions: PromotionPage[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PromotionPage));
-            setPromotions(fetchedPromotions);
-        }, err => handleConnectionError(err, "promotions"));
-
-        // Only set loading to false after the primary data (products) is fetched.
-        const unsubLoader = productsQuery.onSnapshot(() => {
-             setIsLoading(false);
-             setError(null);
-        });
-
         return () => {
             unsubSettings();
             unsubStatus();
             unsubCategories();
             unsubProducts();
             unsubOrders();
-            unsubPromotions();
-            unsubLoader();
         };
     }, []);
 
@@ -475,69 +470,33 @@ const App: React.FC = () => {
         }
     }, [addToast]);
 
-    const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }, audioFiles: { [key: string]: File | null }) => {
+    const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => {
         try {
-            const settingsToUpdate = JSON.parse(JSON.stringify(settings)); 
+            const settingsToUpdate = JSON.parse(JSON.stringify(settings)); // Deep copy
 
             for (const key in files) {
                 const file = files[key];
                 if (file) {
                     const url = await firebaseService.uploadSiteAsset(file, key);
                     
-                    if (key === 'logo') settingsToUpdate.logoUrl = url;
-                    else if (key === 'heroBg') settingsToUpdate.heroBgUrl = url;
-                    else { 
+                    if (key === 'logo') {
+                        settingsToUpdate.logoUrl = url;
+                    } else if (key === 'heroBg') {
+                        settingsToUpdate.heroBgUrl = url;
+                    } else { // It's a content section file, key is the section ID
                         const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
-                        if (sectionIndex > -1) settingsToUpdate.contentSections[sectionIndex].imageUrl = url;
+                        if (sectionIndex > -1) {
+                            settingsToUpdate.contentSections[sectionIndex].imageUrl = url;
+                        }
                     }
-                }
-            }
-            
-            for (const key in audioFiles) {
-                const file = audioFiles[key];
-                if(file) {
-                    const url = await firebaseService.uploadAudioFile(file, key);
-                    if(key === 'notificationSound') settingsToUpdate.audioSettings.notificationSound = url;
-                    if(key === 'backgroundMusic') settingsToUpdate.audioSettings.backgroundMusic = url;
                 }
             }
 
             await firebaseService.updateSiteSettings(settingsToUpdate);
-            addToast("Configurações do site salvas com sucesso!", 'success');
+            addToast("Personalização do site salva com sucesso!", 'success');
         } catch (error) {
             console.error("Failed to save site settings:", error);
             addToast("Erro ao salvar as configurações do site.", 'error');
-        }
-    }, [addToast]);
-    
-    // --- Handlers for new Promotion features ---
-    const handleSavePromotion = useCallback(async (promotion: PromotionPage) => {
-        try {
-            await firebaseService.savePromotion(promotion);
-            addToast("Promoção salva com sucesso!", 'success');
-        } catch (error) {
-            console.error("Failed to save promotion:", error);
-            addToast("Erro ao salvar promoção.", 'error');
-        }
-    }, [addToast]);
-
-    const handleDeletePromotion = useCallback(async (promotionId: string) => {
-        try {
-            await firebaseService.deletePromotion(promotionId);
-            addToast("Promoção deletada com sucesso!", 'success');
-        } catch (error) {
-            console.error("Failed to delete promotion:", error);
-            addToast("Erro ao deletar promoção.", 'error');
-        }
-    }, [addToast]);
-
-    const handleReorderPromotions = useCallback(async (promotionsToUpdate: { id: string; order: number }[]) => {
-        try {
-            await firebaseService.updatePromotionsOrder(promotionsToUpdate);
-            addToast("Ordem das promoções atualizada.", 'success');
-        } catch (error) {
-            console.error("Failed to reorder promotions:", error);
-            addToast("Erro ao reordenar promoções.", 'error');
         }
     }, [addToast]);
     
@@ -632,7 +591,6 @@ const App: React.FC = () => {
                         <p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p>
                     </div>
                 ) : !error && (
-                    <>
                     <MenuSection 
                         categories={categories} 
                         products={products} 
@@ -647,10 +605,6 @@ const App: React.FC = () => {
                         showFinalizeButtonTrigger={showFinalizeButtonTrigger}
                         setShowFinalizeButtonTrigger={setShowFinalizeButtonTrigger}
                     />
-                    {promotions.filter(p => p.isVisible).sort((a,b) => a.order - b.order).map(promo => (
-                        <PromotionSection key={promo.id} promotion={promo} allProducts={products} />
-                    ))}
-                    </>
                 )}
                 <div id="sobre">
                     {siteSettings.contentSections
@@ -667,7 +621,6 @@ const App: React.FC = () => {
                     isStoreOnline={isStoreOnline}
                     siteSettings={siteSettings}
                     orders={orders}
-                    promotions={promotions}
                     onSaveProduct={handleSaveProduct}
                     onDeleteProduct={handleDeleteProduct}
                     onProductStatusChange={handleProductStatusChange}
@@ -685,9 +638,6 @@ const App: React.FC = () => {
                     onUpdateOrderReservationTime={handleUpdateOrderReservationTime}
                     onDeleteOrder={handleDeleteOrder}
                     onPermanentDeleteOrder={handlePermanentDeleteOrder}
-                    onSavePromotion={handleSavePromotion}
-                    onDeletePromotion={handleDeletePromotion}
-                    onReorderPromotions={handleReorderPromotions}
                 />
             </main>
 

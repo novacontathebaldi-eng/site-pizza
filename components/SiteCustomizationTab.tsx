@@ -7,8 +7,7 @@ import { CSS } from '@dnd-kit/utilities';
 // PROPS
 interface SiteCustomizationTabProps {
     settings: SiteSettings;
-    // FIX: Updated onSave prop to accept audioFiles to match the handler signature.
-    onSave: (settings: SiteSettings, files: { [key: string]: File | null }, audioFiles: { [key: string]: File | null }) => Promise<void>;
+    onSave: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
 }
 
 // IconInput Component (Helper)
@@ -233,8 +232,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
-        // FIX: Pass empty object for audioFiles argument to match the expected signature.
-        await onSave(formData, files, {});
+        await onSave(formData, files);
         setFiles({}); // Clear files after saving
         setIsSaving(false);
     };
