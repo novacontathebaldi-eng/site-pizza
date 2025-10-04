@@ -26,7 +26,7 @@ let db: firebase.firestore.Firestore | null = null;
 let storage: firebase.storage.Storage | null = null;
 let auth: firebase.auth.Auth | null = null; // Add auth service
 let functions: firebase.functions.Functions | null = null; // Add functions service
-let messaging: firebase.messaging.Messaging | null = null; // Add messaging service
+let messagingPromise: Promise<firebase.messaging.Messaging | null> | null = null;
 
 try {
   // Use the initialization pattern from the user's working old version.
@@ -38,17 +38,20 @@ try {
   auth = firebase.auth();
   functions = firebase.functions();
   
-  if (firebase.messaging.isSupported()) {
-    try {
-      messaging = firebase.messaging();
-      console.log("Firebase Messaging is supported and initialized.");
-    } catch (err) {
-      console.error("Firebase Messaging failed to initialize, push notifications will be disabled.", err);
-      messaging = null;
+  // Asynchronously initialize Firebase Messaging to prevent crashes on unsupported browsers.
+  // FIX: Wrap firebase.messaging.isSupported() in Promise.resolve() to handle a potential type mismatch.
+  // This ensures the call is always promise-based, resolving the error where `.then()` cannot be called on a boolean.
+  messagingPromise = Promise.resolve(firebase.messaging.isSupported()).then(isSupported => {
+    if (isSupported) {
+      console.log("Firebase Messaging is supported, initializing.");
+      return firebase.messaging();
     }
-  } else {
     console.warn("Firebase Messaging is not supported in this browser.");
-  }
+    return null;
+  }).catch(err => {
+    console.error("An error occurred while initializing Firebase Messaging:", err);
+    return null;
+  });
   
   // Keep db settings
   db.settings({
@@ -60,4 +63,4 @@ try {
   console.error('Falha ao inicializar o Firebase. Verifique seu objeto firebaseConfig em `services/firebase.ts`.', error);
 }
 
-export { db, storage, auth, functions, messaging };
+export { db, storage, auth, functions, messagingPromise };

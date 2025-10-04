@@ -1,6 +1,6 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
-import { db, storage, functions, messaging, auth } from './firebase';
+import { db, storage, functions, messagingPromise, auth } from './firebase';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
@@ -183,6 +183,7 @@ const saveFcmToken = async (adminUid: string, token: string): Promise<void> => {
 };
 
 export const requestNotificationPermission = async (adminUid: string): Promise<boolean> => {
+    const messaging = await messagingPromise;
     if (!messaging) {
         console.error("Firebase Messaging is not initialized or supported.");
         return false;
@@ -195,8 +196,8 @@ export const requestNotificationPermission = async (adminUid: string): Promise<b
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
             console.log('Notification permission granted.');
-            const fcmVapidKey = "BLs1R3Gvj_S3i58QpmnrS2p2_7Dk-3yYy3-0vVpY_Q1j1_yR8wX3g_1c_4z5_9Z8J6j3_Q1w_5X4k2b_A"; // Public VAPID key
-            const token = await messaging.getToken({ vapidKey: fcmVapidKey });
+            // We don't need to pass the VAPID key here if the service worker is configured correctly.
+            const token = await messaging.getToken();
             if (token) {
                 await saveFcmToken(adminUid, token);
                 console.log('FCM Token saved for admin:', adminUid);
