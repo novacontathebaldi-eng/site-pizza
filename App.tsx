@@ -10,6 +10,7 @@ import { Footer } from './components/Footer';
 import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
 import { PixPaymentModal } from './components/PixPaymentModal';
+import { NewOrderToast } from './components/NewOrderToast';
 import { db } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
@@ -94,22 +95,18 @@ const App: React.FC = () => {
     const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
     const [payingOrder, setPayingOrder] = useState<Order | null>(null);
-    const prevPendingOrdersCount = useRef<number | null>(null);
+    const [newOrderToast, setNewOrderToast] = useState<Order | null>(null);
+    const knownPendingOrderIds = useRef(new Set<string>());
     
-    const notificationSound = useMemo(() => {
-        const soundPath = siteSettings?.audioSettings?.notificationSound;
-        if (soundPath) {
-            return new Audio(soundPath);
-        }
-        return null; 
-    }, [siteSettings?.audioSettings?.notificationSound]);
-
-    useEffect(() => {
-        const volume = siteSettings?.audioSettings?.notificationVolume;
-        if (notificationSound && typeof volume === 'number') {
-            notificationSound.volume = Math.max(0, Math.min(1, volume)); // Clamp volume between 0 and 1
-        }
-    }, [notificationSound, siteSettings?.audioSettings?.notificationVolume]);
+    const notificationSounds = useMemo(() => {
+        return [
+            new Audio('/assets/audio/notf1.mp3'),
+            new Audio('/assets/audio/notf2.mp3'),
+            new Audio('/assets/audio/notf3.mp3'),
+            new Audio('/assets/audio/notf4.mp3'),
+            new Audio('/assets/audio/notf5.mp3'),
+        ];
+    }, []);
 
 
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
@@ -218,23 +215,43 @@ const App: React.FC = () => {
         };
     }, []);
 
-    // Effect for notification sound
+    // Effect for notification sound and toast
     useEffect(() => {
-        const pendingOrders = orders.filter(o => o.status === 'pending');
-        
-        // Initialize count on first valid render without playing sound
-        if (prevPendingOrdersCount.current === null && !isLoading) {
-            prevPendingOrdersCount.current = pendingOrders.length;
+        const currentPendingOrders = orders.filter(o => o.status === 'pending');
+
+        if (isLoading) {
+             // Initialize known orders on first load
+            currentPendingOrders.forEach(o => knownPendingOrderIds.current.add(o.id));
             return;
         }
-        
-        // Play sound if a new pending order arrives
-        if (notificationSound && prevPendingOrdersCount.current !== null && pendingOrders.length > prevPendingOrdersCount.current) {
-            notificationSound.play().catch(e => console.error("Error playing sound:", e));
+
+        const newPendingOrders = currentPendingOrders.filter(o => !knownPendingOrderIds.current.has(o.id));
+
+        if (newPendingOrders.length > 0) {
+            const latestNewOrder = newPendingOrders[newPendingOrders.length - 1];
+            
+            // Play a random sound
+            const randomSoundIndex = Math.floor(Math.random() * notificationSounds.length);
+            const soundToPlay = notificationSounds[randomSoundIndex];
+            soundToPlay.volume = siteSettings?.audioSettings?.notificationVolume ?? 1.0;
+            soundToPlay.play().catch(e => console.error("Error playing sound:", e));
+
+            // Show toast for the latest new order
+            setNewOrderToast(latestNewOrder);
+
+            // Update known orders
+            newPendingOrders.forEach(o => knownPendingOrderIds.current.add(o.id));
         }
         
-        prevPendingOrdersCount.current = pendingOrders.length;
-    }, [orders, isLoading, notificationSound]);
+        // Clean up known orders that are no longer pending
+        const currentPendingIds = new Set(currentPendingOrders.map(o => o.id));
+        knownPendingOrderIds.current.forEach(id => {
+            if (!currentPendingIds.has(id)) {
+                knownPendingOrderIds.current.delete(id);
+            }
+        });
+
+    }, [orders, isLoading, notificationSounds, siteSettings]);
 
     useEffect(() => {
         if (categories.length > 0 && !activeMenuCategory) {
@@ -666,7 +683,6 @@ const App: React.FC = () => {
                     onUpdateOrderReservationTime={handleUpdateOrderReservationTime}
                     onDeleteOrder={handleDeleteOrder}
                     onPermanentDeleteOrder={handlePermanentDeleteOrder}
-                    onRequestNotificationPermission={firebaseService.requestNotificationPermission}
                     addToast={addToast}
                 />
             </main>
@@ -719,6 +735,15 @@ const App: React.FC = () => {
                 onPaymentSuccess={handlePixPaymentSuccess}
             />
             
+            <NewOrderToast 
+                order={newOrderToast}
+                onAccept={(orderId) => {
+                    handleUpdateOrderStatus(orderId, 'accepted');
+                    setNewOrderToast(null);
+                }}
+                onDismiss={() => setNewOrderToast(null)}
+            />
+
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]">
                 <div className="w-full flex flex-col items-center space-y-4 sm:items-end">
                     {toasts.map((toast) => (

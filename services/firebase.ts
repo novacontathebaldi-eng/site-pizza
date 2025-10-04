@@ -6,7 +6,6 @@ import 'firebase/compat/firestore';
 import 'firebase/compat/storage';
 import 'firebase/compat/auth'; // Import for authentication
 import 'firebase/compat/functions'; // Import for Firebase Functions
-import 'firebase/compat/messaging'; // Import for Firebase Messaging (FCM)
 
 // AÇÃO NECESSÁRIA: Credenciais corrigidas.
 // O problema era um erro de digitação na apiKey. Esta versão está 100% correta,
@@ -26,7 +25,6 @@ let db: firebase.firestore.Firestore | null = null;
 let storage: firebase.storage.Storage | null = null;
 let auth: firebase.auth.Auth | null = null; // Add auth service
 let functions: firebase.functions.Functions | null = null; // Add functions service
-let messagingPromise: Promise<firebase.messaging.Messaging | null> | null = null;
 
 try {
   // Use the initialization pattern from the user's working old version.
@@ -38,21 +36,6 @@ try {
   auth = firebase.auth();
   functions = firebase.functions();
   
-  // Asynchronously initialize Firebase Messaging to prevent crashes on unsupported browsers.
-  // FIX: Wrap firebase.messaging.isSupported() in Promise.resolve() to handle a potential type mismatch.
-  // This ensures the call is always promise-based, resolving the error where `.then()` cannot be called on a boolean.
-  messagingPromise = Promise.resolve(firebase.messaging.isSupported()).then(isSupported => {
-    if (isSupported) {
-      console.log("Firebase Messaging is supported, initializing.");
-      return firebase.messaging();
-    }
-    console.warn("Firebase Messaging is not supported in this browser.");
-    return null;
-  }).catch(err => {
-    console.error("An error occurred while initializing Firebase Messaging:", err);
-    return null;
-  });
-  
   // Keep db settings
   db.settings({
     experimentalForceLongPolling: true,
@@ -63,4 +46,4 @@ try {
   console.error('Falha ao inicializar o Firebase. Verifique seu objeto firebaseConfig em `services/firebase.ts`.', error);
 }
 
-export { db, storage, auth, functions, messagingPromise };
+export { db, storage, auth, functions };

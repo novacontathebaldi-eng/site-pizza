@@ -34,7 +34,6 @@ interface AdminSectionProps {
     onUpdateOrderReservationTime: (orderId: string, reservationTime: string) => Promise<void>;
     onDeleteOrder: (orderId: string) => Promise<void>;
     onPermanentDeleteOrder: (orderId: string) => Promise<void>;
-    onRequestNotificationPermission: (adminUid: string) => Promise<boolean>;
     addToast: (message: string, type?: 'success' | 'error') => void;
 }
 
@@ -157,8 +156,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     
-    const [notificationPermission, setNotificationPermission] = useState(Notification.permission);
-
     // State for order management
     const [orderSearchTerm, setOrderSearchTerm] = useState('');
     const [orderFilters, setOrderFilters] = useState({ orderType: '', paymentMethod: '', paymentStatus: '', orderStatus: '' });
@@ -275,27 +272,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const pendingOrdersCount = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
     const tabOrders = useMemo(() => filteredOrders.filter(o => o.status === activeOrdersTab), [filteredOrders, activeOrdersTab]);
     
-    const handleRequestNotificationPermission = async () => {
-        if (!user) {
-            addToast("Usuário não autenticado.", 'error');
-            return;
-        }
-        const success = await firebaseService.requestNotificationPermission(user.uid);
-        // After the request, update the state to reflect the browser's current permission status
-        setNotificationPermission(Notification.permission);
-        
-        if (success) {
-            addToast("Notificações ativadas com sucesso!", 'success');
-        } else {
-            // Check the final permission state to give a more accurate error
-            if (Notification.permission === 'denied') {
-                addToast("As notificações foram bloqueadas pelo navegador.", 'error');
-            } else {
-                addToast("Não foi possível ativar as notificações.", 'error');
-            }
-        }
-    };
-
     if (!showAdminPanel) return null;
     if (authLoading) return <section id="admin" className="py-20 bg-brand-ivory-50"><div className="text-center"><i className="fas fa-spinner fa-spin text-4xl text-accent"></i></div></section>;
     if (!user) return (<> <section id="admin" className="py-20 bg-brand-ivory-50"> <div className="container mx-auto px-4 max-w-md"> <div className="bg-white p-8 rounded-2xl shadow-lg border"> <h2 className="text-3xl font-bold text-center mb-6"><i className="fas fa-shield-alt mr-2"></i>Painel</h2> <form onSubmit={handleLogin}> <div className="mb-4"> <label className="block font-semibold mb-2" htmlFor="admin-email">Email</label> <input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> <div className="mb-6"> <label className="block font-semibold mb-2" htmlFor="admin-password">Senha</label> <input id="admin-password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> {error && <div className="text-red-600 mb-4 bg-red-50 p-3 rounded-lg border border-red-200">{error}</div>} <button type="submit" className="w-full bg-accent text-white font-bold py-3 rounded-lg hover:bg-opacity-90 disabled:bg-opacity-70 flex justify-center" disabled={isLoggingIn}>{isLoggingIn ? <i className="fas fa-spinner fa-spin"></i> : 'Entrar'}</button> </form> </div> </div> </section> <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} /> </>);
@@ -324,34 +300,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                         </div>
 
                         {activeTab === 'status' && ( <div> <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3> <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg"> <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer"> <input type="checkbox" id="store-status-toggle" className="sr-only peer" checked={isStoreOnline} onChange={e => onStoreStatusChange(e.target.checked)} /> <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600"></div> </label> <span className={`font-semibold text-lg ${isStoreOnline ? 'text-green-600' : 'text-red-600'}`}>{isStoreOnline ? 'Aberta' : 'Fechada'}</span> </div>
-                         <div className="mt-6 pt-6 border-t">
-                            <h3 className="text-xl font-bold mb-4">Notificações de Pedidos</h3>
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                {notificationPermission === 'granted' && (
-                                    <div className="flex items-center gap-3 text-green-600">
-                                        <i className="fas fa-check-circle text-xl"></i>
-                                        <p className="font-semibold">Notificações ativadas para este navegador.</p>
-                                    </div>
-                                )}
-                                {notificationPermission === 'default' && (
-                                    <div className="flex items-center gap-3">
-                                        <p>Receba alertas de novos pedidos, mesmo com o site fechado.</p>
-                                        <button onClick={handleRequestNotificationPermission} className="bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600">
-                                            <i className="fas fa-bell mr-2"></i>Ativar Notificações
-                                        </button>
-                                    </div>
-                                )}
-                                {notificationPermission === 'denied' && (
-                                     <div className="flex items-center gap-3 text-red-600">
-                                        <i className="fas fa-times-circle text-xl"></i>
-                                        <div>
-                                            <p className="font-semibold">As notificações estão bloqueadas.</p>
-                                            <p className="text-sm">Para ativá-las, você precisa alterar as permissões de notificação para este site nas configurações do seu navegador.</p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
                         </div> )}
                         
                         {activeTab === 'orders' && (

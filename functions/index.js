@@ -1,7 +1,6 @@
 /* eslint-disable max-len */
-const {onCall} = require("firebase-functions/v2/https");
+const {onCall} = require("firebase-functions/v2/onCall");
 const {onRequest} = require("firebase-functions/v2/https");
-const {onDocumentCreated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const axios = require("axios");
@@ -106,81 +105,4 @@ exports.infinitePayWebhook = onRequest(async (request, response) => {
     logger.info(`Webhook para o pedido ${orderId} recebido com status: ${status}. Nenhuma ação tomada.`);
     response.status(200).json({success: true, message: `Webhook received with status: ${status}`});
   }
-});
-
-// Cloud Function to send a push notification when a new order is created
-exports.sendNotificationOnNewOrder = onDocumentCreated("orders/{orderId}", async (event) => {
-  const order = event.data.data();
-  const orderId = event.params.orderId;
-
-  if (order.status !== "pending") {
-    logger.info(`Order ${orderId} created with status '${order.status}', no notification sent.`);
-    return null;
-  }
-
-  // Get all admin users
-  const adminsSnapshot = await db.collection("admins").get();
-  if (adminsSnapshot.empty) {
-    logger.info("No admin users found. No notifications will be sent.");
-    return null;
-  }
-
-  const allTokens = new Set();
-
-  // For each admin, get their FCM tokens from the subcollection
-  const tokenPromises = adminsSnapshot.docs.map(async (adminDoc) => {
-    const tokensSnapshot = await adminDoc.ref.collection("fcmTokens").get();
-    if (!tokensSnapshot.empty) {
-      tokensSnapshot.forEach((tokenDoc) => {
-        allTokens.add(tokenDoc.id);
-      });
-    }
-  });
-
-  await Promise.all(tokenPromises);
-
-  const tokens = Array.from(allTokens);
-
-  if (tokens.length === 0) {
-    logger.info("No FCM tokens found for any admin. No notification sent.");
-    return null;
-  }
-
-  // Notification payload
-  const payload = {
-    notification: {
-      title: "🍕 Novo Pedido!",
-      body: `Cliente: ${order.customer.name} - Total: R$${order.total.toFixed(2).replace(".", ",")}`,
-      icon: "https://www.santasensacao.me/assets/logo para icones.png",
-      click_action: `https://www.santasensacao.me/#admin`,
-    },
-    webpush: {
-      fcmOptions: {
-        link: `https://www.santasensacao.me/#admin`,
-      },
-    },
-  };
-
-  logger.info(`Sending notification for new order ${orderId} to ${tokens.length} device(s).`);
-
-  const response = await admin.messaging().sendToDevice(tokens, payload);
-  const tokensToRemovePromises = [];
-
-  // Clean up invalid or unregistered tokens
-  response.results.forEach((result, index) => {
-    const error = result.error;
-    const token = tokens[index];
-    if (error) {
-      logger.error(`Failure sending notification to ${token}`, error);
-      if (error.code === "messaging/registration-token-not-registered" ||
-          error.code === "messaging/invalid-registration-token") {
-        // Need to find which admin this token belongs to in order to delete it.
-        // This part is complex and might be omitted for simplicity,
-        // or handled by a separate cleanup function.
-        logger.warn(`Token ${token} is invalid. It should be removed.`);
-      }
-    }
-  });
-
-  return Promise.all(tokensToRemovePromises);
 });

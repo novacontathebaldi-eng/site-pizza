@@ -1,6 +1,6 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
-import { db, storage, functions, messagingPromise, auth } from './firebase';
+import { db, storage, functions, auth } from './firebase';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
@@ -169,48 +169,5 @@ export const initiatePixPayment = async (orderId: string): Promise<any> => {
     } catch (error) {
         console.error("Error calling generatePixCharge function:", error);
         throw new Error("Não foi possível gerar a cobrança PIX. Tente novamente.");
-    }
-};
-
-// Notification (FCM) Functions
-const saveFcmToken = async (adminUid: string, token: string): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    // Save token to a subcollection within the specific admin's document
-    const tokenRef = db.collection('admins').doc(adminUid).collection('fcmTokens').doc(token);
-    await tokenRef.set({ 
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-};
-
-export const requestNotificationPermission = async (adminUid: string): Promise<boolean> => {
-    const messaging = await messagingPromise;
-    if (!messaging) {
-        console.error("Firebase Messaging is not initialized or supported.");
-        return false;
-    }
-    if (!adminUid) {
-        console.error("Admin user ID is required to save FCM token.");
-        return false;
-    }
-    try {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-            console.log('Notification permission granted.');
-            // We don't need to pass the VAPID key here if the service worker is configured correctly.
-            const token = await messaging.getToken();
-            if (token) {
-                await saveFcmToken(adminUid, token);
-                console.log('FCM Token saved for admin:', adminUid);
-                return true;
-            }
-            console.warn("No registration token available despite permission.");
-            return false;
-        } else {
-            console.warn("Notification permission denied.");
-            return false;
-        }
-    } catch (err) {
-        console.error("An error occurred while requesting permission or retrieving token.", err);
-        return false;
     }
 };
