@@ -227,6 +227,13 @@ const App: React.FC = () => {
         };
     }, []);
 
+    const handleStopSound = useCallback(() => {
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
+    }, []);
+
     // Effect for notification sound and toast - GATED BY LOGIN
     useEffect(() => {
         // SECURITY: Only run notification logic if an admin is logged in.
@@ -243,7 +250,7 @@ const App: React.FC = () => {
 
         const newPendingOrders = currentPendingOrders.filter(o => !knownPendingOrderIds.current.has(o.id));
 
-        if (newPendingOrders.length > 0) {
+        if (newPendingOrders.length > 0 && !newOrderToast) { // Only trigger if no other toast is active
             const latestNewOrder = newPendingOrders[newPendingOrders.length - 1];
             
             if (!isMuted) {
@@ -268,7 +275,18 @@ const App: React.FC = () => {
             }
         });
 
-    }, [orders, isLoading, user, authLoading, siteSettings, isMuted]);
+    }, [orders, isLoading, user, authLoading, siteSettings, isMuted, newOrderToast]);
+    
+    // Effect to auto-dismiss notification if order status changes
+    useEffect(() => {
+        if (newOrderToast) {
+            const correspondingOrder = orders.find(o => o.id === newOrderToast.id);
+            if (!correspondingOrder || correspondingOrder.status !== 'pending') {
+                handleStopSound();
+                setNewOrderToast(null);
+            }
+        }
+    }, [orders, newOrderToast, handleStopSound]);
 
     useEffect(() => {
         if (categories.length > 0 && !activeMenuCategory) {
@@ -282,13 +300,6 @@ const App: React.FC = () => {
     useEffect(() => {
         localStorage.setItem('santaSensacaoCart', JSON.stringify(cart));
     }, [cart]);
-
-    const handleStopSound = useCallback(() => {
-        if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-        }
-    }, []);
 
     const handleAddToCart = useCallback((product: Product, size: string, price: number) => {
         setCart(prevCart => {
