@@ -1,6 +1,6 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
-import { db, storage } from './firebase';
+import { db, storage, functions, auth } from './firebase';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
@@ -158,19 +158,6 @@ export const updateOrderPaymentStatus = async (orderId: string, paymentStatus: P
     await orderRef.update({ paymentStatus });
 };
 
-export const updateOrderAfterTapPayment = async (orderId: string, details: { nsu: string, aut: string, cardBrand: string | null }): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const orderRef = db.collection('orders').doc(orderId);
-    await orderRef.update({
-        paymentStatus: 'paid',
-        transactionDetails: {
-            nsu: details.nsu,
-            aut: details.aut,
-            cardBrand: details.cardBrand || 'N/A',
-        }
-    });
-};
-
 export const updateOrderReservationTime = async (orderId: string, reservationTime: string): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     const orderRef = db.collection('orders').doc(orderId);
@@ -181,4 +168,19 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     const orderRef = db.collection('orders').doc(orderId);
     await orderRef.delete();
+};
+
+// PIX Payment Function
+export const initiatePixPayment = async (orderId: string): Promise<any> => {
+    if (!functions) {
+        throw new Error("Firebase Functions is not initialized.");
+    }
+    const generatePixCharge = functions.httpsCallable('generatePixCharge');
+    try {
+        const result = await generatePixCharge({ orderId });
+        return result.data;
+    } catch (error) {
+        console.error("Error calling generatePixCharge function:", error);
+        throw new Error("Não foi possível gerar a cobrança PIX. Tente novamente.");
+    }
 };

@@ -10,6 +10,7 @@ import { AdminSection } from './components/AdminSection';
 import { Footer } from './components/Footer';
 import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
+import { PixPaymentModal } from './components/PixPaymentModal';
 import { NewOrderToast } from './components/NewOrderToast';
 import { db, auth } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
@@ -94,6 +95,7 @@ const App: React.FC = () => {
     const [siteSettings, setSiteSettings] = useState<SiteSettings>(defaultSiteSettings);
     const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
+    const [payingOrder, setPayingOrder] = useState<Order | null>(null);
     const [newOrderToast, setNewOrderToast] = useState<Order | null>(null);
     const knownPendingOrderIds = useRef(new Set<string>());
     
@@ -133,126 +135,6 @@ const App: React.FC = () => {
             setCart(JSON.parse(savedCart));
         }
     }, []);
-
-    const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, isPaid: boolean) => {
-        const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumir no local' };
-        const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
-
-        let message = `*🍕 NOVO PEDIDO - PIZZARIA SANTA SENSAÇÃO 🍕*\n\n`;
-        if (isPaid) {
-            message += `*✅ JÁ PAGO VIA PIX PELO SITE*\n\n`;
-        }
-        message += `*👤 DADOS DO CLIENTE:*\n`;
-        message += `*Nome:* ${details.name}\n`;
-        message += `*Telefone:* ${details.phone}\n`;
-        message += `*Tipo de Pedido:* ${orderTypeMap[details.orderType]}\n`;
-        if (details.orderType === 'delivery') {
-            message += `*Endereço:* ${details.address}\n`;
-        }
-        if (details.orderType === 'local' && details.reservationTime) {
-            message += `*Horário da Reserva:* ${details.reservationTime}\n`;
-        }
-        message += `\n*🛒 ITENS DO PEDIDO:*\n`;
-        currentCart.forEach(item => {
-            message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2).replace('.', ',')}\n`;
-        });
-        message += `\n*💰 TOTAL: R$ ${total.toFixed(2).replace('.', ',')}*\n\n`;
-        message += `*💳 PAGAMENTO:*\n`;
-        message += `*Forma:* ${paymentMethodMap[details.paymentMethod]}\n`;
-        if (!isPaid && details.paymentMethod === 'cash') {
-            if (details.changeNeeded) {
-                message += `*Precisa de troco para:* R$ ${details.changeAmount}\n`;
-            } else {
-                message += `*Não precisa de troco.*\n`;
-            }
-        }
-        if (details.notes) {
-            message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
-        }
-        message += `\n_Pedido gerado pelo nosso site._`;
-        return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
-    };
-
-    // Effect to handle post-payment redirect from InfinitePay PIX link
-    useEffect(() => {
-      const handlePostPayment = async () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const paymentStatusParam = urlParams.get('payment_status');
-        const orderId = urlParams.get('order_nsu');
-
-        if (paymentStatusParam === 'success' && orderId) {
-          window.history.replaceState(null, '', window.location.pathname);
-
-          addToast("Verificando seu pagamento...", 'success');
-
-          if (!db) {
-            addToast("Erro de conexão para verificar o pagamento.", 'error');
-            return;
-          }
-          const orderRef = db.collection('orders').doc(orderId);
-          const doc = await orderRef.get();
-
-          if (doc.exists) {
-            const paidOrder = { id: doc.id, ...doc.data() } as Order;
-            
-            addToast("Pagamento recebido! Seu pedido está sendo preparado.", 'success');
-            
-            const details: OrderDetails = {
-                name: paidOrder.customer.name, phone: paidOrder.customer.phone, orderType: paidOrder.customer.orderType,
-                address: paidOrder.customer.address || '', paymentMethod: 'pix', changeNeeded: false,
-                notes: paidOrder.notes || '', reservationTime: paidOrder.customer.reservationTime || ''
-            };
-            const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, true);
-            window.open(whatsappUrl, '_blank');
-
-            setCart([]);
-            setIsCartOpen(false);
-            
-          } else {
-             addToast("Pedido não encontrado após o pagamento.", 'error');
-          }
-        }
-      };
-
-      handlePostPayment();
-    }, [addToast]);
-
-    // Effect to handle post-payment redirect from InfiniteTap
-    useEffect(() => {
-        const handleTapResult = async () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const isTapResult = urlParams.get('tap_result') === 'true';
-            const orderId = urlParams.get('order_id');
-            const nsu = urlParams.get('nsu');
-            const aut = urlParams.get('aut');
-            const cardBrand = urlParams.get('card_brand');
-            const warning = urlParams.get('warning');
-
-            if (isTapResult && orderId) {
-                window.history.replaceState(null, '', window.location.pathname + '#admin');
-                
-                if (warning) {
-                    console.error(`InfiniteTap Error for order ${orderId}: ${warning}`);
-                    addToast(`Falha no pagamento: ${warning}`, 'error');
-                    return;
-                }
-
-                if (nsu && aut) {
-                    try {
-                        await firebaseService.updateOrderAfterTapPayment(orderId, { nsu, aut, cardBrand });
-                        addToast("Pagamento com cartão recebido com sucesso!", 'success');
-                        setActiveAdminTab('orders');
-                    } catch (error) {
-                        console.error("Error updating order after Tap payment:", error);
-                        addToast("Erro ao atualizar o pedido após o pagamento.", 'error');
-                    }
-                } else {
-                    addToast("Pagamento cancelado ou falhou no app.", 'error');
-                }
-            }
-        };
-        handleTapResult();
-    }, [addToast]);
 
     useEffect(() => {
         const sectionIds = ['inicio', 'cardapio', 'sobre', 'contato'];
@@ -466,6 +348,45 @@ const App: React.FC = () => {
             return prevCart.map(item => item.id === itemId ? { ...item, quantity: newQuantity } : item);
         });
     }, []);
+
+    const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, isPaid: boolean) => {
+        const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumir no local' };
+        const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
+
+        let message = `*🍕 NOVO PEDIDO - PIZZARIA SANTA SENSAÇÃO 🍕*\n\n`;
+        if (isPaid) {
+            message += `*✅ JÁ PAGO VIA PIX PELO SITE*\n\n`;
+        }
+        message += `*👤 DADOS DO CLIENTE:*\n`;
+        message += `*Nome:* ${details.name}\n`;
+        message += `*Telefone:* ${details.phone}\n`;
+        message += `*Tipo de Pedido:* ${orderTypeMap[details.orderType]}\n`;
+        if (details.orderType === 'delivery') {
+            message += `*Endereço:* ${details.address}\n`;
+        }
+        if (details.orderType === 'local' && details.reservationTime) {
+            message += `*Horário da Reserva:* ${details.reservationTime}\n`;
+        }
+        message += `\n*🛒 ITENS DO PEDIDO:*\n`;
+        currentCart.forEach(item => {
+            message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2).replace('.', ',')}\n`;
+        });
+        message += `\n*💰 TOTAL: R$ ${total.toFixed(2).replace('.', ',')}*\n\n`;
+        message += `*💳 PAGAMENTO:*\n`;
+        message += `*Forma:* ${paymentMethodMap[details.paymentMethod]}\n`;
+        if (!isPaid && details.paymentMethod === 'cash') {
+            if (details.changeNeeded) {
+                message += `*Precisa de troco para:* R$ ${details.changeAmount}\n`;
+            } else {
+                message += `*Não precisa de troco.*\n`;
+            }
+        }
+        if (details.notes) {
+            message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
+        }
+        message += `\n_Pedido gerado pelo nosso site._`;
+        return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
+    };
     
     const handleCheckout = async (details: OrderDetails) => {
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -501,84 +422,30 @@ const App: React.FC = () => {
             notes: details.notes || '', status: 'pending' as OrderStatus, paymentStatus: 'pending' as PaymentStatus,
         };
 
-        let orderId = '';
         try {
-            // Step 1: Create the order in Firestore to get a unique ID
             const docRef = await firebaseService.addOrder(newOrderData);
-            orderId = docRef.id;
-            addToast("Pedido salvo, gerando link de pagamento...", 'success');
+            const createdOrder: Order = { ...newOrderData, id: docRef.id, createdAt: new Date() }; // Create a temporary full order object
+            addToast("Pedido pré-salvo, aguardando pagamento.", 'success');
             setIsCheckoutModalOpen(false);
-
-            // Step 2: Call the InfinitePay public API directly from the client
-            const totalInCents = Math.round(total * 100);
-            const webhookUrl = `https://us-central1-site-pizza-a2930.cloudfunctions.net/infinitePayWebhook`;
-            const redirectUrl = `${window.location.origin}?payment_status=success&order_nsu=${orderId}`;
-
-            const payload = {
-                handle: "thebaldi",
-                redirect_url: redirectUrl,
-                webhook_url: webhookUrl,
-                order_nsu: orderId,
-                items: [{
-                    quantity: 1,
-                    price: totalInCents,
-                    description: `Pedido de ${details.name} na Santa Sensação`,
-                }],
-            };
-
-            const response = await fetch("https://api.infinitepay.io/invoices/public/checkout/links", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            const responseData = await response.json();
-
-            if (!response.ok) {
-                const errorMessage = responseData.message || `Erro ${response.status} ao conectar com o sistema de pagamento.`;
-                console.error('InfinitePay API Error:', response.status, responseData);
-                throw new Error(errorMessage);
-            }
-
-            if (responseData?.data?.payment_url) {
-                window.location.href = responseData.data.payment_url;
-            } else {
-                console.error('Invalid response structure from InfinitePay', responseData);
-                throw new Error("Falha ao obter URL de pagamento. A resposta do servidor foi inválida.");
-            }
-
-        } catch (error: any) {
-            console.error("Failed to initiate pix payment:", error);
-            const errorMessage = error.message || "Erro de conexão ao iniciar pagamento. Tente novamente.";
-            addToast(errorMessage, 'error');
-            throw error; // Propagate error to CheckoutModal to stop loading state
+            setPayingOrder(createdOrder);
+        } catch (error) {
+            console.error("Failed to pre-save order:", error);
+            addToast("Erro ao iniciar pagamento. Tente novamente.", 'error');
         }
     };
 
-    const handleInitiateAdminTapPayment = async (order: Order) => {
-        addToast("Abrindo app de pagamento...", 'success');
-        
-        const totalInCents = Math.round(order.total * 100);
-        const resultUrl = `${window.location.origin}/?tap_result=true`;
+    const handlePixPaymentSuccess = (paidOrder: Order) => {
+        const details: OrderDetails = {
+            name: paidOrder.customer.name, phone: paidOrder.customer.phone, orderType: paidOrder.customer.orderType,
+            address: paidOrder.customer.address || '', paymentMethod: 'pix', changeNeeded: false,
+            notes: paidOrder.notes || '', reservationTime: paidOrder.customer.reservationTime || ''
+        };
+        const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, true);
+        window.open(whatsappUrl, '_blank');
 
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-
-        const params = new URLSearchParams({
-            amount: totalInCents.toString(),
-            payment_method: order.paymentMethod,
-            installments: "1",
-            order_id: order.id,
-            result_url: resultUrl,
-            app_client_referrer: "PizzariaSantaSensacao",
-            handle: "thebaldi"
-        });
-
-        if (isIOS) {
-            params.append("af_force_deeplink", "true");
-        }
-
-        const deeplinkUrl = `infinitepaydash://infinitetap-app?${params.toString()}`;
-        window.location.href = deeplinkUrl;
+        setCart([]);
+        setPayingOrder(null);
+        setIsCartOpen(false);
     };
 
 
@@ -860,7 +727,6 @@ const App: React.FC = () => {
                     onUpdateOrderReservationTime={handleUpdateOrderReservationTime}
                     onDeleteOrder={handleDeleteOrder}
                     onPermanentDeleteOrder={handlePermanentDeleteOrder}
-                    onInitiateTapPayment={handleInitiateAdminTapPayment}
                     addToast={addToast}
                     isMuted={isMuted}
                     setIsMuted={setIsMuted}
@@ -908,6 +774,11 @@ const App: React.FC = () => {
                 cartItems={cart}
                 onConfirmCheckout={handleCheckout}
                 onInitiatePixPayment={handleInitiatePixPayment}
+            />
+             <PixPaymentModal
+                order={payingOrder}
+                onClose={() => setPayingOrder(null)}
+                onPaymentSuccess={handlePixPaymentSuccess}
             />
             
             <NewOrderToast 

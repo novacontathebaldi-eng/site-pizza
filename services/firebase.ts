@@ -46,4 +46,4 @@ try {
   console.error('Falha ao inicializar o Firebase. Verifique seu objeto firebaseConfig em `services/firebase.ts`.', error);
 }
 
-export { db, storage, auth };
+export { db, storage, auth, functions };

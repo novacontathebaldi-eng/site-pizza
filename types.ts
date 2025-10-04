@@ -65,11 +65,6 @@ export interface Order {
     createdAt: any; // Firestore Timestamp
     pickupTimeEstimate?: string; // Added for pickup
     pixChargeId?: string; // To store the InfinitePay transaction ID
-    transactionDetails?: {
-        nsu?: string;
-        aut?: string;
-        cardBrand?: string;
-    }
 }
 
 
