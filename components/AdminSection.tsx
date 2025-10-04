@@ -10,6 +10,7 @@ import { CSS } from '@dnd-kit/utilities';
 import firebase from 'firebase/compat/app';
 import { auth } from '../services/firebase';
 import { SupportModal } from './SupportModal';
+import * as firebaseService from '../services/firebaseService';
 
 interface AdminSectionProps {
     allProducts: Product[];
@@ -33,7 +34,7 @@ interface AdminSectionProps {
     onUpdateOrderReservationTime: (orderId: string, reservationTime: string) => Promise<void>;
     onDeleteOrder: (orderId: string) => Promise<void>;
     onPermanentDeleteOrder: (orderId: string) => Promise<void>;
-    onRequestNotificationPermission: () => Promise<boolean>;
+    onRequestNotificationPermission: (adminUid: string) => Promise<boolean>;
     addToast: (message: string, type?: 'success' | 'error') => void;
 }
 
@@ -134,7 +135,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         onSaveProduct, onDeleteProduct, onProductStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
         onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
-        onDeleteOrder, onPermanentDeleteOrder, onRequestNotificationPermission
+        onDeleteOrder, onPermanentDeleteOrder
     } = props;
     
     const [user, setUser] = useState<firebase.User | null>(null);
@@ -275,13 +276,24 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const tabOrders = useMemo(() => filteredOrders.filter(o => o.status === activeOrdersTab), [filteredOrders, activeOrdersTab]);
     
     const handleRequestNotificationPermission = async () => {
-        const success = await onRequestNotificationPermission();
+        if (!user) {
+            addToast("Usuário não autenticado.", 'error');
+            return;
+        }
+        const success = await firebaseService.requestNotificationPermission(user.uid);
+        // After the request, update the state to reflect the browser's current permission status
+        setNotificationPermission(Notification.permission);
+        
         if (success) {
             addToast("Notificações ativadas com sucesso!", 'success');
         } else {
-            addToast("Não foi possível ativar as notificações.", 'error');
+            // Check the final permission state to give a more accurate error
+            if (Notification.permission === 'denied') {
+                addToast("As notificações foram bloqueadas pelo navegador.", 'error');
+            } else {
+                addToast("Não foi possível ativar as notificações.", 'error');
+            }
         }
-        setNotificationPermission(Notification.permission);
     };
 
     if (!showAdminPanel) return null;

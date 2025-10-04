@@ -39,8 +39,13 @@ try {
   functions = firebase.functions();
   
   if (firebase.messaging.isSupported()) {
-    messaging = firebase.messaging();
-    console.log("Firebase Messaging is supported and initialized.");
+    try {
+      messaging = firebase.messaging();
+      console.log("Firebase Messaging is supported and initialized.");
+    } catch (err) {
+      console.error("Firebase Messaging failed to initialize, push notifications will be disabled.", err);
+      messaging = null;
+    }
   } else {
     console.warn("Firebase Messaging is not supported in this browser.");
   }

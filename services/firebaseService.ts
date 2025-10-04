@@ -1,6 +1,6 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
-import { db, storage, functions, messaging } from './firebase';
+import { db, storage, functions, messaging, auth } from './firebase';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
@@ -173,18 +173,22 @@ export const initiatePixPayment = async (orderId: string): Promise<any> => {
 };
 
 // Notification (FCM) Functions
-const saveFcmToken = async (token: string): Promise<void> => {
+const saveFcmToken = async (adminUid: string, token: string): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    const tokenRef = db.collection('fcmTokens').doc(token);
-    // Save the token with a timestamp. This can be used later to clean up old tokens.
+    // Save token to a subcollection within the specific admin's document
+    const tokenRef = db.collection('admins').doc(adminUid).collection('fcmTokens').doc(token);
     await tokenRef.set({ 
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 };
 
-export const requestNotificationPermission = async (): Promise<boolean> => {
+export const requestNotificationPermission = async (adminUid: string): Promise<boolean> => {
     if (!messaging) {
-        console.error("Firebase Messaging is not initialized.");
+        console.error("Firebase Messaging is not initialized or supported.");
+        return false;
+    }
+    if (!adminUid) {
+        console.error("Admin user ID is required to save FCM token.");
         return false;
     }
     try {
@@ -194,8 +198,8 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
             const fcmVapidKey = "BLs1R3Gvj_S3i58QpmnrS2p2_7Dk-3yYy3-0vVpY_Q1j1_yR8wX3g_1c_4z5_9Z8J6j3_Q1w_5X4k2b_A"; // Public VAPID key
             const token = await messaging.getToken({ vapidKey: fcmVapidKey });
             if (token) {
-                await saveFcmToken(token);
-                console.log('FCM Token saved:', token);
+                await saveFcmToken(adminUid, token);
+                console.log('FCM Token saved for admin:', adminUid);
                 return true;
             }
             console.warn("No registration token available despite permission.");
