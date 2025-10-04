@@ -9,6 +9,7 @@ interface OrderCardProps {
     onUpdateReservationTime: (orderId: string, reservationTime: string) => void;
     onDelete: (orderId: string) => void;
     onPermanentDelete: (orderId: string) => void;
+    onInitiateTapPayment: (order: Order) => void;
 }
 
 const statusConfig: { [key in OrderStatus]: { text: string; icon: string; color: string; } } = {
@@ -24,13 +25,19 @@ const statusConfig: { [key in OrderStatus]: { text: string; icon: string; color:
 const paymentMethodMap = { credit: 'Crédito', debit: 'Débito', pix: 'PIX', cash: 'Dinheiro' };
 const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo no Local' };
 
-export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete }) => {
+export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete, onInitiateTapPayment }) => {
     const { id, customer, items, total, paymentMethod, changeNeeded, changeAmount, notes, status, paymentStatus, createdAt, pickupTimeEstimate } = order;
     const config = statusConfig[status] || statusConfig.pending;
 
     const [isContactModalOpen, setIsContactModalOpen] = useState(false);
     const [isEditingTime, setIsEditingTime] = useState(false);
     const [newTime, setNewTime] = useState(customer.reservationTime || '');
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        setIsMobile(isMobileDevice);
+    }, []);
 
     useEffect(() => {
         setNewTime(customer.reservationTime || '');
@@ -146,6 +153,15 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                             </>
                         ) : !isArchived ? (
                             <>
+                                {status === 'pending' && (paymentMethod === 'credit' || paymentMethod === 'debit') && isMobile && (
+                                    <button
+                                        onClick={() => onInitiateTapPayment(order)}
+                                        className="bg-blue-600 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-blue-700 flex items-center gap-2"
+                                        title="Cobrar por aproximação no celular"
+                                    >
+                                        <i className="fas fa-mobile-alt"></i> Cobrar (Tap)
+                                    </button>
+                                )}
                                 <button onClick={handleTogglePaymentStatus} className={`font-semibold py-2 px-3 rounded-lg text-sm transition-colors ${paymentStatus === 'paid' ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-orange-400 text-white hover:bg-orange-500'}`}>
                                     <i className={`fas ${paymentStatus === 'paid' ? 'fa-check' : 'fa-dollar-sign'} mr-2`}></i>{paymentStatus === 'paid' ? 'Pago' : 'Marcar Pago'}
                                 </button>

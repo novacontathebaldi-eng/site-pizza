@@ -173,7 +173,7 @@ const App: React.FC = () => {
         return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
     };
 
-    // Effect to handle post-payment redirect from InfinitePay
+    // Effect to handle post-payment redirect from InfinitePay PIX link
     useEffect(() => {
       const handlePostPayment = async () => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -215,7 +215,44 @@ const App: React.FC = () => {
       };
 
       handlePostPayment();
-    }, [addToast]); // Runs once on mount
+    }, [addToast]);
+
+    // Effect to handle post-payment redirect from InfiniteTap
+    useEffect(() => {
+        const handleTapResult = async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const isTapResult = urlParams.get('tap_result') === 'true';
+            const orderId = urlParams.get('order_id');
+            const nsu = urlParams.get('nsu');
+            const aut = urlParams.get('aut');
+            const cardBrand = urlParams.get('card_brand');
+            const warning = urlParams.get('warning');
+
+            if (isTapResult && orderId) {
+                window.history.replaceState(null, '', window.location.pathname + '#admin');
+                
+                if (warning) {
+                    console.error(`InfiniteTap Error for order ${orderId}: ${warning}`);
+                    addToast(`Falha no pagamento: ${warning}`, 'error');
+                    return;
+                }
+
+                if (nsu && aut) {
+                    try {
+                        await firebaseService.updateOrderAfterTapPayment(orderId, { nsu, aut, cardBrand });
+                        addToast("Pagamento com cartão recebido com sucesso!", 'success');
+                        setActiveAdminTab('orders');
+                    } catch (error) {
+                        console.error("Error updating order after Tap payment:", error);
+                        addToast("Erro ao atualizar o pedido após o pagamento.", 'error');
+                    }
+                } else {
+                    addToast("Pagamento cancelado ou falhou no app.", 'error');
+                }
+            }
+        };
+        handleTapResult();
+    }, [addToast]);
 
     useEffect(() => {
         const sectionIds = ['inicio', 'cardapio', 'sobre', 'contato'];
@@ -464,30 +501,86 @@ const App: React.FC = () => {
             notes: details.notes || '', status: 'pending' as OrderStatus, paymentStatus: 'pending' as PaymentStatus,
         };
 
+        let orderId = '';
         try {
             // Step 1: Create the order in Firestore to get a unique ID
             const docRef = await firebaseService.addOrder(newOrderData);
+            orderId = docRef.id;
             addToast("Pedido salvo, gerando link de pagamento...", 'success');
             setIsCheckoutModalOpen(false);
 
-            // Step 2: Call the Firebase Function to get the InfinitePay link
+            // Step 2: Call the InfinitePay public API directly from the client
             const totalInCents = Math.round(total * 100);
-            const paymentUrl = await firebaseService.createInfinitePayLink(docRef.id, totalInCents, details.name);
-            
-            // Step 3: Redirect the user to the payment page
-            if (paymentUrl) {
-                window.location.href = paymentUrl;
-            } else {
-                throw new Error("Não foi possível obter o link de pagamento.");
+            const webhookUrl = `https://us-central1-site-pizza-a2930.cloudfunctions.net/infinitePayWebhook`;
+            const redirectUrl = `${window.location.origin}?payment_status=success&order_nsu=${orderId}`;
+
+            const payload = {
+                handle: "thebaldi",
+                redirect_url: redirectUrl,
+                webhook_url: webhookUrl,
+                order_nsu: orderId,
+                items: [{
+                    quantity: 1,
+                    price: totalInCents,
+                    description: `Pedido de ${details.name} na Santa Sensação`,
+                }],
+            };
+
+            const response = await fetch("https://api.infinitepay.io/invoices/public/checkout/links", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const responseData = await response.json();
+
+            if (!response.ok) {
+                const errorMessage = responseData.message || `Erro ${response.status} ao conectar com o sistema de pagamento.`;
+                console.error('InfinitePay API Error:', response.status, responseData);
+                throw new Error(errorMessage);
             }
+
+            if (responseData?.data?.payment_url) {
+                window.location.href = responseData.data.payment_url;
+            } else {
+                console.error('Invalid response structure from InfinitePay', responseData);
+                throw new Error("Falha ao obter URL de pagamento. A resposta do servidor foi inválida.");
+            }
+
         } catch (error: any) {
             console.error("Failed to initiate pix payment:", error);
-            // The error message from the cloud function will be more specific
-            const errorMessage = error.message || "Erro ao iniciar pagamento. Tente novamente.";
+            const errorMessage = error.message || "Erro de conexão ao iniciar pagamento. Tente novamente.";
             addToast(errorMessage, 'error');
             throw error; // Propagate error to CheckoutModal to stop loading state
         }
     };
+
+    const handleInitiateAdminTapPayment = async (order: Order) => {
+        addToast("Abrindo app de pagamento...", 'success');
+        
+        const totalInCents = Math.round(order.total * 100);
+        const resultUrl = `${window.location.origin}/?tap_result=true`;
+
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+
+        const params = new URLSearchParams({
+            amount: totalInCents.toString(),
+            payment_method: order.paymentMethod,
+            installments: "1",
+            order_id: order.id,
+            result_url: resultUrl,
+            app_client_referrer: "PizzariaSantaSensacao",
+            handle: "thebaldi"
+        });
+
+        if (isIOS) {
+            params.append("af_force_deeplink", "true");
+        }
+
+        const deeplinkUrl = `infinitepaydash://infinitetap-app?${params.toString()}`;
+        window.location.href = deeplinkUrl;
+    };
+
 
     const handleSaveProduct = useCallback(async (product: Product) => {
         try {
@@ -767,6 +860,7 @@ const App: React.FC = () => {
                     onUpdateOrderReservationTime={handleUpdateOrderReservationTime}
                     onDeleteOrder={handleDeleteOrder}
                     onPermanentDeleteOrder={handlePermanentDeleteOrder}
+                    onInitiateTapPayment={handleInitiateAdminTapPayment}
                     addToast={addToast}
                     isMuted={isMuted}
                     setIsMuted={setIsMuted}

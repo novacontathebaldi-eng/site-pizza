@@ -1,6 +1,6 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
-import { db, storage, functions, auth } from './firebase';
+import { db, storage } from './firebase';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
@@ -146,25 +146,6 @@ export const addOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'pick
     });
 };
 
-// This function calls the new Firebase Function to get the public checkout link.
-export const createInfinitePayLink = async (orderId: string, totalInCents: number, customerName: string): Promise<string> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    // 'createInfinitePayLink' is the name of the V2 onCall function in index.js
-    const getLink = functions.httpsCallable('createInfinitePayLink');
-    
-    const result = await getLink({ orderId, totalInCents, customerName });
-    
-    const data = result.data as { paymentUrl?: string };
-
-    if (data && data.paymentUrl) {
-        return data.paymentUrl;
-    } else {
-        throw new Error("Failed to retrieve payment URL from the server.");
-    }
-};
-
 export const updateOrderStatus = async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     const orderRef = db.collection('orders').doc(orderId);
@@ -175,6 +156,19 @@ export const updateOrderPaymentStatus = async (orderId: string, paymentStatus: P
     if (!db) throw new Error("Firestore is not initialized.");
     const orderRef = db.collection('orders').doc(orderId);
     await orderRef.update({ paymentStatus });
+};
+
+export const updateOrderAfterTapPayment = async (orderId: string, details: { nsu: string, aut: string, cardBrand: string | null }): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const orderRef = db.collection('orders').doc(orderId);
+    await orderRef.update({
+        paymentStatus: 'paid',
+        transactionDetails: {
+            nsu: details.nsu,
+            aut: details.aut,
+            cardBrand: details.cardBrand || 'N/A',
+        }
+    });
 };
 
 export const updateOrderReservationTime = async (orderId: string, reservationTime: string): Promise<void> => {
