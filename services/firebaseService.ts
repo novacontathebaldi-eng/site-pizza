@@ -146,18 +146,23 @@ export const addOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'pick
     });
 };
 
-// FIX: Added missing 'initiatePixPayment' function to resolve build error.
-// This function is intended to call a Firebase Cloud Function which would securely
-// interact with the payment provider's API to generate a PIX charge.
-// The corresponding cloud function ('initiatePixPayment') is required on the backend for this to work.
-export const initiatePixPayment = async (orderId: string): Promise<{ qrCode: string; copyPaste: string; }> => {
+// This function calls the new Firebase Function to get the public checkout link.
+export const createInfinitePayLink = async (orderId: string, totalInCents: number, customerName: string): Promise<string> => {
     if (!functions) {
         throw new Error("Firebase Functions is not initialized.");
     }
-    const generatePix = functions.httpsCallable('initiatePixPayment');
-    const result = await generatePix({ orderId });
-    // Assuming the cloud function returns data in the expected format.
-    return result.data as { qrCode: string; copyPaste: string; };
+    // 'createInfinitePayLink' is the name of the V2 onCall function in index.js
+    const getLink = functions.httpsCallable('createInfinitePayLink');
+    
+    const result = await getLink({ orderId, totalInCents, customerName });
+    
+    const data = result.data as { paymentUrl?: string };
+
+    if (data && data.paymentUrl) {
+        return data.paymentUrl;
+    } else {
+        throw new Error("Failed to retrieve payment URL from the server.");
+    }
 };
 
 export const updateOrderStatus = async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>): Promise<void> => {

@@ -465,49 +465,27 @@ const App: React.FC = () => {
         };
 
         try {
+            // Step 1: Create the order in Firestore to get a unique ID
             const docRef = await firebaseService.addOrder(newOrderData);
-            addToast("Pedido salvo, redirecionando para pagamento...", 'success');
+            addToast("Pedido salvo, gerando link de pagamento...", 'success');
             setIsCheckoutModalOpen(false);
 
+            // Step 2: Call the Firebase Function to get the InfinitePay link
             const totalInCents = Math.round(total * 100);
-            const webhookUrl = `https://us-central1-site-pizza-a2930.cloudfunctions.net/infinitePayWebhook`;
-            const redirectUrl = `${window.location.origin}?payment_status=success&order_nsu=${docRef.id}`;
-            const payload = {
-                handle: "thebaldi",
-                redirect_url: redirectUrl,
-                webhook_url: webhookUrl,
-                order_nsu: docRef.id,
-                items: [{
-                    quantity: 1,
-                    price: totalInCents,
-                    description: `Pedido de ${details.name} na Santa Sensação`
-                }]
-            };
+            const paymentUrl = await firebaseService.createInfinitePayLink(docRef.id, totalInCents, details.name);
             
-            const response = await fetch("https://api.infinitepay.io/invoices/public/checkout/links", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                console.error("InfinitePay API error:", errorData);
-                throw new Error(errorData.message || "Falha ao gerar link de pagamento.");
-            }
-
-            const responseData = await response.json();
-            
-            if (responseData.data && responseData.data.payment_url) {
-                window.location.href = responseData.data.payment_url;
+            // Step 3: Redirect the user to the payment page
+            if (paymentUrl) {
+                window.location.href = paymentUrl;
             } else {
-                console.error("Resposta da API da InfinitePay inválida:", responseData);
                 throw new Error("Não foi possível obter o link de pagamento.");
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to initiate pix payment:", error);
-            addToast("Erro ao iniciar pagamento. Tente novamente.", 'error');
-            throw error; // Propagate error to CheckoutModal
+            // The error message from the cloud function will be more specific
+            const errorMessage = error.message || "Erro ao iniciar pagamento. Tente novamente.";
+            addToast(errorMessage, 'error');
+            throw error; // Propagate error to CheckoutModal to stop loading state
         }
     };
 

@@ -143,6 +143,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                             </select>
                         </div>
 
+                        {paymentMethod === 'pix' && (
+                            <div className="p-3 bg-blue-50 text-blue-800 rounded-md text-sm animate-fade-in-up">
+                                <i className="fas fa-info-circle mr-2"></i>
+                                Você será redirecionado para a página de pagamento seguro da InfinitePay para concluir a transação.
+                            </div>
+                        )}
+                        {paymentMethod && paymentMethod !== 'pix' && (
+                            <div className="p-3 bg-gray-100 text-gray-800 rounded-md text-sm animate-fade-in-up">
+                                <i className="fas fa-info-circle mr-2"></i>
+                                Seu pedido será enviado via WhatsApp para confirmação. O pagamento será realizado no momento da entrega/retirada.
+                            </div>
+                        )}
+
                         {paymentMethod === 'cash' && (
                             <div className="p-3 bg-gray-50 rounded-md border animate-fade-in-up">
                                 <label className="flex items-center gap-2">

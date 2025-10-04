@@ -28,6 +28,12 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
             setIsPaid(false);
             setTimeLeft(PIX_EXPIRATION_SECONDS);
 
+            // FIX: The function 'initiatePixPayment' does not exist in firebaseService.
+            // This component is likely obsolete as the PIX payment flow was changed to a redirect.
+            // The component will now display an error message if opened.
+            setError('O pagamento PIX por QR Code não está mais disponível.');
+            setIsLoading(false);
+            /*
             firebaseService.initiatePixPayment(order.id)
                 .then(data => {
                     setPixData(data);
@@ -37,6 +43,7 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                     setError(err.message || 'Erro desconhecido ao gerar PIX.');
                     setIsLoading(false);
                 });
+            */
         }
     }, [order]);
 
