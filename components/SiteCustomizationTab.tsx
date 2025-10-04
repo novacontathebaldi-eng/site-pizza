@@ -8,8 +8,6 @@ import { CSS } from '@dnd-kit/utilities';
 interface SiteCustomizationTabProps {
     settings: SiteSettings;
     onSave: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
-    isMuted: boolean;
-    setIsMuted: (muted: boolean) => void;
 }
 
 // IconInput Component (Helper)
@@ -108,13 +106,11 @@ const ImageUploader: React.FC<{
 };
 
 // Main Component
-export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ settings, onSave, isMuted, setIsMuted }) => {
+export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ settings, onSave }) => {
     const [formData, setFormData] = useState<SiteSettings>(settings);
     const [files, setFiles] = useState<{ [key: string]: File | null }>({});
     const [isSaving, setIsSaving] = useState(false);
     const [activeAccordion, setActiveAccordion] = useState<string | null>(null);
-    
-    const soundFileInputRef = useRef<HTMLInputElement>(null);
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -135,34 +131,6 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
 
     const handleUrlChange = (field: keyof SiteSettings, url: string) => {
         setFormData(prev => ({ ...prev, [field]: url }));
-    };
-    
-    const handleMuteToggle = () => {
-        const newMutedState = !isMuted;
-        setIsMuted(newMutedState);
-        localStorage.setItem('isSoundMuted', String(newMutedState));
-    };
-
-    const handleSoundFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            handleFileChange('notificationSound', file);
-            // Create a preview URL for the new sound
-            const soundUrl = URL.createObjectURL(file);
-            setFormData(prev => ({
-                ...prev,
-                audioSettings: { ...prev.audioSettings, notificationSound: soundUrl }
-            }));
-        }
-    };
-
-    const handleDefaultSoundSelect = (soundPath: string) => {
-        setFormData(prev => ({
-            ...prev,
-            audioSettings: { ...prev.audioSettings, notificationSound: soundPath }
-        }));
-        // If a file was staged for upload, clear it
-        handleFileChange('notificationSound', null);
     };
 
     // --- Content Section Handlers ---
@@ -264,81 +232,14 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
-        // Before saving, if the sound URL is a blob, it means we must use the file from the state.
-        // Otherwise, the URL is already what we want to save.
-        if (formData.audioSettings.notificationSound.startsWith('blob:')) {
-            // A file is staged, onSave will handle it.
-            // But we need to reset the form data to a placeholder because blob URL is temporary
-        }
         await onSave(formData, files);
         setFiles({}); // Clear files after saving
         setIsSaving(false);
     };
-    
-    const defaultSounds = [
-        { name: "Alerta 1", path: "/assets/audio/notf1.mp3" },
-        { name: "Alerta 2", path: "/assets/audio/notf2.mp3" },
-        { name: "Alerta 3", path: "/assets/audio/notf3.mp3" },
-        { name: "Alerta 4", path: "/assets/audio/notf4.mp3" },
-        { name: "Alerta 5", path: "/assets/audio/notf5.mp3" },
-    ];
 
     return (
         <form onSubmit={handleSubmit}>
             <div className="space-y-6">
-                
-                {/* --- Sound Settings Accordion --- */}
-                <div className="border rounded-lg bg-gray-50/50">
-                    <button type="button" onClick={() => setActiveAccordion(activeAccordion === 'sound' ? null : 'sound')} className="w-full p-4 text-left font-bold flex justify-between items-center">
-                        Configurações de Som
-                        <i className={`fas fa-chevron-down transition-transform ${activeAccordion === 'sound' ? 'rotate-180' : ''}`}></i>
-                    </button>
-                    {activeAccordion === 'sound' && (
-                        <div className="p-4 border-t space-y-4">
-                            <div className="flex items-center justify-between bg-white p-3 rounded-lg border">
-                                <span className="font-semibold">Sons de notificação de pedidos</span>
-                                <button type="button" onClick={handleMuteToggle} className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300 transition-colors text-xl" title={isMuted ? 'Ativar Som' : 'Silenciar'}>
-                                    <i className={`fas ${isMuted ? 'fa-volume-mute' : 'fa-volume-up'}`}></i>
-                                </button>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold mb-2">Som de Alerta Padrão</label>
-                                <div className="space-y-2">
-                                    {defaultSounds.map(sound => (
-                                        <label key={sound.path} className="flex items-center gap-3 p-3 bg-white rounded-lg border has-[:checked]:bg-accent/10 has-[:checked]:border-accent transition-colors">
-                                            <input 
-                                                type="radio" 
-                                                name="notificationSound" 
-                                                value={sound.path}
-                                                checked={formData.audioSettings.notificationSound === sound.path}
-                                                onChange={() => handleDefaultSoundSelect(sound.path)}
-                                                className="w-5 h-5"
-                                            />
-                                            <span className="font-medium">{sound.name}</span>
-                                            <audio src={sound.path} controls className="ml-auto h-8"></audio>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold mb-2">Enviar Novo Som</label>
-                                <div className="flex items-center gap-4">
-                                    <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center border overflow-hidden flex-shrink-0">
-                                        <i className="fas fa-music text-3xl text-gray-300"></i>
-                                    </div>
-                                    <div className="flex-grow space-y-2">
-                                        <p className="text-xs text-gray-500">Envie um arquivo MP3 ou WAV. O som enviado se tornará o novo padrão para todos.</p>
-                                        <button type="button" onClick={() => soundFileInputRef.current?.click()} className="w-full text-sm bg-gray-200 text-gray-800 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300">
-                                            <i className="fas fa-upload mr-2"></i>Escolher Arquivo de Áudio
-                                        </button>
-                                        <input type="file" accept="audio/mpeg, audio/wav" ref={soundFileInputRef} onChange={handleSoundFileChange} className="hidden" />
-                                        {files.notificationSound && <p className="text-sm font-semibold text-green-600 truncate">Selecionado: {files.notificationSound.name}</p>}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
 
                 {/* --- Static Sections Accordion --- */}
                 <div className="border rounded-lg bg-gray-50/50">

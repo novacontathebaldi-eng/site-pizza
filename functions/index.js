@@ -1,6 +1,7 @@
 /* eslint-disable max-len */
-const {onCall} = require("firebase-functions/v2/onCall");
+const {onCall} = require("firebase-functions/v2/https");
 const {onRequest} = require("firebase-functions/v2/https");
+const {onDocumentCreated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const axios = require("axios");
@@ -105,4 +106,58 @@ exports.infinitePayWebhook = onRequest(async (request, response) => {
     logger.info(`Webhook para o pedido ${orderId} recebido com status: ${status}. Nenhuma ação tomada.`);
     response.status(200).json({success: true, message: `Webhook received with status: ${status}`});
   }
+});
+
+// Cloud Function to send a push notification when a new order is created
+exports.sendNotificationOnNewOrder = onDocumentCreated("orders/{orderId}", async (event) => {
+  const order = event.data.data();
+
+  // Only send notifications for new orders that are in 'pending' state
+  if (order.status !== "pending") {
+    logger.info(`Order ${event.params.orderId} created with status '${order.status}', no notification sent.`);
+    return null;
+  }
+
+  // Get all the FCM tokens for registered admin devices
+  const tokensSnapshot = await db.collection("fcmTokens").get();
+  if (tokensSnapshot.empty) {
+    logger.info("No FCM tokens found. No notification will be sent.");
+    return null;
+  }
+
+  const tokens = tokensSnapshot.docs.map((doc) => doc.id);
+
+  // Notification payload
+  const payload = {
+    notification: {
+      title: "🍕 Novo Pedido!",
+      body: `Cliente: ${order.customer.name} - Total: R$${order.total.toFixed(2).replace(".", ",")}`,
+      icon: "https://santasensacao.me/assets/logo para icones.png",
+      click_action: `https://santasensacao.me/#admin`,
+    },
+    webpush: {
+      fcmOptions: {
+        link: `https://santasensacao.me/#admin`,
+      },
+    },
+  };
+
+  logger.info(`Sending notification for new order ${event.params.orderId} to ${tokens.length} device(s).`);
+
+  const response = await admin.messaging().sendToDevice(tokens, payload);
+  const tokensToRemove = [];
+
+  // Clean up invalid or unregistered tokens
+  response.results.forEach((result, index) => {
+    const error = result.error;
+    if (error) {
+      logger.error(`Failure sending notification to ${tokens[index]}`, error);
+      if (error.code === "messaging/registration-token-not-registered" ||
+          error.code === "messaging/invalid-registration-token") {
+        tokensToRemove.push(tokensSnapshot.docs[index].ref.delete());
+      }
+    }
+  });
+
+  return Promise.all(tokensToRemove);
 });
