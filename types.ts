@@ -95,12 +95,6 @@ export interface FooterLink {
     isVisible?: boolean;
 }
 
-export interface AudioSettings {
-    notificationSound: string;
-    notificationVolume: number;
-}
-
-
 export interface SiteSettings {
     logoUrl: string;
     heroSlogan: string;
@@ -109,5 +103,4 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
-    audioSettings: AudioSettings;
 }

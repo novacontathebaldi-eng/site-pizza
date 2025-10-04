@@ -1,7 +1,7 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
-import { db, storage, functions, auth } from './firebase';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
+import { db, storage, functions } from './firebase';
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, CartItem } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -31,19 +31,6 @@ export const uploadSiteAsset = async (file: File, assetName: string): Promise<st
     }
     const fileExtension = file.name.split('.').pop();
     const fileName = `site/${assetName}_${new Date().getTime()}.${fileExtension}`;
-    const storageRef = storage.ref(fileName);
-    
-    const snapshot = await storageRef.put(file);
-    return await snapshot.ref.getDownloadURL();
-};
-
-// Notification Sound Upload Function
-export const uploadNotificationSound = async (file: File): Promise<string> => {
-    if (!storage) {
-        throw new Error("Firebase Storage não está inicializado.");
-    }
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `site_assets/audio/notification_${new Date().getTime()}.${fileExtension}`;
     const storageRef = storage.ref(fileName);
     
     const snapshot = await storageRef.put(file);
@@ -170,17 +157,54 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
     await orderRef.delete();
 };
 
-// PIX Payment Function
-export const initiatePixPayment = async (orderId: string): Promise<any> => {
+// NEW: PIX Payment Function using public checkout link
+export const generateCheckoutLink = async (orderId: string, cartItems: CartItem[]): Promise<string> => {
     if (!functions) {
         throw new Error("Firebase Functions is not initialized.");
     }
-    const generatePixCharge = functions.httpsCallable('generatePixCharge');
+    const generateLink = functions.httpsCallable('generateInfinitePayCheckoutLink');
     try {
-        const result = await generatePixCharge({ orderId });
+        const result = await generateLink({ orderId, cartItems });
         return result.data;
     } catch (error) {
-        console.error("Error calling generatePixCharge function:", error);
-        throw new Error("Não foi possível gerar a cobrança PIX. Tente novamente.");
+        console.error("Error calling generateInfinitePayCheckoutLink function:", error);
+        throw new Error("Não foi possível gerar o link de pagamento PIX. Tente novamente.");
+    }
+};
+
+// Notification (FCM) Functions
+const saveFcmToken = async (token: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const tokenRef = db.collection('fcmTokens').doc(token);
+    // Save the token with a timestamp. This can be used later to clean up old tokens.
+    await tokenRef.set({ 
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+};
+
+export const requestNotificationPermission = async (): Promise<boolean> => {
+    const { messaging } = await import('./firebase');
+    if (!messaging) {
+        console.warn("Firebase Messaging is not available in this browser.");
+        return false;
+    }
+    try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            const token = await messaging.getToken({ vapidKey: "YOUR_VAPID_KEY_HERE" }); // Add your VAPID key
+            if (token) {
+                await saveFcmToken(token);
+                console.log('Notification permission granted and token saved:', token);
+                return true;
+            }
+            console.warn("No registration token available despite permission. Request permission to generate one.");
+            return false;
+        } else {
+            console.warn("Notification permission denied.");
+            return false;
+        }
+    } catch (err) {
+        console.error("An error occurred while requesting permission or retrieving token.", err);
+        return false;
     }
 };
