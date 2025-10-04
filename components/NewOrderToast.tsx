@@ -3,17 +3,24 @@ import { Order } from '../types';
 
 interface NewOrderToastProps {
     order: Order | null;
-    onAccept: (orderId: string) => void;
+    onNavigate: () => void;
     onDismiss: () => void;
+    onStopSound: () => void;
 }
 
-export const NewOrderToast: React.FC<NewOrderToastProps> = ({ order, onAccept, onDismiss }) => {
+export const NewOrderToast: React.FC<NewOrderToastProps> = ({ order, onNavigate, onDismiss, onStopSound }) => {
     if (!order) {
         return null;
     }
 
-    const handleAcceptClick = () => {
-        onAccept(order.id);
+    const handleNavigateClick = () => {
+        onStopSound();
+        onNavigate();
+    };
+    
+    const handleDismissClick = () => {
+        onStopSound();
+        onDismiss();
     };
 
     return (
@@ -41,16 +48,16 @@ export const NewOrderToast: React.FC<NewOrderToastProps> = ({ order, onAccept, o
                             </p>
                             <div className="mt-3 flex gap-3">
                                 <button
-                                    onClick={handleAcceptClick}
+                                    onClick={handleNavigateClick}
                                     className="flex-1 bg-green-500 text-white font-bold py-2 px-3 rounded-lg text-sm hover:bg-green-600 transition-colors"
                                 >
-                                    <i className="fas fa-check mr-2"></i>Ver e Aceitar
+                                    <i className="fas fa-eye mr-2"></i>Ver Pedidos
                                 </button>
                             </div>
                         </div>
                          <div className="ml-4 flex-shrink-0 flex">
                             <button
-                                onClick={onDismiss}
+                                onClick={handleDismissClick}
                                 className="inline-flex text-gray-400 rounded-md hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                             >
                                 <span className="sr-only">Fechar</span>

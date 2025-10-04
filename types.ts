@@ -96,8 +96,8 @@ export interface FooterLink {
 }
 
 export interface AudioSettings {
-    notificationSound?: string;
-    notificationVolume?: number;
+    notificationSound: string;
+    notificationVolume: number;
 }
 
 
@@ -109,5 +109,5 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
-    audioSettings?: AudioSettings;
+    audioSettings: AudioSettings;
 }
