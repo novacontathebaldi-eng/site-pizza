@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import firebase from 'firebase/compat/app';
 import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
@@ -9,8 +10,8 @@ import { AdminSection } from './components/AdminSection';
 import { Footer } from './components/Footer';
 import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
-import { PixPaymentModal } from './components/PixPaymentModal';
-import { db } from './services/firebase';
+import { NewOrderToast } from './components/NewOrderToast';
+import { db, auth } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
 // Static assets for default values
@@ -70,7 +71,11 @@ const defaultSiteSettings: SiteSettings = {
         { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996500341', isVisible: true },
         { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/santasensacao.sl', isVisible: true },
         { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin', isVisible: true }
-    ]
+    ],
+    audioSettings: {
+        notificationSound: '/assets/audio/notf1.mp3',
+        notificationVolume: 1.0,
+    }
 };
 
 const App: React.FC = () => {
@@ -89,9 +94,17 @@ const App: React.FC = () => {
     const [siteSettings, setSiteSettings] = useState<SiteSettings>(defaultSiteSettings);
     const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
-    const prevPendingOrdersCount = useRef<number | null>(null);
+    const [newOrderToast, setNewOrderToast] = useState<Order | null>(null);
+    const knownPendingOrderIds = useRef(new Set<string>());
     
-    const notificationSound = useMemo(() => new Audio('data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaW5nIG9uIHNpdGUgbG9hZAAAAAA+bWljcm9zb2Z0LmNvbS9pbmZvL2RlZmF1bHQuYXNwP2N0eD1zZWFyY2gmc2N0eD1zdGF0aWMmbmFtZT1taWNyb3NvZnQmZm9ybT1sYWJzMSZzcmM9aHR0cCUzYSUyZiUyZm1pY3Jvc29mdC5jb20lMmZkb3dubG9hZCUyZmV4ZWN1dGUuYXNwJTJmJTNmcGFnZSUzZDEwNTI0JTI2dGFnJTNEU1RFSU5FLVdFVFNFLUNPTU0lMjZzY2FuJTNEZG93bmxvYWR8bWljcm9zb2Z0LmNvbS9kb3dubG9hZC9leGVjdXRlLmFzcC8/cGFnZT0xMDUyNCZ0YWc9U1RFSU5FLVdFVFNFLUNPTU0mc2Nhbj1kb3dubG9hZG1pbGxlbm5pdW0ubWljcm9zb2Z0LmNvbS9kb3dubG9hZC9leGVjdXRlLmFzcC8/cGFnZT0xMDUyNCZ0YWc9U1RFSU5FLVdFVFNFLUNPTU0mc2Nhbj1kb3dubG9hZGx1bGEubWljcm9zb2Z0LmNvbS9kb3dubG9hZC9leGVjdXRlLmFzcC8/cGFnZT0xMDUyNCZ0YWc9U1RFSU5FLVdFVFNFLUNPTU0mc2Nhbj1kb3dubG9hZFRoaXMgc291bmQgaXMgZnJvbSBGaW5kU291bmRzLmNvbSBhdCBodHRwOi8vd3d3LmZpbmRzb3VuZHMuY29tLAAAAElDT1JEAAAAAgAAAExNUEdhZG1wZWdAYWRtcGVnLm9yZ0xNUEVHQWRtcGVnQGFkbXBlZy5vcmdMAAAAAAAARaGqgA8AAAAJAAAAAAAAAAAAAAAAD/9oAD/9sAQwAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB/9oAD/9sAQwEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB/8IAEQgABgAGAwEiAAIRAQMRAf/EABQAAQAAAAAAAAAAAAAAAAAAAAD/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAACK/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPwB//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwB//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwB//9k='), []);
+    // Auth and Admin State
+    const [user, setUser] = useState<firebase.User | null>(null);
+    const [authLoading, setAuthLoading] = useState(true);
+    const [activeAdminTab, setActiveAdminTab] = useState('status');
+
+    // Audio State
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const [isMuted, setIsMuted] = useState(() => localStorage.getItem('isSoundMuted') === 'true');
 
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
@@ -102,11 +115,107 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        if (!auth) {
+            setError("Falha na conexão com o serviço de autenticação.");
+            setAuthLoading(false);
+            return;
+        }
+        const unsubscribe = auth.onAuthStateChanged(user => { 
+            setUser(user); 
+            setAuthLoading(false); 
+        });
+        return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
         const savedCart = localStorage.getItem('santaSensacaoCart');
         if (savedCart) {
             setCart(JSON.parse(savedCart));
         }
     }, []);
+
+    const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, isPaid: boolean) => {
+        const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumir no local' };
+        const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
+
+        let message = `*🍕 NOVO PEDIDO - PIZZARIA SANTA SENSAÇÃO 🍕*\n\n`;
+        if (isPaid) {
+            message += `*✅ JÁ PAGO VIA PIX PELO SITE*\n\n`;
+        }
+        message += `*👤 DADOS DO CLIENTE:*\n`;
+        message += `*Nome:* ${details.name}\n`;
+        message += `*Telefone:* ${details.phone}\n`;
+        message += `*Tipo de Pedido:* ${orderTypeMap[details.orderType]}\n`;
+        if (details.orderType === 'delivery') {
+            message += `*Endereço:* ${details.address}\n`;
+        }
+        if (details.orderType === 'local' && details.reservationTime) {
+            message += `*Horário da Reserva:* ${details.reservationTime}\n`;
+        }
+        message += `\n*🛒 ITENS DO PEDIDO:*\n`;
+        currentCart.forEach(item => {
+            message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2).replace('.', ',')}\n`;
+        });
+        message += `\n*💰 TOTAL: R$ ${total.toFixed(2).replace('.', ',')}*\n\n`;
+        message += `*💳 PAGAMENTO:*\n`;
+        message += `*Forma:* ${paymentMethodMap[details.paymentMethod]}\n`;
+        if (!isPaid && details.paymentMethod === 'cash') {
+            if (details.changeNeeded) {
+                message += `*Precisa de troco para:* R$ ${details.changeAmount}\n`;
+            } else {
+                message += `*Não precisa de troco.*\n`;
+            }
+        }
+        if (details.notes) {
+            message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
+        }
+        message += `\n_Pedido gerado pelo nosso site._`;
+        return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
+    };
+
+    // Effect to handle post-payment redirect from InfinitePay
+    useEffect(() => {
+      const handlePostPayment = async () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const paymentStatusParam = urlParams.get('payment_status');
+        const orderId = urlParams.get('order_nsu');
+
+        if (paymentStatusParam === 'success' && orderId) {
+          window.history.replaceState(null, '', window.location.pathname);
+
+          addToast("Verificando seu pagamento...", 'success');
+
+          if (!db) {
+            addToast("Erro de conexão para verificar o pagamento.", 'error');
+            return;
+          }
+          const orderRef = db.collection('orders').doc(orderId);
+          const doc = await orderRef.get();
+
+          if (doc.exists) {
+            const paidOrder = { id: doc.id, ...doc.data() } as Order;
+            
+            addToast("Pagamento recebido! Seu pedido está sendo preparado.", 'success');
+            
+            const details: OrderDetails = {
+                name: paidOrder.customer.name, phone: paidOrder.customer.phone, orderType: paidOrder.customer.orderType,
+                address: paidOrder.customer.address || '', paymentMethod: 'pix', changeNeeded: false,
+                notes: paidOrder.notes || '', reservationTime: paidOrder.customer.reservationTime || ''
+            };
+            const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, true);
+            window.open(whatsappUrl, '_blank');
+
+            setCart([]);
+            setIsCartOpen(false);
+            
+          } else {
+             addToast("Pedido não encontrado após o pagamento.", 'error');
+          }
+        }
+      };
+
+      handlePostPayment();
+    }, [addToast]); // Runs once on mount
 
     useEffect(() => {
         const sectionIds = ['inicio', 'cardapio', 'sobre', 'contato'];
@@ -199,35 +308,66 @@ const App: React.FC = () => {
         };
     }, []);
 
-    // Effect for notification sound
+    const handleStopSound = useCallback(() => {
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
+    }, []);
+
+    // Effect for notification sound and toast - GATED BY LOGIN
     useEffect(() => {
-        const pendingOrders = orders.filter(o => o.status === 'pending');
-        
-        // Initialize count on first valid render without playing sound
-        if (prevPendingOrdersCount.current === null && !isLoading) {
-            prevPendingOrdersCount.current = pendingOrders.length;
+        // SECURITY: Only run notification logic if an admin is logged in.
+        if (!user || authLoading) {
             return;
         }
-        
-        // Play sound if a new pending order arrives
-        if (prevPendingOrdersCount.current !== null && pendingOrders.length > prevPendingOrdersCount.current) {
-            notificationSound.play().catch(e => console.error("Error playing sound:", e));
+
+        const currentPendingOrders = orders.filter(o => o.status === 'pending');
+
+        if (isLoading) {
+            currentPendingOrders.forEach(o => knownPendingOrderIds.current.add(o.id));
+            return;
+        }
+
+        const newPendingOrders = currentPendingOrders.filter(o => !knownPendingOrderIds.current.has(o.id));
+
+        if (newPendingOrders.length > 0 && !newOrderToast) { // Only trigger if no other toast is active
+            const latestNewOrder = newPendingOrders[newPendingOrders.length - 1];
+            
+            if (!isMuted) {
+                if (!audioRef.current) {
+                    audioRef.current = new Audio();
+                }
+                const soundToPlay = audioRef.current;
+                soundToPlay.src = siteSettings.audioSettings.notificationSound;
+                soundToPlay.volume = siteSettings.audioSettings.notificationVolume;
+                soundToPlay.loop = true;
+                soundToPlay.play().catch(e => console.error("Error playing sound:", e));
+            }
+            
+            setNewOrderToast(latestNewOrder);
+            newPendingOrders.forEach(o => knownPendingOrderIds.current.add(o.id));
         }
         
-        prevPendingOrdersCount.current = pendingOrders.length;
-    }, [orders, isLoading, notificationSound]);
+        const currentPendingIds = new Set(currentPendingOrders.map(o => o.id));
+        knownPendingOrderIds.current.forEach(id => {
+            if (!currentPendingIds.has(id)) {
+                knownPendingOrderIds.current.delete(id);
+            }
+        });
 
-    // Effect to handle return from successful PIX payment
+    }, [orders, isLoading, user, authLoading, siteSettings, isMuted, newOrderToast]);
+    
+    // Effect to auto-dismiss notification if order status changes
     useEffect(() => {
-        if (window.location.hash === '#payment-success') {
-            addToast('Pagamento recebido! Seu pedido foi confirmado.', 'success');
-            setCart([]); // Clear the cart
-            localStorage.setItem('santaSensacaoCart', '[]'); // Also clear from storage
-            // Clean the URL hash without reloading the page
-            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        if (newOrderToast) {
+            const correspondingOrder = orders.find(o => o.id === newOrderToast.id);
+            if (!correspondingOrder || correspondingOrder.status !== 'pending') {
+                handleStopSound();
+                setNewOrderToast(null);
+            }
         }
-    }, [addToast]);
-
+    }, [orders, newOrderToast, handleStopSound]);
 
     useEffect(() => {
         if (categories.length > 0 && !activeMenuCategory) {
@@ -289,45 +429,6 @@ const App: React.FC = () => {
             return prevCart.map(item => item.id === itemId ? { ...item, quantity: newQuantity } : item);
         });
     }, []);
-
-    const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, isPaid: boolean) => {
-        const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumir no local' };
-        const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
-
-        let message = `*🍕 NOVO PEDIDO - PIZZARIA SANTA SENSAÇÃO 🍕*\n\n`;
-        if (isPaid) {
-            message += `*✅ JÁ PAGO VIA PIX PELO SITE*\n\n`;
-        }
-        message += `*👤 DADOS DO CLIENTE:*\n`;
-        message += `*Nome:* ${details.name}\n`;
-        message += `*Telefone:* ${details.phone}\n`;
-        message += `*Tipo de Pedido:* ${orderTypeMap[details.orderType]}\n`;
-        if (details.orderType === 'delivery') {
-            message += `*Endereço:* ${details.address}\n`;
-        }
-        if (details.orderType === 'local' && details.reservationTime) {
-            message += `*Horário da Reserva:* ${details.reservationTime}\n`;
-        }
-        message += `\n*🛒 ITENS DO PEDIDO:*\n`;
-        currentCart.forEach(item => {
-            message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2).replace('.', ',')}\n`;
-        });
-        message += `\n*💰 TOTAL: R$ ${total.toFixed(2).replace('.', ',')}*\n\n`;
-        message += `*💳 PAGAMENTO:*\n`;
-        message += `*Forma:* ${paymentMethodMap[details.paymentMethod]}\n`;
-        if (!isPaid && details.paymentMethod === 'cash') {
-            if (details.changeNeeded) {
-                message += `*Precisa de troco para:* R$ ${details.changeAmount}\n`;
-            } else {
-                message += `*Não precisa de troco.*\n`;
-            }
-        }
-        if (details.notes) {
-            message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
-        }
-        message += `\n_Pedido gerado pelo nosso site._`;
-        return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
-    };
     
     const handleCheckout = async (details: OrderDetails) => {
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -364,21 +465,49 @@ const App: React.FC = () => {
         };
 
         try {
-            // 1. Save order to get an ID
             const docRef = await firebaseService.addOrder(newOrderData);
             addToast("Pedido salvo, redirecionando para pagamento...", 'success');
-            
-            // 2. Generate checkout link with the new order ID
-            const checkoutUrl = await firebaseService.generateCheckoutLink(docRef.id, cart);
-
-            // 3. Redirect user to InfinitePay
-            window.location.href = checkoutUrl;
-            
-            // Note: Cart is not cleared here. It's cleared on return with #payment-success
             setIsCheckoutModalOpen(false);
+
+            const totalInCents = Math.round(total * 100);
+            const webhookUrl = `https://us-central1-site-pizza-a2930.cloudfunctions.net/infinitePayWebhook`;
+            const redirectUrl = `${window.location.origin}?payment_status=success&order_nsu=${docRef.id}`;
+            const payload = {
+                handle: "thebaldi",
+                redirect_url: redirectUrl,
+                webhook_url: webhookUrl,
+                order_nsu: docRef.id,
+                items: [{
+                    quantity: 1,
+                    price: totalInCents,
+                    description: `Pedido de ${details.name} na Santa Sensação`
+                }]
+            };
+            
+            const response = await fetch("https://api.infinitepay.io/invoices/public/checkout/links", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error("InfinitePay API error:", errorData);
+                throw new Error(errorData.message || "Falha ao gerar link de pagamento.");
+            }
+
+            const responseData = await response.json();
+            
+            if (responseData.data && responseData.data.payment_url) {
+                window.location.href = responseData.data.payment_url;
+            } else {
+                console.error("Resposta da API da InfinitePay inválida:", responseData);
+                throw new Error("Não foi possível obter o link de pagamento.");
+            }
         } catch (error) {
-            console.error("Failed to initiate PIX payment:", error);
+            console.error("Failed to initiate pix payment:", error);
             addToast("Erro ao iniciar pagamento. Tente novamente.", 'error');
+            throw error; // Propagate error to CheckoutModal
         }
     };
 
@@ -491,16 +620,21 @@ const App: React.FC = () => {
             for (const key in files) {
                 const file = files[key];
                 if (file) {
-                    const url = await firebaseService.uploadSiteAsset(file, key);
-                    
-                    if (key === 'logo') {
-                        settingsToUpdate.logoUrl = url;
-                    } else if (key === 'heroBg') {
-                        settingsToUpdate.heroBgUrl = url;
-                    } else { // It's a content section file, key is the section ID
-                        const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
-                        if (sectionIndex > -1) {
-                            settingsToUpdate.contentSections[sectionIndex].imageUrl = url;
+                    let url: string;
+                    if (key === 'notificationSound') {
+                         url = await firebaseService.uploadNotificationSound(file);
+                         settingsToUpdate.audioSettings.notificationSound = url;
+                    } else {
+                        url = await firebaseService.uploadSiteAsset(file, key);
+                        if (key === 'logo') {
+                            settingsToUpdate.logoUrl = url;
+                        } else if (key === 'heroBg') {
+                            settingsToUpdate.heroBgUrl = url;
+                        } else { // It's a content section file, key is the section ID
+                            const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
+                            if (sectionIndex > -1) {
+                                settingsToUpdate.contentSections[sectionIndex].imageUrl = url;
+                            }
                         }
                     }
                 }
@@ -630,6 +764,10 @@ const App: React.FC = () => {
                 </div>
                 <ContactSection />
                 <AdminSection 
+                    user={user}
+                    authLoading={authLoading}
+                    activeTab={activeAdminTab}
+                    setActiveTab={setActiveAdminTab}
                     allProducts={products}
                     allCategories={categories}
                     isStoreOnline={isStoreOnline}
@@ -652,6 +790,8 @@ const App: React.FC = () => {
                     onDeleteOrder={handleDeleteOrder}
                     onPermanentDeleteOrder={handlePermanentDeleteOrder}
                     addToast={addToast}
+                    isMuted={isMuted}
+                    setIsMuted={setIsMuted}
                 />
             </main>
 
@@ -697,12 +837,26 @@ const App: React.FC = () => {
                 onConfirmCheckout={handleCheckout}
                 onInitiatePixPayment={handleInitiatePixPayment}
             />
-             <PixPaymentModal
-                order={null} // This modal is no longer used for the new flow
-                onClose={() => {}}
-                onPaymentSuccess={() => {}}
-            />
             
+            <NewOrderToast 
+                order={newOrderToast}
+                onNavigate={() => {
+                    handleStopSound();
+                    setActiveAdminTab('orders');
+                    // Scroll to admin section
+                    const adminSection = document.getElementById('admin');
+                    if(adminSection) {
+                        adminSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                    setNewOrderToast(null);
+                }}
+                onDismiss={() => {
+                    handleStopSound();
+                    setNewOrderToast(null);
+                }}
+                onStopSound={handleStopSound}
+            />
+
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]">
                 <div className="w-full flex flex-col items-center space-y-4 sm:items-end">
                     {toasts.map((toast) => (

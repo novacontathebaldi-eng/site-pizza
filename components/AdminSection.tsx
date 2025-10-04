@@ -10,10 +10,12 @@ import { CSS } from '@dnd-kit/utilities';
 import firebase from 'firebase/compat/app';
 import { auth } from '../services/firebase';
 import { SupportModal } from './SupportModal';
-import * as firebaseService from '../services/firebaseService';
-
 
 interface AdminSectionProps {
+    user: firebase.User | null;
+    authLoading: boolean;
+    activeTab: string;
+    setActiveTab: (tab: string) => void;
     allProducts: Product[];
     allCategories: Category[];
     isStoreOnline: boolean;
@@ -36,6 +38,8 @@ interface AdminSectionProps {
     onDeleteOrder: (orderId: string) => Promise<void>;
     onPermanentDeleteOrder: (orderId: string) => Promise<void>;
     addToast: (message: string, type?: 'success' | 'error') => void;
+    isMuted: boolean;
+    setIsMuted: (muted: boolean) => void;
 }
 
 interface SortableProductItemProps {
@@ -131,16 +135,14 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
 
 export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const { 
+        user, authLoading, activeTab, setActiveTab,
         allProducts, allCategories, isStoreOnline, siteSettings, orders, addToast,
         onSaveProduct, onDeleteProduct, onProductStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
         onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
-        onDeleteOrder, onPermanentDeleteOrder
+        onDeleteOrder, onPermanentDeleteOrder, isMuted, setIsMuted,
     } = props;
     
-    const [user, setUser] = useState<firebase.User | null>(null);
-    const [authLoading, setAuthLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('status');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | React.ReactNode>('');
@@ -157,8 +159,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     
-    const [notificationPermission, setNotificationPermission] = useState(Notification.permission);
-
     // State for order management
     const [orderSearchTerm, setOrderSearchTerm] = useState('');
     const [orderFilters, setOrderFilters] = useState({ orderType: '', paymentMethod: '', paymentStatus: '', orderStatus: '' });
@@ -168,16 +168,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
     useEffect(() => setLocalProducts(allProducts), [allProducts]);
     useEffect(() => setLocalCategories([...allCategories].sort((a, b) => a.order - b.order)), [allCategories]);
-
-    useEffect(() => {
-        if (!auth) {
-            setError("Falha na conexão com o serviço de autenticação.");
-            setAuthLoading(false);
-            return;
-        }
-        const unsubscribe = auth.onAuthStateChanged(user => { setUser(user); setAuthLoading(false); });
-        return () => unsubscribe();
-    }, []);
 
     useEffect(() => {
         const handleHashChange = () => setShowAdminPanel(window.location.hash === '#admin');
@@ -275,16 +265,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const pendingOrdersCount = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
     const tabOrders = useMemo(() => filteredOrders.filter(o => o.status === activeOrdersTab), [filteredOrders, activeOrdersTab]);
     
-    const handleRequestNotificationPermission = async () => {
-        const success = await firebaseService.requestNotificationPermission();
-        if (success) {
-            addToast("Notificações ativadas com sucesso!", 'success');
-        } else {
-            addToast("Não foi possível ativar as notificações.", 'error');
-        }
-        setNotificationPermission(Notification.permission);
-    };
-
     if (!showAdminPanel) return null;
     if (authLoading) return <section id="admin" className="py-20 bg-brand-ivory-50"><div className="text-center"><i className="fas fa-spinner fa-spin text-4xl text-accent"></i></div></section>;
     if (!user) return (<> <section id="admin" className="py-20 bg-brand-ivory-50"> <div className="container mx-auto px-4 max-w-md"> <div className="bg-white p-8 rounded-2xl shadow-lg border"> <h2 className="text-3xl font-bold text-center mb-6"><i className="fas fa-shield-alt mr-2"></i>Painel</h2> <form onSubmit={handleLogin}> <div className="mb-4"> <label className="block font-semibold mb-2" htmlFor="admin-email">Email</label> <input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> <div className="mb-6"> <label className="block font-semibold mb-2" htmlFor="admin-password">Senha</label> <input id="admin-password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> {error && <div className="text-red-600 mb-4 bg-red-50 p-3 rounded-lg border border-red-200">{error}</div>} <button type="submit" className="w-full bg-accent text-white font-bold py-3 rounded-lg hover:bg-opacity-90 disabled:bg-opacity-70 flex justify-center" disabled={isLoggingIn}>{isLoggingIn ? <i className="fas fa-spinner fa-spin"></i> : 'Entrar'}</button> </form> </div> </div> </section> <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} /> </>);
@@ -313,34 +293,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                         </div>
 
                         {activeTab === 'status' && ( <div> <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3> <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg"> <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer"> <input type="checkbox" id="store-status-toggle" className="sr-only peer" checked={isStoreOnline} onChange={e => onStoreStatusChange(e.target.checked)} /> <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600"></div> </label> <span className={`font-semibold text-lg ${isStoreOnline ? 'text-green-600' : 'text-red-600'}`}>{isStoreOnline ? 'Aberta' : 'Fechada'}</span> </div>
-                         <div className="mt-6 pt-6 border-t">
-                            <h3 className="text-xl font-bold mb-4">Notificações de Pedidos</h3>
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                {notificationPermission === 'granted' && (
-                                    <div className="flex items-center gap-3 text-green-600">
-                                        <i className="fas fa-check-circle text-xl"></i>
-                                        <p className="font-semibold">Notificações ativadas para este navegador.</p>
-                                    </div>
-                                )}
-                                {notificationPermission === 'default' && (
-                                    <div className="flex items-center gap-3">
-                                        <p>Receba alertas sonoros e notificações de novos pedidos.</p>
-                                        <button onClick={handleRequestNotificationPermission} className="bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600">
-                                            <i className="fas fa-bell mr-2"></i>Ativar Notificações
-                                        </button>
-                                    </div>
-                                )}
-                                {notificationPermission === 'denied' && (
-                                     <div className="flex items-center gap-3 text-red-600">
-                                        <i className="fas fa-times-circle text-xl"></i>
-                                        <div>
-                                            <p className="font-semibold">As notificações estão bloqueadas.</p>
-                                            <p className="text-sm">Para ativá-las, você precisa alterar as permissões de notificação para este site nas configurações do seu navegador.</p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
                         </div> )}
                         
                         {activeTab === 'orders' && (
@@ -356,10 +308,10 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                             <select value={orderFilters.paymentStatus} onChange={e => setOrderFilters(f => ({...f, paymentStatus: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
                                                 <option value="">Status Pgto.</option> <option value="paid">Pago</option> <option value="pending">Pendente</option>
                                             </select>
-                                            <select value={orderFilters.orderStatus} onChange={e => setOrderFilters(f => ({...f, orderStatus: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
+                                            <select value={orderFilters.orderStatus} onChange={e => setOrderFilters(f => ({...f, orderStatus: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white">
                                                 <option value="">Status Pedido</option> <option value="completed">Finalizado</option> <option value="cancelled">Cancelado</option>
                                             </select>
-                                            <select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
+                                            <select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white">
                                                 <option value="">Tipo</option> <option value="delivery">Entrega</option> <option value="pickup">Retirada</option> <option value="local">Local</option>
                                             </select>
                                         </div>
@@ -422,7 +374,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                             </div>
                         )}
                         
-                        {activeTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> )}
+                        {activeTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} isMuted={isMuted} setIsMuted={setIsMuted} /> )}
                         {activeTab === 'products' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Produtos</h3> <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Produto</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}> <div className="space-y-6"> {localCategories.map(category => { const categoryProducts = localProducts.filter(p => p.categoryId === category.id).sort((a, b) => a.orderIndex - b.orderIndex); return ( <div key={category.id}> <h4 className={`text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4> <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3 min-h-[50px]"> {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} />)} </div> </SortableContext> </div> ) })} </div> </DndContext> </div> )}
                         {activeTab === 'categories' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Categorias</h3> <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Categoria</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}> <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localCategories.map(cat => <SortableCategoryItem key={cat.id} category={cat} onEdit={handleEditCategory} onDelete={onDeleteCategory} onStatusChange={onCategoryStatusChange} />)} </div> </SortableContext> </DndContext> </div> )}
                         {activeTab === 'data' && ( <div> <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus dados.</p> <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados iniciais. Use apenas uma vez.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> )}

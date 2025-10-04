@@ -6,7 +6,7 @@ interface CheckoutModalProps {
     onClose: () => void;
     cartItems: CartItem[];
     onConfirmCheckout: (details: OrderDetails) => void;
-    onInitiatePixPayment: (details: OrderDetails) => void;
+    onInitiatePixPayment: (details: OrderDetails) => Promise<void>;
 }
 
 const getSuggestedTimes = () => {
@@ -31,6 +31,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const [changeAmount, setChangeAmount] = useState('');
     const [notes, setNotes] = useState('');
     const [reservationTime, setReservationTime] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
 
     const suggestedTimes = getSuggestedTimes();
 
@@ -38,7 +40,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
         if (!isOpen) {
             setName(''); setPhone(''); setOrderType(''); setAddress('');
             setPaymentMethod(''); setChangeNeeded(false); setChangeAmount('');
-            setNotes(''); setReservationTime('');
+            setNotes(''); setReservationTime(''); setIsSubmitting(false);
         }
     }, [isOpen]);
 
@@ -53,23 +55,32 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
         changeAmount, notes, reservationTime
     });
     
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const details = getOrderDetails();
+        if (isSubmitting) return;
 
-        if (paymentMethod === 'pix') {
-            onInitiatePixPayment(details);
-        } else {
-            onConfirmCheckout(details);
+        const details = getOrderDetails();
+        setIsSubmitting(true);
+        
+        try {
+            if (paymentMethod === 'pix') {
+                await onInitiatePixPayment(details);
+            } else {
+                onConfirmCheckout(details);
+            }
+        } catch (error) {
+            console.error("Submission failed:", error);
+            // Error toast is handled in App.tsx
+            setIsSubmitting(false); // Only reset on error, success will redirect
         }
     };
+    
+    const submitButtonText = paymentMethod === 'pix' 
+        ? 'Pagar com PIX e Finalizar' 
+        : 'Enviar Pedido';
         
-    const submitButtonText = paymentMethod === 'pix'
-        ? 'Ir para Pagamento Seguro'
-        : 'Enviar Pedido via WhatsApp';
-        
-    const submitButtonIconClass = paymentMethod === 'pix'
-        ? 'fas fa-shield-alt'
+    const submitButtonIconClass = paymentMethod === 'pix' 
+        ? 'fab fa-pix' 
         : 'fab fa-whatsapp';
 
 
@@ -125,10 +136,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                             <label className="block text-sm font-semibold mb-1">Método de Pagamento *</label>
                             <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as any)} className="w-full px-3 py-2 border rounded-md bg-white" required>
                                 <option value="" disabled>Selecione...</option>
-                                <option value="credit">Cartão de Crédito (na entrega/retirada)</option>
-                                <option value="debit">Cartão de Débito (na entrega/retirada)</option>
-                                <option value="pix">PIX (Pagamento Online)</option>
-                                <option value="cash">Dinheiro (na entrega/retirada)</option>
+                                <option value="credit">Cartão de Crédito</option>
+                                <option value="debit">Cartão de Débito</option>
+                                <option value="pix">PIX</option>
+                                <option value="cash">Dinheiro</option>
                             </select>
                         </div>
 
@@ -167,10 +178,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
 
                          <button 
                             type="submit" 
+                            disabled={isSubmitting}
                             className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
                         >
-                            <i className={`${submitButtonIconClass} mr-2`}></i>
-                            {submitButtonText}
+                            {isSubmitting ? (
+                                <i className="fas fa-spinner fa-spin"></i>
+                            ) : (
+                                <>
+                                    <i className={`${submitButtonIconClass} mr-2`}></i>
+                                    {submitButtonText}
+                                </>
+                            )}
                         </button>
                     </form>
                 </div>

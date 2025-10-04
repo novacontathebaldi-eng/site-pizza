@@ -1,7 +1,7 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
-import { db, storage, functions } from './firebase';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, CartItem } from '../types';
+import { db, storage, functions, auth } from './firebase';
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -31,6 +31,19 @@ export const uploadSiteAsset = async (file: File, assetName: string): Promise<st
     }
     const fileExtension = file.name.split('.').pop();
     const fileName = `site/${assetName}_${new Date().getTime()}.${fileExtension}`;
+    const storageRef = storage.ref(fileName);
+    
+    const snapshot = await storageRef.put(file);
+    return await snapshot.ref.getDownloadURL();
+};
+
+// Notification Sound Upload Function
+export const uploadNotificationSound = async (file: File): Promise<string> => {
+    if (!storage) {
+        throw new Error("Firebase Storage não está inicializado.");
+    }
+    const fileExtension = file.name.split('.').pop();
+    const fileName = `site_assets/audio/notification_${new Date().getTime()}.${fileExtension}`;
     const storageRef = storage.ref(fileName);
     
     const snapshot = await storageRef.put(file);
@@ -133,6 +146,20 @@ export const addOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'pick
     });
 };
 
+// FIX: Added missing 'initiatePixPayment' function to resolve build error.
+// This function is intended to call a Firebase Cloud Function which would securely
+// interact with the payment provider's API to generate a PIX charge.
+// The corresponding cloud function ('initiatePixPayment') is required on the backend for this to work.
+export const initiatePixPayment = async (orderId: string): Promise<{ qrCode: string; copyPaste: string; }> => {
+    if (!functions) {
+        throw new Error("Firebase Functions is not initialized.");
+    }
+    const generatePix = functions.httpsCallable('initiatePixPayment');
+    const result = await generatePix({ orderId });
+    // Assuming the cloud function returns data in the expected format.
+    return result.data as { qrCode: string; copyPaste: string; };
+};
+
 export const updateOrderStatus = async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     const orderRef = db.collection('orders').doc(orderId);
@@ -155,56 +182,4 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     const orderRef = db.collection('orders').doc(orderId);
     await orderRef.delete();
-};
-
-// NEW: PIX Payment Function using public checkout link
-export const generateCheckoutLink = async (orderId: string, cartItems: CartItem[]): Promise<string> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    const generateLink = functions.httpsCallable('generateInfinitePayCheckoutLink');
-    try {
-        const result = await generateLink({ orderId, cartItems });
-        return result.data;
-    } catch (error) {
-        console.error("Error calling generateInfinitePayCheckoutLink function:", error);
-        throw new Error("Não foi possível gerar o link de pagamento PIX. Tente novamente.");
-    }
-};
-
-// Notification (FCM) Functions
-const saveFcmToken = async (token: string): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const tokenRef = db.collection('fcmTokens').doc(token);
-    // Save the token with a timestamp. This can be used later to clean up old tokens.
-    await tokenRef.set({ 
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-};
-
-export const requestNotificationPermission = async (): Promise<boolean> => {
-    const { messaging } = await import('./firebase');
-    if (!messaging) {
-        console.warn("Firebase Messaging is not available in this browser.");
-        return false;
-    }
-    try {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-            const token = await messaging.getToken({ vapidKey: "YOUR_VAPID_KEY_HERE" }); // Add your VAPID key
-            if (token) {
-                await saveFcmToken(token);
-                console.log('Notification permission granted and token saved:', token);
-                return true;
-            }
-            console.warn("No registration token available despite permission. Request permission to generate one.");
-            return false;
-        } else {
-            console.warn("Notification permission denied.");
-            return false;
-        }
-    } catch (err) {
-        console.error("An error occurred while requesting permission or retrieving token.", err);
-        return false;
-    }
 };
