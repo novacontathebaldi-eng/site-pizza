@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
@@ -90,7 +90,10 @@ const App: React.FC = () => {
     const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
     const [payingOrder, setPayingOrder] = useState<Order | null>(null);
+    const prevPendingOrdersCount = useRef<number | null>(null);
     
+    const notificationSound = useMemo(() => new Audio('data:audio/mpeg;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaW5nIG9uIHNpdGUgbG9hZAAAAAA+bWljcm9zb2Z0LmNvbS9pbmZvL2RlZmF1bHQuYXNwP2N0eD1zZWFyY2gmc2N0eD1zdGF0aWMmbmFtZT1taWNyb3NvZnQmZm9ybT1sYWJzMSZzcmM9aHR0cCUzYSUyZiUyZm1pY3Jvc29mdC5jb20lMmZkb3dubG9hZCUyZmV4ZWN1dGUuYXNwJTJmJTNmcGFnZSUzZDEwNTI0JTI2dGFnJTNEU1RFSU5FLVdFVFNFLUNPTU0lMjZzY2FuJTNEZG93bmxvYWR8bWljcm9zb2Z0LmNvbS9kb3dubG9hZC9leGVjdXRlLmFzcC8/cGFnZT0xMDUyNCZ0YWc9U1RFSU5FLVdFVFNFLUNPTU0mc2Nhbj1kb3dubG9hZG1pbGxlbm5pdW0ubWljcm9zb2Z0LmNvbS9kb3dubG9hZC9leGVjdXRlLmFzcC8/cGFnZT0xMDUyNCZ0YWc9U1RFSU5FLVdFVFNFLUNPTU0mc2Nhbj1kb3dubG9hZGx1bGEubWljcm9zb2Z0LmNvbS9kb3dubG9hZC9leGVjdXRlLmFzcC8/cGFnZT0xMDUyNCZ0YWc9U1RFSU5FLVdFVFNFLUNPTU0mc2Nhbj1kb3dubG9hZFRoaXMgc291bmQgaXMgZnJvbSBGaW5kU291bmRzLmNvbSBhdCBodHRwOi8vd3d3LmZpbmRzb3VuZHMuY29tLAAAAElDT1JEAAAAAgAAAExNUEdhZG1wZWdAYWRtcGVnLm9yZ0xNUEVHQWRtcGVnQGFkbXBlZy5vcmdMAAAAAAAARaGqgA8AAAAJAAAAAAAAAAAAAAAAD/9oAD/9sAQwAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB/9oAD/9sAQwEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB/8IAEQgABgAGAwEiAAIRAQMRAf/EABQAAQAAAAAAAAAAAAAAAAAAAAD/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAACK/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPwB//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwB//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwB//9k='), []);
+
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
         setToasts(prevToasts => [...prevToasts, { id, message, type }]);
@@ -196,6 +199,24 @@ const App: React.FC = () => {
             unsubOrders();
         };
     }, []);
+
+    // Effect for notification sound
+    useEffect(() => {
+        const pendingOrders = orders.filter(o => o.status === 'pending');
+        
+        // Initialize count on first valid render without playing sound
+        if (prevPendingOrdersCount.current === null && !isLoading) {
+            prevPendingOrdersCount.current = pendingOrders.length;
+            return;
+        }
+        
+        // Play sound if a new pending order arrives
+        if (prevPendingOrdersCount.current !== null && pendingOrders.length > prevPendingOrdersCount.current) {
+            notificationSound.play().catch(e => console.error("Error playing sound:", e));
+        }
+        
+        prevPendingOrdersCount.current = pendingOrders.length;
+    }, [orders, isLoading, notificationSound]);
 
     useEffect(() => {
         if (categories.length > 0 && !activeMenuCategory) {
@@ -627,6 +648,8 @@ const App: React.FC = () => {
                     onUpdateOrderReservationTime={handleUpdateOrderReservationTime}
                     onDeleteOrder={handleDeleteOrder}
                     onPermanentDeleteOrder={handlePermanentDeleteOrder}
+                    onRequestNotificationPermission={firebaseService.requestNotificationPermission}
+                    addToast={addToast}
                 />
             </main>
 

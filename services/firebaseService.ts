@@ -1,6 +1,6 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
-import { db, storage, functions } from './firebase';
+import { db, storage, functions, messaging } from './firebase';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
@@ -169,5 +169,43 @@ export const initiatePixPayment = async (orderId: string): Promise<any> => {
     } catch (error) {
         console.error("Error calling generatePixCharge function:", error);
         throw new Error("Não foi possível gerar a cobrança PIX. Tente novamente.");
+    }
+};
+
+// Notification (FCM) Functions
+const saveFcmToken = async (token: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const tokenRef = db.collection('fcmTokens').doc(token);
+    // Save the token with a timestamp. This can be used later to clean up old tokens.
+    await tokenRef.set({ 
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+};
+
+export const requestNotificationPermission = async (): Promise<boolean> => {
+    if (!messaging) {
+        console.error("Firebase Messaging is not initialized.");
+        return false;
+    }
+    try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            console.log('Notification permission granted.');
+            const fcmVapidKey = "BLs1R3Gvj_S3i58QpmnrS2p2_7Dk-3yYy3-0vVpY_Q1j1_yR8wX3g_1c_4z5_9Z8J6j3_Q1w_5X4k2b_A"; // Public VAPID key
+            const token = await messaging.getToken({ vapidKey: fcmVapidKey });
+            if (token) {
+                await saveFcmToken(token);
+                console.log('FCM Token saved:', token);
+                return true;
+            }
+            console.warn("No registration token available despite permission.");
+            return false;
+        } else {
+            console.warn("Notification permission denied.");
+            return false;
+        }
+    } catch (err) {
+        console.error("An error occurred while requesting permission or retrieving token.", err);
+        return false;
     }
 };
