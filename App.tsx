@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import firebase from 'firebase/compat/app';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
@@ -11,8 +10,7 @@ import { Footer } from './components/Footer';
 import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
 import { PixPaymentModal } from './components/PixPaymentModal';
-import { NewOrderToast } from './components/NewOrderToast';
-import { db, auth } from './services/firebase';
+import { db } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
 // Static assets for default values
@@ -72,11 +70,7 @@ const defaultSiteSettings: SiteSettings = {
         { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996500341', isVisible: true },
         { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/santasensacao.sl', isVisible: true },
         { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin', isVisible: true }
-    ],
-    audioSettings: {
-        notificationSound: '/assets/audio/notf1.mp3',
-        notificationVolume: 1.0,
-    }
+    ]
 };
 
 const App: React.FC = () => {
@@ -96,37 +90,13 @@ const App: React.FC = () => {
     const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
     const [payingOrder, setPayingOrder] = useState<Order | null>(null);
-    const [newOrderToast, setNewOrderToast] = useState<Order | null>(null);
-    const knownPendingOrderIds = useRef(new Set<string>());
     
-    // Auth and Admin State
-    const [user, setUser] = useState<firebase.User | null>(null);
-    const [authLoading, setAuthLoading] = useState(true);
-    const [activeAdminTab, setActiveAdminTab] = useState('status');
-
-    // Audio State
-    const audioRef = useRef<HTMLAudioElement | null>(null);
-    const [isMuted, setIsMuted] = useState(() => localStorage.getItem('isSoundMuted') === 'true');
-
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
         setToasts(prevToasts => [...prevToasts, { id, message, type }]);
         setTimeout(() => {
             setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
         }, 4000);
-    }, []);
-
-    useEffect(() => {
-        if (!auth) {
-            setError("Falha na conexão com o serviço de autenticação.");
-            setAuthLoading(false);
-            return;
-        }
-        const unsubscribe = auth.onAuthStateChanged(user => { 
-            setUser(user); 
-            setAuthLoading(false); 
-        });
-        return () => unsubscribe();
     }, []);
 
     useEffect(() => {
@@ -226,67 +196,6 @@ const App: React.FC = () => {
             unsubOrders();
         };
     }, []);
-
-    const handleStopSound = useCallback(() => {
-        if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-        }
-    }, []);
-
-    // Effect for notification sound and toast - GATED BY LOGIN
-    useEffect(() => {
-        // SECURITY: Only run notification logic if an admin is logged in.
-        if (!user || authLoading) {
-            return;
-        }
-
-        const currentPendingOrders = orders.filter(o => o.status === 'pending');
-
-        if (isLoading) {
-            currentPendingOrders.forEach(o => knownPendingOrderIds.current.add(o.id));
-            return;
-        }
-
-        const newPendingOrders = currentPendingOrders.filter(o => !knownPendingOrderIds.current.has(o.id));
-
-        if (newPendingOrders.length > 0 && !newOrderToast) { // Only trigger if no other toast is active
-            const latestNewOrder = newPendingOrders[newPendingOrders.length - 1];
-            
-            if (!isMuted) {
-                if (!audioRef.current) {
-                    audioRef.current = new Audio();
-                }
-                const soundToPlay = audioRef.current;
-                soundToPlay.src = siteSettings.audioSettings.notificationSound;
-                soundToPlay.volume = siteSettings.audioSettings.notificationVolume;
-                soundToPlay.loop = true;
-                soundToPlay.play().catch(e => console.error("Error playing sound:", e));
-            }
-            
-            setNewOrderToast(latestNewOrder);
-            newPendingOrders.forEach(o => knownPendingOrderIds.current.add(o.id));
-        }
-        
-        const currentPendingIds = new Set(currentPendingOrders.map(o => o.id));
-        knownPendingOrderIds.current.forEach(id => {
-            if (!currentPendingIds.has(id)) {
-                knownPendingOrderIds.current.delete(id);
-            }
-        });
-
-    }, [orders, isLoading, user, authLoading, siteSettings, isMuted, newOrderToast]);
-    
-    // Effect to auto-dismiss notification if order status changes
-    useEffect(() => {
-        if (newOrderToast) {
-            const correspondingOrder = orders.find(o => o.id === newOrderToast.id);
-            if (!correspondingOrder || correspondingOrder.status !== 'pending') {
-                handleStopSound();
-                setNewOrderToast(null);
-            }
-        }
-    }, [orders, newOrderToast, handleStopSound]);
 
     useEffect(() => {
         if (categories.length > 0 && !activeMenuCategory) {
@@ -558,21 +467,16 @@ const App: React.FC = () => {
             for (const key in files) {
                 const file = files[key];
                 if (file) {
-                    let url: string;
-                    if (key === 'notificationSound') {
-                         url = await firebaseService.uploadNotificationSound(file);
-                         settingsToUpdate.audioSettings.notificationSound = url;
-                    } else {
-                        url = await firebaseService.uploadSiteAsset(file, key);
-                        if (key === 'logo') {
-                            settingsToUpdate.logoUrl = url;
-                        } else if (key === 'heroBg') {
-                            settingsToUpdate.heroBgUrl = url;
-                        } else { // It's a content section file, key is the section ID
-                            const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
-                            if (sectionIndex > -1) {
-                                settingsToUpdate.contentSections[sectionIndex].imageUrl = url;
-                            }
+                    const url = await firebaseService.uploadSiteAsset(file, key);
+                    
+                    if (key === 'logo') {
+                        settingsToUpdate.logoUrl = url;
+                    } else if (key === 'heroBg') {
+                        settingsToUpdate.heroBgUrl = url;
+                    } else { // It's a content section file, key is the section ID
+                        const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
+                        if (sectionIndex > -1) {
+                            settingsToUpdate.contentSections[sectionIndex].imageUrl = url;
                         }
                     }
                 }
@@ -702,10 +606,6 @@ const App: React.FC = () => {
                 </div>
                 <ContactSection />
                 <AdminSection 
-                    user={user}
-                    authLoading={authLoading}
-                    activeTab={activeAdminTab}
-                    setActiveTab={setActiveAdminTab}
                     allProducts={products}
                     allCategories={categories}
                     isStoreOnline={isStoreOnline}
@@ -727,9 +627,6 @@ const App: React.FC = () => {
                     onUpdateOrderReservationTime={handleUpdateOrderReservationTime}
                     onDeleteOrder={handleDeleteOrder}
                     onPermanentDeleteOrder={handlePermanentDeleteOrder}
-                    addToast={addToast}
-                    isMuted={isMuted}
-                    setIsMuted={setIsMuted}
                 />
             </main>
 
@@ -781,25 +678,6 @@ const App: React.FC = () => {
                 onPaymentSuccess={handlePixPaymentSuccess}
             />
             
-            <NewOrderToast 
-                order={newOrderToast}
-                onNavigate={() => {
-                    handleStopSound();
-                    setActiveAdminTab('orders');
-                    // Scroll to admin section
-                    const adminSection = document.getElementById('admin');
-                    if(adminSection) {
-                        adminSection.scrollIntoView({ behavior: 'smooth' });
-                    }
-                    setNewOrderToast(null);
-                }}
-                onDismiss={() => {
-                    handleStopSound();
-                    setNewOrderToast(null);
-                }}
-                onStopSound={handleStopSound}
-            />
-
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]">
                 <div className="w-full flex flex-col items-center space-y-4 sm:items-end">
                     {toasts.map((toast) => (

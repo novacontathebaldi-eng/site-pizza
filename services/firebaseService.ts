@@ -1,6 +1,6 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
-import { db, storage, functions, auth } from './firebase';
+import { db, storage, functions } from './firebase';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
@@ -31,19 +31,6 @@ export const uploadSiteAsset = async (file: File, assetName: string): Promise<st
     }
     const fileExtension = file.name.split('.').pop();
     const fileName = `site/${assetName}_${new Date().getTime()}.${fileExtension}`;
-    const storageRef = storage.ref(fileName);
-    
-    const snapshot = await storageRef.put(file);
-    return await snapshot.ref.getDownloadURL();
-};
-
-// Notification Sound Upload Function
-export const uploadNotificationSound = async (file: File): Promise<string> => {
-    if (!storage) {
-        throw new Error("Firebase Storage não está inicializado.");
-    }
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `site_assets/audio/notification_${new Date().getTime()}.${fileExtension}`;
     const storageRef = storage.ref(fileName);
     
     const snapshot = await storageRef.put(file);
