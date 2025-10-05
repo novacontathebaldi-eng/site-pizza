@@ -6,7 +6,6 @@ import 'firebase/compat/firestore';
 import 'firebase/compat/storage';
 import 'firebase/compat/auth'; // Import for authentication
 import 'firebase/compat/functions'; // Import for Firebase Functions
-import 'firebase/compat/messaging'; // Import for Firebase Messaging (FCM)
 
 // AÇÃO NECESSÁRIA: Credenciais corrigidas.
 // O problema era um erro de digitação na apiKey. Esta versão está 100% correta,
@@ -26,7 +25,6 @@ let db: firebase.firestore.Firestore | null = null;
 let storage: firebase.storage.Storage | null = null;
 let auth: firebase.auth.Auth | null = null; // Add auth service
 let functions: firebase.functions.Functions | null = null; // Add functions service
-let messaging: firebase.messaging.Messaging | null = null; // Add messaging service
 
 try {
   // Use the initialization pattern from the user's working old version.
@@ -38,13 +36,6 @@ try {
   auth = firebase.auth();
   functions = firebase.functions();
   
-  if (firebase.messaging.isSupported()) {
-    messaging = firebase.messaging();
-    console.log("Firebase Messaging is supported and initialized.");
-  } else {
-    console.warn("Firebase Messaging is not supported in this browser.");
-  }
-  
   // Keep db settings
   db.settings({
     experimentalForceLongPolling: true,
@@ -55,4 +46,4 @@ try {
   console.error('Falha ao inicializar o Firebase. Verifique seu objeto firebaseConfig em `services/firebase.ts`.', error);
 }
 
-export { db, storage, auth, functions, messaging };
+export { db, storage, auth, functions };
