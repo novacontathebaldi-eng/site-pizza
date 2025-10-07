@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Order, OrderStatus, PaymentStatus } from '../types';
 import { ContactModal } from './ContactModal';
 
@@ -66,6 +66,42 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
     };
 
     const isArchived = status === 'completed' || status === 'cancelled';
+
+    // Logic for the status changer dropdown
+    const statusOptionsMap: { [key in OrderStatus]?: string } = {
+        pending: 'Pendente',
+        accepted: 'Aceito',
+        reserved: 'Reserva',
+        ready: 'Pronto/Em Rota',
+        completed: 'Finalizado',
+        cancelled: 'Cancelado',
+    };
+
+    const allowedStatusesForOrderType = useMemo<OrderStatus[]>(() => {
+        if (customer.orderType === 'local') {
+            return ['pending', 'reserved', 'completed', 'cancelled'];
+        }
+        return ['pending', 'accepted', 'ready', 'completed', 'cancelled'];
+    }, [customer.orderType]);
+
+    const statusChanger = (
+        <div className="flex items-center gap-2">
+            <label htmlFor={`status-select-${order.id}`} className="text-sm font-semibold text-gray-700 whitespace-nowrap">Alterar status:</label>
+            <select
+                id={`status-select-${order.id}`}
+                value={order.status}
+                onChange={(e) => onUpdateStatus(id, e.target.value as OrderStatus)}
+                className="px-3 py-2 border rounded-md bg-white text-sm focus:ring-accent focus:border-accent"
+            >
+                {Object.entries(statusOptionsMap)
+                    .filter(([key]) => allowedStatusesForOrderType.includes(key as OrderStatus))
+                    .map(([key, text]) => (
+                        <option key={key} value={key}>{text}</option>
+                    ))}
+            </select>
+        </div>
+    );
+
 
     return (
         <>
@@ -140,41 +176,34 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
 
                     <div className="flex flex-wrap items-center justify-end gap-2 mt-4 pt-4 border-t">
                         {status === 'deleted' ? (
-                            <>
+                             <>
                                 <button onClick={() => onUpdateStatus(id, 'completed')} className="bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-blue-600"><i className="fas fa-undo mr-2"></i>Restaurar</button>
                                 <button onClick={() => onPermanentDelete(id)} className="bg-red-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-red-600"><i className="fas fa-trash-alt mr-2"></i>Apagar Perm.</button>
                             </>
-                        ) : !isArchived ? (
+                        ) : status === 'pending' ? (
                             <>
-                                <button onClick={handleTogglePaymentStatus} className={`font-semibold py-2 px-3 rounded-lg text-sm transition-colors ${paymentStatus === 'paid' ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-orange-400 text-white hover:bg-orange-500'}`}>
-                                    <i className={`fas ${paymentStatus === 'paid' ? 'fa-check' : 'fa-dollar-sign'} mr-2`}></i>{paymentStatus === 'paid' ? 'Pago' : 'Marcar Pago'}
-                                </button>
                                 <div className="flex-grow"></div>
-                                {status === 'pending' && <button onClick={handleAccept} className="bg-green-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-green-600"><i className="fas fa-check mr-2"></i>Aceitar</button>}
-                                {(status === 'accepted' || status === 'reserved') && <button onClick={() => onUpdateStatus(id, 'pending')} className="bg-yellow-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-yellow-600"><i className="fas fa-undo mr-2"></i>Reverter</button>}
-                                {status === 'accepted' && <button onClick={() => onUpdateStatus(id, 'ready')} className="bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-blue-600"><i className="fas fa-box-open mr-2"></i>Pronto</button>}
-                                {(status === 'ready' || status === 'reserved') && <button onClick={() => onUpdateStatus(id, 'completed')} className="bg-purple-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-purple-600"><i className="fas fa-flag-checkered mr-2"></i>Finalizar</button>}
+                                <button onClick={handleAccept} className="bg-green-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-green-600"><i className="fas fa-check mr-2"></i>Aceitar</button>
                                 <button onClick={() => onUpdateStatus(id, 'cancelled')} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Cancelar</button>
                             </>
                         ) : (
-                            <div className="flex flex-wrap items-center justify-end gap-4 w-full">
-                                <div className="flex items-center gap-2">
-                                    <label htmlFor={`status-select-${order.id}`} className="text-sm font-semibold text-gray-700 whitespace-nowrap">Alterar status:</label>
-                                    <select
-                                        id={`status-select-${order.id}`}
-                                        value={order.status}
-                                        onChange={(e) => onUpdateStatus(id, e.target.value as OrderStatus)}
-                                        className="px-3 py-2 border rounded-md bg-white text-sm focus:ring-accent focus:border-accent"
-                                    >
-                                        <option value="pending">Pendente</option>
-                                        <option value="accepted">Aceito</option>
-                                        <option value="reserved">Reserva</option>
-                                        <option value="ready">Pronto/Em Rota</option>
-                                        <option value="completed">Finalizado</option>
-                                        <option value="cancelled">Cancelado</option>
-                                    </select>
-                                </div>
-                                <button onClick={() => onDelete(id)} className="text-red-500 font-semibold py-2 px-3 rounded-lg text-xs hover:bg-red-50"><i className="fas fa-trash mr-2"></i>Mover p/ Lixeira</button>
+                             <div className="flex flex-wrap items-center justify-end gap-3 w-full">
+                                {!isArchived && (
+                                    <button onClick={handleTogglePaymentStatus} className={`font-semibold py-2 px-3 rounded-lg text-sm transition-colors ${paymentStatus === 'paid' ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-orange-400 text-white hover:bg-orange-500'}`}>
+                                        <i className={`fas ${paymentStatus === 'paid' ? 'fa-check' : 'fa-dollar-sign'} mr-2`}></i>{paymentStatus === 'paid' ? 'Pago' : 'Marcar Pago'}
+                                    </button>
+                                )}
+                                <div className="flex-grow"></div>
+                                
+                                {/* Next-step buttons */}
+                                {status === 'accepted' && customer.orderType !== 'local' && <button onClick={() => onUpdateStatus(id, 'ready')} className="bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-blue-600"><i className="fas fa-box-open mr-2"></i>Pronto</button>}
+                                {(status === 'ready' || status === 'reserved') && <button onClick={() => onUpdateStatus(id, 'completed')} className="bg-purple-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-purple-600"><i className="fas fa-flag-checkered mr-2"></i>Finalizar</button>}
+                                
+                                {!isArchived && <button onClick={() => onUpdateStatus(id, 'cancelled')} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Cancelar</button>}
+
+                                {statusChanger}
+
+                                {isArchived && <button onClick={() => onDelete(id)} className="text-red-500 font-semibold py-2 px-3 rounded-lg text-xs hover:bg-red-50"><i className="fas fa-trash mr-2"></i>Mover p/ Lixeira</button>}
                             </div>
                         )}
                     </div>
