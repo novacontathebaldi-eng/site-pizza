@@ -36,7 +36,37 @@ export interface OrderDetails {
     changeNeeded: boolean;
     changeAmount?: string;
     notes: string;
+    reservationTime?: string; // Added for dine-in
 }
+
+// New Types for Order Management
+export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted';
+export type PaymentStatus = 'pending' | 'paid';
+
+export interface OrderCustomerDetails {
+    name: string;
+    phone: string;
+    orderType: 'delivery' | 'pickup' | 'local';
+    address?: string;
+    reservationTime?: string;
+}
+
+export interface Order {
+    id: string;
+    customer: OrderCustomerDetails;
+    items: CartItem[];
+    total: number;
+    paymentMethod: 'credit' | 'debit' | 'pix' | 'cash';
+    changeNeeded?: boolean;
+    changeAmount?: string;
+    notes?: string;
+    status: OrderStatus;
+    paymentStatus: PaymentStatus; // New field for payment status
+    createdAt: any; // Firestore Timestamp
+    pickupTimeEstimate?: string; // Added for pickup
+    pixChargeId?: string; // To store the InfinitePay transaction ID
+}
+
 
 export interface ContentSectionListItem {
     id: string;
@@ -49,6 +79,8 @@ export interface ContentSection {
     order: number;
     isVisible: boolean;
     imageUrl: string;
+    isTagVisible?: boolean;
+    tagIcon?: string;
     tag: string;
     title: string;
     description: string;
@@ -60,7 +92,14 @@ export interface FooterLink {
     icon: string;
     text: string;
     url: string;
+    isVisible?: boolean;
 }
+
+export interface AudioSettings {
+    notificationSound: string;
+    notificationVolume: number;
+}
+
 
 export interface SiteSettings {
     logoUrl: string;
@@ -70,4 +109,5 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
+    audioSettings: AudioSettings;
 }

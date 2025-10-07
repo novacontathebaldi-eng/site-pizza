@@ -43,6 +43,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ settings }) => {
         }
     };
 
+    const heroTitle = settings.heroTitle ?? '';
+    const heroSlogan = settings.heroSlogan ?? '';
+    const heroSubtitle = settings.heroSubtitle ?? '';
+
     return (
         <section id="inicio" className="bg-brand-green-700 text-text-on-dark min-h-[calc(100vh-80px)] flex items-center justify-center pb-20 px-4 relative overflow-hidden">
             {/* Camada da Imagem de Fundo com Fade */}
@@ -67,17 +71,17 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ settings }) => {
             
             <div className="container mx-auto text-center z-10">
                 <div className="inline-block bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 mb-6">
-                    <p className="font-semibold text-sm flex items-center gap-2"><i className="fas fa-award text-brand-gold-600"></i> {settings.heroSlogan}</p>
+                    <p className="font-semibold text-sm flex items-center gap-2"><i className="fas fa-award text-brand-gold-600"></i> {heroSlogan}</p>
                 </div>
                 <h1 className="text-4xl md:text-6xl font-extrabold mb-4 leading-tight">
-                    {settings.heroTitle.split(' ').map((word, index, arr) => 
+                    {heroTitle.split(' ').map((word, index, arr) => 
                         word.toLowerCase() === 'santa' || word.toLowerCase() === 'sensação' 
                         ? <span key={index} className="text-brand-gold-600">{word} </span> 
                         : <span key={index}>{word} </span>
                     )}
                 </h1>
                 <p className="text-lg md:text-xl font-medium text-brand-ivory-50/90 mb-8 max-w-2xl mx-auto">
-                    {settings.heroSubtitle}
+                    {heroSubtitle}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <button onClick={scrollToCardapio} className="bg-brand-gold-600 text-text-on-dark font-bold py-3 px-8 rounded-xl text-lg hover:bg-opacity-90 transition-all transform hover:scale-105">

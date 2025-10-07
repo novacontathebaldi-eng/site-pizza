@@ -1,6 +1,6 @@
 
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { Product, Category } from '../types';
 import { MenuItemCard } from './MenuItemCard';
 
@@ -56,6 +56,19 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
 
     const showFinalizeButton = activeCategoryId === lastCategoryId && cartItemCount > 0 && !suggestedNextCategoryId && showFinalizeButtonTrigger;
 
+    useEffect(() => {
+        if (activeCategoryId) {
+            const activeTabElement = document.getElementById(`category-tab-${activeCategoryId}`);
+            if (activeTabElement) {
+                activeTabElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest',
+                    inline: 'center'
+                });
+            }
+        }
+    }, [activeCategoryId]);
+
     const scrollToProductList = () => {
         const productList = document.getElementById('category-product-list');
         const stickyHeader = document.getElementById('sticky-menu-header');
@@ -99,20 +112,21 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                 </div>
                 
                 <div id="sticky-menu-header" className="sticky top-20 bg-white/95 backdrop-blur-sm z-30 -mx-4 shadow-sm">
-                    <div id="menu-filters-container" className="px-4 pt-4 pb-4">
-                        <div className="flex justify-center flex-wrap gap-3">
+                    <div className="border-b border-gray-200">
+                        <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide px-2 sm:px-4 lg:flex-wrap lg:justify-center lg:overflow-x-visible">
                             {sortedCategories.filter(c => c.active).map(category => (
                                 <button 
                                     key={category.id} 
+                                    id={`category-tab-${category.id}`}
                                     onClick={() => handleCategoryClick(category.id)}
-                                    className={`px-6 py-3 rounded-full font-semibold text-sm transition-all duration-300 flex items-center gap-2
+                                    className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors
                                         ${activeCategoryId === category.id 
-                                            ? 'bg-brand-green-700 text-text-on-dark shadow-md' 
-                                            : 'bg-brand-ivory-50 text-text-on-light hover:bg-brand-green-300'
+                                            ? 'border-b-2 border-accent text-accent' 
+                                            : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                 >
-                                    <i className={categoryIcons[category.id] || 'fas fa-utensils'}></i>
-                                    {category.name}
+                                    <i className={`${categoryIcons[category.id] || 'fas fa-utensils'} w-5 text-center`}></i>
+                                    <span>{category.name}</span>
                                 </button>
                             ))}
                         </div>
