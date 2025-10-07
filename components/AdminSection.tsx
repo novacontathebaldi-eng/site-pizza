@@ -204,6 +204,35 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         return () => window.removeEventListener('hashchange', handleHashChange, false);
     }, []);
 
+    // Scroll main admin tabs into view
+    useEffect(() => {
+        if (activeTab) {
+            const activeTabElement = document.getElementById(`admin-tab-${activeTab}`);
+            if (activeTabElement) {
+                activeTabElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest',
+                    inline: 'center'
+                });
+            }
+        }
+    }, [activeTab]);
+
+    // Scroll order status sub-tabs into view
+    useEffect(() => {
+        if (activeOrdersTab) {
+            const activeSubTabElement = document.getElementById(`order-status-tab-${activeOrdersTab}`);
+            if (activeSubTabElement) {
+                activeSubTabElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest',
+                    inline: 'center'
+                });
+            }
+        }
+    }, [activeOrdersTab]);
+
+
     const pendingOrdersCount = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
 
     // Effect for sound notification
@@ -391,7 +420,12 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                     const icons: { [key: string]: string } = { status: 'fa-store-alt', orders: 'fa-receipt', products: 'fa-pizza-slice', categories: 'fa-tags', customization: 'fa-paint-brush', data: 'fa-database' };
                                     const labels: { [key: string]: string } = { status: 'Status', orders: 'Pedidos', products: 'Produtos', categories: 'Categorias', customization: 'Personalização', data: 'Dados' };
                                     return (
-                                        <button key={tab} onClick={() => setActiveTab(tab)} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === tab ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                        <button 
+                                            key={tab} 
+                                            id={`admin-tab-${tab}`}
+                                            onClick={() => setActiveTab(tab)} 
+                                            className={`relative flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === tab ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}
+                                        >
                                             <i className={`fas ${icons[tab]} w-5 text-center`}></i> <span>{labels[tab]}</span>
                                             {tab === 'orders' && pendingOrdersCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">{pendingOrdersCount}</span>}
                                         </button>
@@ -452,7 +486,12 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                     const count = getOrderTabCount(tabKey);
                                                     const showCounter = count > 0 && !['completed', 'cancelled'].includes(tabKey);
                                                     return (
-                                                    <button key={tabKey} onClick={() => setActiveOrdersTab(tabKey)} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-2 px-4 font-semibold text-sm ${activeOrdersTab === tabKey && !isTrashVisible ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                                    <button 
+                                                        key={tabKey} 
+                                                        id={`order-status-tab-${tabKey}`}
+                                                        onClick={() => setActiveOrdersTab(tabKey)} 
+                                                        className={`relative flex-shrink-0 inline-flex items-center gap-2 py-2 px-4 font-semibold text-sm ${activeOrdersTab === tabKey && !isTrashVisible ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}
+                                                    >
                                                         {{accepted: 'Aceitos', reserved: 'Reservas', pronto: 'Prontos', emRota: 'Em Rota', completed: 'Finalizados', cancelled: 'Cancelados'}[tabKey]}
                                                         {showCounter && <span className="bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{count}</span>}
                                                     </button>
