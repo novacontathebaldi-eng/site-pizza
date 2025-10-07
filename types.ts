@@ -8,6 +8,7 @@ export interface Product {
     badge?: string;
     active: boolean;
     orderIndex: number;
+    stockStatus?: 'available' | 'out_of_stock';
 }
 
 export interface Category {
