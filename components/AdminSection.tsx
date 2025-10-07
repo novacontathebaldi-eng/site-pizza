@@ -137,6 +137,10 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
     );
 };
 
+// Define a type for the tabs in the admin UI to handle the split view
+type OrderTabKey = 'accepted' | 'reserved' | 'pronto' | 'emRota' | 'completed' | 'cancelled';
+
+
 export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const { 
         allProducts, allCategories, isStoreOnline, siteSettings, orders,
@@ -169,7 +173,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const [orderSearchTerm, setOrderSearchTerm] = useState('');
     const [orderFilters, setOrderFilters] = useState({ orderType: '', paymentMethod: '', paymentStatus: '', orderStatus: '' });
     const [showFilters, setShowFilters] = useState(false);
-    const [activeOrdersTab, setActiveOrdersTab] = useState<OrderStatus>('accepted');
+    const [activeOrdersTab, setActiveOrdersTab] = useState<OrderTabKey>('accepted');
     const [isTrashVisible, setIsTrashVisible] = useState(false);
 
     // State for sound notification
@@ -330,14 +334,38 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         });
     }, [orders, orderSearchTerm, orderFilters, isTrashVisible, activeOrders, deletedOrders]);
 
-    const getOrderStatusCount = (status: OrderStatus) => filteredOrders.filter(o => o.status === status).length;
-    const tabOrders = useMemo(() => filteredOrders.filter(o => o.status === activeOrdersTab), [filteredOrders, activeOrdersTab]);
+    const getOrderTabCount = (tab: OrderTabKey) => {
+        switch(tab) {
+            case 'pronto':
+                return filteredOrders.filter(o => o.status === 'ready' && o.customer.orderType === 'pickup').length;
+            case 'emRota':
+                 return filteredOrders.filter(o => o.status === 'ready' && o.customer.orderType === 'delivery').length;
+            case 'accepted':
+            case 'reserved':
+            case 'completed':
+            case 'cancelled':
+                return filteredOrders.filter(o => o.status === tab).length;
+            default:
+                return 0;
+        }
+    };
+    
+    const tabOrders = useMemo(() => {
+        switch (activeOrdersTab) {
+            case 'pronto':
+                return filteredOrders.filter(o => o.status === 'ready' && o.customer.orderType === 'pickup');
+            case 'emRota':
+                return filteredOrders.filter(o => o.status === 'ready' && o.customer.orderType === 'delivery');
+            default:
+                return filteredOrders.filter(o => o.status === activeOrdersTab);
+        }
+    }, [filteredOrders, activeOrdersTab]);
     
     if (!showAdminPanel) return null;
     if (authLoading) return <section id="admin" className="py-20 bg-brand-ivory-50"><div className="text-center"><i className="fas fa-spinner fa-spin text-4xl text-accent"></i></div></section>;
     if (!user) return (<> <section id="admin" className="py-20 bg-brand-ivory-50"> <div className="container mx-auto px-4 max-w-md"> <div className="bg-white p-8 rounded-2xl shadow-lg border"> <h2 className="text-3xl font-bold text-center mb-6"><i className="fas fa-shield-alt mr-2"></i>Painel</h2> <form onSubmit={handleLogin}> <div className="mb-4"> <label className="block font-semibold mb-2" htmlFor="admin-email">Email</label> <input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> <div className="mb-6"> <label className="block font-semibold mb-2" htmlFor="admin-password">Senha</label> <input id="admin-password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> {error && <div className="text-red-600 mb-4 bg-red-50 p-3 rounded-lg border border-red-200">{error}</div>} <button type="submit" className="w-full bg-accent text-white font-bold py-3 rounded-lg hover:bg-opacity-90 disabled:bg-opacity-70 flex justify-center" disabled={isLoggingIn}>{isLoggingIn ? <i className="fas fa-spinner fa-spin"></i> : 'Entrar'}</button> </form> </div> </div> </section> <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} /> </>);
 
-    const OrderStatusTabs: OrderStatus[] = ['accepted', 'reserved', 'ready', 'completed', 'cancelled'];
+    const OrderStatusTabs: OrderTabKey[] = ['accepted', 'reserved', 'pronto', 'emRota', 'completed', 'cancelled'];
 
     return (
         <>
@@ -420,12 +448,12 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                     <div>
                                         <div className="border-b">
                                             <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
-                                                {!isTrashVisible && OrderStatusTabs.map(status => {
-                                                    const count = getOrderStatusCount(status);
-                                                    const showCounter = count > 0 && !['completed', 'cancelled'].includes(status);
+                                                {!isTrashVisible && OrderStatusTabs.map(tabKey => {
+                                                    const count = getOrderTabCount(tabKey);
+                                                    const showCounter = count > 0 && !['completed', 'cancelled'].includes(tabKey);
                                                     return (
-                                                    <button key={status} onClick={() => setActiveOrdersTab(status)} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-2 px-4 font-semibold text-sm ${activeOrdersTab === status && !isTrashVisible ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
-                                                        {{accepted: 'Aceitos', reserved: 'Reservas', ready: 'Prontos/Em Rota', completed: 'Finalizados', cancelled: 'Cancelados'}[status]}
+                                                    <button key={tabKey} onClick={() => setActiveOrdersTab(tabKey)} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-2 px-4 font-semibold text-sm ${activeOrdersTab === tabKey && !isTrashVisible ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
+                                                        {{accepted: 'Aceitos', reserved: 'Reservas', pronto: 'Prontos', emRota: 'Em Rota', completed: 'Finalizados', cancelled: 'Cancelados'}[tabKey]}
                                                         {showCounter && <span className="bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{count}</span>}
                                                     </button>
                                                     )

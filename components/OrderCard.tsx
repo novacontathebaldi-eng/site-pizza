@@ -11,14 +11,28 @@ interface OrderCardProps {
     onPermanentDelete: (orderId: string) => void;
 }
 
-const statusConfig: { [key in OrderStatus]: { text: string; icon: string; color: string; } } = {
-    pending: { text: 'Pendente', icon: 'fas fa-hourglass-start', color: 'border-yellow-500' },
-    accepted: { text: 'Aceito / Em Preparo', icon: 'fas fa-cogs', color: 'border-blue-500' },
-    reserved: { text: 'Reserva (No Local)', icon: 'fas fa-chair', color: 'border-teal-500' },
-    ready: { text: 'Pronto / Saiu p/ Entrega', icon: 'fas fa-shipping-fast', color: 'border-purple-500' },
-    completed: { text: 'Finalizado', icon: 'fas fa-check-circle', color: 'border-green-500' },
-    cancelled: { text: 'Cancelado', icon: 'fas fa-times-circle', color: 'border-red-500' },
-    deleted: { text: 'Na Lixeira', icon: 'fas fa-trash-alt', color: 'border-gray-500' },
+// This is now a function to provide dynamic text based on the order type
+const getStatusConfig = (order: Order): { text: string; icon: string; color: string; } => {
+    const staticConfig: { [key in OrderStatus]: { text: string; icon: string; color: string; } } = {
+        pending: { text: 'Pendente', icon: 'fas fa-hourglass-start', color: 'border-yellow-500' },
+        accepted: { text: 'Aceito / Em Preparo', icon: 'fas fa-cogs', color: 'border-blue-500' },
+        reserved: { text: 'Reserva (No Local)', icon: 'fas fa-chair', color: 'border-teal-500' },
+        ready: { text: 'Pronto / Em Rota', icon: 'fas fa-shipping-fast', color: 'border-purple-500' }, // Default text
+        completed: { text: 'Finalizado', icon: 'fas fa-check-circle', color: 'border-green-500' },
+        cancelled: { text: 'Cancelado', icon: 'fas fa-times-circle', color: 'border-red-500' },
+        deleted: { text: 'Na Lixeira', icon: 'fas fa-trash-alt', color: 'border-gray-500' },
+    };
+
+    if (order.status === 'ready') {
+        if (order.customer.orderType === 'pickup') {
+            return { ...staticConfig.ready, text: 'Pronto para Retirada' };
+        }
+        if (order.customer.orderType === 'delivery') {
+            return { ...staticConfig.ready, text: 'Saiu para Entrega' };
+        }
+    }
+    
+    return staticConfig[order.status] || staticConfig.pending;
 };
 
 const paymentMethodMap = { credit: 'Crédito', debit: 'Débito', pix: 'PIX', cash: 'Dinheiro' };
@@ -26,7 +40,7 @@ const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo 
 
 export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete }) => {
     const { id, customer, items, total, paymentMethod, changeNeeded, changeAmount, notes, status, paymentStatus, createdAt, pickupTimeEstimate } = order;
-    const config = statusConfig[status] || statusConfig.pending;
+    const config = getStatusConfig(order);
 
     const [isContactModalOpen, setIsContactModalOpen] = useState(false);
     const [isEditingTime, setIsEditingTime] = useState(false);
