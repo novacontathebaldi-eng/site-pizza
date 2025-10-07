@@ -144,20 +144,23 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 <button onClick={() => onUpdateStatus(id, 'completed')} className="bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-blue-600"><i className="fas fa-undo mr-2"></i>Restaurar</button>
                                 <button onClick={() => onPermanentDelete(id)} className="bg-red-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-red-600"><i className="fas fa-trash-alt mr-2"></i>Apagar Perm.</button>
                             </>
-                        ) : !isArchived ? (
-                            <>
+                        ) : status === 'pending' ? (
+                             <>
                                 <button onClick={handleTogglePaymentStatus} className={`font-semibold py-2 px-3 rounded-lg text-sm transition-colors ${paymentStatus === 'paid' ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-orange-400 text-white hover:bg-orange-500'}`}>
                                     <i className={`fas ${paymentStatus === 'paid' ? 'fa-check' : 'fa-dollar-sign'} mr-2`}></i>{paymentStatus === 'paid' ? 'Pago' : 'Marcar Pago'}
                                 </button>
                                 <div className="flex-grow"></div>
-                                {status === 'pending' && <button onClick={handleAccept} className="bg-green-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-green-600"><i className="fas fa-check mr-2"></i>Aceitar</button>}
-                                {(status === 'accepted' || status === 'reserved') && <button onClick={() => onUpdateStatus(id, 'pending')} className="bg-yellow-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-yellow-600"><i className="fas fa-undo mr-2"></i>Reverter</button>}
-                                {status === 'accepted' && <button onClick={() => onUpdateStatus(id, 'ready')} className="bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-blue-600"><i className="fas fa-box-open mr-2"></i>Pronto</button>}
-                                {(status === 'ready' || status === 'reserved') && <button onClick={() => onUpdateStatus(id, 'completed')} className="bg-purple-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-purple-600"><i className="fas fa-flag-checkered mr-2"></i>Finalizar</button>}
+                                <button onClick={handleAccept} className="bg-green-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-green-600"><i className="fas fa-check mr-2"></i>Aceitar</button>
                                 <button onClick={() => onUpdateStatus(id, 'cancelled')} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Cancelar</button>
                             </>
                         ) : (
                             <div className="flex flex-wrap items-center justify-end gap-4 w-full">
+                                <button onClick={handleTogglePaymentStatus} className={`font-semibold py-2 px-3 rounded-lg text-sm transition-colors ${paymentStatus === 'paid' ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-orange-400 text-white hover:bg-orange-500'}`}>
+                                    <i className={`fas ${paymentStatus === 'paid' ? 'fa-check' : 'fa-dollar-sign'} mr-2`}></i>{paymentStatus === 'paid' ? 'Pago' : 'Marcar Pago'}
+                                </button>
+
+                                <div className="flex-grow"></div>
+
                                 <div className="flex items-center gap-2">
                                     <label htmlFor={`status-select-${order.id}`} className="text-sm font-semibold text-gray-700 whitespace-nowrap">Alterar status:</label>
                                     <select
