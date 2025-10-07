@@ -343,7 +343,7 @@ const App: React.FC = () => {
         }
     };
 
-    const handlePixPaymentSuccess = useCallback((paidOrder: Order) => {
+    const handlePixPaymentSuccess = (paidOrder: Order) => {
         const details: OrderDetails = {
             name: paidOrder.customer.name, phone: paidOrder.customer.phone, orderType: paidOrder.customer.orderType,
             address: paidOrder.customer.address || '', paymentMethod: 'pix', changeNeeded: false,
@@ -355,7 +355,7 @@ const App: React.FC = () => {
         setCart([]);
         setPayingOrder(null);
         setIsCartOpen(false);
-    }, []);
+    };
 
 
     const handleSaveProduct = useCallback(async (product: Product) => {
@@ -365,7 +365,7 @@ const App: React.FC = () => {
                 await firebaseService.updateProduct(id, dataToSave);
                 addToast("Produto atualizado com sucesso!", 'success');
             } else {
-                await firebaseService.addProduct({ ...dataToSave, orderIndex: products.length, stockStatus: 'available' });
+                await firebaseService.addProduct({ ...dataToSave, orderIndex: products.length });
                 addToast("Produto adicionado com sucesso!", 'success');
             }
         } catch (error) {
@@ -391,16 +391,6 @@ const App: React.FC = () => {
         } catch (error) {
             console.error("Failed to update product status:", error);
             addToast("Erro ao atualizar status do produto.", 'error');
-        }
-    }, [addToast]);
-
-    const handleProductStockStatusChange = useCallback(async (productId: string, stockStatus: 'available' | 'out_of_stock') => {
-        try {
-            await firebaseService.updateProductStockStatus(productId, stockStatus);
-            addToast(`Estoque do produto atualizado.`, 'success');
-        } catch (error) {
-            console.error("Failed to update product stock status:", error);
-            addToast("Erro ao atualizar estoque do produto.", 'error');
         }
     }, [addToast]);
 
@@ -624,7 +614,6 @@ const App: React.FC = () => {
                     onSaveProduct={handleSaveProduct}
                     onDeleteProduct={handleDeleteProduct}
                     onProductStatusChange={handleProductStatusChange}
-                    onProductStockStatusChange={handleProductStockStatusChange}
                     onStoreStatusChange={handleStoreStatusChange}
                     onSaveCategory={handleSaveCategory}
                     onDeleteCategory={handleDeleteCategory}
