@@ -37,10 +37,9 @@ export interface OrderDetails {
     changeNeeded: boolean;
     changeAmount?: string;
     notes: string;
-    reservationTime?: string; // Added for dine-in
+    reservationTime?: string;
 }
 
-// New Types for Order Management
 export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted';
 export type PaymentStatus = 'pending' | 'paid';
 
@@ -62,12 +61,11 @@ export interface Order {
     changeAmount?: string;
     notes?: string;
     status: OrderStatus;
-    paymentStatus: PaymentStatus; // New field for payment status
-    createdAt: any; // Firestore Timestamp
-    pickupTimeEstimate?: string; // Added for pickup
-    pixChargeId?: string; // To store the InfinitePay transaction ID
+    paymentStatus: PaymentStatus;
+    createdAt: any;
+    pickupTimeEstimate?: string;
+    pixChargeId?: string;
 }
-
 
 export interface ContentSectionListItem {
     id: string;
@@ -96,6 +94,36 @@ export interface FooterLink {
     isVisible?: boolean;
 }
 
+// --- NEW TYPES FOR NEW FEATURES ---
+
+export interface AudioSettings {
+    notificationSound: string; // URL or 'default-1', 'default-2'
+    notificationVolume: number; // 0 to 1
+    backgroundMusic: string; // URL
+    backgroundVolume: number; // 0 to 1
+}
+
+export interface NotificationSettings {
+    browserNotificationsEnabled: boolean;
+}
+
+export interface PromotionPage {
+    id: string;
+    order: number;
+    isVisible: boolean;
+    title: string;
+    text: string;
+    videoUrl: string;
+    layout: 'video-left' | 'video-right';
+    featuredProductIds: string[];
+    // Visibility toggles for each element
+    isTitleVisible: boolean;
+    isTextVisible: boolean;
+    isVideoVisible: boolean;
+    isProductsVisible: boolean;
+}
+
+
 export interface SiteSettings {
     logoUrl: string;
     heroSlogan: string;
@@ -104,4 +132,7 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
+    // New settings integrated
+    audioSettings?: AudioSettings;
+    notificationSettings?: NotificationSettings;
 }
