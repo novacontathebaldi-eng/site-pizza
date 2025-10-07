@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, PromotionPage } from './types';
+import firebase from 'firebase/compat/app';
+import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
@@ -10,12 +11,14 @@ import { Footer } from './components/Footer';
 import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
 import { PixPaymentModal } from './components/PixPaymentModal';
+import { NewOrderToast } from './components/NewOrderToast';
 import { db, auth } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
-import { PromotionSection } from './components/PromotionSection';
-import { ImagePreloader } from './components/ImagePreloader';
-import { defaultSiteSettings } from './services/defaultSettings';
+// Static assets for default values
+import defaultLogo from './assets/logo.png';
+import defaultHeroBg from './assets/ambiente-pizzaria.webp';
+import defaultAboutImg from './assets/sobre-imagem.webp';
 
 interface Toast {
     id: number;
@@ -23,11 +26,63 @@ interface Toast {
     type: 'success' | 'error';
 }
 
+const defaultSiteSettings: SiteSettings = {
+    logoUrl: defaultLogo,
+    heroSlogan: "A pizza nº 1 do ES",
+    heroTitle: "Pizzaria Santa Sensação",
+    heroSubtitle: "A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.",
+    heroBgUrl: defaultHeroBg,
+    contentSections: [
+        {
+            id: 'section-1',
+            order: 0,
+            isVisible: true,
+            isTagVisible: true,
+            tagIcon: "fas fa-award",
+            imageUrl: defaultAboutImg,
+            tag: "Nossa Conquista",
+            title: "A Melhor Pizza do Estado, Assinada por um Mestre",
+            description: "Em parceria com o renomado mestre pizzaiolo Luca Lonardi, a Santa Sensação eleva a pizza a um novo patamar. Fomos os grandes vencedores do concurso Panshow 2025, um reconhecimento que celebra nossa dedicação aos ingredientes frescos, massa de fermentação natural e, acima de tudo, a paixão por criar sabores inesquecíveis. Cada pizza que sai do nosso forno a lenha carrega a assinatura de um campeão e a promessa de uma experiência única.",
+            list: [
+                { id: 'item-1-1', icon: "fas fa-award", text: "Vencedora do Panshow 2025" },
+                { id: 'item-1-2', icon: "fas fa-user-check", text: "Assinada pelo Mestre Luca Lonardi" },
+                { id: 'item-1-3', icon: "fas fa-leaf", text: "Ingredientes frescos e selecionados" },
+                { id: 'item-1-4', icon: "fas fa-fire-alt", text: "Forno a lenha tradicional" }
+            ]
+        },
+        {
+            id: 'section-2',
+            order: 1,
+            isVisible: true,
+            isTagVisible: true,
+            tagIcon: 'fas fa-seedling',
+            imageUrl: 'https://picsum.photos/seed/ingredients/800/600',
+            tag: "Qualidade e Tradição",
+            title: "Ingredientes Frescos, Sabor Incomparável",
+            description: "Nossa paixão pela pizza começa na escolha de cada ingrediente. Trabalhamos com produtores locais para garantir o frescor e a qualidade que você sente em cada fatia. Da nossa massa de fermentação lenta aos tomates italianos, tudo é pensado para criar uma experiência única.",
+            list: [
+                { id: 'item-2-1', icon: 'fas fa-bread-slice', text: "Massa de fermentação natural de 48h" },
+                { id: 'item-2-2', icon: 'fas fa-pepper-hot', text: "Tomates italianos San Marzano" },
+                { id: 'item-2-3', icon: 'fas fa-cheese', text: "Mozzarella fresca e queijos selecionados" },
+                { id: 'item-2-4', icon: 'fas fa-leaf', text: "Manjericão e ervas da nossa horta" }
+            ]
+        }
+    ],
+    footerLinks: [
+        { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996500341', isVisible: true },
+        { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/santasensacao.sl', isVisible: true },
+        { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin', isVisible: true }
+    ],
+    audioSettings: {
+        notificationSound: '/assets/audio/notf1.mp3',
+        notificationVolume: 1.0,
+    }
+};
+
 const App: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
-    const [promotions, setPromotions] = useState<PromotionPage[]>([]);
     const [isStoreOnline, setIsStoreOnline] = useState<boolean>(true);
     const [cart, setCart] = useState<CartItem[]>([]);
     const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
@@ -41,10 +96,17 @@ const App: React.FC = () => {
     const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
     const [payingOrder, setPayingOrder] = useState<Order | null>(null);
-    const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+    const [newOrderToast, setNewOrderToast] = useState<Order | null>(null);
+    const knownPendingOrderIds = useRef(new Set<string>());
     
-    const prevPendingOrdersCount = useRef(0);
-    const notificationAudioRef = useRef<HTMLAudioElement | null>(null);
+    // Auth and Admin State
+    const [user, setUser] = useState<firebase.User | null>(null);
+    const [authLoading, setAuthLoading] = useState(true);
+    const [activeAdminTab, setActiveAdminTab] = useState('status');
+
+    // Audio State
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const [isMuted, setIsMuted] = useState(() => localStorage.getItem('isSoundMuted') === 'true');
 
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
@@ -55,12 +117,16 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        if (auth) {
-            const unsubscribe = auth.onAuthStateChanged(user => {
-                setIsAdminLoggedIn(!!user);
-            });
-            return () => unsubscribe();
+        if (!auth) {
+            setError("Falha na conexão com o serviço de autenticação.");
+            setAuthLoading(false);
+            return;
         }
+        const unsubscribe = auth.onAuthStateChanged(user => { 
+            setUser(user); 
+            setAuthLoading(false); 
+        });
+        return () => unsubscribe();
     }, []);
 
     useEffect(() => {
@@ -71,7 +137,7 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        const sectionIds = ['inicio', 'promocoes', 'cardapio', 'sobre', 'contato'];
+        const sectionIds = ['inicio', 'cardapio', 'sobre', 'contato'];
         const sectionElements = sectionIds.map(id => document.getElementById(id));
         
         const observerOptions = {
@@ -85,7 +151,6 @@ const App: React.FC = () => {
                 if (entry.isIntersecting) {
                     const idToTitle: { [key: string]: string } = {
                         'inicio': 'Início',
-                        'promocoes': 'Promoções',
                         'cardapio': 'Cardápio',
                         'sobre': 'Sobre Nós',
                         'contato': 'Contato'
@@ -104,7 +169,7 @@ const App: React.FC = () => {
                 if (el) observer.unobserve(el);
             });
         };
-    }, [promotions]);
+    }, []);
 
     useEffect(() => {
         if (!db) {
@@ -123,15 +188,7 @@ const App: React.FC = () => {
         const unsubSettings = settingsDocRef.onSnapshot(doc => {
             if (doc.exists) {
                  const data = doc.data() as Partial<SiteSettings>;
-                 setSiteSettings(prev => ({
-                    ...defaultSiteSettings,
-                    ...prev,
-                    ...data,
-                    audioSettings: { ...defaultSiteSettings.audioSettings, ...prev.audioSettings, ...data.audioSettings },
-                    notificationSettings: { ...defaultSiteSettings.notificationSettings, ...prev.notificationSettings, ...data.notificationSettings },
-                 }));
-            } else {
-                firebaseService.updateSiteSettings(defaultSiteSettings);
+                 setSiteSettings(prev => ({ ...defaultSiteSettings, ...prev, ...data }));
             }
         }, err => handleConnectionError(err, "site settings"));
 
@@ -151,6 +208,8 @@ const App: React.FC = () => {
         const unsubProducts = productsQuery.onSnapshot(snapshot => {
             const fetchedProducts: Product[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
             setProducts(fetchedProducts);
+            setIsLoading(false);
+            setError(null);
         }, err => handleConnectionError(err, "products"));
 
         const ordersQuery = db.collection('orders').orderBy('createdAt', 'desc');
@@ -159,62 +218,75 @@ const App: React.FC = () => {
             setOrders(fetchedOrders);
         }, err => handleConnectionError(err, "orders"));
 
-        const promotionsQuery = db.collection('promotions').orderBy('order');
-        const unsubPromotions = promotionsQuery.onSnapshot(snapshot => {
-            const fetchedPromotions: PromotionPage[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PromotionPage));
-            setPromotions(fetchedPromotions);
-        }, err => handleConnectionError(err, "promotions"));
-
-        const unsubLoader = productsQuery.onSnapshot(() => {
-             setIsLoading(false);
-             setError(null);
-        });
-
         return () => {
             unsubSettings();
             unsubStatus();
             unsubCategories();
             unsubProducts();
             unsubOrders();
-            unsubPromotions();
-            unsubLoader();
         };
     }, []);
-    
-    // New Order Notification Effect
+
+    const handleStopSound = useCallback(() => {
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
+    }, []);
+
+    // Effect for notification sound and toast - GATED BY LOGIN
     useEffect(() => {
-        const pendingOrdersCount = orders.filter(o => o.status === 'pending').length;
-
-        if (isAdminLoggedIn && pendingOrdersCount > prevPendingOrdersCount.current) {
-            const playSound = () => {
-                if (siteSettings.audioSettings?.notificationSound) {
-                    if (!notificationAudioRef.current) {
-                        notificationAudioRef.current = new Audio();
-                    }
-                    notificationAudioRef.current.src = siteSettings.audioSettings.notificationSound;
-                    notificationAudioRef.current.volume = siteSettings.audioSettings.notificationVolume ?? 0.5;
-                    notificationAudioRef.current.play().catch(e => console.error("Audio playback failed automatically:", e));
-                }
-            };
-
-            const showBrowserNotification = () => {
-                if (siteSettings.notificationSettings?.browserNotificationsEnabled && Notification.permission === 'granted') {
-                    const newOrder = orders.find(o => o.status === 'pending');
-                    new Notification('Novo Pedido Recebido!', {
-                        body: `Você tem um novo pedido de ${newOrder?.customer.name || 'um cliente'}.`,
-                        icon: '/assets/logo para icones.png',
-                        tag: 'new-order'
-                    });
-                }
-            };
-            
-            playSound();
-            showBrowserNotification();
+        // SECURITY: Only run notification logic if an admin is logged in.
+        if (!user || authLoading) {
+            return;
         }
 
-        prevPendingOrdersCount.current = pendingOrdersCount;
-    }, [orders, isAdminLoggedIn, siteSettings]);
+        const currentPendingOrders = orders.filter(o => o.status === 'pending');
 
+        if (isLoading) {
+            currentPendingOrders.forEach(o => knownPendingOrderIds.current.add(o.id));
+            return;
+        }
+
+        const newPendingOrders = currentPendingOrders.filter(o => !knownPendingOrderIds.current.has(o.id));
+
+        if (newPendingOrders.length > 0 && !newOrderToast) { // Only trigger if no other toast is active
+            const latestNewOrder = newPendingOrders[newPendingOrders.length - 1];
+            
+            if (!isMuted) {
+                if (!audioRef.current) {
+                    audioRef.current = new Audio();
+                }
+                const soundToPlay = audioRef.current;
+                soundToPlay.src = siteSettings.audioSettings.notificationSound;
+                soundToPlay.volume = siteSettings.audioSettings.notificationVolume;
+                soundToPlay.loop = true;
+                soundToPlay.play().catch(e => console.error("Error playing sound:", e));
+            }
+            
+            setNewOrderToast(latestNewOrder);
+            newPendingOrders.forEach(o => knownPendingOrderIds.current.add(o.id));
+        }
+        
+        const currentPendingIds = new Set(currentPendingOrders.map(o => o.id));
+        knownPendingOrderIds.current.forEach(id => {
+            if (!currentPendingIds.has(id)) {
+                knownPendingOrderIds.current.delete(id);
+            }
+        });
+
+    }, [orders, isLoading, user, authLoading, siteSettings, isMuted, newOrderToast]);
+    
+    // Effect to auto-dismiss notification if order status changes
+    useEffect(() => {
+        if (newOrderToast) {
+            const correspondingOrder = orders.find(o => o.id === newOrderToast.id);
+            if (!correspondingOrder || correspondingOrder.status !== 'pending') {
+                handleStopSound();
+                setNewOrderToast(null);
+            }
+        }
+    }, [orders, newOrderToast, handleStopSound]);
 
     useEffect(() => {
         if (categories.length > 0 && !activeMenuCategory) {
@@ -352,7 +424,7 @@ const App: React.FC = () => {
 
         try {
             const docRef = await firebaseService.addOrder(newOrderData);
-            const createdOrder: Order = { ...newOrderData, id: docRef.id, createdAt: new Date() };
+            const createdOrder: Order = { ...newOrderData, id: docRef.id, createdAt: new Date() }; // Create a temporary full order object
             addToast("Pedido pré-salvo, aguardando pagamento.", 'success');
             setIsCheckoutModalOpen(false);
             setPayingOrder(createdOrder);
@@ -362,7 +434,7 @@ const App: React.FC = () => {
         }
     };
 
-    const handlePixPaymentSuccess = useCallback((paidOrder: Order) => {
+    const handlePixPaymentSuccess = (paidOrder: Order) => {
         const details: OrderDetails = {
             name: paidOrder.customer.name, phone: paidOrder.customer.phone, orderType: paidOrder.customer.orderType,
             address: paidOrder.customer.address || '', paymentMethod: 'pix', changeNeeded: false,
@@ -374,7 +446,8 @@ const App: React.FC = () => {
         setCart([]);
         setPayingOrder(null);
         setIsCartOpen(false);
-    }, []);
+    };
+
 
     const handleSaveProduct = useCallback(async (product: Product) => {
         try {
@@ -383,7 +456,7 @@ const App: React.FC = () => {
                 await firebaseService.updateProduct(id, dataToSave);
                 addToast("Produto atualizado com sucesso!", 'success');
             } else {
-                await firebaseService.addProduct({ ...dataToSave, orderIndex: products.length, stockStatus: 'available' });
+                await firebaseService.addProduct({ ...dataToSave, orderIndex: products.length });
                 addToast("Produto adicionado com sucesso!", 'success');
             }
         } catch (error) {
@@ -409,16 +482,6 @@ const App: React.FC = () => {
         } catch (error) {
             console.error("Failed to update product status:", error);
             addToast("Erro ao atualizar status do produto.", 'error');
-        }
-    }, [addToast]);
-
-    const handleProductStockStatusChange = useCallback(async (productId: string, stockStatus: 'available' | 'out_of_stock') => {
-        try {
-            await firebaseService.updateProductStockStatus(productId, stockStatus);
-            addToast(`Estoque do produto atualizado.`, 'success');
-        } catch (error) {
-            console.error("Failed to update product stock status:", error);
-            addToast("Erro ao atualizar estoque do produto.", 'error');
         }
     }, [addToast]);
 
@@ -488,86 +551,38 @@ const App: React.FC = () => {
         }
     }, [addToast]);
 
-    const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }, audioFiles: { [key: string]: File | null }) => {
+    const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => {
         try {
-            const settingsToUpdate = JSON.parse(JSON.stringify(settings)); 
+            const settingsToUpdate = JSON.parse(JSON.stringify(settings)); // Deep copy
 
             for (const key in files) {
                 const file = files[key];
                 if (file) {
-                    const url = await firebaseService.uploadSiteAsset(file, key);
-                    
-                    if (key === 'logo') settingsToUpdate.logoUrl = url;
-                    else if (key === 'heroBg') settingsToUpdate.heroBgUrl = url;
-                    else { 
-                        const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
-                        if (sectionIndex > -1) settingsToUpdate.contentSections[sectionIndex].imageUrl = url;
+                    let url: string;
+                    if (key === 'notificationSound') {
+                         url = await firebaseService.uploadNotificationSound(file);
+                         settingsToUpdate.audioSettings.notificationSound = url;
+                    } else {
+                        url = await firebaseService.uploadSiteAsset(file, key);
+                        if (key === 'logo') {
+                            settingsToUpdate.logoUrl = url;
+                        } else if (key === 'heroBg') {
+                            settingsToUpdate.heroBgUrl = url;
+                        } else { // It's a content section file, key is the section ID
+                            const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
+                            if (sectionIndex > -1) {
+                                settingsToUpdate.contentSections[sectionIndex].imageUrl = url;
+                            }
+                        }
                     }
-                }
-            }
-            
-            for (const key in audioFiles) {
-                const file = audioFiles[key];
-                if(file) {
-                    const url = await firebaseService.uploadAudioFile(file, key);
-                    if(key === 'notificationSound') settingsToUpdate.audioSettings.notificationSound = url;
-                    if(key === 'backgroundMusic') settingsToUpdate.audioSettings.backgroundMusic = url;
                 }
             }
 
             await firebaseService.updateSiteSettings(settingsToUpdate);
-            addToast("Configurações do site salvas com sucesso!", 'success');
+            addToast("Personalização do site salva com sucesso!", 'success');
         } catch (error) {
             console.error("Failed to save site settings:", error);
             addToast("Erro ao salvar as configurações do site.", 'error');
-        }
-    }, [addToast]);
-    
-    const handleSavePromotion = useCallback(async (promotion: PromotionPage) => {
-        try {
-            const { id, ...dataToSave } = promotion;
-            if (id) {
-                await firebaseService.updatePromotion(id, dataToSave);
-                addToast("Promoção atualizada com sucesso!", 'success');
-            } else {
-                await firebaseService.addPromotion({ ...dataToSave, order: promotions.length });
-                addToast("Promoção adicionada com sucesso!", 'success');
-            }
-        } catch (error) {
-            console.error("Failed to save promotion:", error);
-            addToast("Erro ao salvar promoção.", 'error');
-        }
-    }, [promotions.length, addToast]);
-
-    const handleDeletePromotion = useCallback(async (promotionId: string) => {
-        try {
-            await firebaseService.deletePromotion(promotionId);
-            addToast("Promoção deletada com sucesso!", 'success');
-        } catch (error) {
-            console.error("Failed to delete promotion:", error);
-            addToast("Erro ao deletar promoção.", 'error');
-        }
-    }, [addToast]);
-
-    const handleReorderPromotions = useCallback(async (promotionsToUpdate: { id: string; order: number }[]) => {
-        try {
-            await firebaseService.updatePromotionsOrder(promotionsToUpdate);
-            addToast("Ordem das promoções atualizada.", 'success');
-        } catch (error) {
-            console.error("Failed to reorder promotions:", error);
-            addToast("Erro ao reordenar promoções.", 'error');
-        }
-    }, [addToast]);
-
-    const handleRestoreDefaults = useCallback(async () => {
-        if (window.confirm("Tem certeza que deseja restaurar todas as configurações para o padrão original? Isso afetará a aparência, os links e as configurações de áudio/notificação.")) {
-            try {
-                await firebaseService.restoreDefaultSettings();
-                addToast("Configurações restauradas para o padrão.", 'success');
-            } catch (error) {
-                console.error("Failed to restore default settings:", error);
-                addToast("Erro ao restaurar as configurações.", 'error');
-            }
         }
     }, [addToast]);
     
@@ -634,24 +649,9 @@ const App: React.FC = () => {
 
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
-    
-    const visiblePromotions = useMemo(() => promotions.filter(p => p.isVisible).sort((a, b) => a.order - b.order), [promotions]);
-    const promotionsAboveMenu = useMemo(() => visiblePromotions.filter(p => p.position === 'above'), [visiblePromotions]);
-    const promotionsBelowMenu = useMemo(() => visiblePromotions.filter(p => p.position !== 'above'), [visiblePromotions]);
-
-    const imagePreloadList = useMemo(() => {
-        const productImages = products.map(p => p.imageUrl);
-        const promotionProductImages = promotions.flatMap(promo => 
-            promo.featuredProductIds
-                .map(id => products.find(p => p.id === id)?.imageUrl)
-                .filter((url): url is string => !!url)
-        );
-        return [...new Set([...productImages, ...promotionProductImages])];
-    }, [products, promotions]);
 
     return (
         <div className="flex flex-col min-h-screen">
-            <ImagePreloader imageUrls={imagePreloadList} />
             <Header cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} activeSection={activeSection} settings={siteSettings} />
             
             <div id="status-banner" className={`bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
@@ -677,12 +677,6 @@ const App: React.FC = () => {
                         <p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p>
                     </div>
                 ) : !error && (
-                    <>
-                    <div id="promocoes">
-                        {promotionsAboveMenu.map(promo => (
-                            <PromotionSection key={promo.id} promotion={promo} allProducts={products} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} />
-                        ))}
-                    </div>
                     <MenuSection 
                         categories={categories} 
                         products={products} 
@@ -697,12 +691,6 @@ const App: React.FC = () => {
                         showFinalizeButtonTrigger={showFinalizeButtonTrigger}
                         setShowFinalizeButtonTrigger={setShowFinalizeButtonTrigger}
                     />
-                     <div id="promocoes-below">
-                         {promotionsBelowMenu.map(promo => (
-                            <PromotionSection key={promo.id} promotion={promo} allProducts={products} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} />
-                        ))}
-                    </div>
-                    </>
                 )}
                 <div id="sobre">
                     {siteSettings.contentSections
@@ -714,16 +702,18 @@ const App: React.FC = () => {
                 </div>
                 <ContactSection />
                 <AdminSection 
+                    user={user}
+                    authLoading={authLoading}
+                    activeTab={activeAdminTab}
+                    setActiveTab={setActiveAdminTab}
                     allProducts={products}
                     allCategories={categories}
                     isStoreOnline={isStoreOnline}
                     siteSettings={siteSettings}
                     orders={orders}
-                    promotions={promotions}
                     onSaveProduct={handleSaveProduct}
                     onDeleteProduct={handleDeleteProduct}
                     onProductStatusChange={handleProductStatusChange}
-                    onProductStockStatusChange={handleProductStockStatusChange}
                     onStoreStatusChange={handleStoreStatusChange}
                     onSaveCategory={handleSaveCategory}
                     onDeleteCategory={handleDeleteCategory}
@@ -737,10 +727,9 @@ const App: React.FC = () => {
                     onUpdateOrderReservationTime={handleUpdateOrderReservationTime}
                     onDeleteOrder={handleDeleteOrder}
                     onPermanentDeleteOrder={handlePermanentDeleteOrder}
-                    onSavePromotion={handleSavePromotion}
-                    onDeletePromotion={handleDeletePromotion}
-                    onReorderPromotions={handleReorderPromotions}
-                    onRestoreDefaults={handleRestoreDefaults}
+                    addToast={addToast}
+                    isMuted={isMuted}
+                    setIsMuted={setIsMuted}
                 />
             </main>
 
@@ -792,6 +781,25 @@ const App: React.FC = () => {
                 onPaymentSuccess={handlePixPaymentSuccess}
             />
             
+            <NewOrderToast 
+                order={newOrderToast}
+                onNavigate={() => {
+                    handleStopSound();
+                    setActiveAdminTab('orders');
+                    // Scroll to admin section
+                    const adminSection = document.getElementById('admin');
+                    if(adminSection) {
+                        adminSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                    setNewOrderToast(null);
+                }}
+                onDismiss={() => {
+                    handleStopSound();
+                    setNewOrderToast(null);
+                }}
+                onStopSound={handleStopSound}
+            />
+
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]">
                 <div className="w-full flex flex-col items-center space-y-4 sm:items-end">
                     {toasts.map((toast) => (

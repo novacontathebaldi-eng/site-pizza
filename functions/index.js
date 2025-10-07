@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-const {onCall} = require("firebase-functions/v2/https");
+const {onCall} = require("firebase-functions/v2/onCall");
 const {onRequest} = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");

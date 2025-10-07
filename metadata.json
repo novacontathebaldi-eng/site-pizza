@@ -1,5 +1,7 @@
 {
-  "name": "Clean React Starter",
-  "description": "A clean and minimal React development environment with TypeScript and Tailwind CSS, ready for you to start building your application.",
-  "requestFramePermissions": []
+  "name": "continuei do nada do melhor: OK COM PIX FINAL",
+  "description": "A complete and modern web application for Pizzaria Santa Sensação, featuring a full menu, a functional shopping cart, a real-time admin panel, and a seamless ordering process via WhatsApp. Built with React and Tailwind CSS for a beautiful, responsive user experience.",
+  "requestFramePermissions": [
+    "camera"
+  ]
 }

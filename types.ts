@@ -8,7 +8,6 @@ export interface Product {
     badge?: string;
     active: boolean;
     orderIndex: number;
-    stockStatus?: 'available' | 'out_of_stock';
 }
 
 export interface Category {
@@ -37,9 +36,10 @@ export interface OrderDetails {
     changeNeeded: boolean;
     changeAmount?: string;
     notes: string;
-    reservationTime?: string;
+    reservationTime?: string; // Added for dine-in
 }
 
+// New Types for Order Management
 export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted';
 export type PaymentStatus = 'pending' | 'paid';
 
@@ -61,11 +61,12 @@ export interface Order {
     changeAmount?: string;
     notes?: string;
     status: OrderStatus;
-    paymentStatus: PaymentStatus;
-    createdAt: any;
-    pickupTimeEstimate?: string;
-    pixChargeId?: string;
+    paymentStatus: PaymentStatus; // New field for payment status
+    createdAt: any; // Firestore Timestamp
+    pickupTimeEstimate?: string; // Added for pickup
+    pixChargeId?: string; // To store the InfinitePay transaction ID
 }
+
 
 export interface ContentSectionListItem {
     id: string;
@@ -97,29 +98,8 @@ export interface FooterLink {
 export interface AudioSettings {
     notificationSound: string;
     notificationVolume: number;
-    backgroundMusic: string;
-    backgroundVolume: number;
 }
 
-export interface NotificationSettings {
-    browserNotificationsEnabled: boolean;
-}
-
-export interface PromotionPage {
-    id: string;
-    order: number;
-    isVisible: boolean;
-    title: string;
-    text: string;
-    videoUrl: string;
-    componentOrder: ('video' | 'text' | 'products')[];
-    featuredProductIds: string[];
-    isTitleVisible: boolean;
-    isTextVisible: boolean;
-    isVideoVisible: boolean;
-    isProductsVisible: boolean;
-    position: 'above' | 'below';
-}
 
 export interface SiteSettings {
     logoUrl: string;
@@ -129,6 +109,5 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
-    audioSettings?: AudioSettings;
-    notificationSettings?: NotificationSettings;
+    audioSettings: AudioSettings;
 }
