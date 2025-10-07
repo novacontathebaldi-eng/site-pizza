@@ -8,7 +8,6 @@ export interface Product {
     badge?: string;
     active: boolean;
     orderIndex: number;
-    stockStatus?: 'available' | 'out_of_stock';
 }
 
 export interface Category {
@@ -37,34 +36,6 @@ export interface OrderDetails {
     changeNeeded: boolean;
     changeAmount?: string;
     notes: string;
-    reservationTime?: string;
-}
-
-export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted';
-export type PaymentStatus = 'pending' | 'paid';
-
-export interface OrderCustomerDetails {
-    name: string;
-    phone: string;
-    orderType: 'delivery' | 'pickup' | 'local';
-    address?: string;
-    reservationTime?: string;
-}
-
-export interface Order {
-    id: string;
-    customer: OrderCustomerDetails;
-    items: CartItem[];
-    total: number;
-    paymentMethod: 'credit' | 'debit' | 'pix' | 'cash';
-    changeNeeded?: boolean;
-    changeAmount?: string;
-    notes?: string;
-    status: OrderStatus;
-    paymentStatus: PaymentStatus;
-    createdAt: any;
-    pickupTimeEstimate?: string;
-    pixChargeId?: string;
 }
 
 export interface ContentSectionListItem {
@@ -78,8 +49,6 @@ export interface ContentSection {
     order: number;
     isVisible: boolean;
     imageUrl: string;
-    isTagVisible?: boolean;
-    tagIcon?: string;
     tag: string;
     title: string;
     description: string;
@@ -91,38 +60,7 @@ export interface FooterLink {
     icon: string;
     text: string;
     url: string;
-    isVisible?: boolean;
 }
-
-// --- NEW TYPES FOR NEW FEATURES ---
-
-export interface AudioSettings {
-    notificationSound: string; // URL or 'default-1', 'default-2'
-    notificationVolume: number; // 0 to 1
-    backgroundMusic: string; // URL
-    backgroundVolume: number; // 0 to 1
-}
-
-export interface NotificationSettings {
-    browserNotificationsEnabled: boolean;
-}
-
-export interface PromotionPage {
-    id: string;
-    order: number;
-    isVisible: boolean;
-    title: string;
-    text: string;
-    videoUrl: string;
-    layout: 'video-left' | 'video-right';
-    featuredProductIds: string[];
-    // Visibility toggles for each element
-    isTitleVisible: boolean;
-    isTextVisible: boolean;
-    isVideoVisible: boolean;
-    isProductsVisible: boolean;
-}
-
 
 export interface SiteSettings {
     logoUrl: string;
@@ -132,7 +70,4 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
-    // New settings integrated
-    audioSettings?: AudioSettings;
-    notificationSettings?: NotificationSettings;
 }

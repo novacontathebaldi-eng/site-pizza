@@ -1,5 +1,7 @@
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, PromotionPage } from './types';
+import { Product, Category, CartItem, OrderDetails, SiteSettings } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
@@ -9,14 +11,13 @@ import { AdminSection } from './components/AdminSection';
 import { Footer } from './components/Footer';
 import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
-import { PixPaymentModal } from './components/PixPaymentModal';
 import { db } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
+// Static assets for default values
 import defaultLogo from './assets/logo.png';
 import defaultHeroBg from './assets/ambiente-pizzaria.webp';
 import defaultAboutImg from './assets/sobre-imagem.webp';
-import { PromotionSection } from './components/PromotionSection';
 
 interface Toast {
     id: number;
@@ -35,8 +36,6 @@ const defaultSiteSettings: SiteSettings = {
             id: 'section-1',
             order: 0,
             isVisible: true,
-            isTagVisible: true,
-            tagIcon: "fas fa-award",
             imageUrl: defaultAboutImg,
             tag: "Nossa Conquista",
             title: "A Melhor Pizza do Estado, Assinada por um Mestre",
@@ -48,28 +47,32 @@ const defaultSiteSettings: SiteSettings = {
                 { id: 'item-1-4', icon: "fas fa-fire-alt", text: "Forno a lenha tradicional" }
             ]
         },
+        {
+            id: 'section-2',
+            order: 1,
+            isVisible: true,
+            imageUrl: 'https://picsum.photos/seed/ingredients/800/600',
+            tag: "Qualidade e Tradição",
+            title: "Ingredientes Frescos, Sabor Incomparável",
+            description: "Nossa paixão pela pizza começa na escolha de cada ingrediente. Trabalhamos com produtores locais para garantir o frescor e a qualidade que você sente em cada fatia. Da nossa massa de fermentação lenta aos tomates italianos, tudo é pensado para criar uma experiência única.",
+            list: [
+                { id: 'item-2-1', icon: 'fas fa-bread-slice', text: "Massa de fermentação natural de 48h" },
+                { id: 'item-2-2', icon: 'fas fa-pepper-hot', text: "Tomates italianos San Marzano" },
+                { id: 'item-2-3', icon: 'fas fa-cheese', text: "Mozzarella fresca e queijos selecionados" },
+                { id: 'item-2-4', icon: 'fas fa-leaf', text: "Manjericão e ervas da nossa horta" }
+            ]
+        }
     ],
     footerLinks: [
-        { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996500341', isVisible: true },
-        { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/santasensacao.sl', isVisible: true },
-        { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin', isVisible: true }
-    ],
-    audioSettings: {
-        notificationSound: 'default-1',
-        notificationVolume: 0.5,
-        backgroundMusic: '',
-        backgroundVolume: 0.2,
-    },
-    notificationSettings: {
-        browserNotificationsEnabled: false,
-    }
+        { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996500341' },
+        { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/santasensacao.sl' },
+        { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin' }
+    ]
 };
 
 const App: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
-    const [orders, setOrders] = useState<Order[]>([]);
-    const [promotions, setPromotions] = useState<PromotionPage[]>([]);
     const [isStoreOnline, setIsStoreOnline] = useState<boolean>(true);
     const [cart, setCart] = useState<CartItem[]>([]);
     const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
@@ -82,7 +85,6 @@ const App: React.FC = () => {
     const [siteSettings, setSiteSettings] = useState<SiteSettings>(defaultSiteSettings);
     const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
-    const [payingOrder, setPayingOrder] = useState<Order | null>(null);
     
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
@@ -99,13 +101,14 @@ const App: React.FC = () => {
         }
     }, []);
 
+    // Observer for active section title
     useEffect(() => {
         const sectionIds = ['inicio', 'cardapio', 'sobre', 'contato'];
         const sectionElements = sectionIds.map(id => document.getElementById(id));
         
         const observerOptions = {
             root: null,
-            rootMargin: '-80px 0px -60% 0px',
+            rootMargin: '-80px 0px -60% 0px', // Focus on the top part of the viewport, below the header
             threshold: 0
         };
 
@@ -136,80 +139,67 @@ const App: React.FC = () => {
 
     useEffect(() => {
         if (!db) {
-            setError("Falha na conexão com o banco de dados.");
+            setError("Falha na conexão com o banco de dados. Este é um problema conhecido no ambiente de desenvolvimento atual (sandbox), que bloqueia conexões externas. Seu site funcionará normalmente online. Verifique se as credenciais em services/firebase.ts estão corretas.");
             setIsLoading(false);
             return;
         }
 
         const handleConnectionError = (err: Error, context: string) => {
             console.error(`Error fetching ${context}:`, err);
-            setError("Não foi possível conectar ao banco de dados.");
+            setError("Não foi possível conectar ao banco de dados. Este é um problema conhecido no ambiente de desenvolvimento atual (sandbox), que bloqueia conexões externas. Seu site funcionará normalmente online.");
             setIsLoading(false);
         };
         
+        // Listener for site settings
         const settingsDocRef = db.doc('store_config/site_settings');
         const unsubSettings = settingsDocRef.onSnapshot(doc => {
             if (doc.exists) {
                  const data = doc.data() as Partial<SiteSettings>;
-                 setSiteSettings(prev => ({ ...defaultSiteSettings, ...prev, ...data }));
+                 // Merge fetched data with defaults to ensure all keys exist
+                 setSiteSettings(prev => ({
+                     ...defaultSiteSettings,
+                     ...prev,
+                     ...data
+                 }));
             }
         }, err => handleConnectionError(err, "site settings"));
 
+
+        // Listener for store status
         const statusDocRef = db.doc('store_config/status');
         const unsubStatus = statusDocRef.onSnapshot(doc => {
             const data = doc.data();
-            if (data) setIsStoreOnline(data.isOpen);
+            if (data) {
+                setIsStoreOnline(data.isOpen);
+            }
         }, err => handleConnectionError(err, "store status"));
 
+        // Listener for categories
         const categoriesQuery = db.collection('categories').orderBy('order');
         const unsubCategories = categoriesQuery.onSnapshot(snapshot => {
             const fetchedCategories: Category[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
             setCategories(fetchedCategories);
+            if (fetchedCategories.length > 0 && !activeMenuCategory) {
+                setActiveMenuCategory(fetchedCategories[0].id);
+            }
         }, err => handleConnectionError(err, "categories"));
 
+        // Listener for products
         const productsQuery = db.collection('products').orderBy('orderIndex');
         const unsubProducts = productsQuery.onSnapshot(snapshot => {
             const fetchedProducts: Product[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
             setProducts(fetchedProducts);
+            setIsLoading(false);
+            setError(null);
         }, err => handleConnectionError(err, "products"));
-
-        const ordersQuery = db.collection('orders').orderBy('createdAt', 'desc');
-        const unsubOrders = ordersQuery.onSnapshot(snapshot => {
-            const fetchedOrders: Order[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-            setOrders(fetchedOrders);
-        }, err => handleConnectionError(err, "orders"));
-
-        const promotionsQuery = db.collection('promotions').orderBy('order');
-        const unsubPromotions = promotionsQuery.onSnapshot(snapshot => {
-            const fetchedPromotions: PromotionPage[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PromotionPage));
-            setPromotions(fetchedPromotions);
-        }, err => handleConnectionError(err, "promotions"));
-
-        // Only set loading to false after the primary data (products) is fetched.
-        const unsubLoader = productsQuery.onSnapshot(() => {
-             setIsLoading(false);
-             setError(null);
-        });
 
         return () => {
             unsubSettings();
             unsubStatus();
             unsubCategories();
             unsubProducts();
-            unsubOrders();
-            unsubPromotions();
-            unsubLoader();
         };
-    }, []);
-
-    useEffect(() => {
-        if (categories.length > 0 && !activeMenuCategory) {
-            const firstActiveCategory = categories.find(c => c.active);
-            if (firstActiveCategory) {
-                setActiveMenuCategory(firstActiveCategory.id);
-            }
-        }
-    }, [categories, activeMenuCategory]);
+    }, [activeMenuCategory]);
     
     useEffect(() => {
         localStorage.setItem('santaSensacaoCart', JSON.stringify(cart));
@@ -263,32 +253,26 @@ const App: React.FC = () => {
         });
     }, []);
 
-    const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, isPaid: boolean) => {
-        const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumir no local' };
-        const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
-
+    const handleCheckout = (details: OrderDetails) => {
+        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2);
         let message = `*🍕 NOVO PEDIDO - PIZZARIA SANTA SENSAÇÃO 🍕*\n\n`;
-        if (isPaid) {
-            message += `*✅ JÁ PAGO VIA PIX PELO SITE*\n\n`;
-        }
         message += `*👤 DADOS DO CLIENTE:*\n`;
         message += `*Nome:* ${details.name}\n`;
         message += `*Telefone:* ${details.phone}\n`;
-        message += `*Tipo de Pedido:* ${orderTypeMap[details.orderType]}\n`;
+        message += `*Tipo de Pedido:* ${details.orderType}\n`;
         if (details.orderType === 'delivery') {
-            message += `*Endereço:* ${details.address}\n`;
+            message += `*Endereço:* ${details.address}\n\n`;
         }
-        if (details.orderType === 'local' && details.reservationTime) {
-            message += `*Horário da Reserva:* ${details.reservationTime}\n`;
-        }
-        message += `\n*🛒 ITENS DO PEDIDO:*\n`;
-        currentCart.forEach(item => {
-            message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2).replace('.', ',')}\n`;
+
+        message += `*🛒 ITENS DO PEDIDO:*\n`;
+        cart.forEach(item => {
+            message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2)}\n`;
         });
-        message += `\n*💰 TOTAL: R$ ${total.toFixed(2).replace('.', ',')}*\n\n`;
+        message += `\n*💰 TOTAL: R$ ${total}*\n\n`;
+        
         message += `*💳 PAGAMENTO:*\n`;
-        message += `*Forma:* ${paymentMethodMap[details.paymentMethod]}\n`;
-        if (!isPaid && details.paymentMethod === 'cash') {
+        message += `*Forma:* ${details.paymentMethod}\n`;
+        if (details.paymentMethod === 'cash') {
             if (details.changeNeeded) {
                 message += `*Precisa de troco para:* R$ ${details.changeAmount}\n`;
             } else {
@@ -298,70 +282,16 @@ const App: React.FC = () => {
         if (details.notes) {
             message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
         }
-        message += `\n_Pedido gerado pelo nosso site._`;
-        return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
-    };
-    
-    const handleCheckout = async (details: OrderDetails) => {
-        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        const whatsappUrl = generateWhatsAppMessage(details, cart, total, false);
-        window.open(whatsappUrl, '_blank');
-        
-        const newOrder = {
-            customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.orderType === 'delivery' ? details.address : '', reservationTime: details.orderType === 'local' ? details.reservationTime : '', },
-            items: cart, total, paymentMethod: details.paymentMethod,
-            changeNeeded: details.paymentMethod === 'cash' ? details.changeNeeded : false,
-            changeAmount: details.paymentMethod === 'cash' && details.changeNeeded ? details.changeAmount : '',
-            notes: details.notes || '', status: 'pending' as OrderStatus, paymentStatus: 'pending' as PaymentStatus,
-        };
 
-        try {
-            await firebaseService.addOrder(newOrder);
-            addToast("Pedido salvo no sistema!", 'success');
-        } catch (error) {
-            console.error("Failed to save order:", error);
-            addToast("Erro ao salvar pedido no sistema.", 'error');
-        }
+        message += `\n_Pedido gerado pelo nosso site._`;
+        
+        const whatsappUrl = `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
         
         setCart([]);
         setIsCheckoutModalOpen(false);
         setIsCartOpen(false);
     };
-
-    const handleInitiatePixPayment = async (details: OrderDetails) => {
-        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
-            customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.orderType === 'delivery' ? details.address : '', reservationTime: details.orderType === 'local' ? details.reservationTime : '', },
-            items: cart, total, paymentMethod: 'pix',
-            notes: details.notes || '', status: 'pending' as OrderStatus, paymentStatus: 'pending' as PaymentStatus,
-        };
-
-        try {
-            const docRef = await firebaseService.addOrder(newOrderData);
-            const createdOrder: Order = { ...newOrderData, id: docRef.id, createdAt: new Date() }; // Create a temporary full order object
-            addToast("Pedido pré-salvo, aguardando pagamento.", 'success');
-            setIsCheckoutModalOpen(false);
-            setPayingOrder(createdOrder);
-        } catch (error) {
-            console.error("Failed to pre-save order:", error);
-            addToast("Erro ao iniciar pagamento. Tente novamente.", 'error');
-        }
-    };
-
-    const handlePixPaymentSuccess = useCallback((paidOrder: Order) => {
-        const details: OrderDetails = {
-            name: paidOrder.customer.name, phone: paidOrder.customer.phone, orderType: paidOrder.customer.orderType,
-            address: paidOrder.customer.address || '', paymentMethod: 'pix', changeNeeded: false,
-            notes: paidOrder.notes || '', reservationTime: paidOrder.customer.reservationTime || ''
-        };
-        const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, true);
-        window.open(whatsappUrl, '_blank');
-
-        setCart([]);
-        setPayingOrder(null);
-        setIsCartOpen(false);
-    }, []);
-
 
     const handleSaveProduct = useCallback(async (product: Product) => {
         try {
@@ -370,7 +300,7 @@ const App: React.FC = () => {
                 await firebaseService.updateProduct(id, dataToSave);
                 addToast("Produto atualizado com sucesso!", 'success');
             } else {
-                await firebaseService.addProduct({ ...dataToSave, orderIndex: products.length, stockStatus: 'available' });
+                await firebaseService.addProduct({ ...dataToSave, orderIndex: products.length });
                 addToast("Produto adicionado com sucesso!", 'success');
             }
         } catch (error) {
@@ -386,26 +316,6 @@ const App: React.FC = () => {
         } catch (error) {
             console.error("Failed to delete product:", error);
             addToast("Erro ao deletar produto. Tente novamente.", 'error');
-        }
-    }, [addToast]);
-    
-    const handleProductStatusChange = useCallback(async (productId: string, active: boolean) => {
-        try {
-            await firebaseService.updateProductStatus(productId, active);
-            addToast(`Produto ${active ? 'ativado' : 'desativado'}.`, 'success');
-        } catch (error) {
-            console.error("Failed to update product status:", error);
-            addToast("Erro ao atualizar status do produto.", 'error');
-        }
-    }, [addToast]);
-
-    const handleProductStockStatusChange = useCallback(async (productId: string, stockStatus: 'available' | 'out_of_stock') => {
-        try {
-            await firebaseService.updateProductStockStatus(productId, stockStatus);
-            addToast(`Estoque do produto atualizado.`, 'success');
-        } catch (error) {
-            console.error("Failed to update product stock status:", error);
-            addToast("Erro ao atualizar estoque do produto.", 'error');
         }
     }, [addToast]);
 
@@ -439,21 +349,11 @@ const App: React.FC = () => {
         try {
             await firebaseService.deleteCategory(categoryId, products);
             addToast("Categoria deletada com sucesso!", 'success');
-        } catch (error: any) {
+        } catch (error) {
             console.error("Failed to delete category:", error);
             addToast(`Erro ao deletar categoria: ${error.message}`, 'error');
         }
     }, [products, addToast]);
-    
-    const handleCategoryStatusChange = useCallback(async (categoryId: string, active: boolean) => {
-        try {
-            await firebaseService.updateCategoryStatus(categoryId, active);
-            addToast(`Categoria ${active ? 'ativada' : 'desativada'}.`, 'success');
-        } catch (error) {
-            console.error("Failed to update category status:", error);
-            addToast("Erro ao atualizar status da categoria.", 'error');
-        }
-    }, [addToast]);
 
     const handleReorderProducts = useCallback(async (productsToUpdate: { id: string; orderIndex: number }[]) => {
         try {
@@ -475,130 +375,33 @@ const App: React.FC = () => {
         }
     }, [addToast]);
 
-    const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }, audioFiles: { [key: string]: File | null }) => {
+    const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => {
         try {
-            const settingsToUpdate = JSON.parse(JSON.stringify(settings)); 
+            const settingsToUpdate = JSON.parse(JSON.stringify(settings)); // Deep copy
 
             for (const key in files) {
                 const file = files[key];
                 if (file) {
                     const url = await firebaseService.uploadSiteAsset(file, key);
                     
-                    if (key === 'logo') settingsToUpdate.logoUrl = url;
-                    else if (key === 'heroBg') settingsToUpdate.heroBgUrl = url;
-                    else { 
+                    if (key === 'logo') {
+                        settingsToUpdate.logoUrl = url;
+                    } else if (key === 'heroBg') {
+                        settingsToUpdate.heroBgUrl = url;
+                    } else { // It's a content section file, key is the section ID
                         const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
-                        if (sectionIndex > -1) settingsToUpdate.contentSections[sectionIndex].imageUrl = url;
+                        if (sectionIndex > -1) {
+                            settingsToUpdate.contentSections[sectionIndex].imageUrl = url;
+                        }
                     }
-                }
-            }
-            
-            for (const key in audioFiles) {
-                const file = audioFiles[key];
-                if(file) {
-                    const url = await firebaseService.uploadAudioFile(file, key);
-                    if(key === 'notificationSound') settingsToUpdate.audioSettings.notificationSound = url;
-                    if(key === 'backgroundMusic') settingsToUpdate.audioSettings.backgroundMusic = url;
                 }
             }
 
             await firebaseService.updateSiteSettings(settingsToUpdate);
-            addToast("Configurações do site salvas com sucesso!", 'success');
+            addToast("Personalização do site salva com sucesso!", 'success');
         } catch (error) {
             console.error("Failed to save site settings:", error);
             addToast("Erro ao salvar as configurações do site.", 'error');
-        }
-    }, [addToast]);
-    
-    // --- Handlers for new Promotion features ---
-    const handleSavePromotion = useCallback(async (promotion: PromotionPage) => {
-        try {
-            await firebaseService.savePromotion(promotion);
-            addToast("Promoção salva com sucesso!", 'success');
-        } catch (error) {
-            console.error("Failed to save promotion:", error);
-            addToast("Erro ao salvar promoção.", 'error');
-        }
-    }, [addToast]);
-
-    const handleDeletePromotion = useCallback(async (promotionId: string) => {
-        try {
-            await firebaseService.deletePromotion(promotionId);
-            addToast("Promoção deletada com sucesso!", 'success');
-        } catch (error) {
-            console.error("Failed to delete promotion:", error);
-            addToast("Erro ao deletar promoção.", 'error');
-        }
-    }, [addToast]);
-
-    const handleReorderPromotions = useCallback(async (promotionsToUpdate: { id: string; order: number }[]) => {
-        try {
-            await firebaseService.updatePromotionsOrder(promotionsToUpdate);
-            addToast("Ordem das promoções atualizada.", 'success');
-        } catch (error) {
-            console.error("Failed to reorder promotions:", error);
-            addToast("Erro ao reordenar promoções.", 'error');
-        }
-    }, [addToast]);
-    
-    const handleUpdateOrderStatus = useCallback(async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => {
-        try {
-            let finalStatus = status;
-            const order = orders.find(o => o.id === orderId);
-
-            if (status === 'accepted' && order?.customer.orderType === 'local') {
-                finalStatus = 'reserved';
-            }
-            
-            await firebaseService.updateOrderStatus(orderId, finalStatus, payload);
-            addToast("Status do pedido atualizado!", 'success');
-        } catch (error) {
-            console.error("Failed to update order status:", error);
-            addToast("Erro ao atualizar o status do pedido.", 'error');
-        }
-    }, [orders, addToast]);
-
-    const handleUpdateOrderPaymentStatus = useCallback(async (orderId: string, paymentStatus: PaymentStatus) => {
-        try {
-            await firebaseService.updateOrderPaymentStatus(orderId, paymentStatus);
-            addToast("Status de pagamento atualizado!", 'success');
-        } catch (error) {
-            console.error("Failed to update order payment status:", error);
-            addToast("Erro ao atualizar o status de pagamento.", 'error');
-        }
-    }, [addToast]);
-
-    const handleUpdateOrderReservationTime = useCallback(async (orderId: string, reservationTime: string) => {
-        try {
-            await firebaseService.updateOrderReservationTime(orderId, reservationTime);
-            addToast("Horário da reserva atualizado!", 'success');
-        } catch (error) {
-            console.error("Failed to update reservation time:", error);
-            addToast("Erro ao atualizar horário da reserva.", 'error');
-        }
-    }, [addToast]);
-
-    const handleDeleteOrder = useCallback(async (orderId: string) => {
-        if (window.confirm("Tem certeza que deseja apagar este pedido? Após apagar, o pedido será enviado para a lixeira 🗑️")) {
-            try {
-                await firebaseService.updateOrderStatus(orderId, 'deleted');
-                addToast("Pedido movido para a lixeira.", 'success');
-            } catch (error) {
-                console.error("Failed to move order to trash:", error);
-                addToast("Erro ao mover pedido para a lixeira.", 'error');
-            }
-        }
-    }, [addToast]);
-
-    const handlePermanentDeleteOrder = useCallback(async (orderId: string) => {
-        if (window.confirm("Este pedido será apagado PERMANENTEMENTE. Esta ação não pode ser desfeita. Continuar?")) {
-            try {
-                await firebaseService.deleteOrder(orderId);
-                addToast("Pedido apagado permanentemente.", 'success');
-            } catch (error) {
-                console.error("Failed to permanently delete order:", error);
-                addToast("Erro ao apagar o pedido permanentemente.", 'error');
-            }
         }
     }, [addToast]);
 
@@ -632,7 +435,6 @@ const App: React.FC = () => {
                         <p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p>
                     </div>
                 ) : !error && (
-                    <>
                     <MenuSection 
                         categories={categories} 
                         products={products} 
@@ -647,14 +449,10 @@ const App: React.FC = () => {
                         showFinalizeButtonTrigger={showFinalizeButtonTrigger}
                         setShowFinalizeButtonTrigger={setShowFinalizeButtonTrigger}
                     />
-                    {promotions.filter(p => p.isVisible).sort((a,b) => a.order - b.order).map(promo => (
-                        <PromotionSection key={promo.id} promotion={promo} allProducts={products} />
-                    ))}
-                    </>
                 )}
                 <div id="sobre">
                     {siteSettings.contentSections
-                        ?.filter(section => section.isVisible)
+                        .filter(section => section.isVisible)
                         .sort((a, b) => a.order - b.order)
                         .map((section, index) => (
                             <DynamicContentSection key={section.id} section={section} order={index} />
@@ -666,28 +464,15 @@ const App: React.FC = () => {
                     allCategories={categories}
                     isStoreOnline={isStoreOnline}
                     siteSettings={siteSettings}
-                    orders={orders}
-                    promotions={promotions}
                     onSaveProduct={handleSaveProduct}
                     onDeleteProduct={handleDeleteProduct}
-                    onProductStatusChange={handleProductStatusChange}
-                    onProductStockStatusChange={handleProductStockStatusChange}
                     onStoreStatusChange={handleStoreStatusChange}
                     onSaveCategory={handleSaveCategory}
                     onDeleteCategory={handleDeleteCategory}
-                    onCategoryStatusChange={handleCategoryStatusChange}
                     onReorderProducts={handleReorderProducts}
                     onReorderCategories={handleReorderCategories}
                     onSeedDatabase={seedDatabase}
                     onSaveSiteSettings={handleSaveSiteSettings}
-                    onUpdateOrderStatus={handleUpdateOrderStatus}
-                    onUpdateOrderPaymentStatus={handleUpdateOrderPaymentStatus}
-                    onUpdateOrderReservationTime={handleUpdateOrderReservationTime}
-                    onDeleteOrder={handleDeleteOrder}
-                    onPermanentDeleteOrder={handlePermanentDeleteOrder}
-                    onSavePromotion={handleSavePromotion}
-                    onDeletePromotion={handleDeletePromotion}
-                    onReorderPromotions={handleReorderPromotions}
                 />
             </main>
 
@@ -731,14 +516,9 @@ const App: React.FC = () => {
                 onClose={() => setIsCheckoutModalOpen(false)}
                 cartItems={cart}
                 onConfirmCheckout={handleCheckout}
-                onInitiatePixPayment={handleInitiatePixPayment}
-            />
-             <PixPaymentModal
-                order={payingOrder}
-                onClose={() => setPayingOrder(null)}
-                onPaymentSuccess={handlePixPaymentSuccess}
             />
             
+            {/* Toast Notification Container */}
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]">
                 <div className="w-full flex flex-col items-center space-y-4 sm:items-end">
                     {toasts.map((toast) => (

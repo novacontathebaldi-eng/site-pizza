@@ -7,49 +7,8 @@ import { CSS } from '@dnd-kit/utilities';
 // PROPS
 interface SiteCustomizationTabProps {
     settings: SiteSettings;
-    // FIX: Updated onSave prop to accept audioFiles to match the handler signature.
-    onSave: (settings: SiteSettings, files: { [key: string]: File | null }, audioFiles: { [key: string]: File | null }) => Promise<void>;
+    onSave: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
 }
-
-// IconInput Component (Helper)
-const IconInput: React.FC<{
-    value: string;
-    onChange: (value: string) => void;
-    placeholder?: string;
-}> = ({ value, onChange, placeholder = "ex: fas fa-award" }) => {
-    const [showTooltip, setShowTooltip] = useState(false);
-
-    return (
-        <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-gray-100 rounded-md flex items-center justify-center border text-xl text-brand-olive-600 flex-shrink-0">
-                <i className={value || 'fas fa-image'}></i>
-            </div>
-            <div className="flex-grow relative">
-                <input
-                    value={value}
-                    onChange={e => onChange(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md"
-                    placeholder={placeholder}
-                />
-            </div>
-            <div className="relative">
-                 <button type="button" onMouseEnter={() => setShowTooltip(true)} onMouseLeave={() => setShowTooltip(false)} onClick={() => setShowTooltip(!showTooltip)} className="text-gray-400 hover:text-gray-600 focus:outline-none w-8 h-8 flex items-center justify-center" aria-label="Informações sobre ícones">
-                    <i className="fas fa-question-circle"></i>
-                </button>
-                {showTooltip && (
-                     <div style={{ animation: 'fadeInUp 0.2s ease-out' }} className="absolute bottom-full right-0 mb-2 w-72 bg-gray-800 text-white text-sm rounded-lg p-3 z-20 shadow-lg">
-                        <p>Use classes do Font Awesome 6 (Free).</p>
-                        <a href="https://fontawesome.com/v6/search?m=free" target="_blank" rel="noopener noreferrer" className="mt-2 font-semibold text-accent hover:underline inline-block">
-                            Encontrar Ícones <i className="fas fa-external-link-alt text-xs ml-1"></i>
-                        </a>
-                        <div className="absolute right-4 -bottom-1 w-2 h-2 bg-gray-800 rotate-45"></div>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
-
 
 // ImageUploader Component (Helper)
 const ImageUploader: React.FC<{
@@ -63,7 +22,7 @@ const ImageUploader: React.FC<{
 
     useEffect(() => {
         // If imageUrl is a blob url, don't update preview from props
-        if (!preview || !preview.startsWith('blob:')) {
+        if (!preview.startsWith('blob:')) {
             setPreview(imageUrl);
         }
     }, [imageUrl]);
@@ -73,11 +32,11 @@ const ImageUploader: React.FC<{
             const file = e.target.files[0];
             onFileChange(file);
             const objectUrl = URL.createObjectURL(file);
+            setPreview(objectUrl);
              // Clean up previous blob url if it exists
-            if (preview && preview.startsWith('blob:')) {
+            if (preview.startsWith('blob:')) {
                 URL.revokeObjectURL(preview);
             }
-            setPreview(objectUrl);
         }
     };
     
@@ -91,7 +50,7 @@ const ImageUploader: React.FC<{
          <div>
             <label className="block text-sm font-semibold mb-1">{label}</label>
             <div className="flex items-center gap-4">
-                <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center border overflow-hidden flex-shrink-0">
+                <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center border overflow-hidden">
                     {preview ? <img src={preview} alt="Prévia" className="w-full h-full object-cover" /> : <i className="fas fa-image text-3xl text-gray-300"></i>}
                 </div>
                 <div className="flex-grow space-y-2">
@@ -179,8 +138,6 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
             order: formData.contentSections.length,
             isVisible: true,
             imageUrl: '',
-            isTagVisible: true,
-            tagIcon: 'fas fa-star',
             tag: 'Nova Seção',
             title: 'Título da Nova Seção',
             description: '',
@@ -206,13 +163,13 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
     };
 
     // --- Footer Link Handlers ---
-    const handleFooterLinkChange = (id: string, field: keyof Omit<FooterLink, 'id'>, value: string | boolean) => {
+    const handleFooterLinkChange = (id: string, field: keyof Omit<FooterLink, 'id'>, value: string) => {
         const newLinks = formData.footerLinks.map(link => link.id === id ? { ...link, [field]: value } : link);
         setFormData({ ...formData, footerLinks: newLinks });
     };
 
     const handleAddFooterLink = () => {
-        const newLink: FooterLink = { id: `footer-${Date.now()}`, icon: 'fas fa-link', text: 'Novo Link', url: '#', isVisible: true };
+        const newLink: FooterLink = { id: `footer-${Date.now()}`, icon: 'fas fa-link', text: 'Novo Link', url: '#' };
         setFormData({ ...formData, footerLinks: [...formData.footerLinks, newLink] });
     };
 
@@ -233,8 +190,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
-        // FIX: Pass empty object for audioFiles argument to match the expected signature.
-        await onSave(formData, files, {});
+        await onSave(formData, files);
         setFiles({}); // Clear files after saving
         setIsSaving(false);
     };
@@ -352,7 +308,7 @@ const SortableContentSectionItem: React.FC<{
         <div ref={setNodeRef} style={style} className="border rounded-lg bg-white">
             <header className="p-3 flex items-center justify-between bg-gray-100 rounded-t-lg">
                 <div className="flex items-center gap-2">
-                    <button type="button" {...attributes} {...listeners} className="cursor-grab p-2 text-gray-500"><i className="fas fa-grip-vertical"></i></button>
+                    <button {...attributes} {...listeners} className="cursor-grab p-2 text-gray-500"><i className="fas fa-grip-vertical"></i></button>
                     <button type="button" onClick={onToggle} className="font-bold text-left flex-grow">{section.title || "Nova Seção"}</button>
                 </div>
                 <div className="flex items-center gap-3">
@@ -369,31 +325,10 @@ const SortableContentSectionItem: React.FC<{
             {isOpen && (
                 <div className="p-4 space-y-4">
                     <ImageUploader label="Imagem da Seção" imageUrl={section.imageUrl} onUrlChange={(url) => onChange(section.id, 'imageUrl', url)} onFileChange={(file) => onFileChange(section.id, file)} />
-                    
                     <div>
-                        <label className="block text-sm font-semibold mb-2">Etiqueta</label>
-                        <div className="flex items-center gap-4 bg-gray-100 p-2 rounded-md">
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" checked={section.isTagVisible ?? true} onChange={e => onChange(section.id, 'isTagVisible', e.target.checked)} className="sr-only peer" />
-                                <div className="w-11 h-6 bg-gray-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                            </label>
-                            <span className="text-sm font-medium">{section.isTagVisible ?? true ? 'Visível' : 'Oculta'}</span>
-                        </div>
+                        <label className="block text-sm font-semibold mb-1">Etiqueta</label>
+                        <input value={section.tag} onChange={e => onChange(section.id, 'tag', e.target.value)} className="w-full px-3 py-2 border rounded-md" />
                     </div>
-
-                    {(section.isTagVisible ?? true) && (
-                        <div className="pl-4 border-l-2 ml-5 space-y-4 py-4 animate-fade-in-up">
-                            <div>
-                                <label className="block text-sm font-semibold mb-1">Ícone da Etiqueta</label>
-                                <IconInput value={section.tagIcon || ''} onChange={value => onChange(section.id, 'tagIcon', value)} />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold mb-1">Texto da Etiqueta</label>
-                                <input value={section.tag} onChange={e => onChange(section.id, 'tag', e.target.value)} className="w-full px-3 py-2 border rounded-md" />
-                            </div>
-                        </div>
-                    )}
-
                     <div>
                         <label className="block text-sm font-semibold mb-1">Título</label>
                         <input value={section.title} onChange={e => onChange(section.id, 'title', e.target.value)} className="w-full px-3 py-2 border rounded-md" />
@@ -406,18 +341,10 @@ const SortableContentSectionItem: React.FC<{
                         <label className="block text-sm font-semibold mb-1">Lista de Itens</label>
                         <div className="space-y-2">
                              {section.list.map((item, index) => (
-                                <div key={item.id} className="grid grid-cols-1 md:grid-cols-[1fr_2fr_auto] gap-3 items-start p-3 bg-gray-50 rounded-md border">
-                                    <div>
-                                        <label className="block text-xs font-semibold mb-1">Ícone</label>
-                                        <IconInput value={item.icon} onChange={(value) => onListItemChange(section.id, index, 'icon', value)} />
-                                    </div>
-                                    <div className="flex-grow">
-                                        <label className="block text-xs font-semibold mb-1">Texto</label>
-                                        <input value={item.text} onChange={(e) => onListItemChange(section.id, index, 'text', e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Texto do item" />
-                                    </div>
-                                    <div className="flex items-end h-full">
-                                        <button type="button" onClick={() => onRemoveListItem(section.id, index)} className="bg-red-500 text-white w-9 h-9 flex-shrink-0 rounded-md hover:bg-red-600 flex items-center justify-center"><i className="fas fa-trash"></i></button>
-                                    </div>
+                                <div key={item.id} className="flex items-center gap-2">
+                                    <input value={item.icon} onChange={(e) => onListItemChange(section.id, index, 'icon', e.target.value)} className="w-1/3 px-3 py-2 border rounded-md" placeholder="Ícone (ex: fas fa-award)" />
+                                    <input value={item.text} onChange={(e) => onListItemChange(section.id, index, 'text', e.target.value)} className="w-2/3 px-3 py-2 border rounded-md" placeholder="Texto do item" />
+                                    <button type="button" onClick={() => onRemoveListItem(section.id, index)} className="bg-red-500 text-white w-9 h-9 flex-shrink-0 rounded-md hover:bg-red-600 flex items-center justify-center"><i className="fas fa-trash"></i></button>
                                 </div>
                             ))}
                         </div>
@@ -432,38 +359,19 @@ const SortableContentSectionItem: React.FC<{
 // Sortable Item for Footer Links
 const SortableFooterLinkItem: React.FC<{
     link: FooterLink,
-    onChange: (id: string, field: keyof Omit<FooterLink, 'id'>, value: string | boolean) => void,
+    onChange: (id: string, field: keyof Omit<FooterLink, 'id'>, value: string) => void,
     onDelete: (id: string) => void,
 }> = ({ link, onChange, onDelete }) => {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: link.id });
     const style = { transform: CSS.Transform.toString(transform), transition };
     
-    const isVisible = link.isVisible !== false;
-
     return(
-        <div ref={setNodeRef} style={style} className={`grid grid-cols-[auto_1fr_auto] gap-3 items-start p-3 bg-white border rounded-lg transition-opacity ${!isVisible ? 'opacity-50' : ''}`}>
-             <button type="button" {...attributes} {...listeners} className="cursor-grab p-2 text-gray-500 mt-7"><i className="fas fa-grip-vertical"></i></button>
-             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                 <div>
-                     <label className="block text-xs font-semibold mb-1">Ícone</label>
-                     <IconInput value={link.icon} onChange={value => onChange(link.id, 'icon', value)} />
-                 </div>
-                 <div>
-                     <label className="block text-xs font-semibold mb-1">Texto</label>
-                     <input value={link.text} onChange={e => onChange(link.id, 'text', e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Texto do Link"/>
-                 </div>
-                 <div>
-                     <label className="block text-xs font-semibold mb-1">URL</label>
-                     <input value={link.url} onChange={e => onChange(link.id, 'url', e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="https://..."/>
-                 </div>
-             </div>
-             <div className="flex items-center justify-end h-full gap-3 pt-6">
-                 <label className="relative inline-flex items-center cursor-pointer" title={isVisible ? 'Ocultar Link' : 'Exibir Link'}>
-                    <input type="checkbox" checked={isVisible} onChange={e => onChange(link.id, 'isVisible', e.target.checked)} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                </label>
-                <button type="button" onClick={() => onDelete(link.id)} className="bg-red-500 text-white w-9 h-9 flex-shrink-0 rounded-md hover:bg-red-600 flex items-center justify-center"><i className="fas fa-trash"></i></button>
-             </div>
+        <div ref={setNodeRef} style={style} className="p-3 flex items-center gap-2 bg-white border rounded-lg">
+             <button {...attributes} {...listeners} className="cursor-grab p-2 text-gray-500"><i className="fas fa-grip-vertical"></i></button>
+             <input value={link.icon} onChange={e => onChange(link.id, 'icon', e.target.value)} className="w-1/4 px-3 py-2 border rounded-md" placeholder="Ícone"/>
+             <input value={link.text} onChange={e => onChange(link.id, 'text', e.target.value)} className="w-1/4 px-3 py-2 border rounded-md" placeholder="Texto"/>
+             <input value={link.url} onChange={e => onChange(link.id, 'url', e.target.value)} className="w-2/4 px-3 py-2 border rounded-md" placeholder="URL"/>
+             <button type="button" onClick={() => onDelete(link.id)} className="bg-red-500 text-white w-9 h-9 flex-shrink-0 rounded-md hover:bg-red-600 flex items-center justify-center"><i className="fas fa-trash"></i></button>
         </div>
     );
 }

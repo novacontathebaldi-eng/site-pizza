@@ -1,3 +1,5 @@
+
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product } from '../types';
 
@@ -10,20 +12,15 @@ interface MenuItemCardProps {
 const sizeOrder = ['P', 'M', 'G', 'Única'];
 
 export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart, isStoreOnline }) => {
-    const prices = product.prices ?? {};
-    const hasPrices = Object.keys(prices).length > 0;
-    const isOutOfStock = product.stockStatus === 'out_of_stock';
-
     const sortedSizes = useMemo(() => {
-        if (!hasPrices) return [];
-        return Object.keys(prices).sort((a, b) => {
+        return Object.keys(product.prices).sort((a, b) => {
             const indexA = sizeOrder.indexOf(a);
             const indexB = sizeOrder.indexOf(b);
             if (indexA === -1) return 1;
             if (indexB === -1) return -1;
             return indexA - indexB;
         });
-    }, [prices, hasPrices]);
+    }, [product.prices]);
 
     const [selectedSize, setSelectedSize] = useState<string>(sortedSizes[0] || '');
     const [wasAdded, setWasAdded] = useState(false);
@@ -44,8 +41,8 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
     }, []);
     
     const handleAddToCart = () => {
-        if (!isStoreOnline || !selectedSize || wasAdded || !hasPrices || isOutOfStock) return;
-        const price = prices[selectedSize];
+        if (!isStoreOnline || !selectedSize || wasAdded) return;
+        const price = product.prices[selectedSize];
         onAddToCart(product, selectedSize, price);
         setWasAdded(true);
 
@@ -65,8 +62,6 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
     const buttonClass = wasAdded
         ? 'bg-green-500 text-white font-bold py-2 px-5 rounded-lg transition-all cursor-default'
         : 'bg-accent text-white font-bold py-2 px-5 rounded-lg transition-all transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed';
-        
-    const displayPrice = hasPrices ? formatPrice(prices[selectedSize] || prices[sortedSizes[0]]) : "Indisponível";
 
     return (
         <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col overflow-hidden border border-gray-200">
@@ -75,18 +70,13 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
                 {product.badge && (
                     <span className="absolute top-2 right-2 bg-accent text-white px-2 py-0.5 text-xs font-bold rounded-full">{product.badge}</span>
                 )}
-                 {isOutOfStock && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                        <span className="bg-red-600 text-white px-4 py-1 font-bold rounded-full text-sm">ESGOTADO</span>
-                    </div>
-                )}
             </div>
             <div className="p-4 flex flex-col flex-grow">
                 <div className="flex-grow">
                     <h3 className="text-lg font-bold text-text-on-light mb-1">{product.name}</h3>
                     <p className="text-gray-500 text-xs mb-3 line-clamp-2">{product.description}</p>
                     
-                    {hasPrices && sortedSizes.length > 1 && (
+                    {sortedSizes.length > 1 && (
                         <div className="flex flex-wrap gap-1 mb-3">
                             {sortedSizes.map(size => (
                                 <button
@@ -97,7 +87,6 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
                                             ? 'bg-brand-olive-600 text-white border-brand-olive-600'
                                             : 'bg-gray-100 text-gray-700 border-gray-300 hover:border-brand-olive-600'
                                     }`}
-                                    disabled={isOutOfStock}
                                 >
                                     {size}
                                 </button>
@@ -108,16 +97,14 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
 
                 <div className="mt-auto pt-2 flex justify-between items-center">
                     <span className="text-xl font-bold text-accent">
-                        {displayPrice}
+                        {formatPrice(product.prices[selectedSize] || Object.values(product.prices)[0])}
                     </span>
                     <button 
                         onClick={handleAddToCart}
-                        disabled={!isStoreOnline || wasAdded || !hasPrices || isOutOfStock}
+                        disabled={!isStoreOnline || wasAdded}
                         className={buttonClass}
                     >
-                        {isOutOfStock ? (
-                            'Esgotado'
-                        ) : wasAdded ? (
+                        {wasAdded ? (
                             <>
                                 <i className="fas fa-check mr-1"></i>
                                 Adicionado!

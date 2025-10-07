@@ -11,17 +11,15 @@ export const DynamicContentSection: React.FC<DynamicContentSectionProps> = ({ se
 
     const content = (
         <div className="flex flex-col justify-center">
-            {(section.isTagVisible ?? true) && section.tag && (
-                <span className="inline-block bg-brand-green-300 text-brand-green-700 px-4 py-2 rounded-full font-semibold text-sm mb-4 self-start">
-                    <i className={`${section.tagIcon || 'fas fa-star'} mr-2`}></i>{section.tag}
-                </span>
-            )}
+             <span className="inline-block bg-brand-green-300 text-brand-green-700 px-4 py-2 rounded-full font-semibold text-sm mb-4 self-start">
+                <i className={`${section.list[0]?.icon || 'fas fa-star'} mr-2`}></i>{section.tag}
+            </span>
             <h2 className="text-4xl font-bold text-text-on-light mb-6">{section.title}</h2>
             <p className="text-gray-700 leading-relaxed mb-6 whitespace-pre-wrap">
                {section.description}
             </p>
             <div className="space-y-3">
-                {(section.list ?? []).map((item) => (
+                {section.list.map((item) => (
                     item.text && (
                         <div key={item.id} className="flex items-center gap-3">
                             <i className={`${item.icon} text-accent w-5 text-center`}></i>
