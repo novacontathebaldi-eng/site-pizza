@@ -445,7 +445,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                 )}
 
                                 <div className="border-t pt-4">
-                                    <div>
+                                    <div className="sticky top-20 bg-brand-ivory-50/95 backdrop-blur-sm z-30 shadow-sm">
                                         <div className="border-b">
                                             <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
                                                 {!isTrashVisible && OrderStatusTabs.map(tabKey => {
