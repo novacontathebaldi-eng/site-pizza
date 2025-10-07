@@ -445,9 +445,9 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                 )}
 
                                 <div className="border-t pt-4">
-                                    <div className="sticky top-20 bg-brand-ivory-50/95 backdrop-blur-sm z-30 shadow-sm">
+                                    <div className="sticky top-20 bg-brand-ivory-50/95 backdrop-blur-sm z-30 shadow-sm -mx-8">
                                         <div className="border-b">
-                                            <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
+                                            <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide px-8">
                                                 {!isTrashVisible && OrderStatusTabs.map(tabKey => {
                                                     const count = getOrderTabCount(tabKey);
                                                     const showCounter = count > 0 && !['completed', 'cancelled'].includes(tabKey);
