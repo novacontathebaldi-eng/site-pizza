@@ -37,19 +37,6 @@ export const uploadSiteAsset = async (file: File, assetName: string): Promise<st
     return await snapshot.ref.getDownloadURL();
 };
 
-// Notification Sound Upload Function
-export const uploadNotificationSound = async (file: File): Promise<string> => {
-    if (!storage) {
-        throw new Error("Firebase Storage não está inicializado.");
-    }
-    // Use a fixed path to overwrite the previous sound
-    const fileName = `site_assets/notification_sound.${file.name.split('.').pop()}`;
-    const storageRef = storage.ref(fileName);
-    
-    const snapshot = await storageRef.put(file);
-    return await snapshot.ref.getDownloadURL();
-};
-
 
 // Product Functions
 export const addProduct = async (productData: Omit<Product, 'id'>): Promise<void> => {
