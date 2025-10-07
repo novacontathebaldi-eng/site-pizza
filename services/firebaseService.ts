@@ -1,6 +1,6 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
-import { db, storage, functions, auth } from './firebase';
+import { db, storage, functions } from './firebase';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
@@ -37,19 +37,6 @@ export const uploadSiteAsset = async (file: File, assetName: string): Promise<st
     return await snapshot.ref.getDownloadURL();
 };
 
-// Notification Sound Upload Function
-export const uploadNotificationSound = async (file: File): Promise<string> => {
-    if (!storage) {
-        throw new Error("Firebase Storage não está inicializado.");
-    }
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `site_assets/audio/notification_${new Date().getTime()}.${fileExtension}`;
-    const storageRef = storage.ref(fileName);
-    
-    const snapshot = await storageRef.put(file);
-    return await snapshot.ref.getDownloadURL();
-};
-
 
 // Product Functions
 export const addProduct = async (productData: Omit<Product, 'id'>): Promise<void> => {
@@ -68,6 +55,12 @@ export const updateProductStatus = async (productId: string, active: boolean): P
     if (!db) throw new Error("Firestore is not initialized.");
     const productRef = db.collection('products').doc(productId);
     await productRef.update({ active });
+};
+
+export const updateProductStockStatus = async (productId: string, stockStatus: 'available' | 'out_of_stock'): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const productRef = db.collection('products').doc(productId);
+    await productRef.update({ stockStatus });
 };
 
 export const deleteProduct = async (productId: string): Promise<void> => {
