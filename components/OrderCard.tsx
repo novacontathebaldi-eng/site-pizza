@@ -97,6 +97,16 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
         }
         return ['pending', 'accepted', 'ready', 'completed', 'cancelled'];
     }, [customer.orderType]);
+    
+    // Helper function to get the correct label for the dropdown based on order type.
+    const getStatusLabelForDropdown = (status: OrderStatus, orderType: 'delivery' | 'pickup' | 'local'): string => {
+        if (status === 'ready') {
+            if (orderType === 'delivery') return 'Em Rota';
+            if (orderType === 'pickup') return 'Pronto';
+        }
+        return statusOptionsMap[status] || status; // Fallback to the default map
+    };
+
 
     const statusChanger = (
         <div className="flex items-center gap-2">
@@ -107,10 +117,10 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                 onChange={(e) => onUpdateStatus(id, e.target.value as OrderStatus)}
                 className="px-3 py-2 border rounded-md bg-white text-sm focus:ring-accent focus:border-accent"
             >
-                {Object.entries(statusOptionsMap)
-                    .filter(([key]) => allowedStatusesForOrderType.includes(key as OrderStatus))
-                    .map(([key, text]) => (
-                        <option key={key} value={key}>{text}</option>
+                {Object.keys(statusOptionsMap)
+                    .filter((key): key is OrderStatus => allowedStatusesForOrderType.includes(key as OrderStatus))
+                    .map((key) => (
+                        <option key={key} value={key}>{getStatusLabelForDropdown(key, customer.orderType)}</option>
                     ))}
             </select>
         </div>
