@@ -104,4 +104,5 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
+    notificationSoundUrl?: string;
 }

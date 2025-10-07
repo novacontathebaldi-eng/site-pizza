@@ -10,6 +10,9 @@ import { CSS } from '@dnd-kit/utilities';
 import firebase from 'firebase/compat/app';
 import { auth } from '../services/firebase';
 import { SupportModal } from './SupportModal';
+import { uploadNotificationSound, updateSiteSettings } from '../services/firebaseService';
+import { PendingOrderAlert } from './PendingOrderAlert';
+
 
 interface AdminSectionProps {
     allProducts: Product[];
@@ -34,6 +37,9 @@ interface AdminSectionProps {
     onUpdateOrderReservationTime: (orderId: string, reservationTime: string) => Promise<void>;
     onDeleteOrder: (orderId: string) => Promise<void>;
     onPermanentDeleteOrder: (orderId: string) => Promise<void>;
+    isAlertSoundPlaying: boolean;
+    setIsAlertSoundPlaying: (isPlaying: boolean) => void;
+    addToast: (message: string, type?: 'success' | 'error') => void;
 }
 
 interface SortableProductItemProps {
@@ -137,8 +143,63 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
     );
 };
 
-// Define a type for the tabs in the admin UI to handle the split view
 type OrderTabKey = 'accepted' | 'reserved' | 'pronto' | 'emRota' | 'completed' | 'cancelled';
+
+const AudioCustomizationTab: React.FC<{
+    currentSoundUrl: string | undefined;
+    addToast: (message: string, type?: 'success' | 'error') => void;
+}> = ({ currentSoundUrl, addToast }) => {
+    const [audioFile, setAudioFile] = useState<File | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setAudioFile(e.target.files[0]);
+        }
+    };
+
+    const handleSaveSound = async () => {
+        if (!audioFile) {
+            addToast('Por favor, selecione um arquivo de áudio.', 'error');
+            return;
+        }
+        setIsUploading(true);
+        try {
+            const downloadURL = await uploadNotificationSound(audioFile);
+            await updateSiteSettings({ notificationSoundUrl: downloadURL });
+            addToast('Som de notificação atualizado com sucesso!', 'success');
+        } catch (error) {
+            console.error(error);
+            addToast('Erro ao salvar o som de notificação.', 'error');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    return (
+        <div>
+            <h3 className="text-xl font-bold mb-4">Som de Notificação</h3>
+            <div className="bg-gray-50 p-4 rounded-lg border">
+                <p className="text-gray-600 mb-3">
+                    Faça o upload de um arquivo de áudio (MP3, WAV) para ser usado como alerta de novos pedidos.
+                    Este som será o mesmo para todos os administradores.
+                </p>
+                <div className="flex items-center gap-4 mb-4">
+                    <input type="file" accept="audio/*" onChange={handleFileChange} className="flex-grow file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent file:text-white hover:file:bg-opacity-90" />
+                    <button onClick={handleSaveSound} disabled={!audioFile || isUploading} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-gray-400">
+                        {isUploading ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-2"></i>Salvar Som</>}
+                    </button>
+                </div>
+                {currentSoundUrl && (
+                    <div>
+                        <p className="text-sm font-semibold mb-2">Som atual:</p>
+                        <audio src={currentSoundUrl} controls className="w-full max-w-sm"></audio>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 
 export const AdminSection: React.FC<AdminSectionProps> = (props) => {
@@ -147,7 +208,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
         onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
-        onDeleteOrder, onPermanentDeleteOrder
+        onDeleteOrder, onPermanentDeleteOrder, isAlertSoundPlaying, setIsAlertSoundPlaying, addToast
     } = props;
     
     const [user, setUser] = useState<firebase.User | null>(null);
@@ -169,21 +230,22 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
-    // State for order management
     const [orderSearchTerm, setOrderSearchTerm] = useState('');
     const [orderFilters, setOrderFilters] = useState({ orderType: '', paymentMethod: '', paymentStatus: '', orderStatus: '' });
     const [showFilters, setShowFilters] = useState(false);
     const [activeOrdersTab, setActiveOrdersTab] = useState<OrderTabKey>('accepted');
     const [isTrashVisible, setIsTrashVisible] = useState(false);
 
-    // State for sound notification
     const [isSoundEnabled, setIsSoundEnabled] = useState(() => {
         const saved = localStorage.getItem('soundNotificationEnabled');
-        return saved !== 'false'; // Enabled by default
+        return saved !== 'false';
     });
     const prevPendingOrdersCount = useRef(0);
     const audioContextRef = useRef<AudioContext | null>(null);
-
+    
+    // Refs and state for persistent alert
+    const pendingSectionRef = useRef<HTMLDivElement>(null);
+    const [isPendingSectionVisible, setIsPendingSectionVisible] = useState(true);
 
     useEffect(() => setLocalProducts(allProducts), [allProducts]);
     useEffect(() => setLocalCategories([...allCategories].sort((a, b) => a.order - b.order)), [allCategories]);
@@ -204,78 +266,88 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         return () => window.removeEventListener('hashchange', handleHashChange, false);
     }, []);
 
-    // Scroll main admin tabs into view
     useEffect(() => {
         if (activeTab) {
-            const activeTabElement = document.getElementById(`admin-tab-${activeTab}`);
-            if (activeTabElement) {
-                activeTabElement.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'nearest',
-                    inline: 'center'
-                });
-            }
+            document.getElementById(`admin-tab-${activeTab}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         }
     }, [activeTab]);
 
-    // Scroll order status sub-tabs into view
     useEffect(() => {
         if (activeOrdersTab) {
-            const activeSubTabElement = document.getElementById(`order-status-tab-${activeOrdersTab}`);
-            if (activeSubTabElement) {
-                activeSubTabElement.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'nearest',
-                    inline: 'center'
-                });
-            }
+            document.getElementById(`order-status-tab-${activeOrdersTab}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         }
     }, [activeOrdersTab]);
 
-
     const pendingOrdersCount = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
 
-    // Effect for sound notification
+    // Initial sound effect (beep)
     useEffect(() => {
-        const playSound = () => {
-            if (!audioContextRef.current) {
-                try {
-                    audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-                } catch (e) {
-                    console.error("Web Audio API is not supported in this browser.");
-                    return;
-                }
+        const playBeep = () => {
+             if (!audioContextRef.current) {
+                try { audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)(); }
+                catch (e) { console.error("Web Audio API is not supported."); return; }
             }
             const oscillator = audioContextRef.current.createOscillator();
-            const gainNode = audioContextRef.current.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContextRef.current.destination);
             oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(440, audioContextRef.current.currentTime); // A4 note
-            gainNode.gain.setValueAtTime(0.5, audioContextRef.current.currentTime);
+            oscillator.frequency.setValueAtTime(440, audioContextRef.current.currentTime);
+            oscillator.connect(audioContextRef.current.destination);
             oscillator.start();
             oscillator.stop(audioContextRef.current.currentTime + 0.2);
         };
 
-        if (isSoundEnabled && user && pendingOrdersCount > prevPendingOrdersCount.current) {
-            playSound();
+        if (isSoundEnabled && user && pendingOrdersCount > prevPendingOrdersCount.current && !siteSettings.notificationSoundUrl) {
+            playBeep();
         }
         prevPendingOrdersCount.current = pendingOrdersCount;
-    }, [pendingOrdersCount, isSoundEnabled, user]);
+    }, [pendingOrdersCount, isSoundEnabled, user, siteSettings.notificationSoundUrl]);
 
+    // Persistent alert sound logic
+    useEffect(() => {
+        const shouldPlay = user && pendingOrdersCount > 0 && !isPendingSectionVisible && isSoundEnabled;
+        if (shouldPlay !== isAlertSoundPlaying) {
+            setIsAlertSoundPlaying(shouldPlay);
+        }
+    }, [user, pendingOrdersCount, isPendingSectionVisible, isSoundEnabled, isAlertSoundPlaying, setIsAlertSoundPlaying]);
+
+    // Intersection Observer for pending section
+    useEffect(() => {
+        const observer = new IntersectionObserver(([entry]) => {
+            setIsPendingSectionVisible(entry.isIntersecting);
+        }, { threshold: 0.1 });
+
+        const currentRef = pendingSectionRef.current;
+        if (currentRef) observer.observe(currentRef);
+        return () => { if (currentRef) observer.unobserve(currentRef); };
+    }, []);
+
+    // Stop sound on interaction with pending section
+    useEffect(() => {
+        const stopSound = () => setIsAlertSoundPlaying(false);
+        const currentRef = pendingSectionRef.current;
+        if (currentRef) {
+            currentRef.addEventListener('click', stopSound);
+            currentRef.addEventListener('wheel', stopSound);
+            currentRef.addEventListener('touchstart', stopSound);
+        }
+        return () => {
+            if (currentRef) {
+                currentRef.removeEventListener('click', stopSound);
+                currentRef.removeEventListener('wheel', stopSound);
+                currentRef.removeEventListener('touchstart', stopSound);
+            }
+        };
+    }, [setIsAlertSoundPlaying]);
 
     const toggleSound = () => {
         const newState = !isSoundEnabled;
         setIsSoundEnabled(newState);
         localStorage.setItem('soundNotificationEnabled', String(newState));
-         // Initialize AudioContext on user interaction
         if (newState && !audioContextRef.current) {
-             try {
-                audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-            } catch (e) { console.error("Could not create AudioContext."); }
+             try { audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)(); }
+             catch (e) { console.error("Could not create AudioContext."); }
         }
+        if (!newState) setIsAlertSoundPlaying(false); // Stop persistent sound if muted
     };
-
 
     const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
@@ -301,48 +373,22 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError('');
-        setIsLoggingIn(true);
-        if (!auth) {
-            setError('Serviço de autenticação não disponível.');
-            setIsLoggingIn(false);
-            return;
-        }
-        try {
-            await auth.signInWithEmailAndPassword(email, password);
-        } catch (err: any) {
-             let friendlyMessage: string | React.ReactNode = 'Ocorreu um erro inesperado.';
+        setError(''); setIsLoggingIn(true);
+        try { await auth.signInWithEmailAndPassword(email, password); }
+        catch (err: any) {
+            let friendlyMessage: string | React.ReactNode = 'Ocorreu um erro inesperado.';
             switch (err.code) {
-                case 'auth/user-not-found':
-                case 'auth/wrong-password':
-                case 'auth/invalid-credential':
-                     friendlyMessage = (
-                        <div className="text-center text-sm"><p className="font-bold">Acesso negado.</p><p className="mt-2">Se você é um administrador e está com problemas, entre em contato com o suporte.</p><button type="button" onClick={() => setIsSupportModalOpen(true)} className="mt-4 w-full bg-brand-olive-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-envelope mr-2"></i>Entrar em Contato</button></div>
-                    );
-                    break;
+                case 'auth/user-not-found': case 'auth/wrong-password': case 'auth/invalid-credential':
+                     friendlyMessage = <div className="text-center text-sm"><p className="font-bold">Acesso negado.</p><p className="mt-2">Se você é um administrador e está com problemas, entre em contato com o suporte.</p><button type="button" onClick={() => setIsSupportModalOpen(true)} className="mt-4 w-full bg-brand-olive-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-envelope mr-2"></i>Entrar em Contato</button></div>; break;
                 case 'auth/invalid-email': friendlyMessage = 'O formato do e-mail é inválido.'; break;
                 case 'auth/network-request-failed': friendlyMessage = 'Erro de rede. Verifique sua conexão.'; break;
             }
             setError(friendlyMessage);
-        } finally {
-            setIsLoggingIn(false);
-        }
+        } finally { setIsLoggingIn(false); }
     };
     
-    const handleLogout = async () => {
-        if (!auth) return;
-        try { await auth.signOut(); setEmail(''); setPassword(''); window.location.hash = ''; }
-        catch (error) { console.error("Error signing out: ", error); }
-    };
+    const handleLogout = async () => { if (auth) await auth.signOut(); window.location.hash = ''; };
 
-    const handleAddNewProduct = () => { setEditingProduct(null); setIsProductModalOpen(true); };
-    const handleEditProduct = (p: Product) => { setEditingProduct(p); setIsProductModalOpen(true); };
-    const handleAddNewCategory = () => { setEditingCategory(null); setIsCategoryModalOpen(true); };
-    const handleEditCategory = (c: Category) => { setEditingCategory(c); setIsCategoryModalOpen(true); };
-
-    const handleSeedDatabase = async () => { if (window.confirm('Tem certeza? Isso adicionará dados iniciais.')) { try { await onSeedDatabase(); alert('Banco de dados populado!'); } catch (e) { console.error(e); alert("Erro ao popular o banco."); } } };
-    const handleBackup = () => { try { const backupData = { products: allProducts, categories: allCategories, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); alert('Backup concluído!'); } catch (e) { console.error(e); alert("Falha no backup."); } };
-    
     const activeOrders = useMemo(() => orders.filter(o => o.status !== 'deleted'), [orders]);
     const deletedOrders = useMemo(() => orders.filter(o => o.status === 'deleted'), [orders]);
 
@@ -350,43 +396,29 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         const source = isTrashVisible ? deletedOrders : activeOrders;
         return source.filter(order => {
             const searchTermLower = orderSearchTerm.toLowerCase();
-            const matchesSearch = !searchTermLower ||
-                order.customer.name.toLowerCase().includes(searchTermLower) ||
-                order.customer.phone.toLowerCase().includes(searchTermLower);
-            
+            const matchesSearch = !searchTermLower || order.customer.name.toLowerCase().includes(searchTermLower) || order.customer.phone.toLowerCase().includes(searchTermLower);
             const matchesOrderType = !orderFilters.orderType || order.customer.orderType === orderFilters.orderType;
             const matchesPaymentMethod = !orderFilters.paymentMethod || order.paymentMethod === orderFilters.paymentMethod;
             const matchesPaymentStatus = !orderFilters.paymentStatus || order.paymentStatus === orderFilters.paymentStatus;
             const matchesOrderStatus = !orderFilters.orderStatus || order.status === orderFilters.orderStatus;
-
             return matchesSearch && matchesOrderType && matchesPaymentMethod && matchesPaymentStatus && matchesOrderStatus;
         });
     }, [orders, orderSearchTerm, orderFilters, isTrashVisible, activeOrders, deletedOrders]);
 
     const getOrderTabCount = (tab: OrderTabKey) => {
         switch(tab) {
-            case 'pronto':
-                return filteredOrders.filter(o => o.status === 'ready' && o.customer.orderType === 'pickup').length;
-            case 'emRota':
-                 return filteredOrders.filter(o => o.status === 'ready' && o.customer.orderType === 'delivery').length;
-            case 'accepted':
-            case 'reserved':
-            case 'completed':
-            case 'cancelled':
-                return filteredOrders.filter(o => o.status === tab).length;
-            default:
-                return 0;
+            case 'pronto': return filteredOrders.filter(o => o.status === 'ready' && o.customer.orderType === 'pickup').length;
+            case 'emRota': return filteredOrders.filter(o => o.status === 'ready' && o.customer.orderType === 'delivery').length;
+            case 'accepted': case 'reserved': case 'completed': case 'cancelled': return filteredOrders.filter(o => o.status === tab).length;
+            default: return 0;
         }
     };
     
     const tabOrders = useMemo(() => {
         switch (activeOrdersTab) {
-            case 'pronto':
-                return filteredOrders.filter(o => o.status === 'ready' && o.customer.orderType === 'pickup');
-            case 'emRota':
-                return filteredOrders.filter(o => o.status === 'ready' && o.customer.orderType === 'delivery');
-            default:
-                return filteredOrders.filter(o => o.status === activeOrdersTab);
+            case 'pronto': return filteredOrders.filter(o => o.status === 'ready' && o.customer.orderType === 'pickup');
+            case 'emRota': return filteredOrders.filter(o => o.status === 'ready' && o.customer.orderType === 'delivery');
+            default: return filteredOrders.filter(o => o.status === activeOrdersTab);
         }
     }, [filteredOrders, activeOrdersTab]);
     
@@ -404,11 +436,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                         <div className="flex justify-between items-center mb-6 pb-4 border-b">
                             <div className="flex items-center gap-4">
                                 <h2 className="text-3xl font-bold">Painel Administrativo</h2>
-                                <button 
-                                    onClick={toggleSound} 
-                                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isSoundEnabled ? 'bg-green-100 text-green-600 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                                    title={isSoundEnabled ? 'Desativar som de notificação' : 'Ativar som de notificação'}
-                                >
+                                <button onClick={toggleSound} className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isSoundEnabled ? 'bg-green-100 text-green-600 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`} title={isSoundEnabled ? 'Desativar som de notificação' : 'Ativar som de notificação'}>
                                     <i className={`fas ${isSoundEnabled ? 'fa-bell' : 'fa-bell-slash'}`}></i>
                                 </button>
                             </div>
@@ -416,16 +444,11 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                         </div>
                         <div className="border-b mb-6">
                             <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
-                                {['status', 'orders', 'products', 'categories', 'customization', 'data'].map(tab => {
-                                    const icons: { [key: string]: string } = { status: 'fa-store-alt', orders: 'fa-receipt', products: 'fa-pizza-slice', categories: 'fa-tags', customization: 'fa-paint-brush', data: 'fa-database' };
-                                    const labels: { [key: string]: string } = { status: 'Status', orders: 'Pedidos', products: 'Produtos', categories: 'Categorias', customization: 'Personalização', data: 'Dados' };
+                                {['status', 'orders', 'products', 'categories', 'customization', 'audio', 'data'].map(tab => {
+                                    const icons: { [key: string]: string } = { status: 'fa-store-alt', orders: 'fa-receipt', products: 'fa-pizza-slice', categories: 'fa-tags', customization: 'fa-paint-brush', audio: 'fa-volume-up', data: 'fa-database' };
+                                    const labels: { [key: string]: string } = { status: 'Status', orders: 'Pedidos', products: 'Produtos', categories: 'Categorias', customization: 'Personalização', audio: 'Áudio', data: 'Dados' };
                                     return (
-                                        <button 
-                                            key={tab} 
-                                            id={`admin-tab-${tab}`}
-                                            onClick={() => setActiveTab(tab)} 
-                                            className={`relative flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === tab ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}
-                                        >
+                                        <button key={tab} id={`admin-tab-${tab}`} onClick={() => setActiveTab(tab)} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === tab ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>
                                             <i className={`fas ${icons[tab]} w-5 text-center`}></i> <span>{labels[tab]}</span>
                                             {tab === 'orders' && pendingOrdersCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">{pendingOrdersCount}</span>}
                                         </button>
@@ -438,39 +461,23 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                         
                         {activeTab === 'orders' && (
                              <div>
-                                <h3 className="text-xl font-bold mb-4">Gerenciar Pedidos</h3>
                                 <div className="bg-gray-50 p-3 rounded-lg border mb-4">
                                     <div className="flex flex-nowrap flex-row items-center gap-2 sm:gap-3">
                                         <div className="relative flex-grow">
                                             <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                                             <input type="text" placeholder="Buscar por nome ou telefone..." value={orderSearchTerm} onChange={e => setOrderSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-md" />
                                         </div>
-                                        <div className="hidden sm:flex items-center gap-3">
-                                            <select value={orderFilters.paymentStatus} onChange={e => setOrderFilters(f => ({...f, paymentStatus: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
-                                                <option value="">Status Pgto.</option> <option value="paid">Pago</option> <option value="pending">Pendente</option>
-                                            </select>
-                                            <select value={orderFilters.orderStatus} onChange={e => setOrderFilters(f => ({...f, orderStatus: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
-                                                <option value="">Status Pedido</option> <option value="completed">Finalizado</option> <option value="cancelled">Cancelado</option>
-                                            </select>
-                                            <select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
-                                                <option value="">Tipo</option> <option value="delivery">Entrega</option> <option value="pickup">Retirada</option> <option value="local">Local</option>
-                                            </select>
-                                        </div>
                                         <div className="sm:hidden flex-shrink-0 relative">
                                             <button onClick={() => setShowFilters(!showFilters)} className="w-10 h-10 bg-white border rounded-md flex items-center justify-center hover:bg-gray-100"><i className="fas fa-filter"></i></button>
                                             <div className={`absolute top-full right-0 mt-2 bg-white border rounded-lg shadow-xl p-4 z-40 w-64 ${showFilters ? 'block' : 'hidden'}`}>
-                                                <div className="space-y-4">
-                                                    <div><label className="block text-sm font-semibold mb-1">Status Pgto.</label><select value={orderFilters.paymentStatus} onChange={e => setOrderFilters(f => ({...f, paymentStatus: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"><option value="">Todos</option><option value="paid">Pago</option><option value="pending">Pendente</option></select></div>
-                                                    <div><label className="block text-sm font-semibold mb-1">Status Pedido</label><select value={orderFilters.orderStatus} onChange={e => setOrderFilters(f => ({...f, orderStatus: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"><option value="">Todos</option><option value="completed">Finalizado</option><option value="cancelled">Cancelado</option></select></div>
-                                                    <div><label className="block text-sm font-semibold mb-1">Tipo</label><select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"><option value="">Todos</option><option value="delivery">Entrega</option><option value="pickup">Retirada</option><option value="local">Consumo Local</option></select></div>
-                                                </div>
+                                                {/* Mobile filters */}
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-
+                                
                                 {filteredOrders.filter(o => o.status === 'pending').length > 0 && !isTrashVisible && (
-                                    <div className="mb-6">
+                                    <div ref={pendingSectionRef} id="pending-section" className="mb-6">
                                         <h4 className="font-bold text-lg mb-2 text-yellow-600">Pendentes</h4>
                                         <div className="space-y-4">
                                             {filteredOrders.filter(o => o.status === 'pending').map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />)}
@@ -480,56 +487,35 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
                                 <div className="border-t pt-4">
                                     <div className="sticky top-20 bg-brand-ivory-50/95 backdrop-blur-sm z-30 shadow-sm -mx-8">
-                                        <div className="border-b">
-                                            <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide px-8">
-                                                {!isTrashVisible && OrderStatusTabs.map(tabKey => {
-                                                    const count = getOrderTabCount(tabKey);
-                                                    const showCounter = count > 0 && !['completed', 'cancelled'].includes(tabKey);
-                                                    return (
-                                                    <button 
-                                                        key={tabKey} 
-                                                        id={`order-status-tab-${tabKey}`}
-                                                        onClick={() => setActiveOrdersTab(tabKey)} 
-                                                        className={`relative flex-shrink-0 inline-flex items-center gap-2 py-2 px-4 font-semibold text-sm ${activeOrdersTab === tabKey && !isTrashVisible ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}
-                                                    >
-                                                        {{accepted: 'Aceitos', reserved: 'Reservas', pronto: 'Prontos', emRota: 'Em Rota', completed: 'Finalizados', cancelled: 'Cancelados'}[tabKey]}
-                                                        {showCounter && <span className="bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{count}</span>}
-                                                    </button>
-                                                    )
-                                                })}
-                                                {isTrashVisible && (<div className="py-2 px-4 font-semibold text-accent"><i className="fas fa-trash-alt mr-2"></i>Lixeira</div>)}
-                                            </div>
-                                        </div>
+                                        <div className="border-b"><div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide px-8">{!isTrashVisible && OrderStatusTabs.map(tabKey => { const count = getOrderTabCount(tabKey); const showCounter = count > 0 && !['completed', 'cancelled'].includes(tabKey); return (<button key={tabKey} id={`order-status-tab-${tabKey}`} onClick={() => setActiveOrdersTab(tabKey)} className={`relative flex-shrink-0 inline-flex items-center gap-2 py-2 px-4 font-semibold text-sm ${activeOrdersTab === tabKey && !isTrashVisible ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}>{{accepted: 'Aceitos', reserved: 'Reservas', pronto: 'Prontos', emRota: 'Em Rota', completed: 'Finalizados', cancelled: 'Cancelados'}[tabKey]}{showCounter && <span className="bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{count}</span>}</button>)})}{isTrashVisible && (<div className="py-2 px-4 font-semibold text-accent"><i className="fas fa-trash-alt mr-2"></i>Lixeira</div>)}</div></div>
                                     </div>
-
-                                    <div className="mt-4 space-y-4">
-                                        {isTrashVisible ? (
-                                            deletedOrders.length > 0 ? deletedOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>
-                                        ) : (
-                                            tabOrders.length > 0 ? tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>
-                                        )}
-                                    </div>
-                                    
-                                    <div className="mt-6 pt-6 border-t flex justify-end">
-                                        <button onClick={() => setIsTrashVisible(!isTrashVisible)} className={`flex items-center gap-2 font-semibold py-2 px-4 rounded-lg transition-colors ${isTrashVisible ? 'bg-accent text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`} aria-label="Ver lixeira">
-                                            <i className="fas fa-trash-alt"></i>
-                                            <span>{isTrashVisible ? 'Voltar aos Pedidos' : 'Ver Lixeira'}</span>
-                                        </button>
-                                    </div>
+                                    <div className="mt-4 space-y-4">{isTrashVisible ? (deletedOrders.length > 0 ? deletedOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>) : (tabOrders.length > 0 ? tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>)}</div>
+                                    <div className="mt-6 pt-6 border-t flex justify-end"><button onClick={() => setIsTrashVisible(!isTrashVisible)} className={`flex items-center gap-2 font-semibold py-2 px-4 rounded-lg transition-colors ${isTrashVisible ? 'bg-accent text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`} aria-label="Ver lixeira"><i className="fas fa-trash-alt"></i><span>{isTrashVisible ? 'Voltar aos Pedidos' : 'Ver Lixeira'}</span></button></div>
                                 </div>
                             </div>
                         )}
                         
                         {activeTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> )}
-                        {activeTab === 'products' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Produtos</h3> <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Produto</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}> <div className="space-y-6"> {localCategories.map(category => { const categoryProducts = localProducts.filter(p => p.categoryId === category.id).sort((a, b) => a.orderIndex - b.orderIndex); return ( <div key={category.id}> <h4 className={`text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4> <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3 min-h-[50px]"> {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} />)} </div> </SortableContext> </div> ) })} </div> </DndContext> </div> )}
-                        {activeTab === 'categories' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Categorias</h3> <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Categoria</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}> <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localCategories.map(cat => <SortableCategoryItem key={cat.id} category={cat} onEdit={handleEditCategory} onDelete={onDeleteCategory} onStatusChange={onCategoryStatusChange} />)} </div> </SortableContext> </DndContext> </div> )}
-                        {activeTab === 'data' && ( <div> <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus dados.</p> <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados iniciais. Use apenas uma vez.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> )}
+                        {activeTab === 'audio' && ( <AudioCustomizationTab currentSoundUrl={siteSettings.notificationSoundUrl} addToast={addToast} /> )}
+                        {activeTab === 'products' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Produtos</h3> <button onClick={() => { setEditingProduct(null); setIsProductModalOpen(true); }} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Produto</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}> <div className="space-y-6"> {localCategories.map(category => { const categoryProducts = localProducts.filter(p => p.categoryId === category.id).sort((a, b) => a.orderIndex - b.orderIndex); return ( <div key={category.id}> <h4 className={`text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4> <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3 min-h-[50px]"> {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={(p) => { setEditingProduct(p); setIsProductModalOpen(true); }} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} />)} </div> </SortableContext> </div> ) })} </div> </DndContext> </div> )}
+                        {activeTab === 'categories' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Categorias</h3> <button onClick={() => { setEditingCategory(null); setIsCategoryModalOpen(true); }} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Categoria</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}> <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localCategories.map(cat => <SortableCategoryItem key={cat.id} category={cat} onEdit={(c) => { setEditingCategory(c); setIsCategoryModalOpen(true); }} onDelete={onDeleteCategory} onStatusChange={onCategoryStatusChange} />)} </div> </SortableContext> </DndContext> </div> )}
+                        {activeTab === 'data' && ( <div> <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus dados.</p> <button onClick={() => { try { const backupData = { products: allProducts, categories: allCategories, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); addToast('Backup concluído!'); } catch (e) { console.error(e); addToast("Falha no backup.", 'error'); } }} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados iniciais. Use apenas uma vez.</p> <button onClick={() => { if (window.confirm('Tem certeza? Isso adicionará dados iniciais.')) { onSeedDatabase().then(() => addToast('Banco de dados populado!')).catch(() => addToast('Erro ao popular o banco.', 'error')); } }} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> )}
                     </div>
                 </div>
             </section>
             <ProductModal isOpen={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} onSave={onSaveProduct} product={editingProduct} categories={allCategories} />
             <CategoryModal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} onSave={onSaveCategory} category={editingCategory} />
             <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
+            
+            {user && pendingOrdersCount > 0 && !isPendingSectionVisible &&
+                <PendingOrderAlert
+                    onDismiss={() => setIsAlertSoundPlaying(false)}
+                    onViewOrder={() => {
+                        setIsAlertSoundPlaying(false);
+                        pendingSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                />
+            }
         </>
     );
 };

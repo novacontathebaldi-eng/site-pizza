@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
@@ -70,7 +70,8 @@ const defaultSiteSettings: SiteSettings = {
         { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996500341', isVisible: true },
         { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/santasensacao.sl', isVisible: true },
         { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin', isVisible: true }
-    ]
+    ],
+    notificationSoundUrl: '', // Default empty
 };
 
 const App: React.FC = () => {
@@ -91,6 +92,10 @@ const App: React.FC = () => {
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
     const [payingOrder, setPayingOrder] = useState<Order | null>(null);
     
+    // State for the persistent alert sound
+    const [isAlertSoundPlaying, setIsAlertSoundPlaying] = useState(false);
+    const audioRef = useRef<HTMLAudioElement>(null);
+
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
         setToasts(prevToasts => [...prevToasts, { id, message, type }]);
@@ -98,6 +103,19 @@ const App: React.FC = () => {
             setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
         }, 4000);
     }, []);
+
+    // Effect to control the persistent audio player
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (audio) {
+            if (isAlertSoundPlaying) {
+                audio.play().catch(e => console.error("Audio play failed:", e));
+            } else {
+                audio.pause();
+                audio.currentTime = 0;
+            }
+        }
+    }, [isAlertSoundPlaying]);
 
     useEffect(() => {
         const savedCart = localStorage.getItem('santaSensacaoCart');
@@ -566,6 +584,7 @@ const App: React.FC = () => {
 
     return (
         <div className="flex flex-col min-h-screen">
+            <audio ref={audioRef} src={siteSettings.notificationSoundUrl} loop />
             <Header cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} activeSection={activeSection} settings={siteSettings} />
             
             <div id="status-banner" className={`bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
@@ -638,6 +657,9 @@ const App: React.FC = () => {
                     onUpdateOrderReservationTime={handleUpdateOrderReservationTime}
                     onDeleteOrder={handleDeleteOrder}
                     onPermanentDeleteOrder={handlePermanentDeleteOrder}
+                    isAlertSoundPlaying={isAlertSoundPlaying}
+                    setIsAlertSoundPlaying={setIsAlertSoundPlaying}
+                    addToast={addToast}
                 />
             </main>
 
