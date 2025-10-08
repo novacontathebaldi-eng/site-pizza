@@ -1,5 +1,7 @@
+
 import React from 'react';
-import { ContentSection } from '../types';
+// FIX: Added '.ts' extension to fix module resolution error.
+import { ContentSection } from '../types.ts';
 
 interface DynamicContentSectionProps {
     section: ContentSection;
@@ -40,8 +42,7 @@ export const DynamicContentSection: React.FC<DynamicContentSectionProps> = ({ se
     ) : null;
 
     return (
-        // FIX: Changed section ID to match navigation links (e.g., 'sobre')
-        <section id={section.id} className="py-20 bg-brand-ivory-50 odd:bg-white">
+        <section id={`content-${section.id}`} className="py-20 bg-brand-ivory-50 odd:bg-white">
             <div className="container mx-auto px-4">
                 <div className={`grid ${image ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-12 items-center`}>
                     {/* If there's no image, always render content first. Otherwise, alternate. */}

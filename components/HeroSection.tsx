@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
-import { SiteSettings } from '../types';
+// FIX: Added '.ts' extension to fix module resolution error.
+import { SiteSettings } from '../types.ts';
 
 interface HeroSectionProps {
     settings: SiteSettings;

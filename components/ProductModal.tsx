@@ -1,7 +1,11 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Product, Category } from '../types';
-import * as firebaseService from '../services/firebaseService';
-import { CameraModal } from './CameraModal';
+// FIX: Added '.ts' extension to fix module resolution error.
+import { Product, Category } from '../types.ts';
+// FIX: Added '.ts' extension to fix module resolution error.
+import * as firebaseService from '../services/firebaseService.ts';
+// FIX: Added '.tsx' extension to fix module resolution error.
+import { CameraModal } from './CameraModal.tsx';
 
 interface ProductModalProps {
     isOpen: boolean;

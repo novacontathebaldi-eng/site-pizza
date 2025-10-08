@@ -1,80 +1,163 @@
-
 import React, { useState } from 'react';
 import { auth, googleProvider } from '../services/firebase';
-import * as firebaseService from '../services/firebaseService';
 
 interface AuthModalProps {
     isOpen: boolean;
     onClose: () => void;
+    addToast: (message: string, type: 'success' | 'error') => void;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
+type AuthView = 'login' | 'signup' | 'reset';
+
+export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, addToast }) => {
+    const [view, setView] = useState<AuthView>('login');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
 
     if (!isOpen) return null;
 
+    const handleAuthError = (err: any) => {
+        setIsLoading(false);
+        switch (err.code) {
+            case 'auth/user-not-found':
+            case 'auth/wrong-password':
+            case 'auth/invalid-credential':
+                setError('E-mail ou senha incorretos.');
+                break;
+            case 'auth/email-already-in-use':
+                setError('Este e-mail já está cadastrado.');
+                break;
+            case 'auth/weak-password':
+                setError('A senha deve ter pelo menos 6 caracteres.');
+                break;
+            case 'auth/invalid-email':
+                setError('O formato do e-mail é inválido.');
+                break;
+            default:
+                setError('Ocorreu um erro. Tente novamente.');
+        }
+    };
+
     const handleGoogleSignIn = async () => {
+        if (!auth || !googleProvider) return;
         setIsLoading(true);
-        setError(null);
+        setError('');
         try {
-            if (!auth || !googleProvider) {
-                throw new Error("Serviço de autenticação não inicializado.");
-            }
-            const result = await auth.signInWithPopup(googleProvider);
-            if (result.user) {
-                // Check for or create a user profile in Firestore
-                await firebaseService.getOrCreateUserProfile(result.user);
-                onClose(); // Close modal on success
-            }
-        } catch (err: any) {
-            console.error("Erro no login com Google: ", err);
-            let friendlyMessage = 'Ocorreu um erro ao tentar fazer login.';
-            if (err.code === 'auth/popup-closed-by-user') {
-                friendlyMessage = 'A janela de login foi fechada antes da conclusão.';
-            } else if (err.code === 'auth/network-request-failed') {
-                friendlyMessage = 'Erro de rede. Verifique sua conexão e tente novamente.';
-            }
-            setError(friendlyMessage);
+            await auth.signInWithPopup(googleProvider);
+            addToast('Login com Google bem-sucedido!', 'success');
+            onClose();
+        } catch (error) {
+            handleAuthError(error);
         } finally {
             setIsLoading(false);
         }
     };
 
+    const handleEmailPasswordAuth = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!auth) return;
+        setIsLoading(true);
+        setError('');
+
+        try {
+            if (view === 'signup') {
+                await auth.createUserWithEmailAndPassword(email, password);
+                addToast('Conta criada com sucesso!', 'success');
+            } else {
+                await auth.signInWithEmailAndPassword(email, password);
+                addToast('Login bem-sucedido!', 'success');
+            }
+            onClose();
+        } catch (error) {
+            handleAuthError(error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    const handlePasswordReset = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!auth) return;
+        setIsLoading(true);
+        setError('');
+
+        try {
+            await auth.sendPasswordResetEmail(email);
+            addToast('E-mail de redefinição de senha enviado!', 'success');
+            setView('login');
+        } catch (error) {
+            handleAuthError(error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+
+    const title = view === 'login' ? 'Entrar na sua conta' : view === 'signup' ? 'Criar uma nova conta' : 'Redefinir Senha';
+    const buttonText = view === 'login' ? 'Entrar' : view === 'signup' ? 'Criar Conta' : 'Enviar E-mail';
+    const switchViewText = view === 'login' ? 'Não tem uma conta? Cadastre-se' : view === 'signup' ? 'Já tem uma conta? Entre' : 'Voltar para o login';
+    
+    const handleSwitchView = () => {
+        setError('');
+        if (view === 'reset') {
+            setView('login');
+        } else {
+            setView(view === 'login' ? 'signup' : 'login');
+        }
+    };
+
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm max-h-[90vh] flex flex-col">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
                 <div className="flex justify-between items-center p-5 border-b border-gray-200">
-                    <h2 className="text-2xl font-bold text-text-on-light">Acessar Conta</h2>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl" disabled={isLoading}>&times;</button>
+                    <h2 className="text-2xl font-bold text-text-on-light">{title}</h2>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
                 </div>
-                <div className="p-6 text-center">
-                    <p className="text-gray-600 mb-6">Entre com sua conta para salvar seus endereços e visualizar o histórico de pedidos.</p>
-                    
-                    {error && (
-                        <div className="bg-red-50 text-red-700 p-3 rounded-lg mb-4 text-sm">
-                            {error}
+                <div className="overflow-y-auto p-6">
+                    {view !== 'reset' && (
+                        <>
+                        <button onClick={handleGoogleSignIn} disabled={isLoading} className="w-full flex items-center justify-center gap-3 py-3 border rounded-lg hover:bg-gray-50 font-semibold mb-4 disabled:opacity-50">
+                            <i className="fab fa-google text-red-500"></i>
+                            Continuar com Google
+                        </button>
+                        <div className="flex items-center my-4">
+                            <hr className="flex-grow border-t" />
+                            <span className="mx-4 text-sm text-gray-500">OU</span>
+                            <hr className="flex-grow border-t" />
                         </div>
+                        </>
                     )}
-                    
-                    <button 
-                        onClick={handleGoogleSignIn}
-                        disabled={isLoading}
-                        className="w-full bg-blue-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-blue-600 transition-all flex items-center justify-center disabled:bg-blue-300"
-                    >
-                        {isLoading ? (
-                            <i className="fas fa-spinner fa-spin"></i>
-                        ) : (
-                            <>
-                                <i className="fab fa-google mr-3"></i>
-                                Entrar com Google
-                            </>
+
+                    <form onSubmit={view === 'reset' ? handlePasswordReset : handleEmailPasswordAuth} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-semibold mb-1" htmlFor="auth-email">E-mail</label>
+                            <input id="auth-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
+                        </div>
+                        {view !== 'reset' && (
+                            <div>
+                                <label className="block text-sm font-semibold mb-1" htmlFor="auth-password">Senha</label>
+                                <input id="auth-password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
+                            </div>
                         )}
-                    </button>
-                    
-                    <p className="text-xs text-gray-400 mt-4">
-                        Ao continuar, você concorda com nossos Termos de Serviço e Política de Privacidade.
-                    </p>
+                        {error && <p className="text-red-600 text-sm">{error}</p>}
+                        
+                        <button type="submit" disabled={isLoading} className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all disabled:bg-opacity-70 flex items-center justify-center">
+                            {isLoading ? <i className="fas fa-spinner fa-spin"></i> : buttonText}
+                        </button>
+                    </form>
+
+                    <div className="text-center mt-4">
+                        <button onClick={handleSwitchView} className="text-sm text-brand-olive-600 hover:underline">
+                            {switchViewText}
+                        </button>
+                        {view === 'login' && (
+                            <button onClick={() => { setView('reset'); setError('') }} className="block mx-auto mt-2 text-sm text-gray-500 hover:underline">
+                                Esqueceu sua senha?
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

@@ -25,7 +25,7 @@ let db: firebase.firestore.Firestore | null = null;
 let storage: firebase.storage.Storage | null = null;
 let auth: firebase.auth.Auth | null = null; // Add auth service
 let functions: firebase.functions.Functions | null = null; // Add functions service
-let googleProvider: firebase.auth.GoogleAuthProvider | null = null; // Add Google provider
+let googleProvider: firebase.auth.GoogleAuthProvider | null = null; // Provider for Google Sign-In
 
 try {
   // Use the initialization pattern from the user's working old version.
@@ -36,7 +36,7 @@ try {
   storage = firebase.storage();
   auth = firebase.auth();
   functions = firebase.functions();
-  googleProvider = new firebase.auth.GoogleAuthProvider();
+  googleProvider = new firebase.auth.GoogleAuthProvider(); // Initialize Google provider
   
   // Keep db settings
   db.settings({
