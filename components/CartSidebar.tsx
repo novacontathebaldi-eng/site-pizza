@@ -1,10 +1,7 @@
 
 
-
-
 import React, { useMemo } from 'react';
-// FIX: Added '.ts' extension to fix module resolution error.
-import { CartItem, Category, Product } from '../types.ts';
+import { CartItem, Category, Product } from '../types';
 
 interface CartSidebarProps {
     isOpen: boolean;
@@ -27,9 +24,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ isOpen, onClose, cartI
             return null;
         }
 
-        // FIX: Explicitly type `p` as `Product` to ensure correct type inference for `productMap`.
-        // This resolves an issue where the TypeScript compiler was treating the product object as `unknown`.
-        const productMap = new Map(products.map((p: Product) => [p.id, p]));
+        const productMap = new Map(products.map(p => [p.id, p]));
 
         const findCategoryByKeywords = (keywords: string[]) => {
             return categories.find(c => keywords.some(kw => c.name.toLowerCase().includes(kw)));

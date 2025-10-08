@@ -1,8 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-// FIX: Added '.ts' extension to fix module resolution error.
-import { CartItem, OrderDetails, UserProfile } from '../types.ts';
-import firebase from 'firebase/compat/app';
+import { CartItem, OrderDetails } from '../types';
 
 interface CheckoutModalProps {
     isOpen: boolean;
@@ -10,8 +8,6 @@ interface CheckoutModalProps {
     cartItems: CartItem[];
     onConfirmCheckout: (details: OrderDetails) => void;
     onInitiatePixPayment: (details: OrderDetails) => void;
-    currentUser: firebase.User | null;
-    userProfile: UserProfile | null;
 }
 
 const getSuggestedTimes = () => {
@@ -26,7 +22,7 @@ const getSuggestedTimes = () => {
     return suggestions;
 };
 
-export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, onInitiatePixPayment, currentUser, userProfile }) => {
+export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, onInitiatePixPayment }) => {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [orderType, setOrderType] = useState<'delivery' | 'pickup' | 'local' | ''>('');
@@ -41,17 +37,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
 
     const suggestedTimes = getSuggestedTimes();
 
-    // Pre-fill user data if available
-    useEffect(() => {
-        if (isOpen && userProfile) {
-            setName(userProfile.displayName || '');
-            setPhone(userProfile.phone || '');
-        }
-    }, [isOpen, userProfile]);
-
     useEffect(() => {
         if (!isOpen) {
-            // Reset all fields on close
             setName(''); setPhone(''); setOrderType(''); setAddress('');
             setPaymentMethod(''); setChangeNeeded(false); setChangeAmount('');
             setNotes(''); setReservationTime(''); setPixPaymentOption(null);

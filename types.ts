@@ -1,10 +1,9 @@
-
 export interface Product {
     id: string;
     name: string;
     description: string;
     categoryId: string;
-    prices: { [size: string]: number };
+    prices: { [key: string]: number };
     imageUrl: string;
     badge?: string;
     active: boolean;
@@ -20,40 +19,13 @@ export interface Category {
 }
 
 export interface CartItem {
-    id: string; // Unique ID for the cart item instance
+    id: string;
     productId: string;
     name: string;
     size: string;
     price: number;
     quantity: number;
     imageUrl: string;
-}
-
-export interface CustomerDetails {
-    name: string;
-    phone: string;
-    address?: string;
-    orderType: 'delivery' | 'pickup' | 'local';
-    reservationTime?: string;
-}
-
-export type OrderStatus = 'pending' | 'accepted' | 'reserved' | 'ready' | 'completed' | 'cancelled' | 'deleted';
-export type PaymentStatus = 'pending' | 'paid';
-
-export interface Order {
-    id: string;
-    customer: CustomerDetails;
-    items: CartItem[];
-    total: number;
-    paymentMethod: 'credit' | 'debit' | 'pix' | 'cash';
-    changeNeeded?: boolean;
-    changeAmount?: string;
-    notes?: string;
-    status: OrderStatus;
-    paymentStatus: PaymentStatus;
-    createdAt: any; // firebase.firestore.Timestamp
-    pickupTimeEstimate?: string;
-    mercadoPagoPaymentId?: string;
 }
 
 export interface OrderDetails {
@@ -63,17 +35,39 @@ export interface OrderDetails {
     address: string;
     paymentMethod: 'credit' | 'debit' | 'pix' | 'cash';
     changeNeeded: boolean;
-    changeAmount: string;
+    changeAmount?: string;
     notes: string;
-    reservationTime: string;
+    reservationTime?: string; // Added for dine-in
 }
 
-export interface UserProfile {
-    displayName: string | null;
-    email: string | null;
-    phone: string | null;
-    // any other fields
+// New Types for Order Management
+export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted';
+export type PaymentStatus = 'pending' | 'paid';
+
+export interface OrderCustomerDetails {
+    name: string;
+    phone: string;
+    orderType: 'delivery' | 'pickup' | 'local';
+    address?: string;
+    reservationTime?: string;
 }
+
+export interface Order {
+    id: string;
+    customer: OrderCustomerDetails;
+    items: CartItem[];
+    total: number;
+    paymentMethod: 'credit' | 'debit' | 'pix' | 'cash';
+    changeNeeded?: boolean;
+    changeAmount?: string;
+    notes?: string;
+    status: OrderStatus;
+    paymentStatus: PaymentStatus; // New field for payment status
+    createdAt: any; // Firestore Timestamp
+    pickupTimeEstimate?: string; // Added for pickup
+    mercadoPagoPaymentId?: string; // To store the Mercado Pago payment ID
+}
+
 
 export interface ContentSectionListItem {
     id: string;
@@ -99,7 +93,7 @@ export interface FooterLink {
     icon: string;
     text: string;
     url: string;
-    isVisible: boolean;
+    isVisible?: boolean;
 }
 
 export interface SiteSettings {

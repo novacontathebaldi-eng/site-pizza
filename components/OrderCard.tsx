@@ -1,9 +1,6 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
-// FIX: Added '.ts' extension to fix module resolution error.
-import { Order, OrderStatus, PaymentStatus } from '../types.ts';
-// FIX: Added '.tsx' extension to fix module resolution error.
-import { ContactModal } from './ContactModal.tsx';
+import { Order, OrderStatus, PaymentStatus } from '../types';
+import { ContactModal } from './ContactModal';
 
 interface OrderCardProps {
     order: Order;

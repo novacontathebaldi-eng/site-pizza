@@ -1,11 +1,7 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-// FIX: Added '.ts' extension to fix module resolution error.
-import { Order } from '../types.ts';
-// FIX: Added '.ts' extension to fix module resolution error.
-import * as firebaseService from '../services/firebaseService.ts';
-// FIX: Added '.ts' extension to fix module resolution error.
-import { db } from '../services/firebase.ts';
+import { Order } from '../types';
+import * as firebaseService from '../services/firebaseService';
+import { db } from '../services/firebase';
 
 interface PixPaymentModalProps {
     order: Order | null;
