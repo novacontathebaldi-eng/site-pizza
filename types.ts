@@ -1,3 +1,5 @@
+import firebase from 'firebase/compat/app';
+
 export interface Product {
     id: string;
     name: string;
@@ -40,7 +42,6 @@ export interface OrderDetails {
     reservationTime?: string; // Added for dine-in
 }
 
-// New Types for Order Management
 export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted';
 export type PaymentStatus = 'pending' | 'paid';
 
@@ -54,6 +55,7 @@ export interface OrderCustomerDetails {
 
 export interface Order {
     id: string;
+    userId?: string; // Link to the user who placed the order
     customer: OrderCustomerDetails;
     items: CartItem[];
     total: number;
@@ -62,12 +64,11 @@ export interface Order {
     changeAmount?: string;
     notes?: string;
     status: OrderStatus;
-    paymentStatus: PaymentStatus; // New field for payment status
+    paymentStatus: PaymentStatus;
     createdAt: any; // Firestore Timestamp
-    pickupTimeEstimate?: string; // Added for pickup
-    mercadoPagoPaymentId?: string; // To store the Mercado Pago payment ID
+    pickupTimeEstimate?: string;
+    mercadoPagoPaymentId?: string;
 }
-
 
 export interface ContentSectionListItem {
     id: string;
@@ -104,4 +105,37 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
+}
+
+// --- NEW CUSTOMER PROFILE TYPES ---
+
+export interface UserAddress {
+  id: string;
+  label: 'Casa' | 'Trabalho' | 'Outro';
+  street: string;
+  number: string;
+  complement?: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  reference?: string;
+  isDefault: boolean;
+}
+
+export interface UserProfile {
+  uid: string;
+  name: string;
+  email: string;
+  phone: string;
+  cpf?: string;
+  birthDate?: string; // Format: YYYY-MM-DD
+  addresses: UserAddress[];
+  preferences?: {
+    dietaryRestrictions?: string[]; // e.g., ['lactose_intolerant', 'vegetarian']
+    favoriteItems?: string[]; // array of product IDs
+  };
+  generalNotes?: string;
+  createdAt: firebase.firestore.Timestamp;
+  lastOrderAt?: firebase.firestore.Timestamp;
 }

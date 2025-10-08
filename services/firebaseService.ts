@@ -1,7 +1,6 @@
-// FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
 import { db, storage, functions } from './firebase';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, UserProfile } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -175,5 +174,28 @@ export const initiateMercadoPagoPixPayment = async (orderId: string): Promise<an
     } catch (error) {
         console.error("Error calling createMercadoPagoOrder function:", error);
         throw new Error("Não foi possível gerar a cobrança PIX. Tente novamente.");
+    }
+};
+
+// --- NEW USER PROFILE FUNCTIONS ---
+
+export const findOrCreateUserProfile = async (user: firebase.User): Promise<UserProfile> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const userRef = db.collection('users').doc(user.uid);
+    const doc = await userRef.get();
+
+    if (doc.exists) {
+        return doc.data() as UserProfile;
+    } else {
+        const newUserProfile: UserProfile = {
+            uid: user.uid,
+            name: user.displayName || '',
+            email: user.email || '',
+            phone: user.phoneNumber || '',
+            addresses: [],
+            createdAt: firebase.firestore.FieldValue.serverTimestamp() as firebase.firestore.Timestamp,
+        };
+        await userRef.set(newUserProfile);
+        return newUserProfile;
     }
 };

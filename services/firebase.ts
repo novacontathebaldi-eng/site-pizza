@@ -25,6 +25,7 @@ let db: firebase.firestore.Firestore | null = null;
 let storage: firebase.storage.Storage | null = null;
 let auth: firebase.auth.Auth | null = null; // Add auth service
 let functions: firebase.functions.Functions | null = null; // Add functions service
+let googleProvider: firebase.auth.GoogleAuthProvider | null = null; // Add Google provider
 
 try {
   // Use the initialization pattern from the user's working old version.
@@ -35,6 +36,7 @@ try {
   storage = firebase.storage();
   auth = firebase.auth();
   functions = firebase.functions();
+  googleProvider = new firebase.auth.GoogleAuthProvider();
   
   // Keep db settings
   db.settings({
@@ -46,4 +48,4 @@ try {
   console.error('Falha ao inicializar o Firebase. Verifique seu objeto firebaseConfig em `services/firebase.ts`.', error);
 }
 
-export { db, storage, auth, functions };
+export { db, storage, auth, functions, googleProvider };
