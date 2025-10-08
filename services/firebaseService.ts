@@ -1,6 +1,4 @@
-// FIX: Added an import for the 'firebase/compat/app' module.
-// This resolves an error where the 'firebase.User' type was not recognized because the 'firebase' namespace was not available in this file.
-import firebase from 'firebase/compat/app';
+
 import { db, storage, functions } from './firebase.ts';
 import { seedDatabase as seedDb } from './seed.ts';
 import { Product, Category, OrderDetails, CartItem, Order, SiteSettings, UserProfile, OrderStatus, PaymentStatus } from '../types.ts';
@@ -130,7 +128,7 @@ export const saveSiteSettings = async (settings: SiteSettings, files: { [key: st
 };
 
 // --- Order Management ---
-export const createOrder = async (details: OrderDetails, cartItems: CartItem[], userId?: string | null): Promise<Order> => {
+export const createOrder = async (details: OrderDetails, cartItems: CartItem[]): Promise<Order> => {
     const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const orderData: Omit<Order, 'id'> = {
         customer: {
@@ -149,12 +147,9 @@ export const createOrder = async (details: OrderDetails, cartItems: CartItem[], 
         status: details.orderType === 'local' ? 'reserved' : 'pending',
         paymentStatus: 'pending',
         createdAt: new Date(),
-        userId: userId || null, // Link to user
     };
     const docRef = await db.collection('orders').add(orderData);
-    const newOrder = { id: docRef.id, ...orderData };
-    // We need to cast createdAt because Firestore will convert it to a Timestamp
-    return newOrder as Order;
+    return { id: docRef.id, ...orderData, createdAt: orderData.createdAt };
 };
 
 export const updateOrderStatus = (orderId: string, status: OrderStatus, payload?: any) => db.collection('orders').doc(orderId).update({ status, ...payload });
@@ -162,43 +157,12 @@ export const updateOrderPaymentStatus = (orderId: string, paymentStatus: Payment
 export const updateOrderReservationTime = (orderId: string, reservationTime: string) => db.collection('orders').doc(orderId).update({ 'customer.reservationTime': reservationTime });
 export const deleteOrder = (orderId: string) => db.collection('orders').doc(orderId).update({ status: 'deleted' });
 export const permanentlyDeleteOrder = (orderId: string) => db.collection('orders').doc(orderId).delete();
-export const getOrderById = async (orderId: string): Promise<Order | null> => {
-    const doc = await db.collection('orders').doc(orderId).get();
-    return doc.exists ? { id: doc.id, ...doc.data() } as Order : null;
-};
-export const getOrdersByUserId = (userId: string, onUpdate: (orders: Order[]) => void, onError: (error: Error) => void) => {
-    return db.collection('orders')
-        .where('userId', '==', userId)
-        .orderBy('createdAt', 'desc')
-        .onSnapshot(snapshot => {
-            const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[];
-            onUpdate(orders);
-        }, onError);
-};
 
 // --- Auth & User Profile ---
-export const findOrCreateUserProfile = async (user: firebase.User): Promise<UserProfile> => {
-    const userRef = db.collection('users').doc(user.uid);
-    const doc = await userRef.get();
-
-    if (doc.exists) {
-        return doc.data() as UserProfile;
-    } else {
-        const newUserProfile: UserProfile = {
-            email: user.email,
-            displayName: user.displayName,
-            phone: user.phoneNumber || null,
-        };
-        await userRef.set(newUserProfile);
-        return newUserProfile;
-    }
-};
-
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
     const doc = await db.collection('users').doc(uid).get();
     return doc.exists ? (doc.data() as UserProfile) : null;
 };
-
 
 // --- Database Seeding ---
 export const seedDatabase = async () => seedDb();

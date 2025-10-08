@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { SiteSettings } from '../types.ts';
 
@@ -21,7 +22,6 @@ export const Footer: React.FC<FooterProps> = ({ settings }) => {
                             <li><a href="#sobre" className="hover:text-white">Sobre</a></li>
                             <li><a href="#cardapio" className="hover:text-white">Cardápio</a></li>
                             <li><a href="#contato" className="hover:text-white">Contato</a></li>
-                            <li><a href="#/acompanhar-pedido" className="hover:text-white">Acompanhar Pedido</a></li>
                         </ul>
                     </div>
                     <div>

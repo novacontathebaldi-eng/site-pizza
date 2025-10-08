@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import firebase from 'firebase/compat/app';
 
@@ -74,7 +75,7 @@ export const Header: React.FC<HeaderProps> = ({ logoUrl, cartItemCount, onCartCl
                                 </button>
                                 {isUserMenuOpen && (
                                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
-                                        <a href="#/meus-pedidos" onClick={() => setIsUserMenuOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Meus Pedidos</a>
+                                        <a href="#/meus-pedidos" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Meus Pedidos</a>
                                         <button onClick={handleSignOut} className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Sair</button>
                                     </div>
                                 )}

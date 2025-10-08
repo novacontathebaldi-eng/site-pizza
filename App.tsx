@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header.tsx';
 import { HeroSection } from './components/HeroSection.tsx';
@@ -7,19 +8,16 @@ import { Footer } from './components/Footer.tsx';
 import { AdminSection } from './components/AdminSection.tsx';
 import { CartSidebar } from './components/CartSidebar.tsx';
 import { CheckoutModal } from './components/CheckoutModal.tsx';
+import { OrderConfirmationModal } from './components/OrderConfirmationModal.tsx';
 import { PixPaymentModal } from './components/PixPaymentModal.tsx';
 import { AuthModal } from './components/AuthModal.tsx';
-import * as firebaseService from './services/firebaseService.ts';
-import { auth } from './services/firebase.ts';
-import { Product, Category, CartItem, SiteSettings, Order, OrderDetails, UserProfile, OrderStatus, PaymentStatus, OrderConfirmation } from './types.ts';
-import firebase from 'firebase/compat/app';
-
-// New components for Phase 4
 import { MyOrdersPage } from './components/MyOrdersPage.tsx';
 import { TrackOrderPage } from './components/TrackOrderPage.tsx';
-import { OrderConfirmationModal } from './components/OrderConfirmationModal.tsx';
 import { DynamicContentSection } from './components/DynamicContentSection.tsx';
-
+import * as firebaseService from './services/firebaseService.ts';
+import { auth } from './services/firebase.ts';
+import { Product, Category, CartItem, SiteSettings, Order, OrderDetails, UserProfile, OrderStatus, PaymentStatus } from './types.ts';
+import firebase from 'firebase/compat/app';
 
 const App: React.FC = () => {
     // Data state
@@ -35,13 +33,11 @@ const App: React.FC = () => {
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
-    const [confirmedOrder, setConfirmedOrder] = useState<OrderConfirmation | null>(null);
+    const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
     const [isPixModalOpen, setIsPixModalOpen] = useState(false);
     const [pixOrder, setPixOrder] = useState<Order | null>(null);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [toasts, setToasts] = useState<{ id: number, message: string, type: 'success' | 'error' }[]>([]);
-    const [currentView, setCurrentView] = useState('home');
-
 
     // Menu state
     const [activeCategoryId, setActiveCategoryId] = useState('');
@@ -65,26 +61,6 @@ const App: React.FC = () => {
     };
 
     // --- Effects for data fetching and subscriptions ---
-    useEffect(() => {
-        const handleHashChange = () => {
-            const hash = window.location.hash;
-            if (hash.startsWith('#/meus-pedidos')) {
-                setCurrentView('my-orders');
-            } else if (hash.startsWith('#/acompanhar-pedido')) {
-                setCurrentView('track-order');
-            } else if (hash.startsWith('#admin')) {
-                setCurrentView('admin');
-            } else {
-                setCurrentView('home');
-            }
-        };
-
-        window.addEventListener('hashchange', handleHashChange);
-        handleHashChange(); // Initial check
-
-        return () => window.removeEventListener('hashchange', handleHashChange);
-    }, []);
-
     useEffect(() => {
         const onDataUpdate = (data: { products?: Product[], categories?: Category[], siteSettings?: SiteSettings, isOnline?: boolean }) => {
             if (data.products) setProducts(data.products);
@@ -126,8 +102,7 @@ const App: React.FC = () => {
         const unsubscribe = auth.onAuthStateChanged(async (user) => {
             setCurrentUser(user);
             if (user) {
-                // Use findOrCreate to ensure profile exists
-                const profile = await firebaseService.findOrCreateUserProfile(user);
+                const profile = await firebaseService.getUserProfile(user.uid);
                 setUserProfile(profile);
             } else {
                 setUserProfile(null);
@@ -136,7 +111,6 @@ const App: React.FC = () => {
         });
         return () => unsubscribe();
     }, []);
-
 
     // --- Cart Management ---
     const handleAddToCart = (product: Product, size: string, price: number) => {
@@ -177,21 +151,20 @@ const App: React.FC = () => {
     // --- Checkout Flow ---
     const handleCheckout = () => {
         setIsCartOpen(false);
-        setIsCheckoutOpen(true);
+        if (currentUser) {
+            setIsCheckoutOpen(true);
+        } else {
+            setIsAuthModalOpen(true);
+        }
     };
 
     const handleConfirmCheckout = async (details: OrderDetails) => {
         try {
-            const newOrder = await firebaseService.createOrder(details, cartItems, currentUser?.uid);
+            const newOrder = await firebaseService.createOrder(details, cartItems);
+            setConfirmedOrder(newOrder);
             setIsCheckoutOpen(false);
+            setIsConfirmationOpen(true);
             setCartItems([]);
-            if (currentUser) {
-                addToast("Pedido enviado com sucesso!", "success");
-                window.location.hash = '#/meus-pedidos';
-            } else {
-                setConfirmedOrder({ id: newOrder.id, total: newOrder.total, customerName: newOrder.customer.name });
-                setIsConfirmationOpen(true);
-            }
         } catch (error) {
             console.error("Error creating order:", error);
             addToast("Erro ao finalizar o pedido. Tente novamente.", "error");
@@ -200,7 +173,7 @@ const App: React.FC = () => {
 
     const handleInitiatePixPayment = async (details: OrderDetails) => {
         try {
-            const newOrder = await firebaseService.createOrder(details, cartItems, currentUser?.uid);
+            const newOrder = await firebaseService.createOrder(details, cartItems);
             setPixOrder(newOrder);
             setIsCheckoutOpen(false);
             setIsPixModalOpen(true);
@@ -211,36 +184,47 @@ const App: React.FC = () => {
     };
     
     const handlePaymentSuccess = (paidOrder: Order) => {
+        setConfirmedOrder(paidOrder);
         setIsPixModalOpen(false);
+        setIsConfirmationOpen(true);
         setCartItems([]);
-        if (currentUser) {
-            addToast("Pagamento aprovado! Pedido enviado.", "success");
-            window.location.hash = '#/meus-pedidos';
-        } else {
-            setConfirmedOrder({ id: paidOrder.id, total: paidOrder.total, customerName: paidOrder.customer.name });
-            setIsConfirmationOpen(true);
-        }
     };
 
     // --- Admin Functions ---
-    const onSaveProduct = async (product: Product) => { await firebaseService.saveProduct(product); addToast('Produto salvo com sucesso!', 'success'); };
-    const onDeleteProduct = async (productId: string) => { await firebaseService.deleteProduct(productId); addToast('Produto excluído!', 'success'); };
+    const onSaveProduct = async (product: Product) => {
+        await firebaseService.saveProduct(product);
+        addToast('Produto salvo com sucesso!', 'success');
+    };
+    const onDeleteProduct = async (productId: string) => {
+        await firebaseService.deleteProduct(productId);
+        addToast('Produto excluído!', 'success');
+    };
     const onProductStatusChange = async (productId: string, active: boolean) => await firebaseService.updateProductStatus(productId, active);
     const onProductStockStatusChange = async (productId: string, stockStatus: 'available' | 'out_of_stock') => await firebaseService.updateProductStockStatus(productId, stockStatus);
     const onStoreStatusChange = async (isOnline: boolean) => await firebaseService.setStoreStatus(isOnline);
-    const onSaveCategory = async (category: Category) => { await firebaseService.saveCategory(category); addToast('Categoria salva com sucesso!', 'success'); };
-    const onDeleteCategory = async (categoryId: string) => { await firebaseService.deleteCategory(categoryId); addToast('Categoria excluída!', 'success'); };
+    const onSaveCategory = async (category: Category) => {
+        await firebaseService.saveCategory(category);
+        addToast('Categoria salva com sucesso!', 'success');
+    };
+    const onDeleteCategory = async (categoryId: string) => {
+        await firebaseService.deleteCategory(categoryId);
+        addToast('Categoria excluída!', 'success');
+    };
     const onCategoryStatusChange = async (categoryId: string, active: boolean) => await firebaseService.updateCategoryStatus(categoryId, active);
     const onReorderProducts = async (updates: {id: string, orderIndex: number}[]) => await firebaseService.reorderProducts(updates);
     const onReorderCategories = async (updates: {id: string, order: number}[]) => await firebaseService.reorderCategories(updates);
     const onSeedDatabase = async () => await firebaseService.seedDatabase();
-    const onSaveSiteSettings = async (settings: SiteSettings, files: {[key: string]: File | null}) => { await firebaseService.saveSiteSettings(settings, files); addToast('Configurações salvas!', 'success'); };
+    const onSaveSiteSettings = async (settings: SiteSettings, files: {[key: string]: File | null}) => {
+        await firebaseService.saveSiteSettings(settings, files);
+        addToast('Configurações salvas!', 'success');
+    };
     const onUpdateOrderStatus = async (orderId: string, status: OrderStatus, payload?: any) => await firebaseService.updateOrderStatus(orderId, status, payload);
     const onUpdateOrderPaymentStatus = async (orderId: string, paymentStatus: PaymentStatus) => await firebaseService.updateOrderPaymentStatus(orderId, paymentStatus);
     const onUpdateOrderReservationTime = async (orderId: string, reservationTime: string) => await firebaseService.updateOrderReservationTime(orderId, reservationTime);
     const onDeleteOrder = async (orderId: string) => await firebaseService.deleteOrder(orderId);
     const onPermanentDeleteOrder = async (orderId: string) => await firebaseService.permanentlyDeleteOrder(orderId);
     
+
     if (isLoading || !siteSettings) {
         return <div className="min-h-screen flex items-center justify-center bg-brand-ivory-50"><i className="fas fa-spinner fa-spin text-4xl text-accent"></i></div>;
     }
@@ -249,46 +233,39 @@ const App: React.FC = () => {
         return <div className="min-h-screen flex items-center justify-center bg-red-50 text-red-700 p-4">{error}</div>;
     }
     
+    // Simple routing based on hash
     const renderPage = () => {
-        switch(currentView) {
-            case 'my-orders':
-                if (!isAuthLoading && !currentUser) {
-                    window.location.hash = ''; // Redirect home
-                    setIsAuthModalOpen(true);
-                    return null;
-                }
-                return <MyOrdersPage currentUser={currentUser} />;
-            case 'track-order':
-                return <TrackOrderPage />;
-            case 'admin':
-                return null; // AdminSection is rendered outside this router
-            case 'home':
-            default:
-                 return (
-                    <>
-                        <HeroSection settings={siteSettings} />
-                        {siteSettings.contentSections?.filter(s => s.isVisible).sort((a,b) => a.order - b.order).map((section, index) => (
-                            <DynamicContentSection key={section.id} section={section} order={index} />
-                        ))}
-                        <MenuSection
-                            categories={categories}
-                            products={products}
-                            onAddToCart={handleAddToCart}
-                            isStoreOnline={isStoreOnline}
-                            activeCategoryId={activeCategoryId}
-                            setActiveCategoryId={setActiveCategoryId}
-                            suggestedNextCategoryId={suggestedNextCategoryId}
-                            setSuggestedNextCategoryId={setSuggestedNextCategoryId}
-                            cartItemCount={cartItems.length}
-                            onCartClick={() => setIsCartOpen(true)}
-                            showFinalizeButtonTrigger={showFinalizeButtonTrigger}
-                            setShowFinalizeButtonTrigger={setShowFinalizeButtonTrigger}
-                        />
-                        <ContactSection />
-                    </>
-                );
+        const hash = window.location.hash;
+        if (hash.startsWith('#/meus-pedidos')) return <MyOrdersPage />;
+        if (hash.startsWith('#/acompanhar/')) {
+            const orderId = hash.split('/')[2];
+            return <TrackOrderPage orderId={orderId} />;
         }
-    };
+
+        return (
+            <>
+                <HeroSection settings={siteSettings} />
+                {siteSettings.contentSections?.filter(s => s.isVisible).sort((a,b) => a.order - b.order).map((section, index) => (
+                    <DynamicContentSection key={section.id} section={section} order={index} />
+                ))}
+                <MenuSection
+                    categories={categories}
+                    products={products}
+                    onAddToCart={handleAddToCart}
+                    isStoreOnline={isStoreOnline}
+                    activeCategoryId={activeCategoryId}
+                    setActiveCategoryId={setActiveCategoryId}
+                    suggestedNextCategoryId={suggestedNextCategoryId}
+                    setSuggestedNextCategoryId={setSuggestedNextCategoryId}
+                    cartItemCount={cartItems.length}
+                    onCartClick={() => setIsCartOpen(true)}
+                    showFinalizeButtonTrigger={showFinalizeButtonTrigger}
+                    setShowFinalizeButtonTrigger={setShowFinalizeButtonTrigger}
+                />
+                <ContactSection />
+            </>
+        );
+    }
 
     return (
         <div className="bg-brand-ivory-50">
@@ -321,74 +298,4 @@ const App: React.FC = () => {
                 onDeleteCategory={onDeleteCategory}
                 onCategoryStatusChange={onCategoryStatusChange}
                 onReorderProducts={onReorderProducts}
-                onReorderCategories={onReorderCategories}
-                onSeedDatabase={onSeedDatabase}
-                onSaveSiteSettings={onSaveSiteSettings}
-                onUpdateOrderStatus={onUpdateOrderStatus}
-                onUpdateOrderPaymentStatus={onUpdateOrderPaymentStatus}
-                onUpdateOrderReservationTime={onUpdateOrderReservationTime}
-                onDeleteOrder={onDeleteOrder}
-                onPermanentDeleteOrder={onPermanentDeleteOrder}
-            />
-
-            <CartSidebar 
-                isOpen={isCartOpen}
-                onClose={() => setIsCartOpen(false)}
-                cartItems={cartItems}
-                onUpdateQuantity={handleUpdateQuantity}
-                onCheckout={handleCheckout}
-                isStoreOnline={isStoreOnline}
-                categories={categories}
-                products={products}
-                setActiveCategoryId={setActiveCategoryId}
-            />
-            
-            {isCheckoutOpen && (
-                <CheckoutModal 
-                    isOpen={isCheckoutOpen}
-                    onClose={() => setIsCheckoutOpen(false)}
-                    cartItems={cartItems}
-                    onConfirmCheckout={handleConfirmCheckout}
-                    onInitiatePixPayment={handleInitiatePixPayment}
-                    currentUser={currentUser}
-                    userProfile={userProfile}
-                />
-            )}
-
-            {isPixModalOpen && pixOrder && (
-                <PixPaymentModal
-                    order={pixOrder}
-                    onClose={() => setIsPixModalOpen(false)}
-                    onPaymentSuccess={handlePaymentSuccess}
-                />
-            )}
-
-            {isConfirmationOpen && (
-                 <OrderConfirmationModal
-                    isOpen={isConfirmationOpen}
-                    onClose={() => setIsConfirmationOpen(false)}
-                    order={confirmedOrder}
-                />
-            )}
-            
-            {isAuthModalOpen && (
-                <AuthModal 
-                    isOpen={isAuthModalOpen}
-                    onClose={() => setIsAuthModalOpen(false)}
-                    addToast={addToast}
-                />
-            )}
-
-             {/* Toasts Container */}
-            <div className="fixed bottom-5 right-5 z-[100] space-y-2">
-                {toasts.map(toast => (
-                    <div key={toast.id} className={`px-4 py-2 rounded-lg shadow-lg text-white font-semibold animate-fade-in-up ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
-                        {toast.message}
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-};
-
-export default App;
+                onReorderCategories={onReorder

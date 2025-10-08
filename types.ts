@@ -1,3 +1,4 @@
+
 export interface Product {
     id: string;
     name: string;
@@ -53,7 +54,6 @@ export interface Order {
     createdAt: any; // firebase.firestore.Timestamp
     pickupTimeEstimate?: string;
     mercadoPagoPaymentId?: string;
-    userId?: string | null; // Link to the user who placed the order
 }
 
 export interface OrderDetails {
@@ -73,12 +73,6 @@ export interface UserProfile {
     email: string | null;
     phone: string | null;
     // any other fields
-}
-
-export interface OrderConfirmation {
-    id: string;
-    total: number;
-    customerName: string;
 }
 
 export interface ContentSectionListItem {
