@@ -10,6 +10,7 @@ import { CSS } from '@dnd-kit/utilities';
 import firebase from 'firebase/compat/app';
 import { auth } from '../services/firebase';
 import { SupportModal } from './SupportModal';
+import notificationSound from '../assets/notf1.mp3';
 
 interface AdminSectionProps {
     allProducts: Product[];
@@ -182,7 +183,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         return saved !== 'false'; // Enabled by default
     });
     const prevPendingOrdersCount = useRef(0);
-    const audioContextRef = useRef<AudioContext | null>(null);
+    const audioRef = useRef<HTMLAudioElement>(null);
 
 
     useEffect(() => setLocalProducts(allProducts), [allProducts]);
@@ -235,30 +236,10 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
     const pendingOrdersCount = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
 
-    // Effect for sound notification
+    // Effect for sound notification using HTML <audio> element
     useEffect(() => {
-        const playSound = () => {
-            if (!audioContextRef.current) {
-                try {
-                    audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-                } catch (e) {
-                    console.error("Web Audio API is not supported in this browser.");
-                    return;
-                }
-            }
-            const oscillator = audioContextRef.current.createOscillator();
-            const gainNode = audioContextRef.current.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContextRef.current.destination);
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(440, audioContextRef.current.currentTime); // A4 note
-            gainNode.gain.setValueAtTime(0.5, audioContextRef.current.currentTime);
-            oscillator.start();
-            oscillator.stop(audioContextRef.current.currentTime + 0.2);
-        };
-
         if (isSoundEnabled && user && pendingOrdersCount > prevPendingOrdersCount.current) {
-            playSound();
+            audioRef.current?.play().catch(error => console.error("Audio play failed:", error));
         }
         prevPendingOrdersCount.current = pendingOrdersCount;
     }, [pendingOrdersCount, isSoundEnabled, user]);
@@ -268,11 +249,20 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         const newState = !isSoundEnabled;
         setIsSoundEnabled(newState);
         localStorage.setItem('soundNotificationEnabled', String(newState));
-         // Initialize AudioContext on user interaction
-        if (newState && !audioContextRef.current) {
-             try {
-                audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-            } catch (e) { console.error("Could not create AudioContext."); }
+
+        // Mobile/iOS unlock: play and immediately pause on the first user interaction
+        // to grant permission for programmatic playback later.
+        if (newState && audioRef.current) {
+            const playPromise = audioRef.current.play();
+            if (playPromise !== undefined) {
+                playPromise.then(_ => {
+                    audioRef.current?.pause();
+                }).catch(error => {
+                    // Autoplay was prevented. This is expected on some browsers.
+                    // The user interaction of clicking the button is what matters.
+                    console.info("Audio unlock interaction complete.", error);
+                });
+            }
         }
     };
 
@@ -437,6 +427,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
     return (
         <>
+            <audio ref={audioRef} src={notificationSound} preload="auto" />
             <section id="admin" className="py-20 bg-brand-ivory-50">
                 <div className="container mx-auto px-4">
                     <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
