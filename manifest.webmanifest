@@ -2,7 +2,7 @@
   "name": "Pizzaria Santa Sensação",
   "short_name": "Santa Sensação",
   "description": "A pizza nº 1 do Espírito Santo, premiada no Panshow 2025 e com a assinatura do mestre Luca Lonardi.",
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#EDF5E8",
   "theme_color": "#2C5633",
