@@ -390,6 +390,45 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         }
     }, [filteredOrders, activeOrdersTab]);
     
+    const scrollToContent = (elementId: string) => {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+    
+        const mainHeaderHeight = 80; // Height of the main sticky header
+        let totalOffset = mainHeaderHeight;
+    
+        // Check if the sticky order tabs are visible and add their height
+        if (activeTab === 'orders') {
+            const orderTabsHeader = document.getElementById('sticky-order-tabs');
+            if (orderTabsHeader) {
+                // Check if it's actually sticky (in the viewport)
+                const rect = orderTabsHeader.getBoundingClientRect();
+                if (rect.top <= mainHeaderHeight) {
+                    totalOffset += orderTabsHeader.offsetHeight;
+                }
+            }
+        }
+    
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - totalOffset;
+    
+        window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
+        });
+    };
+
+    const handleMainTabClick = (tab: string) => {
+        setActiveTab(tab);
+        setTimeout(() => scrollToContent(`admin-content-${tab}`), 50);
+    };
+
+    const handleOrderSubTabClick = (tabKey: OrderTabKey) => {
+        setActiveOrdersTab(tabKey);
+        setTimeout(() => scrollToContent('order-list-container'), 50);
+    };
+
+
     if (!showAdminPanel) return null;
     if (authLoading) return <section id="admin" className="py-20 bg-brand-ivory-50"><div className="text-center"><i className="fas fa-spinner fa-spin text-4xl text-accent"></i></div></section>;
     if (!user) return (<> <section id="admin" className="py-20 bg-brand-ivory-50"> <div className="container mx-auto px-4 max-w-md"> <div className="bg-white p-8 rounded-2xl shadow-lg border"> <h2 className="text-3xl font-bold text-center mb-6"><i className="fas fa-shield-alt mr-2"></i>Painel</h2> <form onSubmit={handleLogin}> <div className="mb-4"> <label className="block font-semibold mb-2" htmlFor="admin-email">Email</label> <input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> <div className="mb-6"> <label className="block font-semibold mb-2" htmlFor="admin-password">Senha</label> <input id="admin-password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> {error && <div className="text-red-600 mb-4 bg-red-50 p-3 rounded-lg border border-red-200">{error}</div>} <button type="submit" className="w-full bg-accent text-white font-bold py-3 rounded-lg hover:bg-opacity-90 disabled:bg-opacity-70 flex justify-center" disabled={isLoggingIn}>{isLoggingIn ? <i className="fas fa-spinner fa-spin"></i> : 'Entrar'}</button> </form> </div> </div> </section> <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} /> </>);
@@ -423,7 +462,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                         <button 
                                             key={tab} 
                                             id={`admin-tab-${tab}`}
-                                            onClick={() => setActiveTab(tab)} 
+                                            onClick={() => handleMainTabClick(tab)} 
                                             className={`relative flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === tab ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}
                                         >
                                             <i className={`fas ${icons[tab]} w-5 text-center`}></i> <span>{labels[tab]}</span>
@@ -434,9 +473,9 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                             </div>
                         </div>
 
-                        {activeTab === 'status' && ( <div> <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3> <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg"> <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer"> <input type="checkbox" id="store-status-toggle" className="sr-only peer" checked={isStoreOnline} onChange={e => onStoreStatusChange(e.target.checked)} /> <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600"></div> </label> <span className={`font-semibold text-lg ${isStoreOnline ? 'text-green-600' : 'text-red-600'}`}>{isStoreOnline ? 'Aberta' : 'Fechada'}</span> </div> </div> )}
+                        <div id="admin-content-status"> {activeTab === 'status' && ( <div> <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3> <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg"> <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer"> <input type="checkbox" id="store-status-toggle" className="sr-only peer" checked={isStoreOnline} onChange={e => onStoreStatusChange(e.target.checked)} /> <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600"></div> </label> <span className={`font-semibold text-lg ${isStoreOnline ? 'text-green-600' : 'text-red-600'}`}>{isStoreOnline ? 'Aberta' : 'Fechada'}</span> </div> </div> )} </div>
                         
-                        {activeTab === 'orders' && (
+                        <div id="admin-content-orders"> {activeTab === 'orders' && (
                              <div>
                                 <h3 className="text-xl font-bold mb-4">Gerenciar Pedidos</h3>
                                 <div className="bg-gray-50 p-3 rounded-lg border mb-4">
@@ -479,7 +518,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                 )}
 
                                 <div className="border-t pt-4">
-                                    <div className="sticky top-20 bg-brand-ivory-50/95 backdrop-blur-sm z-30 shadow-sm -mx-8">
+                                    <div id="sticky-order-tabs" className="sticky top-20 bg-brand-ivory-50/95 backdrop-blur-sm z-30 shadow-sm -mx-8">
                                         <div className="border-b">
                                             <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide px-8">
                                                 {!isTrashVisible && OrderStatusTabs.map(tabKey => {
@@ -489,7 +528,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                     <button 
                                                         key={tabKey} 
                                                         id={`order-status-tab-${tabKey}`}
-                                                        onClick={() => setActiveOrdersTab(tabKey)} 
+                                                        onClick={() => handleOrderSubTabClick(tabKey)} 
                                                         className={`relative flex-shrink-0 inline-flex items-center gap-2 py-2 px-4 font-semibold text-sm ${activeOrdersTab === tabKey && !isTrashVisible ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}
                                                     >
                                                         {{accepted: 'Aceitos', reserved: 'Reservas', pronto: 'Prontos', emRota: 'Em Rota', completed: 'Finalizados', cancelled: 'Cancelados'}[tabKey]}
@@ -502,7 +541,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                         </div>
                                     </div>
 
-                                    <div className="mt-4 space-y-4">
+                                    <div id="order-list-container" className="mt-4 space-y-4">
                                         {isTrashVisible ? (
                                             deletedOrders.length > 0 ? deletedOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>
                                         ) : (
@@ -518,12 +557,12 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                     </div>
                                 </div>
                             </div>
-                        )}
+                        )} </div>
                         
-                        {activeTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> )}
-                        {activeTab === 'products' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Produtos</h3> <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Produto</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}> <div className="space-y-6"> {localCategories.map(category => { const categoryProducts = localProducts.filter(p => p.categoryId === category.id).sort((a, b) => a.orderIndex - b.orderIndex); return ( <div key={category.id}> <h4 className={`text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4> <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3 min-h-[50px]"> {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} />)} </div> </SortableContext> </div> ) })} </div> </DndContext> </div> )}
-                        {activeTab === 'categories' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Categorias</h3> <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Categoria</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}> <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localCategories.map(cat => <SortableCategoryItem key={cat.id} category={cat} onEdit={handleEditCategory} onDelete={onDeleteCategory} onStatusChange={onCategoryStatusChange} />)} </div> </SortableContext> </DndContext> </div> )}
-                        {activeTab === 'data' && ( <div> <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus dados.</p> <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados iniciais. Use apenas uma vez.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> )}
+                        <div id="admin-content-customization"> {activeTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> )} </div>
+                        <div id="admin-content-products"> {activeTab === 'products' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Produtos</h3> <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Produto</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}> <div className="space-y-6"> {localCategories.map(category => { const categoryProducts = localProducts.filter(p => p.categoryId === category.id).sort((a, b) => a.orderIndex - b.orderIndex); return ( <div key={category.id}> <h4 className={`text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4> <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3 min-h-[50px]"> {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} />)} </div> </SortableContext> </div> ) })} </div> </DndContext> </div> )} </div>
+                        <div id="admin-content-categories"> {activeTab === 'categories' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Categorias</h3> <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Categoria</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}> <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localCategories.map(cat => <SortableCategoryItem key={cat.id} category={cat} onEdit={handleEditCategory} onDelete={onDeleteCategory} onStatusChange={onCategoryStatusChange} />)} </div> </SortableContext> </DndContext> </div> )} </div>
+                        <div id="admin-content-data"> {activeTab === 'data' && ( <div> <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus dados.</p> <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados iniciais. Use apenas uma vez.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> )} </div>
                     </div>
                 </div>
             </section>
