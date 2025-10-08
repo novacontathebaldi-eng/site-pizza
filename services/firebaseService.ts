@@ -1,191 +1,189 @@
+
+import { db, storage, functions, auth } from './firebase';
+import { Product, Category, SiteSettings, Order, OrderDetails, UserProfile, UserAddress } from '../types';
 import firebase from 'firebase/compat/app';
-import { db, storage, functions } from './firebase';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, UserProfile } from '../types';
+import { seedDatabase as seed } from './seed';
 
-export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const statusRef = db.doc('store_config/status');
-    await statusRef.set({ isOpen: isOnline }, { merge: true });
+// Re-export seed function
+export const seedDatabase = seed;
+
+// --- DATA SUBSCRIPTIONS ---
+
+export const onStoreDataChange = (
+    callback: (data: { products: Product[], categories: Category[], settings: SiteSettings, isOnline: boolean }) => void
+) => {
+    let products: Product[] = [];
+    let categories: Category[] = [];
+    let settings: SiteSettings | null = null;
+    let isOnline: boolean | null = null;
+
+    const maybeCallback = () => {
+        if (products && categories && settings && isOnline !== null) {
+            callback({ products, categories, settings, isOnline });
+        }
+    };
+
+    const unsubProducts = db.collection('products').onSnapshot(snapshot => {
+        products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+        maybeCallback();
+    });
+
+    const unsubCategories = db.collection('categories').onSnapshot(snapshot => {
+        categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
+        maybeCallback();
+    });
+
+    const unsubSettings = db.collection('store_config').doc('site_settings').onSnapshot(doc => {
+        settings = doc.data() as SiteSettings;
+        maybeCallback();
+    });
+    
+    const unsubStatus = db.collection('store_config').doc('status').onSnapshot(doc => {
+        isOnline = doc.data()?.isOpen ?? false;
+        maybeCallback();
+    });
+
+    return () => {
+        unsubProducts();
+        unsubCategories();
+        unsubSettings();
+        unsubStatus();
+    };
 };
 
-// Image Upload Function
+export const onOrdersChange = (callback: (orders: Order[]) => void) => {
+    return db.collection('orders').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+        const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+        callback(orders);
+    });
+};
+
+
+// --- PRODUCT MANAGEMENT ---
+
+export const saveProduct = async (product: Product): Promise<void> => {
+    if (product.id) {
+        await db.collection('products').doc(product.id).update(product);
+    } else {
+        await db.collection('products').add(product);
+    }
+};
+
+export const deleteProduct = (productId: string) => db.collection('products').doc(productId).delete();
+export const updateProductStatus = (productId: string, active: boolean) => db.collection('products').doc(productId).update({ active });
+export const updateProductStockStatus = (productId: string, stockStatus: 'available' | 'out_of_stock') => db.collection('products').doc(productId).update({ stockStatus });
+export const onReorderProducts = async (updates: { id: string; orderIndex: number }[]) => {
+    const batch = db.batch();
+    updates.forEach(update => {
+        const docRef = db.collection('products').doc(update.id);
+        batch.update(docRef, { orderIndex: update.orderIndex });
+    });
+    await batch.commit();
+};
+
+
+// --- CATEGORY MANAGEMENT ---
+
+export const saveCategory = async (category: Category): Promise<void> => {
+    if (category.id) {
+        await db.collection('categories').doc(category.id).update(category);
+    } else {
+        const countSnapshot = await db.collection('categories').get();
+        const newCategory = { ...category, order: countSnapshot.docs.length };
+        await db.collection('categories').add(newCategory);
+    }
+};
+
+export const deleteCategory = (categoryId: string) => db.collection('categories').doc(categoryId).delete();
+export const updateCategoryStatus = (categoryId: string, active: boolean) => db.collection('categories').doc(categoryId).update({ active });
+export const onReorderCategories = async (updates: { id: string; order: number }[]) => {
+    const batch = db.batch();
+    updates.forEach(update => {
+        const docRef = db.collection('categories').doc(update.id);
+        batch.update(docRef, { order: update.order });
+    });
+    await batch.commit();
+};
+
+
+// --- STORE & SITE SETTINGS ---
+
+export const updateStoreStatus = (isOnline: boolean) => db.collection('store_config').doc('status').set({ isOpen: isOnline });
+
 export const uploadImage = async (file: File): Promise<string> => {
-    if (!storage) {
-        throw new Error("Firebase Storage não está inicializado.");
+    if (!storage) throw new Error("Firebase Storage is not initialized.");
+    const storageRef = storage.ref();
+    const fileRef = storageRef.child(`site-images/${new Date().getTime()}_${file.name}`);
+    await fileRef.put(file);
+    return fileRef.getDownloadURL();
+};
+
+export const saveSiteSettings = async (settings: SiteSettings, files: { [key: string]: File | null }): Promise<void> => {
+    let updatedSettings = { ...settings };
+    for (const key in files) {
+        if (files[key]) {
+            const file = files[key] as File;
+            const url = await uploadImage(file);
+            if (key === 'logo') updatedSettings.logoUrl = url;
+            if (key === 'heroBg') updatedSettings.heroBgUrl = url;
+            // Handle content section images
+            if (updatedSettings.contentSections.some(s => s.id === key)) {
+                updatedSettings.contentSections = updatedSettings.contentSections.map(s => s.id === key ? { ...s, imageUrl: url } : s);
+            }
+        }
     }
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `products/${new Date().getTime()}_${Math.random().toString(36).substring(2, 9)}.${fileExtension}`;
-    const storageRef = storage.ref(fileName);
-
-    const snapshot = await storageRef.put(file);
-    const downloadURL = await snapshot.ref.getDownloadURL();
-    
-    return downloadURL;
-};
-
-// Site Asset Upload Function
-export const uploadSiteAsset = async (file: File, assetName: string): Promise<string> => {
-    if (!storage) {
-        throw new Error("Firebase Storage não está inicializado.");
-    }
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `site/${assetName}_${new Date().getTime()}.${fileExtension}`;
-    const storageRef = storage.ref(fileName);
-    
-    const snapshot = await storageRef.put(file);
-    return await snapshot.ref.getDownloadURL();
+    await db.collection('store_config').doc('site_settings').set(updatedSettings, { merge: true });
 };
 
 
-// Product Functions
-export const addProduct = async (productData: Omit<Product, 'id'>): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    await db.collection('products').add(productData);
+// --- ORDER MANAGEMENT ---
+
+export const addOrder = async (orderDetails: OrderDetails, cartItems: CartItem[], total: number, userId?: string): Promise<string> => {
+    const newOrder: Omit<Order, 'id'> = {
+        customer: {
+            name: orderDetails.name,
+            phone: orderDetails.phone,
+            orderType: orderDetails.orderType,
+            address: orderDetails.address,
+            reservationTime: orderDetails.reservationTime,
+        },
+        items: cartItems,
+        total,
+        paymentMethod: orderDetails.paymentMethod,
+        changeNeeded: orderDetails.changeNeeded,
+        changeAmount: orderDetails.changeAmount,
+        notes: orderDetails.notes,
+        status: orderDetails.orderType === 'local' ? 'reserved' : 'pending',
+        paymentStatus: 'pending',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        ...(userId && { userId }),
+    };
+    const docRef = await db.collection('orders').add(newOrder);
+    return docRef.id;
 };
 
-export const updateProduct = async (productId: string, productData: Omit<Product, 'id'>): Promise<void> => {
-    if (!productId) throw new Error("Product ID is missing for update.");
-    if (!db) throw new Error("Firestore is not initialized.");
-    const productRef = db.collection('products').doc(productId);
-    await productRef.update(productData as { [key: string]: any });
+export const updateOrderStatus = (orderId: string, status: Order['status'], payload: any = {}) => db.collection('orders').doc(orderId).update({ status, ...payload });
+export const updateOrderPaymentStatus = (orderId: string, paymentStatus: Order['paymentStatus']) => db.collection('orders').doc(orderId).update({ paymentStatus });
+export const updateOrderReservationTime = (orderId: string, reservationTime: string) => db.collection('orders').doc(orderId).update({ 'customer.reservationTime': reservationTime });
+export const deleteOrder = (orderId: string) => db.collection('orders').doc(orderId).update({ status: 'deleted' });
+export const permanentDeleteOrder = (orderId: string) => db.collection('orders').doc(orderId).delete();
+
+
+// --- PAYMENT FUNCTIONS ---
+
+export const initiateMercadoPagoPixPayment = async (orderId: string): Promise<{ qrCodeBase64: string; copyPaste: string }> => {
+    if (!functions) throw new Error("Firebase Functions not initialized");
+    const createOrderFunction = functions.httpsCallable('createMercadoPagoOrder');
+    const result = await createOrderFunction({ orderId });
+    return result.data;
 };
 
-export const updateProductStatus = async (productId: string, active: boolean): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const productRef = db.collection('products').doc(productId);
-    await productRef.update({ active });
-};
-
-export const updateProductStockStatus = async (productId: string, stockStatus: 'available' | 'out_of_stock'): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const productRef = db.collection('products').doc(productId);
-    await productRef.update({ stockStatus });
-};
-
-export const deleteProduct = async (productId: string): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    if (!productId) throw new Error("Invalid Product ID for deletion.");
-    const productRef = db.collection('products').doc(productId);
-    await productRef.delete();
-};
-
-export const updateProductsOrder = async (productsToUpdate: { id: string; orderIndex: number }[]): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const batch = db.batch();
-    productsToUpdate.forEach(productUpdate => {
-        const productRef = db.collection('products').doc(productUpdate.id);
-        batch.update(productRef, { orderIndex: productUpdate.orderIndex });
-    });
-    await batch.commit();
-};
-
-
-// Category Functions
-export const addCategory = async (categoryData: Omit<Category, 'id'>): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    await db.collection('categories').add(categoryData);
-};
-
-export const updateCategory = async (categoryId: string, categoryData: Omit<Category, 'id'>): Promise<void> => {
-    if (!categoryId) throw new Error("Category ID is missing for update.");
-    if (!db) throw new Error("Firestore is not initialized.");
-    const categoryRef = db.collection('categories').doc(categoryId);
-    await categoryRef.update(categoryData as { [key: string]: any });
-};
-
-export const updateCategoryStatus = async (categoryId: string, active: boolean): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const categoryRef = db.collection('categories').doc(categoryId);
-    await categoryRef.update({ active });
-};
-
-export const deleteCategory = async (categoryId: string, allProducts: Product[]): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    if (!categoryId) throw new Error("Invalid document reference.");
-    
-    const isCategoryInUse = allProducts.some(product => product.categoryId === categoryId);
-    if (isCategoryInUse) {
-        throw new Error("Não é possível excluir esta categoria, pois ela está sendo usada por um ou mais produtos.");
-    }
-
-    const categoryRef = db.collection('categories').doc(categoryId);
-    await categoryRef.delete();
-};
-
-export const updateCategoriesOrder = async (categoriesToUpdate: { id: string; order: number }[]): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const batch = db.batch();
-    categoriesToUpdate.forEach(categoryUpdate => {
-        const categoryRef = db.collection('categories').doc(categoryUpdate.id);
-        batch.update(categoryRef, { order: categoryUpdate.order });
-    });
-    await batch.commit();
-};
-
-// Site Settings Function
-export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const settingsRef = db.doc('store_config/site_settings');
-    await settingsRef.set(settings, { merge: true });
-};
-
-// Order Management Functions
-export const addOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'pickupTimeEstimate'>): Promise<firebase.firestore.DocumentReference> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    return db.collection('orders').add({
-        ...orderData,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-};
-
-export const updateOrderStatus = async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const orderRef = db.collection('orders').doc(orderId);
-    await orderRef.update({ status, ...payload });
-};
-
-export const updateOrderPaymentStatus = async (orderId: string, paymentStatus: PaymentStatus): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const orderRef = db.collection('orders').doc(orderId);
-    await orderRef.update({ paymentStatus });
-};
-
-export const updateOrderReservationTime = async (orderId: string, reservationTime: string): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const orderRef = db.collection('orders').doc(orderId);
-    await orderRef.update({ 'customer.reservationTime': reservationTime });
-};
-
-export const deleteOrder = async (orderId: string): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const orderRef = db.collection('orders').doc(orderId);
-    await orderRef.delete();
-};
-
-// PIX Payment Function
-export const initiateMercadoPagoPixPayment = async (orderId: string): Promise<any> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    const createMercadoPagoOrder = functions.httpsCallable('createMercadoPagoOrder');
-    try {
-        const result = await createMercadoPagoOrder({ orderId });
-        return result.data;
-    } catch (error) {
-        console.error("Error calling createMercadoPagoOrder function:", error);
-        throw new Error("Não foi possível gerar a cobrança PIX. Tente novamente.");
-    }
-};
-
-// --- NEW USER PROFILE FUNCTIONS ---
-
-export const findOrCreateUserProfile = async (user: firebase.User): Promise<UserProfile> => {
-    if (!db) throw new Error("Firestore is not initialized.");
+// --- USER PROFILE MANAGEMENT ---
+export const getOrCreateUserProfile = async (user: firebase.User): Promise<UserProfile> => {
     const userRef = db.collection('users').doc(user.uid);
     const doc = await userRef.get();
-
     if (doc.exists) {
-        return doc.data() as UserProfile;
+        return { uid: doc.id, ...doc.data() } as UserProfile;
     } else {
         const newUserProfile: UserProfile = {
             uid: user.uid,
@@ -193,9 +191,31 @@ export const findOrCreateUserProfile = async (user: firebase.User): Promise<User
             email: user.email || '',
             phone: user.phoneNumber || '',
             addresses: [],
-            createdAt: firebase.firestore.FieldValue.serverTimestamp() as firebase.firestore.Timestamp,
+            createdAt: firebase.firestore.Timestamp.now(),
         };
         await userRef.set(newUserProfile);
         return newUserProfile;
     }
+};
+
+export const onUserProfileChange = (uid: string, callback: (profile: UserProfile | null) => void) => {
+    return db.collection('users').doc(uid).onSnapshot(doc => {
+        if (doc.exists) {
+            callback({ uid: doc.id, ...doc.data() } as UserProfile);
+        } else {
+            callback(null);
+        }
+    });
+};
+
+export const updateUserProfile = (uid: string, data: Partial<UserProfile>) => db.collection('users').doc(uid).update(data);
+
+export const onUserOrdersChange = (userId: string, callback: (orders: Order[]) => void) => {
+    return db.collection('orders')
+        .where('userId', '==', userId)
+        .orderBy('createdAt', 'desc')
+        .onSnapshot(snapshot => {
+            const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+            callback(orders);
+        });
 };
