@@ -17,6 +17,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const messaging = getMessaging(app);
 
+// Add an install event listener for debugging purposes.
+// This will confirm in the browser console that the service worker is being installed.
+self.addEventListener('install', (event) => {
+  console.log('[firebase-messaging-sw.js] Service Worker installing.');
+});
+
 // Handler for background messages.
 // This is triggered when a push notification is received and the page is not in the foreground.
 onBackgroundMessage(messaging, (payload) => {
