@@ -8,9 +8,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import firebase from 'firebase/compat/app';
-import { auth, messaging } from '../services/firebase';
-import { onMessage } from 'firebase/messaging';
-import { saveFcmToken } from '../services/firebaseService';
+import { auth } from '../services/firebase';
 import { SupportModal } from './SupportModal';
 import notificationSound from '../assets/notf1.mp3';
 
@@ -37,7 +35,6 @@ interface AdminSectionProps {
     onUpdateOrderReservationTime: (orderId: string, reservationTime: string) => Promise<void>;
     onDeleteOrder: (orderId: string) => Promise<void>;
     onPermanentDeleteOrder: (orderId: string) => Promise<void>;
-    addToast: (message: string, type?: 'success' | 'error') => void;
 }
 
 interface SortableProductItemProps {
@@ -151,7 +148,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
         onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
-        onDeleteOrder, onPermanentDeleteOrder, addToast
+        onDeleteOrder, onPermanentDeleteOrder
     } = props;
     
     const [user, setUser] = useState<firebase.User | null>(null);
@@ -201,58 +198,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         const unsubscribe = auth.onAuthStateChanged(user => { setUser(user); setAuthLoading(false); });
         return () => unsubscribe();
     }, []);
-
-    // Effect for Push Notifications
-    useEffect(() => {
-        // Only run if a user is logged in and notification/messaging is supported
-        if (user && 'Notification' in window && messaging) {
-            // 1. Request Permission
-            Notification.requestPermission().then((permission) => {
-                if (permission === 'granted') {
-                    console.log('Permissão para notificações concedida.');
-
-                    // AÇÃO NECESSÁRIA: Cole sua chave VAPID gerada no Console do Firebase aqui.
-                    const vapidKey = 'BC2gnsY8mosVWukQS68vWtDr2_ErWOP7m3Dh6mqgxaB7x3BEcszcu41HitgkWc1soZJn3Ezp_3Ieu-WrLONsTgQ';
-
-                    // 2. Get Token
-                    messaging.getToken({ vapidKey }).then((currentToken) => {
-                        if (currentToken) {
-                            console.log('Token FCM obtido:', currentToken);
-                            // 3. Save Token to Database
-                            saveFcmToken(user.uid, currentToken);
-                        } else {
-                            console.log('Nenhum token de registro disponível. É necessário solicitar permissão para gerar um.');
-                        }
-                    }).catch((err) => {
-                        console.log('Ocorreu um erro ao recuperar o token. ', err);
-                    });
-                } else {
-                    console.log('Não foi possível obter permissão para notificar.');
-                }
-            });
-        }
-    }, [user]);
-
-    // Effect for handling FOREGROUND push notifications
-    useEffect(() => {
-        if (messaging && addToast) {
-            const unsubscribe = onMessage(messaging, (payload) => {
-                console.log('Foreground message received.', payload);
-                const { data } = payload;
-                // Read from data payload, as backend now sends data-only messages
-                if (data?.body) {
-                    // Play sound for foreground notification
-                    audioRef.current?.play().catch(error => console.error("Audio play failed:", error));
-                    
-                    // Show an in-app toast instead of a system notification
-                    addToast(`🍕 ${data.body}`, 'success');
-                }
-            });
-
-            return () => unsubscribe();
-        }
-    }, [addToast]);
-
 
     useEffect(() => {
         const handleHashChange = () => setShowAdminPanel(window.location.hash === '#admin');

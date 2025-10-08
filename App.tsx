@@ -638,7 +638,6 @@ const App: React.FC = () => {
                     onUpdateOrderReservationTime={handleUpdateOrderReservationTime}
                     onDeleteOrder={handleDeleteOrder}
                     onPermanentDeleteOrder={handlePermanentDeleteOrder}
-                    addToast={addToast}
                 />
             </main>
 

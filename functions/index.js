@@ -1,7 +1,6 @@
 /* eslint-disable max-len */
 const {onCall} = require("firebase-functions/v2/https");
 const {onRequest} = require("firebase-functions/v2/https");
-const {onDocumentCreated, onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const {MercadoPagoConfig, Payment} = require("mercadopago");
@@ -42,11 +41,16 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
       description: `Pedido #${orderId.substring(0, 8)} - ${orderData.customer.name}`,
       payment_method_id: "pix",
       payer: {
+        // A real email is required, but since we don't collect it,
+        // we use a placeholder. This could be enhanced later.
         email: `cliente_${orderId}@santasensacao.me`,
         first_name: orderData.customer.name.split(" ")[0],
         last_name: orderData.customer.name.split(" ").slice(1).join(" ") || "Cliente",
         identification: {
           type: "CPF",
+          // CPF is required for PIX transactions in Brazil.
+          // Since we don't collect it, we use a dummy value.
+          // For real transactions, this needs to be a valid CPF.
           number: "00000000000",
         },
       },
@@ -71,6 +75,7 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
         throw new Error("Dados PIX não retornados pelo gateway de pagamento.");
     }
 
+    // Save the Mercado Pago payment ID to our order for tracking
     await db.collection("orders").doc(orderId).update({
       mercadoPagoPaymentId: paymentId,
     });
@@ -100,6 +105,7 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
   const {action, data} = request.body;
   logger.info("Webhook do Mercado Pago recebido:", request.body);
 
+  // We only care about payment updates
   if (action !== "payment.updated") {
     logger.info(`Ação '${action}' ignorada.`);
     response.status(200).send("OK");
@@ -114,6 +120,7 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
   }
 
   try {
+    // Security Best Practice: Fetch the payment from Mercado Pago to verify the webhook
     const payment = new Payment(client);
     const paymentInfo = await payment.get({id: paymentId});
 
@@ -138,109 +145,4 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
     logger.error(`Erro ao processar webhook para o pagamento ${paymentId}:`, error.cause || error.message);
     response.status(500).send("Internal Server Error");
   }
-});
-
-/**
- * Sends a push notification to all admins when a new pending order is created.
- */
-exports.sendPushOnNewOrder = onDocumentCreated("orders/{orderId}", async (event) => {
-  const orderData = event.data.data();
-  const orderId = event.params.orderId;
-
-  // Only send notification for new pending orders
-  if (orderData.status !== "pending") {
-    logger.info(`Order ${orderId} created with status '${orderData.status}', no notification sent.`);
-    return null;
-  }
-
-  logger.info(`New pending order detected: ${orderId}. Preparing to send notifications.`);
-
-  // Get all saved FCM tokens for admins
-  const tokensSnapshot = await db.collection("fcmTokens").get();
-  if (tokensSnapshot.empty) {
-    logger.info("No FCM tokens found. No notifications will be sent.");
-    return null;
-  }
-
-  const tokens = tokensSnapshot.docs.map((doc) => doc.id);
-
-  // Use a data-only payload to give the service worker full control.
-  const payload = {
-    data: {
-      type: "NEW_ORDER", // Add a type for the SW to identify the message
-      title: "🍕 Novo Pedido na Santa Sensação!",
-      body: `Novo pedido de ${orderData.customer.name} no valor de R$${orderData.total.toFixed(2).replace(".", ",")}.`,
-      icon: "https://www.santasensacao.me/assets/logo para icones.png",
-      url: "/#admin",
-      orderId: orderId,
-    },
-    webpush: {
-      notification: {
-        // The tag is crucial for identifying the notification to dismiss it later.
-        tag: orderId,
-      },
-    },
-  };
-
-  logger.info(`Sending notification to ${tokens.length} device(s).`);
-
-  // Send notifications to all tokens
-  const response = await admin.messaging().sendToDevice(tokens, payload);
-  const tokensToRemove = [];
-
-  response.results.forEach((result, index) => {
-    const error = result.error;
-    if (error) {
-      logger.error(`Failure sending notification to ${tokens[index]}`, error);
-      // Cleanup the tokens that are not registered anymore.
-      if (error.code === "messaging/invalid-registration-token" ||
-          error.code === "messaging/registration-token-not-registered") {
-        tokensToRemove.push(tokensSnapshot.docs[index].ref.delete());
-      }
-    }
-  });
-
-  return Promise.all(tokensToRemove);
-});
-
-/**
- * Sends a silent push notification to dismiss the "New Order" notification
- * when an order status changes from 'pending' to 'accepted' or 'reserved'.
- */
-exports.onOrderStatusUpdate = onDocumentUpdated("orders/{orderId}", async (event) => {
-  const before = event.data.before.data();
-  const after = event.data.after.data();
-  const orderId = event.params.orderId;
-
-  // Check if the status changed from pending to an accepted state
-  const wasPending = before.status === "pending";
-  const isAccepted = after.status === "accepted" || after.status === "reserved";
-
-  if (wasPending && isAccepted) {
-    logger.info(`Order ${orderId} was accepted. Sending dismiss notification.`);
-
-    // Get all admin FCM tokens
-    const tokensSnapshot = await db.collection("fcmTokens").get();
-    if (tokensSnapshot.empty) {
-      logger.info("No FCM tokens found for dismiss notification.");
-      return null;
-    }
-    const tokens = tokensSnapshot.docs.map((doc) => doc.id);
-
-    // Create a data-only (silent) payload
-    const payload = {
-      data: {
-        type: "DISMISS_NOTIFICATION",
-        orderId: orderId,
-      },
-    };
-
-    logger.info(`Sending dismiss message for order ${orderId} to ${tokens.length} device(s).`);
-
-    // Send the silent message to all tokens
-    return admin.messaging().sendToDevice(tokens, payload);
-  }
-
-  logger.info(`Order ${orderId} status changed from '${before.status}' to '${after.status}'. No action taken.`);
-  return null;
 });
