@@ -22,21 +22,40 @@ const messaging = getMessaging(app);
 onBackgroundMessage(messaging, (payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
 
-  if (!payload.notification) {
-    return;
+  const data = payload.data;
+
+  // Handler for the silent "dismiss" message
+  if (data && data.type === 'DISMISS_NOTIFICATION') {
+    const orderIdToDismiss = data.orderId;
+    if (orderIdToDismiss) {
+      console.log(`[firebase-messaging-sw.js] Attempting to dismiss notification with tag: ${orderIdToDismiss}`);
+      // Find all notifications with the matching tag (orderId) and close them.
+      self.registration.getNotifications({ tag: orderIdToDismiss }).then((notifications) => {
+        if (notifications.length > 0) {
+          console.log(`[firebase-messaging-sw.js] Found ${notifications.length} notification(s) to close.`);
+          notifications.forEach((notification) => notification.close());
+        } else {
+          console.log(`[firebase-messaging-sw.js] No notification found with tag: ${orderIdToDismiss}`);
+        }
+      });
+    }
+    return; // Stop processing since this was a silent message
   }
 
-  // Customize the notification here
-  const notificationTitle = payload.notification.title || 'Novo Pedido!';
-  const notificationOptions = {
-    body: payload.notification.body || 'Você tem um novo pedido pendente.',
-    icon: '/assets/logo para icones.png', // Path to your notification icon
-    data: {
-        url: payload.data?.url || '/#admin' // The URL to open on click
-    }
-  };
+  // Handler for a new order notification
+  if (payload.notification) {
+    const notificationTitle = payload.notification.title || 'Novo Pedido!';
+    const notificationOptions = {
+      body: payload.notification.body || 'Você tem um novo pedido pendente.',
+      icon: '/assets/logo para icones.png', // Path to your notification icon
+      tag: data.orderId, // Use the orderId as a unique tag
+      data: {
+          url: data.url || '/#admin' // The URL to open on click
+      }
+    };
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
+    self.registration.showNotification(notificationTitle, notificationOptions);
+  }
 });
 
 // Event listener for when the user clicks on the notification.

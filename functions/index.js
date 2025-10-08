@@ -1,7 +1,7 @@
 /* eslint-disable max-len */
 const {onCall} = require("firebase-functions/v2/https");
 const {onRequest} = require("firebase-functions/v2/https");
-const {onDocumentCreated} = require("firebase-functions/v2/firestore");
+const {onDocumentCreated, onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const {MercadoPagoConfig, Payment} = require("mercadopago");
@@ -145,14 +145,15 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
  */
 exports.sendPushOnNewOrder = onDocumentCreated("orders/{orderId}", async (event) => {
   const orderData = event.data.data();
+  const orderId = event.params.orderId;
 
   // Only send notification for new pending orders
   if (orderData.status !== "pending") {
-    logger.info(`Order ${event.params.orderId} created with status '${orderData.status}', no notification sent.`);
+    logger.info(`Order ${orderId} created with status '${orderData.status}', no notification sent.`);
     return null;
   }
 
-  logger.info(`New pending order detected: ${event.params.orderId}. Preparing to send notifications.`);
+  logger.info(`New pending order detected: ${orderId}. Preparing to send notifications.`);
 
   // Get all saved FCM tokens for admins
   const tokensSnapshot = await db.collection("fcmTokens").get();
@@ -171,6 +172,14 @@ exports.sendPushOnNewOrder = onDocumentCreated("orders/{orderId}", async (event)
     },
     data: {
       url: "/#admin", // This will be used by the service worker to open the correct page
+      orderId: orderId, // Pass orderId to be used as a tag in the SW
+    },
+    webpush: {
+      notification: {
+        // Use the orderId as the tag to uniquely identify this notification.
+        // This allows us to specifically target and close it later.
+        tag: orderId,
+      },
     },
   };
 
@@ -193,4 +202,46 @@ exports.sendPushOnNewOrder = onDocumentCreated("orders/{orderId}", async (event)
   });
 
   return Promise.all(tokensToRemove);
+});
+
+/**
+ * Sends a silent push notification to dismiss the "New Order" notification
+ * when an order status changes from 'pending' to 'accepted' or 'reserved'.
+ */
+exports.onOrderStatusUpdate = onDocumentUpdated("orders/{orderId}", async (event) => {
+  const before = event.data.before.data();
+  const after = event.data.after.data();
+  const orderId = event.params.orderId;
+
+  // Check if the status changed from pending to an accepted state
+  const wasPending = before.status === "pending";
+  const isAccepted = after.status === "accepted" || after.status === "reserved";
+
+  if (wasPending && isAccepted) {
+    logger.info(`Order ${orderId} was accepted. Sending dismiss notification.`);
+
+    // Get all admin FCM tokens
+    const tokensSnapshot = await db.collection("fcmTokens").get();
+    if (tokensSnapshot.empty) {
+      logger.info("No FCM tokens found for dismiss notification.");
+      return null;
+    }
+    const tokens = tokensSnapshot.docs.map((doc) => doc.id);
+
+    // Create a data-only (silent) payload
+    const payload = {
+      data: {
+        type: "DISMISS_NOTIFICATION",
+        orderId: orderId,
+      },
+    };
+
+    logger.info(`Sending dismiss message for order ${orderId} to ${tokens.length} device(s).`);
+
+    // Send the silent message to all tokens
+    return admin.messaging().sendToDevice(tokens, payload);
+  }
+
+  logger.info(`Order ${orderId} status changed from '${before.status}' to '${after.status}'. No action taken.`);
+  return null;
 });

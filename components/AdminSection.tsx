@@ -9,6 +9,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from '@dnd-kit/utilities';
 import firebase from 'firebase/compat/app';
 import { auth, messaging } from '../services/firebase';
+import { onMessage } from 'firebase/messaging';
 import { saveFcmToken } from '../services/firebaseService';
 import { SupportModal } from './SupportModal';
 import notificationSound from '../assets/notf1.mp3';
@@ -36,6 +37,7 @@ interface AdminSectionProps {
     onUpdateOrderReservationTime: (orderId: string, reservationTime: string) => Promise<void>;
     onDeleteOrder: (orderId: string) => Promise<void>;
     onPermanentDeleteOrder: (orderId: string) => Promise<void>;
+    addToast: (message: string, type?: 'success' | 'error') => void;
 }
 
 interface SortableProductItemProps {
@@ -149,7 +151,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
         onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
-        onDeleteOrder, onPermanentDeleteOrder
+        onDeleteOrder, onPermanentDeleteOrder, addToast
     } = props;
     
     const [user, setUser] = useState<firebase.User | null>(null);
@@ -230,6 +232,25 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
             });
         }
     }, [user]);
+
+    // Effect for handling FOREGROUND push notifications
+    useEffect(() => {
+        if (messaging && addToast) {
+            const unsubscribe = onMessage(messaging, (payload) => {
+                console.log('Foreground message received.', payload);
+                const { notification } = payload;
+                if (notification?.body) {
+                    // Play sound for foreground notification
+                    audioRef.current?.play().catch(error => console.error("Audio play failed:", error));
+                    
+                    // Show an in-app toast instead of a system notification
+                    addToast(`🍕 ${notification.body}`, 'success');
+                }
+            });
+
+            return () => unsubscribe();
+        }
+    }, [addToast]);
 
 
     useEffect(() => {
