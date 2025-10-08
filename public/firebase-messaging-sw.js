@@ -42,18 +42,20 @@ onBackgroundMessage(messaging, (payload) => {
     return; // Stop processing since this was a silent message
   }
 
-  // Handler for a new order notification
-  if (payload.notification) {
-    const notificationTitle = payload.notification.title || 'Novo Pedido!';
+  // Handler for a new order notification from a data-only payload
+  if (data && data.type === 'NEW_ORDER') {
+    const notificationTitle = data.title || 'Novo Pedido!';
     const notificationOptions = {
-      body: payload.notification.body || 'Você tem um novo pedido pendente.',
-      icon: '/assets/logo para icones.png', // Path to your notification icon
+      body: data.body || 'Você tem um novo pedido pendente.',
+      icon: data.icon || '/assets/logo para icones.png',
       tag: data.orderId, // Use the orderId as a unique tag
       data: {
           url: data.url || '/#admin' // The URL to open on click
       }
     };
 
+    // Use the Service Worker's registration to show the notification.
+    // This is the most reliable way to display a notification from the background.
     self.registration.showNotification(notificationTitle, notificationOptions);
   }
 });
@@ -72,8 +74,9 @@ self.addEventListener('notificationclick', (event) => {
     }).then((clientList) => {
       // Check if a window is already open.
       for (const client of clientList) {
-        if (client.url === '/' && 'focus' in client) {
-          // If a window is already open, focus it and navigate.
+        // Attempt to focus and navigate an existing window.
+        // The URL check is relaxed to '/' to find the app even if it's on a different page.
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
           client.navigate(urlToOpen);
           return client.focus();
         }

@@ -238,13 +238,14 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         if (messaging && addToast) {
             const unsubscribe = onMessage(messaging, (payload) => {
                 console.log('Foreground message received.', payload);
-                const { notification } = payload;
-                if (notification?.body) {
+                const { data } = payload;
+                // Read from data payload, as backend now sends data-only messages
+                if (data?.body) {
                     // Play sound for foreground notification
                     audioRef.current?.play().catch(error => console.error("Audio play failed:", error));
                     
                     // Show an in-app toast instead of a system notification
-                    addToast(`🍕 ${notification.body}`, 'success');
+                    addToast(`🍕 ${data.body}`, 'success');
                 }
             });
 

@@ -164,20 +164,19 @@ exports.sendPushOnNewOrder = onDocumentCreated("orders/{orderId}", async (event)
 
   const tokens = tokensSnapshot.docs.map((doc) => doc.id);
 
+  // Use a data-only payload to give the service worker full control.
   const payload = {
-    notification: {
+    data: {
+      type: "NEW_ORDER", // Add a type for the SW to identify the message
       title: "🍕 Novo Pedido na Santa Sensação!",
       body: `Novo pedido de ${orderData.customer.name} no valor de R$${orderData.total.toFixed(2).replace(".", ",")}.`,
       icon: "https://www.santasensacao.me/assets/logo para icones.png",
-    },
-    data: {
-      url: "/#admin", // This will be used by the service worker to open the correct page
-      orderId: orderId, // Pass orderId to be used as a tag in the SW
+      url: "/#admin",
+      orderId: orderId,
     },
     webpush: {
       notification: {
-        // Use the orderId as the tag to uniquely identify this notification.
-        // This allows us to specifically target and close it later.
+        // The tag is crucial for identifying the notification to dismiss it later.
         tag: orderId,
       },
     },
