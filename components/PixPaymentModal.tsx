@@ -14,7 +14,7 @@ const PIX_EXPIRATION_SECONDS = 300; // 5 minutes
 export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose, onPaymentSuccess }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [pixData, setPixData] = useState<{ qrCode: string; copyPaste: string } | null>(null);
+    const [pixData, setPixData] = useState<{ qrCodeBase64: string; copyPaste: string } | null>(null);
     const [timeLeft, setTimeLeft] = useState(PIX_EXPIRATION_SECONDS);
     const [isPaid, setIsPaid] = useState(false);
     const [copySuccess, setCopySuccess] = useState(false);
@@ -28,7 +28,7 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
             setIsPaid(false);
             setTimeLeft(PIX_EXPIRATION_SECONDS);
 
-            firebaseService.initiatePixPayment(order.id)
+            firebaseService.initiateMercadoPagoPixPayment(order.id)
                 .then(data => {
                     setPixData(data);
                     setIsLoading(false);
@@ -124,7 +124,7 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                         <div className="space-y-4">
                             <p>Escaneie o QR Code abaixo com o app do seu banco:</p>
                             <div className="flex justify-center">
-                                <img src={pixData.qrCode} alt="PIX QR Code" className="w-56 h-56 border-4 border-gray-200 rounded-lg" />
+                                <img src={`data:image/png;base64,${pixData.qrCodeBase64}`} alt="PIX QR Code" className="w-56 h-56 border-4 border-gray-200 rounded-lg" />
                             </div>
                             <div className="text-lg font-mono p-2 bg-gray-100 rounded">
                                 <span>{minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}</span>

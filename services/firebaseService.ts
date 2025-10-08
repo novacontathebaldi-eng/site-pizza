@@ -164,16 +164,16 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
 };
 
 // PIX Payment Function
-export const initiatePixPayment = async (orderId: string): Promise<any> => {
+export const initiateMercadoPagoPixPayment = async (orderId: string): Promise<any> => {
     if (!functions) {
         throw new Error("Firebase Functions is not initialized.");
     }
-    const generatePixCharge = functions.httpsCallable('generatePixCharge');
+    const createMercadoPagoOrder = functions.httpsCallable('createMercadoPagoOrder');
     try {
-        const result = await generatePixCharge({ orderId });
+        const result = await createMercadoPagoOrder({ orderId });
         return result.data;
     } catch (error) {
-        console.error("Error calling generatePixCharge function:", error);
+        console.error("Error calling createMercadoPagoOrder function:", error);
         throw new Error("Não foi possível gerar a cobrança PIX. Tente novamente.");
     }
 };
