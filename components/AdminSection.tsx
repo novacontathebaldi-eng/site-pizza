@@ -210,7 +210,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                     console.log('Permissão para notificações concedida.');
 
                     // AÇÃO NECESSÁRIA: Cole sua chave VAPID gerada no Console do Firebase aqui.
-                    const vapidKey = 'COLE_SUA_CHAVE_VAPID_AQUI';
+                    const vapidKey = 'BC2gnsY8mosVWukQS68vWtDr2_ErWOP7m3Dh6mqgxaB7x3BEcszcu41HitgkWc1soZJn3Ezp_3Ieu-WrLONsTgQ';
 
                     // 2. Get Token
                     messaging.getToken({ vapidKey }).then((currentToken) => {
