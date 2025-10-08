@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
-import { Category } from '../types';
+// FIX: Added '.ts' extension to fix module resolution error.
+import { Category } from '../types.ts';
 
 interface CategoryModalProps {
     isOpen: boolean;

@@ -1,6 +1,9 @@
+
 // FIX: Updated Firestore calls to v8 syntax to resolve module import errors.
-import { db } from './firebase';
-import { Product, Category } from '../types';
+// FIX: Added '.ts' extension to fix module resolution error.
+import { db } from './firebase.ts';
+// FIX: Added '.ts' extension to fix module resolution error.
+import { Product, Category } from '../types.ts';
 
 // Dados iniciais para popular o banco de dados
 const initialCategories: Omit<Category, 'id'>[] = [

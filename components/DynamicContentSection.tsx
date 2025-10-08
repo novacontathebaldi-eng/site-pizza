@@ -1,5 +1,7 @@
+
 import React from 'react';
-import { ContentSection } from '../types';
+// FIX: Added '.ts' extension to fix module resolution error.
+import { ContentSection } from '../types.ts';
 
 interface DynamicContentSectionProps {
     section: ContentSection;

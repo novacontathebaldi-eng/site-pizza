@@ -1,15 +1,23 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
-import { ProductModal } from './ProductModal';
-import { CategoryModal } from './CategoryModal';
-import { SiteCustomizationTab } from './SiteCustomizationTab';
-import { OrderCard } from './OrderCard';
+// FIX: Added '.ts' extension to fix module resolution error.
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types.ts';
+// FIX: Added '.tsx' extension to fix module resolution error.
+import { ProductModal } from './ProductModal.tsx';
+// FIX: Added '.tsx' extension to fix module resolution error.
+import { CategoryModal } from './CategoryModal.tsx';
+// FIX: Added '.tsx' extension to fix module resolution error.
+import { SiteCustomizationTab } from './SiteCustomizationTab.tsx';
+// FIX: Added '.tsx' extension to fix module resolution error.
+import { OrderCard } from './OrderCard.tsx';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import firebase from 'firebase/compat/app';
-import { auth } from '../services/firebase';
-import { SupportModal } from './SupportModal';
+// FIX: Added '.ts' extension to fix module resolution error.
+import { auth } from '../services/firebase.ts';
+// FIX: Added '.tsx' extension to fix module resolution error.
+import { SupportModal } from './SupportModal.tsx';
 import notificationSound from '../assets/notf1.mp3';
 
 interface AdminSectionProps {

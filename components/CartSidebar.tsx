@@ -1,7 +1,10 @@
 
 
+
+
 import React, { useMemo } from 'react';
-import { CartItem, Category, Product } from '../types';
+// FIX: Added '.ts' extension to fix module resolution error.
+import { CartItem, Category, Product } from '../types.ts';
 
 interface CartSidebarProps {
     isOpen: boolean;

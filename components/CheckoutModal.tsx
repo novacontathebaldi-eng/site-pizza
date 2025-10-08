@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
-import { CartItem, OrderDetails, UserProfile } from '../types';
+// FIX: Added '.ts' extension to fix module resolution error.
+import { CartItem, OrderDetails, UserProfile } from '../types.ts';
 import firebase from 'firebase/compat/app';
 
 interface CheckoutModalProps {

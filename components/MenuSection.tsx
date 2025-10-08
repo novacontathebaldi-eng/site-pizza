@@ -1,7 +1,10 @@
 
+
 import React, { useMemo } from 'react';
-import { Product, Category } from '../types';
-import { MenuItemCard } from './MenuItemCard';
+// FIX: Added '.ts' extension to fix module resolution error.
+import { Product, Category } from '../types.ts';
+// FIX: Added '.tsx' extension to fix module resolution error.
+import { MenuItemCard } from './MenuItemCard.tsx';
 
 interface MenuSectionProps {
     categories: Category[];
