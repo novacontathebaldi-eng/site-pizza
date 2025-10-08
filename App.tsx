@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus } from './types';
+import firebase from 'firebase/compat/app';
+import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, UserProfile } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
@@ -10,7 +11,8 @@ import { Footer } from './components/Footer';
 import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
 import { PixPaymentModal } from './components/PixPaymentModal';
-import { db } from './services/firebase';
+import { AuthModal } from './components/AuthModal';
+import { db, auth } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
 // Static assets for default values
@@ -91,6 +93,12 @@ const App: React.FC = () => {
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
     const [payingOrder, setPayingOrder] = useState<Order | null>(null);
     
+    // --- NEW AUTH STATES ---
+    const [currentUser, setCurrentUser] = useState<firebase.User | null>(null);
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    const [authLoading, setAuthLoading] = useState(true);
+
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
         setToasts(prevToasts => [...prevToasts, { id, message, type }]);
@@ -98,6 +106,35 @@ const App: React.FC = () => {
             setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
         }, 4000);
     }, []);
+
+    // --- AUTHENTICATION LOGIC ---
+    useEffect(() => {
+        if (!auth) return;
+        const unsubscribe = auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                setCurrentUser(user);
+                const profile = await firebaseService.findOrCreateUserProfile(user);
+                setUserProfile(profile);
+            } else {
+                setCurrentUser(null);
+                setUserProfile(null);
+            }
+            setAuthLoading(false);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const handleSignOut = async () => {
+        if (!auth) return;
+        try {
+            await auth.signOut();
+            addToast("Você saiu da sua conta.", 'success');
+        } catch (error) {
+            console.error(error);
+            addToast("Erro ao sair da conta.", 'error');
+        }
+    };
+
 
     useEffect(() => {
         const savedCart = localStorage.getItem('santaSensacaoCart');
@@ -303,6 +340,7 @@ const App: React.FC = () => {
         window.open(whatsappUrl, '_blank');
         
         const newOrder = {
+            userId: currentUser?.uid || undefined,
             customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.orderType === 'delivery' ? details.address : '', reservationTime: details.orderType === 'local' ? details.reservationTime : '', },
             items: cart, total, paymentMethod: details.paymentMethod,
             changeNeeded: details.paymentMethod === 'cash' ? details.changeNeeded : false,
@@ -326,6 +364,7 @@ const App: React.FC = () => {
     const handleInitiatePixPayment = async (details: OrderDetails) => {
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
+            userId: currentUser?.uid || undefined,
             customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.orderType === 'delivery' ? details.address : '', reservationTime: details.orderType === 'local' ? details.reservationTime : '', },
             items: cart, total, paymentMethod: 'pix',
             notes: details.notes || '', status: 'pending' as OrderStatus, paymentStatus: 'pending' as PaymentStatus,
@@ -566,7 +605,15 @@ const App: React.FC = () => {
 
     return (
         <div className="flex flex-col min-h-screen">
-            <Header cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} activeSection={activeSection} settings={siteSettings} />
+            <Header 
+                cartItemCount={cartTotalItems} 
+                onCartClick={() => setIsCartOpen(true)} 
+                activeSection={activeSection} 
+                settings={siteSettings}
+                currentUser={currentUser}
+                onLoginClick={() => setIsAuthModalOpen(true)}
+                onSignOut={handleSignOut}
+            />
             
             <div id="status-banner" className={`bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
                 <i className="fas fa-times-circle mr-2"></i>
@@ -585,10 +632,10 @@ const App: React.FC = () => {
                     </div>
                 )}
 
-                {isLoading ? (
+                {(isLoading || authLoading) ? (
                     <div className="text-center py-20">
                         <i className="fas fa-spinner fa-spin text-5xl text-accent"></i>
-                        <p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p>
+                        <p className="mt-4 text-xl font-semibold text-gray-600">Carregando...</p>
                     </div>
                 ) : !error && (
                     <MenuSection 
@@ -682,11 +729,19 @@ const App: React.FC = () => {
                 cartItems={cart}
                 onConfirmCheckout={handleCheckout}
                 onInitiatePixPayment={handleInitiatePixPayment}
+                currentUser={currentUser}
+                userProfile={userProfile}
             />
              <PixPaymentModal
                 order={payingOrder}
                 onClose={() => setPayingOrder(null)}
                 onPaymentSuccess={handlePixPaymentSuccess}
+            />
+
+            <AuthModal 
+                isOpen={isAuthModalOpen}
+                onClose={() => setIsAuthModalOpen(false)}
+                addToast={addToast}
             />
             
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]">

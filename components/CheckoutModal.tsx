@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-import { CartItem, OrderDetails } from '../types';
+import { CartItem, OrderDetails, UserProfile } from '../types';
+import firebase from 'firebase/compat/app';
 
 interface CheckoutModalProps {
     isOpen: boolean;
@@ -8,6 +8,8 @@ interface CheckoutModalProps {
     cartItems: CartItem[];
     onConfirmCheckout: (details: OrderDetails) => void;
     onInitiatePixPayment: (details: OrderDetails) => void;
+    currentUser: firebase.User | null;
+    userProfile: UserProfile | null;
 }
 
 const getSuggestedTimes = () => {
@@ -22,7 +24,7 @@ const getSuggestedTimes = () => {
     return suggestions;
 };
 
-export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, onInitiatePixPayment }) => {
+export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, onInitiatePixPayment, currentUser, userProfile }) => {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [orderType, setOrderType] = useState<'delivery' | 'pickup' | 'local' | ''>('');
@@ -37,8 +39,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
 
     const suggestedTimes = getSuggestedTimes();
 
+    // Pre-fill user data if available
+    useEffect(() => {
+        if (isOpen && userProfile) {
+            setName(userProfile.displayName || '');
+            setPhone(userProfile.phone || '');
+        }
+    }, [isOpen, userProfile]);
+
     useEffect(() => {
         if (!isOpen) {
+            // Reset all fields on close
             setName(''); setPhone(''); setOrderType(''); setAddress('');
             setPaymentMethod(''); setChangeNeeded(false); setChangeAmount('');
             setNotes(''); setReservationTime(''); setPixPaymentOption(null);

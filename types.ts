@@ -54,6 +54,7 @@ export interface OrderCustomerDetails {
 
 export interface Order {
     id: string;
+    userId?: string; // Link to the user who placed the order
     customer: OrderCustomerDetails;
     items: CartItem[];
     total: number;
@@ -104,4 +105,20 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
+}
+
+// --- NEW USER-RELATED TYPES ---
+export interface UserAddress {
+    id: string;
+    label: string; // e.g., 'Casa', 'Trabalho'
+    fullAddress: string;
+}
+
+export interface UserProfile {
+    uid: string;
+    displayName: string;
+    email: string;
+    photoURL?: string;
+    phone?: string;
+    addresses?: UserAddress[];
 }
