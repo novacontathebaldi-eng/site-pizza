@@ -105,3 +105,9 @@ export interface SiteSettings {
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
 }
+
+// Nova interface para o token FCM
+export interface FcmToken {
+    userId: string;
+    createdAt: any; // Firestore Timestamp
+}

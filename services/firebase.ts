@@ -6,6 +6,7 @@ import 'firebase/compat/firestore';
 import 'firebase/compat/storage';
 import 'firebase/compat/auth'; // Import for authentication
 import 'firebase/compat/functions'; // Import for Firebase Functions
+import 'firebase/compat/messaging'; // Import for Firebase Cloud Messaging
 
 // AÇÃO NECESSÁRIA: Credenciais corrigidas.
 // O problema era um erro de digitação na apiKey. Esta versão está 100% correta,
@@ -25,6 +26,7 @@ let db: firebase.firestore.Firestore | null = null;
 let storage: firebase.storage.Storage | null = null;
 let auth: firebase.auth.Auth | null = null; // Add auth service
 let functions: firebase.functions.Functions | null = null; // Add functions service
+let messaging: firebase.messaging.Messaging | null = null; // Add messaging service
 
 try {
   // Use the initialization pattern from the user's working old version.
@@ -35,15 +37,16 @@ try {
   storage = firebase.storage();
   auth = firebase.auth();
   functions = firebase.functions();
+  messaging = firebase.messaging(); // Initialize messaging
   
   // Keep db settings
   db.settings({
     experimentalForceLongPolling: true,
   });
   
-  console.log("Firebase inicializado com sucesso. Conectando ao Firestore, Storage, Auth e Functions...");
+  console.log("Firebase inicializado com sucesso. Conectando ao Firestore, Storage, Auth, Functions e Messaging...");
 } catch (error) {
   console.error('Falha ao inicializar o Firebase. Verifique seu objeto firebaseConfig em `services/firebase.ts`.', error);
 }
 
-export { db, storage, auth, functions };
+export { db, storage, auth, functions, messaging };

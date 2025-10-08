@@ -177,3 +177,23 @@ export const initiateMercadoPagoPixPayment = async (orderId: string): Promise<an
         throw new Error("Não foi possível gerar a cobrança PIX. Tente novamente.");
     }
 };
+
+// FCM Token Function
+export const saveFcmToken = async (userId: string, token: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    
+    // Use the token as the document ID to prevent duplicates
+    const tokenRef = db.collection('fcmTokens').doc(token);
+    const doc = await tokenRef.get();
+    
+    // Only save if the token doesn't exist yet
+    if (!doc.exists) {
+        await tokenRef.set({
+            userId,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        console.log('FCM Token saved for user:', userId);
+    } else {
+        console.log('FCM Token already exists.');
+    }
+};

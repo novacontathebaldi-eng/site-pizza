@@ -8,7 +8,8 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import firebase from 'firebase/compat/app';
-import { auth } from '../services/firebase';
+import { auth, messaging } from '../services/firebase';
+import { saveFcmToken } from '../services/firebaseService';
 import { SupportModal } from './SupportModal';
 import notificationSound from '../assets/notf1.mp3';
 
@@ -198,6 +199,38 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         const unsubscribe = auth.onAuthStateChanged(user => { setUser(user); setAuthLoading(false); });
         return () => unsubscribe();
     }, []);
+
+    // Effect for Push Notifications
+    useEffect(() => {
+        // Only run if a user is logged in and notification/messaging is supported
+        if (user && 'Notification' in window && messaging) {
+            // 1. Request Permission
+            Notification.requestPermission().then((permission) => {
+                if (permission === 'granted') {
+                    console.log('Permissão para notificações concedida.');
+
+                    // AÇÃO NECESSÁRIA: Cole sua chave VAPID gerada no Console do Firebase aqui.
+                    const vapidKey = 'COLE_SUA_CHAVE_VAPID_AQUI';
+
+                    // 2. Get Token
+                    messaging.getToken({ vapidKey }).then((currentToken) => {
+                        if (currentToken) {
+                            console.log('Token FCM obtido:', currentToken);
+                            // 3. Save Token to Database
+                            saveFcmToken(user.uid, currentToken);
+                        } else {
+                            console.log('Nenhum token de registro disponível. É necessário solicitar permissão para gerar um.');
+                        }
+                    }).catch((err) => {
+                        console.log('Ocorreu um erro ao recuperar o token. ', err);
+                    });
+                } else {
+                    console.log('Não foi possível obter permissão para notificar.');
+                }
+            });
+        }
+    }, [user]);
+
 
     useEffect(() => {
         const handleHashChange = () => setShowAdminPanel(window.location.hash === '#admin');
