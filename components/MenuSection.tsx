@@ -1,6 +1,6 @@
 
 
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { Product, Category } from '../types';
 import { MenuItemCard } from './MenuItemCard';
 
@@ -34,6 +34,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
     cartItemCount, onCartClick,
     showFinalizeButtonTrigger, setShowFinalizeButtonTrigger
 }) => {
+    const isInitialMount = useRef(true);
 
     const filteredProducts = useMemo(() => 
         products.filter(p => p.categoryId === activeCategoryId && p.active),
@@ -57,6 +58,14 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
     const showFinalizeButton = activeCategoryId === lastCategoryId && cartItemCount > 0 && !suggestedNextCategoryId && showFinalizeButtonTrigger;
 
     useEffect(() => {
+        // On initial load, activeCategoryId is set, which can cause the page to scroll down.
+        // This ref prevents this behavior only on the first execution of this effect,
+        // allowing subsequent category changes (user clicks) to scroll the tabs horizontally.
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+
         if (activeCategoryId) {
             const activeTabElement = document.getElementById(`category-tab-${activeCategoryId}`);
             if (activeTabElement) {
