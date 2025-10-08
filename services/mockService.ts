@@ -1,7 +1,5 @@
 
-
-// FIX: Added '.ts' extension to fix module resolution error.
-import { Product, Category } from '../types.ts';
+import { Product, Category } from '../types';
 
 let mockStoreStatus = { isOnline: true };
 

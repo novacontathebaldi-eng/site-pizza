@@ -1,10 +1,8 @@
 
 
-import React, { useMemo } from 'react';
-// FIX: Added '.ts' extension to fix module resolution error.
-import { Product, Category } from '../types.ts';
-// FIX: Added '.tsx' extension to fix module resolution error.
-import { MenuItemCard } from './MenuItemCard.tsx';
+import React, { useMemo, useEffect } from 'react';
+import { Product, Category } from '../types';
+import { MenuItemCard } from './MenuItemCard';
 
 interface MenuSectionProps {
     categories: Category[];
@@ -36,6 +34,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
     cartItemCount, onCartClick,
     showFinalizeButtonTrigger, setShowFinalizeButtonTrigger
 }) => {
+
     const filteredProducts = useMemo(() => 
         products.filter(p => p.categoryId === activeCategoryId && p.active),
         [products, activeCategoryId]
@@ -57,6 +56,19 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
 
     const showFinalizeButton = activeCategoryId === lastCategoryId && cartItemCount > 0 && !suggestedNextCategoryId && showFinalizeButtonTrigger;
 
+    useEffect(() => {
+        if (activeCategoryId) {
+            const activeTabElement = document.getElementById(`category-tab-${activeCategoryId}`);
+            if (activeTabElement) {
+                activeTabElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest',
+                    inline: 'center'
+                });
+            }
+        }
+    }, [activeCategoryId]);
+
     const scrollToProductList = () => {
         const productList = document.getElementById('category-product-list');
         const stickyHeader = document.getElementById('sticky-menu-header');
@@ -71,30 +83,17 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
             });
         }
     };
-    
-    const scrollTabIntoView = (id: string) => {
-        const activeTabElement = document.getElementById(`category-tab-${id}`);
-        if (activeTabElement) {
-            activeTabElement.scrollIntoView({
-                behavior: 'smooth',
-                block: 'nearest',
-                inline: 'center'
-            });
-        }
-    };
 
     const handleCategoryClick = (id: string) => {
         setActiveCategoryId(id);
         setSuggestedNextCategoryId(null);
         setShowFinalizeButtonTrigger(false); // Reset trigger on manual navigation
-        scrollTabIntoView(id);
         setTimeout(scrollToProductList, 100);
     };
 
     const handleSuggestionClick = () => {
         if (suggestedNextCategoryId) {
             setActiveCategoryId(suggestedNextCategoryId);
-            scrollTabIntoView(suggestedNextCategoryId);
             setSuggestedNextCategoryId(null);
             setTimeout(scrollToProductList, 100);
         }

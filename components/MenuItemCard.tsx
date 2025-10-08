@@ -1,7 +1,5 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-// FIX: Added '.ts' extension to fix module resolution error.
-import { Product } from '../types.ts';
+import { Product } from '../types';
 
 interface MenuItemCardProps {
     product: Product;

@@ -1,21 +1,17 @@
-
 import React, { useState, useEffect } from 'react';
-import firebase from 'firebase/compat/app';
+import { SiteSettings } from '../types';
+// import logo from '../assets/logo.png'; // No longer needed, using dynamic URL
 
 interface HeaderProps {
-    logoUrl: string;
     cartItemCount: number;
     onCartClick: () => void;
-    isStoreOnline: boolean;
-    currentUser: firebase.User | null;
-    onAuthClick: () => void;
-    isAuthLoading: boolean;
+    activeSection: string;
+    settings: SiteSettings;
 }
 
-export const Header: React.FC<HeaderProps> = ({ logoUrl, cartItemCount, onCartClick, isStoreOnline, currentUser, onAuthClick, isAuthLoading }) => {
-    const [isScrolled, setIsScrolled] = useState(false);
+export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, activeSection, settings }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const [isScrolled, setIsScrolled] = useState(false);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -25,83 +21,72 @@ export const Header: React.FC<HeaderProps> = ({ logoUrl, cartItemCount, onCartCl
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    const handleSignOut = () => {
-        firebase.auth().signOut();
-        setIsUserMenuOpen(false);
+    const handleLinkClick = () => {
+        setIsMenuOpen(false);
     };
 
-    const navLinks = [
-        { href: '#inicio', text: 'Início' },
-        { href: '#sobre', text: 'Sobre' },
-        { href: '#cardapio', text: 'Cardápio' },
-        { href: '#contato', text: 'Contato' },
-    ];
+    const scrollToSection = (id: string) => {
+      const element = document.getElementById(id);
+      if(element) {
+        const headerOffset = 80;
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+        
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+      }
+    };
 
     return (
-        <header className={`sticky top-0 z-40 transition-all duration-300 ${isScrolled ? 'bg-white/95 shadow-md backdrop-blur-sm' : 'bg-transparent'}`}>
+        <header className={`bg-brand-green-700 text-text-on-dark sticky top-0 z-50 transition-shadow duration-300 ${isScrolled ? 'shadow-lg' : ''}`}>
             <div className="container mx-auto px-4">
-                <div className="flex justify-between items-center h-20">
-                    <a href="#inicio">
-                        <img src={logoUrl} alt="Logo Pizzaria" className={`h-12 transition-all ${isScrolled ? '' : 'invert brightness-0'}`} />
+                <div className="flex justify-between items-center h-20 relative">
+                    <a href="#inicio" onClick={(e) => { e.preventDefault(); scrollToSection('inicio');}} className="flex items-center gap-3 text-xl font-bold">
+                        <img src={settings.logoUrl} alt="Santa Sensação Logo" className="h-14" />
+                        <span className="hidden sm:inline">Santa Sensação</span>
                     </a>
-
-                    <nav className="hidden lg:flex items-center gap-8">
-                        {navLinks.map(link => (
-                            <a key={link.href} href={link.href} className={`font-semibold transition-colors ${isScrolled ? 'text-text-on-light hover:text-accent' : 'text-text-on-dark hover:text-white/80'}`}>{link.text}</a>
-                        ))}
+                    
+                    <div className="lg:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-bold">
+                        {activeSection}
+                    </div>
+                    
+                    <nav className="hidden lg:flex items-center gap-6">
+                        <a href="#inicio" onClick={(e) => { e.preventDefault(); scrollToSection('inicio');}} className="font-medium hover:text-brand-gold-600 transition-colors">Início</a>
+                        <a href="#cardapio" onClick={(e) => { e.preventDefault(); scrollToSection('cardapio');}} className="font-medium hover:text-brand-gold-600 transition-colors">Cardápio</a>
+                        <a href="#sobre" onClick={(e) => { e.preventDefault(); scrollToSection('sobre');}} className="font-medium hover:text-brand-gold-600 transition-colors">Sobre Nós</a>
+                        <a href="#contato" onClick={(e) => { e.preventDefault(); scrollToSection('contato');}} className="font-medium hover:text-brand-gold-600 transition-colors">Contato</a>
                     </nav>
 
-                    <div className="flex items-center gap-4">
-                        <div className={`text-xs font-bold px-3 py-1 rounded-full ${isStoreOnline ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                            {isStoreOnline ? 'ABERTO' : 'FECHADO'}
-                        </div>
-                        <button onClick={onCartClick} className="relative">
-                            <i className={`fas fa-shopping-cart text-2xl transition-colors ${isScrolled ? 'text-text-on-light hover:text-accent' : 'text-text-on-dark hover:text-white/80'}`}></i>
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => scrollToSection('cardapio')} className="hidden sm:flex items-center gap-2 bg-brand-gold-600 text-text-on-dark px-4 py-2 rounded-lg font-semibold hover:bg-opacity-90 transition-all">
+                            <i className="fas fa-utensils"></i>
+                            <span className="hidden md:inline">Ver Cardápio</span>
+                        </button>
+                        <button onClick={onCartClick} className="relative w-12 h-12 flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors">
+                            <i className="fas fa-shopping-cart text-lg"></i>
                             {cartItemCount > 0 && (
-                                <span className="absolute -top-2 -right-2 bg-accent text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
                                     {cartItemCount}
                                 </span>
                             )}
                         </button>
-                        
-                        {/* Auth Button/Menu */}
-                        <div className="relative">
-                            {isAuthLoading ? (
-                                <div className="w-8 h-8 flex items-center justify-center"><i className="fas fa-spinner fa-spin"></i></div>
-                            ) : currentUser ? (
-                                <>
-                                <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className={`w-9 h-9 rounded-full overflow-hidden ${isScrolled ? 'border-2 border-accent' : 'border-2 border-white'}`}>
-                                    <img src={currentUser.photoURL || `https://ui-avatars.com/api/?name=${currentUser.displayName || currentUser.email}&background=random`} alt="User avatar" />
-                                </button>
-                                {isUserMenuOpen && (
-                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
-                                        <a href="#/meus-pedidos" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Meus Pedidos</a>
-                                        <button onClick={handleSignOut} className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Sair</button>
-                                    </div>
-                                )}
-                                </>
-                            ) : (
-                                <button onClick={onAuthClick} className={`font-semibold transition-colors ${isScrolled ? 'text-text-on-light hover:text-accent' : 'text-text-on-dark hover:text-white/80'}`}>
-                                    Entrar
-                                </button>
-                            )}
-                        </div>
-
-                        <button className="lg:hidden text-2xl" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-                            <i className={`fas ${isMenuOpen ? 'fa-times' : 'fa-bars'} ${isScrolled ? 'text-text-on-light' : 'text-text-on-dark'}`}></i>
+                        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="lg:hidden w-12 h-12 flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors z-50">
+                            <i className={`fas ${isMenuOpen ? 'fa-times' : 'fa-bars'} text-lg`}></i>
                         </button>
                     </div>
                 </div>
-                {/* Mobile Menu */}
-                {isMenuOpen && (
-                    <div className="lg:hidden bg-white shadow-lg absolute top-20 left-0 w-full">
-                        <nav className="flex flex-col p-4 space-y-2">
-                             {navLinks.map(link => (
-                                <a key={link.href} href={link.href} onClick={() => setIsMenuOpen(false)} className="font-semibold p-2 rounded-md hover:bg-gray-100 text-text-on-light hover:text-accent">{link.text}</a>
-                            ))}
-                        </nav>
-                    </div>
-                )}
+            </div>
+
+            {/* Mobile Menu */}
+            <div className={`lg:hidden fixed top-0 left-0 w-full h-full bg-brand-green-700 z-40 transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-y-0' : '-translate-y-full'}`}>
+                <nav className="flex flex-col items-center justify-center h-full gap-8 text-2xl pt-20">
+                    <a href="#inicio" onClick={(e) => { e.preventDefault(); scrollToSection('inicio'); handleLinkClick();}} className="font-bold hover:text-brand-gold-600 transition-colors">Início</a>
+                    <a href="#cardapio" onClick={(e) => { e.preventDefault(); scrollToSection('cardapio'); handleLinkClick();}} className="font-bold hover:text-brand-gold-600 transition-colors">Cardápio</a>
+                    <a href="#sobre" onClick={(e) => { e.preventDefault(); scrollToSection('sobre'); handleLinkClick();}} className="font-bold hover:text-brand-gold-600 transition-colors">Sobre Nós</a>
+                    <a href="#contato" onClick={(e) => { e.preventDefault(); scrollToSection('contato'); handleLinkClick();}} className="font-bold hover:text-brand-gold-600 transition-colors">Contato</a>
+                </nav>
             </div>
         </header>
     );
