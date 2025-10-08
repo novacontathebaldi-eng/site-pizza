@@ -69,6 +69,18 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
         }
     }, [activeCategoryId]);
 
+    // Preload all product images in the background to improve perceived performance.
+    useEffect(() => {
+        if (products && products.length > 0) {
+            products.forEach(product => {
+                if (product.imageUrl) {
+                    const img = new Image();
+                    img.src = product.imageUrl;
+                }
+            });
+        }
+    }, [products]);
+
     const scrollToProductList = () => {
         const productList = document.getElementById('category-product-list');
         const stickyHeader = document.getElementById('sticky-menu-header');
