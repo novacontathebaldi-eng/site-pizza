@@ -177,3 +177,17 @@ export const initiateMercadoPagoPixPayment = async (orderId: string): Promise<an
         throw new Error("Não foi possível gerar a cobrança PIX. Tente novamente.");
     }
 };
+
+export const getPixPaymentStatus = async (orderId: string): Promise<string> => {
+    if (!functions) {
+        throw new Error("Firebase Functions is not initialized.");
+    }
+    const getStatus = functions.httpsCallable('getPixPaymentStatus');
+    try {
+        const result = await getStatus({ orderId });
+        return (result.data as any).status;
+    } catch (error) {
+        console.error("Error calling getPixPaymentStatus function:", error);
+        throw new Error("Não foi possível verificar o status do pagamento.");
+    }
+};

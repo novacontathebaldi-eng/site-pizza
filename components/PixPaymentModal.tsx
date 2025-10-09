@@ -9,28 +9,33 @@ interface PixPaymentModalProps {
     onPaymentSuccess: (paidOrder: Order) => void;
 }
 
-const PIX_EXPIRATION_SECONDS = 300; // 5 minutes
-
 export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose, onPaymentSuccess }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [pixData, setPixData] = useState<{ qrCodeBase64: string; copyPaste: string } | null>(null);
-    const [timeLeft, setTimeLeft] = useState(PIX_EXPIRATION_SECONDS);
+    const [pixData, setPixData] = useState<{ qrCodeBase64: string; copyPaste: string; dateOfExpiration: string; } | null>(null);
+    const [timeLeft, setTimeLeft] = useState(0);
     const [isPaid, setIsPaid] = useState(false);
     const [copySuccess, setCopySuccess] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [refreshMessage, setRefreshMessage] = useState('');
     const timerRef = useRef<number | null>(null);
 
-    // Effect to generate PIX charge when modal opens
+    // Effect to generate PIX charge when modal opens or order changes
     useEffect(() => {
         if (order) {
             setIsLoading(true);
             setError(null);
             setIsPaid(false);
-            setTimeLeft(PIX_EXPIRATION_SECONDS);
+            setPixData(null);
+            setTimeLeft(0);
 
             firebaseService.initiateMercadoPagoPixPayment(order.id)
                 .then(data => {
-                    setPixData(data);
+                    if (data && data.qrCodeBase64 && data.copyPaste && data.dateOfExpiration) {
+                        setPixData(data);
+                    } else {
+                        throw new Error('Dados PIX inválidos recebidos.');
+                    }
                     setIsLoading(false);
                 })
                 .catch(err => {
@@ -40,9 +45,23 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
         }
     }, [order]);
 
-    // Effect for countdown timer
+    // Effect for countdown timer, synchronized with expiration date
     useEffect(() => {
-        if (!isLoading && pixData && !isPaid) {
+        if (timerRef.current) clearInterval(timerRef.current);
+
+        if (!isLoading && pixData && !isPaid && pixData.dateOfExpiration) {
+            const expirationDate = new Date(pixData.dateOfExpiration);
+            const now = new Date();
+            const initialTimeLeft = Math.max(0, Math.floor((expirationDate.getTime() - now.getTime()) / 1000));
+
+            if (initialTimeLeft <= 0) {
+                setError("O código PIX expirou. Por favor, feche e tente novamente.");
+                setTimeLeft(0);
+                return;
+            }
+
+            setTimeLeft(initialTimeLeft);
+
             timerRef.current = window.setInterval(() => {
                 setTimeLeft(prev => {
                     if (prev <= 1) {
@@ -54,6 +73,7 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                 });
             }, 1000);
         }
+
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);
         };
@@ -84,6 +104,29 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                 setCopySuccess(true);
                 setTimeout(() => setCopySuccess(false), 2000);
             });
+        }
+    };
+
+    const handleRefreshStatus = async () => {
+        if (!order || isRefreshing || isPaid) return;
+    
+        setIsRefreshing(true);
+        setRefreshMessage('');
+        try {
+            const status = await firebaseService.getPixPaymentStatus(order.id);
+            if (status === 'approved') {
+                // The onSnapshot listener will handle the full success flow.
+                // We just update the UI here for immediate user feedback.
+                setIsPaid(true);
+            } else {
+                setRefreshMessage('Pagamento ainda pendente.');
+                setTimeout(() => setRefreshMessage(''), 2500);
+            }
+        } catch (error: any) {
+            setRefreshMessage(error.message || 'Erro ao verificar.');
+            setTimeout(() => setRefreshMessage(''), 2500);
+        } finally {
+            setIsRefreshing(false);
         }
     };
 
@@ -142,7 +185,15 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                                 </button>
                             </div>
                             {copySuccess && <p className="text-sm text-green-600">Copiado para a área de transferência!</p>}
-                            <p className="text-xs text-gray-500 pt-4">Após o pagamento, a confirmação será automática nesta tela.</p>
+                            
+                            <div className="pt-2 text-center">
+                                <button onClick={handleRefreshStatus} disabled={isRefreshing || isPaid} className="text-sm text-blue-600 hover:text-blue-800 disabled:text-gray-400 disabled:cursor-wait font-semibold py-1 px-3 rounded-md hover:bg-blue-50 transition-colors">
+                                    {isRefreshing ? <><i className="fas fa-spinner fa-spin mr-2"></i>Verificando...</> : <><i className="fas fa-sync-alt mr-2"></i>Atualizar Status</>}
+                                </button>
+                                {refreshMessage && <p className="text-sm text-gray-600 mt-1 animate-fade-in-up">{refreshMessage}</p>}
+                            </div>
+
+                            <p className="text-xs text-gray-500 pt-2">Após o pagamento, a confirmação será automática nesta tela.</p>
                         </div>
                     )}
                 </div>

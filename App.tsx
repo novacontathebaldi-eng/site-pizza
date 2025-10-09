@@ -141,6 +141,11 @@ const App: React.FC = () => {
         }, 4000);
     }, []);
 
+    const clearPayingOrder = useCallback(() => {
+        sessionStorage.removeItem('payingOrderId');
+        setPayingOrder(null);
+    }, []);
+
     useEffect(() => {
         const savedCart = localStorage.getItem('santaSensacaoCart');
         if (savedCart) {
@@ -228,6 +233,19 @@ const App: React.FC = () => {
         const unsubOrders = ordersQuery.onSnapshot(snapshot => {
             const fetchedOrders: Order[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
             setOrders(fetchedOrders);
+            
+            // Resume PIX payment session on refresh
+            const savedPayingOrderId = sessionStorage.getItem('payingOrderId');
+            if (savedPayingOrderId && !payingOrder) {
+                const resumedOrder = fetchedOrders.find(o => o.id === savedPayingOrderId);
+                // Only resume if the order is still awaiting payment
+                if (resumedOrder && resumedOrder.status === 'awaiting-payment') {
+                    setPayingOrder(resumedOrder);
+                } else {
+                    // Clean up if the order is no longer in a payable state
+                    sessionStorage.removeItem('payingOrderId');
+                }
+            }
         }, err => handleConnectionError(err, "orders"));
 
         return () => {
@@ -237,7 +255,7 @@ const App: React.FC = () => {
             unsubProducts();
             unsubOrders();
         };
-    }, []);
+    }, [payingOrder]);
 
     useEffect(() => {
         if (categories.length > 0 && !activeMenuCategory) {
@@ -337,6 +355,7 @@ const App: React.FC = () => {
         try {
             const docRef = await firebaseService.addOrder(newOrderData);
             const createdOrder: Order = { ...newOrderData, id: docRef.id, createdAt: new Date() };
+            sessionStorage.setItem('payingOrderId', docRef.id);
             addToast("Pedido pré-salvo, aguardando pagamento.", 'success');
             setIsCheckoutModalOpen(false);
             setPayingOrder(createdOrder);
@@ -348,9 +367,7 @@ const App: React.FC = () => {
     };
 
     const handlePixPaymentSuccess = useCallback(async (paidOrder: Order) => {
-        if (!paidOrder || !paidOrder.id) {
-            console.error("handlePixPaymentSuccess called without a valid paidOrder object.");
-            addToast("Erro crítico ao processar pagamento. Contate o suporte.", 'error');
+        if (!payingOrder || payingOrder.id !== paidOrder.id) {
             return;
         }
 
@@ -367,13 +384,13 @@ const App: React.FC = () => {
             window.open(whatsappUrl, '_blank');
 
             setCart([]);
-            setPayingOrder(null);
+            clearPayingOrder();
             setIsCartOpen(false);
         } catch (error) {
              console.error("Error finalizing paid order:", error);
             addToast("Erro ao finalizar o pedido após o pagamento. Contate o suporte.", 'error');
         }
-    }, [addToast, setCart, setPayingOrder, setIsCartOpen]);
+    }, [addToast, clearPayingOrder, payingOrder]);
 
     const handleClosePixModal = () => {
         if (payingOrder) {
@@ -391,7 +408,7 @@ const App: React.FC = () => {
     
         const orderToUpdate = { ...payingOrder };
         setShowPaymentFailureModal(false);
-        setPayingOrder(null);
+        clearPayingOrder();
 
         try {
             await firebaseService.updateOrderStatus(orderToUpdate.id, 'pending');
@@ -752,7 +769,7 @@ const App: React.FC = () => {
                 isOpen={showPaymentFailureModal}
                 onClose={() => {
                     setShowPaymentFailureModal(false);
-                    setPayingOrder(null);
+                    clearPayingOrder();
                 }}
                 onTryAgain={handleTryAgainPix}
                 onPayLater={handlePayLaterFromFailure}

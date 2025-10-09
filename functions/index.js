@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-const {onCall} = require("firebase-functions/v2/https");
+const {onCall} = require("firebase-functions/v2/https);
 const {onRequest} = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
@@ -16,7 +16,8 @@ const client = new MercadoPagoConfig({
 
 /**
  * Creates a PIX payment order with Mercado Pago.
- * This function is called from the frontend to initiate a payment.
+ * This function is now idempotent: it will return an existing pending payment
+ * if one is found for the order, preventing duplicate charges.
  */
 exports.createMercadoPagoOrder = onCall(async (request) => {
   const orderId = request.data.orderId;
@@ -32,6 +33,24 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
       throw new Error("Pedido não encontrado.");
     }
     const orderData = orderDoc.data();
+    const payment = new Payment(client);
+
+    // Check for existing, valid payment before creating a new one
+    if (orderData.mercadoPagoPaymentId) {
+      try {
+        const existingPayment = await payment.get({id: orderData.mercadoPagoPaymentId});
+        if (existingPayment && existingPayment.status === "pending" && new Date(existingPayment.date_of_expiration) > new Date()) {
+          logger.info(`Returning existing valid PIX for order ${orderId}. Payment ID: ${existingPayment.id}`);
+          return {
+            qrCodeBase64: existingPayment.point_of_interaction?.transaction_data?.qr_code_base64,
+            copyPaste: existingPayment.point_of_interaction?.transaction_data?.qr_code,
+            dateOfExpiration: existingPayment.date_of_expiration,
+          };
+        }
+      } catch (e) {
+        logger.warn(`Could not fetch existing payment ${orderData.mercadoPagoPaymentId}, creating a new one.`, e.message);
+      }
+    }
 
     // The notification URL for the webhook
     const notificationUrl = `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/mercadoPagoWebhook`;
@@ -41,16 +60,11 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
       description: `Pedido #${orderId.substring(0, 8)} - ${orderData.customer.name}`,
       payment_method_id: "pix",
       payer: {
-        // A real email is required, but since we don't collect it,
-        // we use a placeholder. This could be enhanced later.
         email: `cliente_${orderId}@santasensacao.me`,
         first_name: orderData.customer.name.split(" ")[0],
         last_name: orderData.customer.name.split(" ").slice(1).join(" ") || "Cliente",
         identification: {
           type: "CPF",
-          // CPF is required for PIX transactions in Brazil.
-          // Since we don't collect it, we use a dummy value.
-          // For real transactions, this needs to be a valid CPF.
           number: "00000000000",
         },
       },
@@ -58,7 +72,6 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
       external_reference: orderId, // Link the payment to our order ID
     };
 
-    const payment = new Payment(client);
     const result = await payment.create({body: paymentData});
 
     if (!result || !result.id) {
@@ -69,26 +82,61 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
     const paymentId = result.id.toString();
     const qrCodeBase64 = result.point_of_interaction?.transaction_data?.qr_code_base64;
     const copyPaste = result.point_of_interaction?.transaction_data?.qr_code;
+    const dateOfExpiration = result.date_of_expiration;
 
     if (!qrCodeBase64 || !copyPaste) {
         logger.error("Mercado Pago response missing PIX data.", {result});
         throw new Error("Dados PIX não retornados pelo gateway de pagamento.");
     }
 
-    // Save the Mercado Pago payment ID to our order for tracking
+    // Save the new Mercado Pago payment ID to our order for tracking
     await db.collection("orders").doc(orderId).update({
       mercadoPagoPaymentId: paymentId,
     });
 
-    logger.info(`Pagamento PIX criado para o pedido ${orderId}, ID do pagamento MP: ${paymentId}`);
+    logger.info(`New PIX payment created for order ${orderId}, MP Payment ID: ${paymentId}`);
 
     return {
       qrCodeBase64,
       copyPaste,
+      dateOfExpiration,
     };
   } catch (error) {
-    logger.error(`Erro ao criar pagamento no Mercado Pago para o pedido ${orderId}:`, error.cause || error.message);
+    logger.error(`Error creating Mercado Pago payment for order ${orderId}:`, error.cause || error.message);
     throw new Error("Falha ao comunicar com o gateway de pagamento.");
+  }
+});
+
+/**
+ * Manually checks the status of a PIX payment.
+ * Called from the frontend when the user clicks "Refresh Status".
+ */
+exports.getPixPaymentStatus = onCall(async (request) => {
+  const {orderId} = request.data;
+  if (!orderId) {
+    logger.error("Request missing orderId for status check.");
+    throw new Error("O ID do pedido é obrigatório.");
+  }
+
+  try {
+    const orderDoc = await db.collection("orders").doc(orderId).get();
+    if (!orderDoc.exists) {
+      throw new Error("Pedido não encontrado.");
+    }
+    const paymentId = orderDoc.data().mercadoPagoPaymentId;
+    if (!paymentId) {
+      throw new Error("Este pedido não tem um pagamento PIX associado.");
+    }
+
+    const payment = new Payment(client);
+    const paymentInfo = await payment.get({id: paymentId});
+
+    logger.info(`Status check for order ${orderId} (Payment ID: ${paymentId}): ${paymentInfo.status}`);
+
+    return {status: paymentInfo.status};
+  } catch (error) {
+    logger.error(`Error checking payment status for order ${orderId}:`, error.cause || error.message);
+    throw new Error("Falha ao verificar status do pagamento.");
   }
 });
 
