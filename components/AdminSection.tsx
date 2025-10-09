@@ -333,7 +333,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const handleSeedDatabase = async () => { if (window.confirm('Tem certeza? Isso adicionará dados iniciais.')) { try { await onSeedDatabase(); alert('Banco de dados populado!'); } catch (e) { console.error(e); alert("Erro ao popular o banco."); } } };
     const handleBackup = () => { try { const backupData = { products: allProducts, categories: allCategories, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); alert('Backup concluído!'); } catch (e) { console.error(e); alert("Falha no backup."); } };
     
-    const activeOrders = useMemo(() => orders.filter(o => o.status !== 'deleted'), [orders]);
+    const activeOrders = useMemo(() => orders.filter(o => o.status !== 'deleted' && o.status !== 'awaiting-payment'), [orders]);
     const deletedOrders = useMemo(() => orders.filter(o => o.status === 'deleted'), [orders]);
 
     const filteredOrders = useMemo(() => {

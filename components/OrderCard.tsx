@@ -21,6 +21,7 @@ const getStatusConfig = (order: Order): { text: string; icon: string; color: str
         completed: { text: 'Finalizado', icon: 'fas fa-check-circle', color: 'border-green-500' },
         cancelled: { text: 'Cancelado', icon: 'fas fa-times-circle', color: 'border-red-500' },
         deleted: { text: 'Na Lixeira', icon: 'fas fa-trash-alt', color: 'border-gray-500' },
+        'awaiting-payment': { text: 'Aguardando Pgto', icon: 'fas fa-clock', color: 'border-gray-400' },
     };
 
     if (order.status === 'ready') {

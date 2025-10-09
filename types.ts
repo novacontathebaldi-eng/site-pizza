@@ -41,7 +41,7 @@ export interface OrderDetails {
 }
 
 // New Types for Order Management
-export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted';
+export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted' | 'awaiting-payment';
 export type PaymentStatus = 'pending' | 'paid';
 
 export interface OrderCustomerDetails {

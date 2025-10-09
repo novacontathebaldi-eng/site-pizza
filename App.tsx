@@ -10,6 +10,7 @@ import { Footer } from './components/Footer';
 import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
 import { PixPaymentModal } from './components/PixPaymentModal';
+import { PaymentFailureModal } from './components/PaymentFailureModal';
 import { db } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
@@ -90,6 +91,8 @@ const App: React.FC = () => {
     const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
     const [payingOrder, setPayingOrder] = useState<Order | null>(null);
+    const [showPaymentFailureModal, setShowPaymentFailureModal] = useState<boolean>(false);
+    const [pixRetryKey, setPixRetryKey] = useState<number>(0);
     
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
@@ -328,15 +331,16 @@ const App: React.FC = () => {
         const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
             customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.orderType === 'delivery' ? details.address : '', reservationTime: details.orderType === 'local' ? details.reservationTime : '', },
             items: cart, total, paymentMethod: 'pix',
-            notes: details.notes || '', status: 'pending' as OrderStatus, paymentStatus: 'pending' as PaymentStatus,
+            notes: details.notes || '', status: 'awaiting-payment' as OrderStatus, paymentStatus: 'pending' as PaymentStatus,
         };
 
         try {
             const docRef = await firebaseService.addOrder(newOrderData);
-            const createdOrder: Order = { ...newOrderData, id: docRef.id, createdAt: new Date() }; // Create a temporary full order object
+            const createdOrder: Order = { ...newOrderData, id: docRef.id, createdAt: new Date() };
             addToast("Pedido pré-salvo, aguardando pagamento.", 'success');
             setIsCheckoutModalOpen(false);
             setPayingOrder(createdOrder);
+            setPixRetryKey(k => k + 1);
         } catch (error) {
             console.error("Failed to pre-save order:", error);
             addToast("Erro ao iniciar pagamento. Tente novamente.", 'error');
@@ -356,6 +360,46 @@ const App: React.FC = () => {
         setPayingOrder(null);
         setIsCartOpen(false);
     }, []);
+
+    const handleClosePixModal = () => {
+        if (payingOrder) {
+            setShowPaymentFailureModal(true);
+        }
+    };
+    
+    const handleTryAgainPix = () => {
+        setShowPaymentFailureModal(false);
+        setPixRetryKey(k => k + 1);
+    };
+
+    const handlePayLaterFromFailure = async () => {
+        if (!payingOrder) return;
+    
+        const orderToUpdate = { ...payingOrder };
+        setShowPaymentFailureModal(false);
+        setPayingOrder(null);
+
+        try {
+            await firebaseService.updateOrderStatus(orderToUpdate.id, 'pending');
+    
+            const details: OrderDetails = {
+                name: orderToUpdate.customer.name, phone: orderToUpdate.customer.phone, orderType: orderToUpdate.customer.orderType,
+                address: orderToUpdate.customer.address || '', paymentMethod: 'pix',
+                changeNeeded: false, changeAmount: '',
+                notes: orderToUpdate.notes || '', reservationTime: orderToUpdate.customer.reservationTime || ''
+            };
+            const whatsappUrl = generateWhatsAppMessage(details, orderToUpdate.items, orderToUpdate.total, false);
+            window.open(whatsappUrl, '_blank');
+            
+            addToast("Pedido enviado! O pagamento será feito depois.", 'success');
+            setCart([]);
+            setIsCartOpen(false);
+
+        } catch (error) {
+            console.error("Failed to update order to pending:", error);
+            addToast("Erro ao processar o pedido. Tente novamente.", 'error');
+        }
+    };
 
 
     const handleSaveProduct = useCallback(async (product: Product) => {
@@ -684,9 +728,20 @@ const App: React.FC = () => {
                 onInitiatePixPayment={handleInitiatePixPayment}
             />
              <PixPaymentModal
+                key={pixRetryKey}
                 order={payingOrder}
-                onClose={() => setPayingOrder(null)}
+                onClose={handleClosePixModal}
                 onPaymentSuccess={handlePixPaymentSuccess}
+            />
+
+            <PaymentFailureModal
+                isOpen={showPaymentFailureModal}
+                onClose={() => {
+                    setShowPaymentFailureModal(false);
+                    setPayingOrder(null);
+                }}
+                onTryAgain={handleTryAgainPix}
+                onPayLater={handlePayLaterFromFailure}
             />
             
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]">
