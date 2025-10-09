@@ -66,8 +66,7 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
         const unsubscribe = db.collection('orders').doc(order.id)
             .onSnapshot(doc => {
                 const updatedOrder = doc.data() as Order;
-                // Listen for 'paid_online' (set by webhook) or 'paid' (set manually by admin)
-                if (updatedOrder && (updatedOrder.paymentStatus === 'paid_online' || updatedOrder.paymentStatus === 'paid')) {
+                if (updatedOrder && updatedOrder.paymentStatus === 'paid') {
                     setIsPaid(true);
                     if (timerRef.current) clearInterval(timerRef.current);
                     setTimeout(() => {

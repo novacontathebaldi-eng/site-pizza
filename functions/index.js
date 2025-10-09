@@ -134,23 +134,15 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
 
     if (paymentInfo.status === "approved") {
       const orderRef = db.collection("orders").doc(orderId);
-      const orderDoc = await orderRef.get();
-
-      // Only update if the order is awaiting payment to prevent reprocessing.
-      if (orderDoc.exists && orderDoc.data().status === "awaiting-payment") {
-        const updateData = {
-          paymentStatus: "paid_online",
-          status: "pending", // Move order to pending queue for admin approval
-          mercadoPagoDetails: {
-            paymentId: paymentId.toString(),
-            transactionId: paymentInfo.transaction_details?.transaction_id || null,
-          },
-        };
-        await orderRef.update(updateData);
-        logger.info(`Pedido ${orderId} (Pagamento MP: ${paymentId}) confirmado e movido para pendente via webhook.`);
-      } else {
-        logger.info(`Webhook para pedido ${orderId} ignorado. Status atual: '${orderDoc.data()?.status}'.`);
-      }
+      const updateData = {
+        paymentStatus: "paid",
+        mercadoPagoDetails: {
+          paymentId: paymentId.toString(),
+          transactionId: paymentInfo.transaction_details?.transaction_id || null,
+        },
+      };
+      await orderRef.update(updateData);
+      logger.info(`Pedido ${orderId} (Pagamento MP: ${paymentId}) foi marcado como 'pago' com detalhes da transação via webhook.`);
     } else {
       logger.info(`Status do pagamento ${paymentId} é '${paymentInfo.status}'. Nenhuma ação tomada.`);
     }
