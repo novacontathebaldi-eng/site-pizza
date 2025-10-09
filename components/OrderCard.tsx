@@ -145,12 +145,6 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 <i className="fab fa-whatsapp text-2xl"></i>
                             </button>
                             <div className="text-right">
-                                {status === 'pending' && paymentStatus === 'paid' && (
-                                    <div className="text-xs font-bold text-green-600 flex items-center justify-end gap-1 mb-1 animate-pulse">
-                                        <i className="fas fa-check-circle"></i>
-                                        <span>PAGO PELO SITE</span>
-                                    </div>
-                                )}
                                 <p className="font-bold text-2xl text-accent">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                                 <p className="text-sm text-gray-600">{items.reduce((acc, item) => acc + item.quantity, 0)} itens</p>
                             </div>
@@ -187,14 +181,28 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                             )}
                             {customer.orderType === 'pickup' && pickupTimeEstimate && <p><strong>Retirada:</strong> <span className="font-bold text-accent">{pickupTimeEstimate}</span></p>}
                         </div>
-                        <div className="bg-gray-50 p-3 rounded-md">
+                         <div className="bg-gray-50 p-3 rounded-md flex flex-col">
                             <h4 className="font-bold mb-2"><i className="fas fa-credit-card mr-2"></i>Pagamento</h4>
-                            <p><strong>Método:</strong> {paymentMethodMap[paymentMethod]}</p>
-                            <p><strong>Status Pgto:</strong>
-                                <span className={`font-bold ml-1 ${paymentStatus === 'paid' ? 'text-green-600' : 'text-yellow-600'}`}>{paymentStatus === 'paid' ? 'Pago' : 'Pendente'}</span>
-                            </p>
-                            {paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {changeNeeded ? `para R$ ${changeAmount}` : 'Não precisa'}</p> )}
-                            
+                            <div className="space-y-1 flex-grow">
+                                <p><strong>Método:</strong> {paymentMethodMap[paymentMethod]}</p>
+
+                                {order.mercadoPagoDetails && order.paymentStatus === 'paid' ? (
+                                    <div>
+                                        <strong>Status Pgto:</strong>
+                                        <div className="text-green-600 font-bold flex items-center gap-2 animate-pulse mt-1">
+                                            <i className="fas fa-check-circle"></i>
+                                            <span>PAGO PELO SITE</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p><strong>Status Pgto:</strong>
+                                        <span className={`font-bold ml-1 ${paymentStatus === 'paid' ? 'text-green-600' : 'text-yellow-600'}`}>{paymentStatus === 'paid' ? 'Pago' : 'Pendente'}</span>
+                                    </p>
+                                )}
+                                
+                                {paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {changeNeeded ? `para R$ ${changeAmount}` : 'Não precisa'}</p> )}
+                            </div>
+
                             {(order.mercadoPagoDetails || notes) && (
                                 <div className="mt-2 pt-2 border-t border-gray-200 space-y-2">
                                     {order.mercadoPagoDetails && (
