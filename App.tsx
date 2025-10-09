@@ -355,8 +355,8 @@ const App: React.FC = () => {
         }
 
         try {
-            await firebaseService.updateOrderStatus(paidOrder.id, 'pending');
-            await firebaseService.updateOrderPaymentStatus(paidOrder.id, 'paid_online');
+            // The order status is now updated by the backend webhook.
+            // This function is only responsible for client-side cleanup.
             
             addToast("Pagamento confirmado! Seu pedido foi enviado para a pizzaria.", 'success');
 
@@ -372,10 +372,10 @@ const App: React.FC = () => {
             setPayingOrder(null);
             setIsCartOpen(false);
         } catch (error) {
-             console.error("Error finalizing paid order:", error);
-            addToast("Erro ao finalizar o pedido após o pagamento. Contate o suporte.", 'error');
+             console.error("Error during client-side cleanup after paid order:", error);
+            addToast("O pagamento foi confirmado, mas houve um erro ao finalizar. Contate o suporte se necessário.", 'error');
         }
-    }, [addToast, setCart, setPayingOrder, setIsCartOpen]);
+    }, [addToast]);
 
     const handleClosePixModal = () => {
         if (payingOrder) {
