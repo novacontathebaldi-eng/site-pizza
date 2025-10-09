@@ -66,6 +66,10 @@ export interface Order {
     createdAt: any; // Firestore Timestamp
     pickupTimeEstimate?: string; // Added for pickup
     mercadoPagoPaymentId?: string; // To store the Mercado Pago payment ID
+    mercadoPagoDetails?: {
+        paymentId: string;
+        transactionId?: string | null;
+    };
 }
 
 

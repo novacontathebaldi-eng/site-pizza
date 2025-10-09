@@ -349,8 +349,8 @@ const App: React.FC = () => {
 
     const handlePixPaymentSuccess = useCallback(async (paidOrder: Order) => {
         try {
-            await firebaseService.updateOrderStatus(paidOrder.id, 'accepted');
-            addToast("Pagamento confirmado! Seu pedido está sendo preparado.", 'success');
+            await firebaseService.updateOrderStatus(paidOrder.id, 'pending');
+            addToast("Pagamento confirmado! Seu pedido foi enviado para a pizzaria.", 'success');
 
             const details: OrderDetails = {
                 name: paidOrder.customer.name, phone: paidOrder.customer.phone, orderType: paidOrder.customer.orderType,

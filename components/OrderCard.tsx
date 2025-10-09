@@ -145,6 +145,12 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 <i className="fab fa-whatsapp text-2xl"></i>
                             </button>
                             <div className="text-right">
+                                {status === 'pending' && paymentStatus === 'paid' && (
+                                    <div className="text-xs font-bold text-green-600 flex items-center justify-end gap-1 mb-1 animate-pulse">
+                                        <i className="fas fa-check-circle"></i>
+                                        <span>PAGO PELO SITE</span>
+                                    </div>
+                                )}
                                 <p className="font-bold text-2xl text-accent">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                                 <p className="text-sm text-gray-600">{items.reduce((acc, item) => acc + item.quantity, 0)} itens</p>
                             </div>
@@ -188,7 +194,29 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 <span className={`font-bold ml-1 ${paymentStatus === 'paid' ? 'text-green-600' : 'text-yellow-600'}`}>{paymentStatus === 'paid' ? 'Pago' : 'Pendente'}</span>
                             </p>
                             {paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {changeNeeded ? `para R$ ${changeAmount}` : 'Não precisa'}</p> )}
-                            {notes && <p className="mt-2 pt-2 border-t"><strong>Obs:</strong> {notes}</p>}
+                            
+                            {(order.mercadoPagoDetails || notes) && (
+                                <div className="mt-2 pt-2 border-t border-gray-200 space-y-2">
+                                    {order.mercadoPagoDetails && (
+                                        <div className="text-xs space-y-1">
+                                            <div>
+                                                {order.mercadoPagoDetails.transactionId && <p><strong>ID Transação:</strong> {order.mercadoPagoDetails.transactionId}</p>}
+                                                <p><strong>ID Pagamento:</strong> {order.mercadoPagoDetails.paymentId}</p>
+                                            </div>
+                                            <a 
+                                                href={`https://www.mercadopago.com.br/payments/${order.mercadoPagoDetails.paymentId}/receipt`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-2 text-sm bg-blue-100 text-blue-700 font-semibold py-1 px-2 rounded-md hover:bg-blue-200"
+                                            >
+                                                <i className="fas fa-receipt"></i>
+                                                <span>Ver Comprovante</span>
+                                            </a>
+                                        </div>
+                                    )}
+                                    {notes && <p className="text-sm"><strong>Obs:</strong> {notes}</p>}
+                                </div>
+                            )}
                         </div>
                     </div>
 
