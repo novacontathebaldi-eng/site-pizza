@@ -40,16 +40,15 @@ const paymentMethodMap = { credit: 'Crédito', debit: 'Débito', pix: 'PIX', cas
 const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo no Local' };
 
 const getPaymentStatusInfo = (order: Order): { text: string; isPaid: boolean } => {
-    if (order.paymentStatus === 'paid') {
-        return {
-            text: order.mercadoPagoDetails ? 'Pago pelo SITE' : 'Pago',
-            isPaid: true
-        };
+    switch (order.paymentStatus) {
+        case 'paid_online':
+            return { text: 'Pago pelo SITE', isPaid: true };
+        case 'paid':
+            return { text: 'Pago', isPaid: true };
+        case 'pending':
+        default:
+            return { text: 'Pendente', isPaid: false };
     }
-    return {
-        text: 'Pendente',
-        isPaid: false
-    };
 };
 
 
@@ -151,6 +150,9 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
             >
                 <option value="pending">Pendente</option>
                 <option value="paid">Pago</option>
+                {order.paymentStatus === 'paid_online' && (
+                    <option value="paid_online" disabled>Pago pelo Site</option>
+                )}
             </select>
         </div>
     );
@@ -173,7 +175,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 <i className="fab fa-whatsapp text-2xl"></i>
                             </button>
                             <div className="text-right">
-                                {isPaid && order.mercadoPagoDetails && (
+                                {isPaid && order.paymentStatus === 'paid_online' && (
                                     <div className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full animate-pulse border border-green-200 mb-1 inline-block">
                                         <i className="fas fa-check-circle mr-1"></i> PAGO PELO SITE
                                     </div>
