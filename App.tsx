@@ -348,34 +348,28 @@ const App: React.FC = () => {
     };
 
     const handlePixPaymentSuccess = useCallback(async (paidOrder: Order) => {
+        // The backend now handles all status updates. This function is only for client-side cleanup and feedback.
         if (!paidOrder || !paidOrder.id) {
-            console.error("handlePixPaymentSuccess called without a valid paidOrder object.");
+            console.error("handlePixPaymentSuccess called with an invalid paidOrder object.");
             addToast("Erro crítico ao processar pagamento. Contate o suporte.", 'error');
             return;
         }
-
-        try {
-            await firebaseService.updateOrderStatus(paidOrder.id, 'pending');
-            await firebaseService.updateOrderPaymentStatus(paidOrder.id, 'paid_online');
-            
-            addToast("Pagamento confirmado! Seu pedido foi enviado para a pizzaria.", 'success');
-
-            const details: OrderDetails = {
-                name: paidOrder.customer.name, phone: paidOrder.customer.phone, orderType: paidOrder.customer.orderType,
-                address: paidOrder.customer.address || '', paymentMethod: 'pix', changeNeeded: false,
-                notes: paidOrder.notes || '', reservationTime: paidOrder.customer.reservationTime || ''
-            };
-            const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, true);
-            window.open(whatsappUrl, '_blank');
-
-            setCart([]);
-            setPayingOrder(null);
-            setIsCartOpen(false);
-        } catch (error) {
-             console.error("Error finalizing paid order:", error);
-            addToast("Erro ao finalizar o pedido após o pagamento. Contate o suporte.", 'error');
-        }
-    }, [addToast, setCart, setPayingOrder, setIsCartOpen]);
+    
+        addToast("Pagamento confirmado! O seu pedido já foi enviado.", 'success');
+    
+        const details: OrderDetails = {
+            name: paidOrder.customer.name, phone: paidOrder.customer.phone, orderType: paidOrder.customer.orderType,
+            address: paidOrder.customer.address || '', paymentMethod: 'pix', changeNeeded: false,
+            notes: paidOrder.notes || '', reservationTime: paidOrder.customer.reservationTime || ''
+        };
+        const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, true);
+        window.open(whatsappUrl, '_blank');
+    
+        // Clean up client-side state
+        setCart([]);
+        setPayingOrder(null);
+        setIsCartOpen(false);
+    }, [addToast]);
 
     const handleClosePixModal = () => {
         if (payingOrder) {
