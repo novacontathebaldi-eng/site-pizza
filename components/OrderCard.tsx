@@ -170,19 +170,21 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                             </div>
                             <p className="text-xs text-gray-500 mt-1">Pedido recebido em: {formatTimestamp(createdAt)}</p>
                         </div>
-                        <div className="flex items-start gap-2">
-                             <div className="text-right flex-grow">
-                                {isPaid && order.paymentStatus === 'paid_online' && (
-                                    <div className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full animate-pulse border border-green-200 mb-1 inline-flex items-center justify-center">
-                                        <i className="fas fa-check-circle mr-1"></i> PAGO PELO SITE
-                                    </div>
-                                )}
-                                <p className="font-bold text-2xl text-accent">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                                <p className="text-sm text-gray-600">{items.reduce((acc, item) => acc + item.quantity, 0)} itens</p>
+                        <div className="flex flex-col items-end gap-1">
+                            <div className="flex items-start gap-2">
+                                <div className="text-right">
+                                    <p className="font-bold text-2xl text-accent">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                    <p className="text-sm text-gray-600">{items.reduce((acc, item) => acc + item.quantity, 0)} itens</p>
+                                </div>
+                                <button onClick={() => setIsContactModalOpen(true)} className="w-10 h-10 bg-green-100 text-green-600 rounded-full flex items-center justify-center hover:bg-green-200 transition-colors flex-shrink-0" aria-label="Contato com cliente">
+                                    <i className="fab fa-whatsapp text-2xl"></i>
+                                </button>
                             </div>
-                            <button onClick={() => setIsContactModalOpen(true)} className="w-10 h-10 bg-green-100 text-green-600 rounded-full flex items-center justify-center hover:bg-green-200 transition-colors flex-shrink-0" aria-label="Contato com cliente">
-                                <i className="fab fa-whatsapp text-2xl"></i>
-                            </button>
+                            {isPaid && order.paymentStatus === 'paid_online' && (
+                                <div className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full animate-pulse border border-green-200 inline-flex items-center justify-center whitespace-nowrap">
+                                    <i className="fas fa-check-circle mr-1"></i> PAGO PELO SITE
+                                </div>
+                            )}
                         </div>
                     </div>
 
