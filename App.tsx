@@ -347,19 +347,27 @@ const App: React.FC = () => {
         }
     };
 
-    const handlePixPaymentSuccess = useCallback((paidOrder: Order) => {
-        const details: OrderDetails = {
-            name: paidOrder.customer.name, phone: paidOrder.customer.phone, orderType: paidOrder.customer.orderType,
-            address: paidOrder.customer.address || '', paymentMethod: 'pix', changeNeeded: false,
-            notes: paidOrder.notes || '', reservationTime: paidOrder.customer.reservationTime || ''
-        };
-        const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, true);
-        window.open(whatsappUrl, '_blank');
+    const handlePixPaymentSuccess = useCallback(async (paidOrder: Order) => {
+        try {
+            await firebaseService.updateOrderStatus(paidOrder.id, 'accepted');
+            addToast("Pagamento confirmado! Seu pedido está sendo preparado.", 'success');
 
-        setCart([]);
-        setPayingOrder(null);
-        setIsCartOpen(false);
-    }, []);
+            const details: OrderDetails = {
+                name: paidOrder.customer.name, phone: paidOrder.customer.phone, orderType: paidOrder.customer.orderType,
+                address: paidOrder.customer.address || '', paymentMethod: 'pix', changeNeeded: false,
+                notes: paidOrder.notes || '', reservationTime: paidOrder.customer.reservationTime || ''
+            };
+            const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, true);
+            window.open(whatsappUrl, '_blank');
+
+            setCart([]);
+            setPayingOrder(null);
+            setIsCartOpen(false);
+        } catch (error) {
+             console.error("Error finalizing paid order:", error);
+            addToast("Erro ao finalizar o pedido após o pagamento. Contate o suporte.", 'error');
+        }
+    }, [addToast]);
 
     const handleClosePixModal = () => {
         if (payingOrder) {
