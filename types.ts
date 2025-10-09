@@ -70,6 +70,11 @@ export interface Order {
         paymentId: string;
         transactionId?: string | null;
     };
+    pixData?: {
+        qrCodeBase64: string;
+        copyPaste: string;
+        dateOfExpiration: string;
+    };
 }
 
 

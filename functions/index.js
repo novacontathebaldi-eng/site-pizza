@@ -36,16 +36,13 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
     const payment = new Payment(client);
 
     // Check for existing, valid payment before creating a new one
-    if (orderData.mercadoPagoPaymentId) {
+    if (orderData.mercadoPagoPaymentId && orderData.pixData) {
       try {
         const existingPayment = await payment.get({id: orderData.mercadoPagoPaymentId});
         if (existingPayment && existingPayment.status === "pending" && new Date(existingPayment.date_of_expiration) > new Date()) {
-          logger.info(`Returning existing valid PIX for order ${orderId}. Payment ID: ${existingPayment.id}`);
-          return {
-            qrCodeBase64: existingPayment.point_of_interaction?.transaction_data?.qr_code_base64,
-            copyPaste: existingPayment.point_of_interaction?.transaction_data?.qr_code,
-            dateOfExpiration: existingPayment.date_of_expiration,
-          };
+          logger.info(`Returning existing valid PIX from Firestore for order ${orderId}. Payment ID: ${existingPayment.id}`);
+          // Return the data we saved in Firestore, which is guaranteed to be correct
+          return orderData.pixData;
         }
       } catch (e) {
         logger.warn(`Could not fetch existing payment ${orderData.mercadoPagoPaymentId}, creating a new one.`, e.message);
@@ -84,23 +81,26 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
     const copyPaste = result.point_of_interaction?.transaction_data?.qr_code;
     const dateOfExpiration = result.date_of_expiration;
 
-    if (!qrCodeBase64 || !copyPaste) {
+    if (!qrCodeBase64 || !copyPaste || !dateOfExpiration) {
         logger.error("Mercado Pago response missing PIX data.", {result});
         throw new Error("Dados PIX não retornados pelo gateway de pagamento.");
     }
 
-    // Save the new Mercado Pago payment ID to our order for tracking
-    await db.collection("orders").doc(orderId).update({
-      mercadoPagoPaymentId: paymentId,
-    });
-
-    logger.info(`New PIX payment created for order ${orderId}, MP Payment ID: ${paymentId}`);
-
-    return {
+    const pixDataToSave = {
       qrCodeBase64,
       copyPaste,
       dateOfExpiration,
     };
+
+    // Save the new Mercado Pago payment ID and PIX data to our order for tracking and persistence
+    await db.collection("orders").doc(orderId).update({
+      mercadoPagoPaymentId: paymentId,
+      pixData: pixDataToSave,
+    });
+
+    logger.info(`New PIX payment created for order ${orderId}, MP Payment ID: ${paymentId}`);
+
+    return pixDataToSave;
   } catch (error) {
     logger.error(`Error creating Mercado Pago payment for order ${orderId}:`, error.cause || error.message);
     throw new Error("Falha ao comunicar com o gateway de pagamento.");
