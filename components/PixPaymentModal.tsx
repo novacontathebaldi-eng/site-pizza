@@ -66,8 +66,8 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
         const unsubscribe = db.collection('orders').doc(order.id)
             .onSnapshot(doc => {
                 const updatedOrder = doc.data() as Order;
-                // Check for the 'paid' status set by the webhook. This is the reliable trigger.
-                if (updatedOrder && updatedOrder.paymentStatus === 'paid') {
+                // Listen for the final 'paid_online' status set by the backend webhook.
+                if (updatedOrder && updatedOrder.paymentStatus === 'paid_online') {
                     setIsPaid(true);
                     if (timerRef.current) clearInterval(timerRef.current);
                     setTimeout(() => {

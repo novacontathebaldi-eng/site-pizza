@@ -348,17 +348,9 @@ const App: React.FC = () => {
     };
 
     const handlePixPaymentSuccess = useCallback(async (paidOrder: Order) => {
-        if (!paidOrder || !paidOrder.id) {
-            console.error("handlePixPaymentSuccess called without a valid paidOrder object.");
-            addToast("Erro crítico ao processar pagamento. Contate o suporte.", 'error');
-            return;
-        }
-
+        // This function is now only responsible for client-side UI cleanup.
+        // The backend webhook handles all database updates.
         try {
-            // The backend has already set status to 'pending' and paymentStatus to 'paid'.
-            // Now, we do the final client-side update to set the desired 'paid_online' status.
-            await firebaseService.updateOrderPaymentStatus(paidOrder.id, 'paid_online');
-            
             addToast("Pagamento confirmado! Seu pedido foi enviado para a pizzaria.", 'success');
 
             const details: OrderDetails = {
