@@ -355,8 +355,9 @@ const App: React.FC = () => {
         }
 
         try {
-            // The order status is now updated by the backend webhook.
-            // This function is only responsible for client-side cleanup.
+            // The backend has already set status to 'pending' and paymentStatus to 'paid'.
+            // Now, we do the final client-side update to set the desired 'paid_online' status.
+            await firebaseService.updateOrderPaymentStatus(paidOrder.id, 'paid_online');
             
             addToast("Pagamento confirmado! Seu pedido foi enviado para a pizzaria.", 'success');
 
