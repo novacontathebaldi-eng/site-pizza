@@ -38,12 +38,6 @@ const getStatusConfig = (order: Order): { text: string; icon: string; color: str
 
 const paymentMethodMap = { credit: 'Crédito', debit: 'Débito', pix: 'PIX', cash: 'Dinheiro' };
 const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo no Local' };
-const paymentStatusMap: { [key in PaymentStatus]: string } = {
-    pending: 'Pendente',
-    paid: 'Pago',
-    paid_online: 'Pago pelo SITE'
-};
-
 
 export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete }) => {
     const { id, customer, items, total, paymentMethod, changeNeeded, changeAmount, notes, status, paymentStatus, createdAt, pickupTimeEstimate } = order;
@@ -72,6 +66,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
             payload = { pickupTimeEstimate: `~${formattedTime}` };
         }
         onUpdateStatus(id, 'accepted', payload);
+    };
+    
+    const handleTogglePaymentStatus = () => {
+        const newStatus = paymentStatus === 'pending' ? 'paid' : 'pending';
+        onUpdatePaymentStatus(id, newStatus);
     };
     
     const handleTimeSave = () => {
@@ -127,31 +126,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
             </select>
         </div>
     );
-    
-    const paymentStatusChanger = !isArchived && (
-        <div className="flex items-center gap-2">
-            <label htmlFor={`payment-status-select-${order.id}`} className="text-sm font-semibold text-gray-700 whitespace-nowrap">Pgto:</label>
-            <select
-                id={`payment-status-select-${order.id}`}
-                value={order.paymentStatus}
-                onChange={(e) => onUpdatePaymentStatus(id, e.target.value as PaymentStatus)}
-                className={`px-2 py-1 border rounded-md bg-white text-sm focus:ring-accent focus:border-accent font-semibold ${
-                    order.paymentStatus === 'paid_online' ? 'text-green-600' :
-                    order.paymentStatus === 'paid' ? 'text-green-600' :
-                    'text-yellow-600'
-                }`}
-            >
-                <option value="pending">Pendente</option>
-                <option value="paid">Pago</option>
-                <option value="paid_online">Pago pelo SITE</option>
-            </select>
-        </div>
-    );
 
 
     return (
         <>
-            <div className={`relative bg-white rounded-lg shadow-md border-l-4 ${config.color} overflow-hidden transition-opacity ${isArchived || status === 'deleted' ? 'opacity-70' : ''}`}>
+            <div className={`bg-white rounded-lg shadow-md border-l-4 ${config.color} overflow-hidden transition-opacity ${isArchived || status === 'deleted' ? 'opacity-70' : ''}`}>
                 <div className="p-4">
                     <div className="flex justify-between items-start mb-4">
                         <div>
@@ -166,11 +145,6 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 <i className="fab fa-whatsapp text-2xl"></i>
                             </button>
                             <div className="text-right">
-                                {order.paymentStatus === 'paid_online' && (
-                                    <div className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full animate-pulse border border-green-200 mb-1 inline-block">
-                                        <i className="fas fa-check-circle mr-1"></i> PAGO PELO SITE
-                                    </div>
-                                )}
                                 <p className="font-bold text-2xl text-accent">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                                 <p className="text-sm text-gray-600">{items.reduce((acc, item) => acc + item.quantity, 0)} itens</p>
                             </div>
@@ -207,42 +181,14 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                             )}
                             {customer.orderType === 'pickup' && pickupTimeEstimate && <p><strong>Retirada:</strong> <span className="font-bold text-accent">{pickupTimeEstimate}</span></p>}
                         </div>
-                         <div className="bg-gray-50 p-3 rounded-md flex flex-col">
+                        <div className="bg-gray-50 p-3 rounded-md">
                             <h4 className="font-bold mb-2"><i className="fas fa-credit-card mr-2"></i>Pagamento</h4>
-                            <div className="space-y-1 flex-grow">
-                                <p><strong>Método:</strong> {paymentMethodMap[paymentMethod]}</p>
-                                <p><strong>Status Pgto:</strong>
-                                    <span className={`font-bold ml-1 ${
-                                        paymentStatus === 'paid' || paymentStatus === 'paid_online' ? 'text-green-600' : 'text-yellow-600'
-                                    }`}>
-                                        {paymentStatusMap[paymentStatus]}
-                                    </span>
-                                </p>
-                                {paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {changeNeeded ? `para R$ ${changeAmount}` : 'Não precisa'}</p> )}
-                            </div>
-
-                            {(order.mercadoPagoDetails || notes) && (
-                                <div className="mt-2 pt-2 border-t border-gray-200 space-y-2">
-                                    {order.mercadoPagoDetails && (
-                                        <div className="text-xs space-y-1">
-                                            <div>
-                                                {order.mercadoPagoDetails.transactionId && <p><strong>ID Transação:</strong> {order.mercadoPagoDetails.transactionId}</p>}
-                                                <p><strong>ID Pagamento:</strong> {order.mercadoPagoDetails.paymentId}</p>
-                                            </div>
-                                            <a 
-                                                href={`https://www.mercadopago.com.br/payments/${order.mercadoPagoDetails.paymentId}/receipt`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-2 text-sm bg-blue-100 text-blue-700 font-semibold py-1 px-2 rounded-md hover:bg-blue-200"
-                                            >
-                                                <i className="fas fa-receipt"></i>
-                                                <span>Ver Comprovante</span>
-                                            </a>
-                                        </div>
-                                    )}
-                                    {notes && <p className="text-sm"><strong>Obs:</strong> {notes}</p>}
-                                </div>
-                            )}
+                            <p><strong>Método:</strong> {paymentMethodMap[paymentMethod]}</p>
+                            <p><strong>Status Pgto:</strong>
+                                <span className={`font-bold ml-1 ${paymentStatus === 'paid' ? 'text-green-600' : 'text-yellow-600'}`}>{paymentStatus === 'paid' ? 'Pago' : 'Pendente'}</span>
+                            </p>
+                            {paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {changeNeeded ? `para R$ ${changeAmount}` : 'Não precisa'}</p> )}
+                            {notes && <p className="mt-2 pt-2 border-t"><strong>Obs:</strong> {notes}</p>}
                         </div>
                     </div>
 
@@ -267,7 +213,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                             </>
                         ) : (
                              <div className="flex flex-wrap items-center justify-end gap-3 w-full">
-                                {paymentStatusChanger}
+                                {!isArchived && (
+                                    <button onClick={handleTogglePaymentStatus} className={`font-semibold py-2 px-3 rounded-lg text-sm transition-colors ${paymentStatus === 'paid' ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-orange-400 text-white hover:bg-orange-500'}`}>
+                                        <i className={`fas ${paymentStatus === 'paid' ? 'fa-check' : 'fa-dollar-sign'} mr-2`}></i>{paymentStatus === 'paid' ? 'Pago' : 'Marcar Pago'}
+                                    </button>
+                                )}
                                 <div className="flex-grow"></div>
                                 
                                 {/* Next-step buttons */}

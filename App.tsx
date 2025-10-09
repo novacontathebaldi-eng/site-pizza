@@ -74,45 +74,6 @@ const defaultSiteSettings: SiteSettings = {
     ]
 };
 
-const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, isPaid: boolean) => {
-    const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumir no local' };
-    const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
-
-    let message = `*🍕 NOVO PEDIDO - PIZZARIA SANTA SENSAÇÃO 🍕*\n\n`;
-    if (isPaid) {
-        message += `*✅ JÁ PAGO VIA PIX PELO SITE*\n\n`;
-    }
-    message += `*👤 DADOS DO CLIENTE:*\n`;
-    message += `*Nome:* ${details.name}\n`;
-    message += `*Telefone:* ${details.phone}\n`;
-    message += `*Tipo de Pedido:* ${orderTypeMap[details.orderType]}\n`;
-    if (details.orderType === 'delivery') {
-        message += `*Endereço:* ${details.address}\n`;
-    }
-    if (details.orderType === 'local' && details.reservationTime) {
-        message += `*Horário da Reserva:* ${details.reservationTime}\n`;
-    }
-    message += `\n*🛒 ITENS DO PEDIDO:*\n`;
-    currentCart.forEach(item => {
-        message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2).replace('.', ',')}\n`;
-    });
-    message += `\n*💰 TOTAL: R$ ${total.toFixed(2).replace('.', ',')}*\n\n`;
-    message += `*💳 PAGAMENTO:*\n`;
-    message += `*Forma:* ${paymentMethodMap[details.paymentMethod]}\n`;
-    if (!isPaid && details.paymentMethod === 'cash') {
-        if (details.changeNeeded) {
-            message += `*Precisa de troco para:* R$ ${details.changeAmount}\n`;
-        } else {
-            message += `*Não precisa de troco.*\n`;
-        }
-    }
-    if (details.notes) {
-        message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
-    }
-    message += `\n_Pedido gerado pelo nosso site._`;
-    return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
-};
-
 const App: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -299,6 +260,45 @@ const App: React.FC = () => {
             return prevCart.map(item => item.id === itemId ? { ...item, quantity: newQuantity } : item);
         });
     }, []);
+
+    const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, isPaid: boolean) => {
+        const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumir no local' };
+        const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
+
+        let message = `*🍕 NOVO PEDIDO - PIZZARIA SANTA SENSAÇÃO 🍕*\n\n`;
+        if (isPaid) {
+            message += `*✅ JÁ PAGO VIA PIX PELO SITE*\n\n`;
+        }
+        message += `*👤 DADOS DO CLIENTE:*\n`;
+        message += `*Nome:* ${details.name}\n`;
+        message += `*Telefone:* ${details.phone}\n`;
+        message += `*Tipo de Pedido:* ${orderTypeMap[details.orderType]}\n`;
+        if (details.orderType === 'delivery') {
+            message += `*Endereço:* ${details.address}\n`;
+        }
+        if (details.orderType === 'local' && details.reservationTime) {
+            message += `*Horário da Reserva:* ${details.reservationTime}\n`;
+        }
+        message += `\n*🛒 ITENS DO PEDIDO:*\n`;
+        currentCart.forEach(item => {
+            message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2).replace('.', ',')}\n`;
+        });
+        message += `\n*💰 TOTAL: R$ ${total.toFixed(2).replace('.', ',')}*\n\n`;
+        message += `*💳 PAGAMENTO:*\n`;
+        message += `*Forma:* ${paymentMethodMap[details.paymentMethod]}\n`;
+        if (!isPaid && details.paymentMethod === 'cash') {
+            if (details.changeNeeded) {
+                message += `*Precisa de troco para:* R$ ${details.changeAmount}\n`;
+            } else {
+                message += `*Não precisa de troco.*\n`;
+            }
+        }
+        if (details.notes) {
+            message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
+        }
+        message += `\n_Pedido gerado pelo nosso site._`;
+        return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
+    };
     
     const handleCheckout = async (details: OrderDetails) => {
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -348,15 +348,9 @@ const App: React.FC = () => {
     };
 
     const handlePixPaymentSuccess = useCallback(async (paidOrder: Order) => {
-        if (!paidOrder || !paidOrder.id) {
-            console.error("handlePixPaymentSuccess called without a valid paidOrder object.");
-            addToast("Erro crítico ao processar pagamento. Contate o suporte.", 'error');
-            return;
-        }
-
         try {
-            await firebaseService.updateOrderStatus(paidOrder.id, 'pending');
-            addToast("Pagamento confirmado! Seu pedido foi enviado para a pizzaria.", 'success');
+            await firebaseService.updateOrderStatus(paidOrder.id, 'accepted');
+            addToast("Pagamento confirmado! Seu pedido está sendo preparado.", 'success');
 
             const details: OrderDetails = {
                 name: paidOrder.customer.name, phone: paidOrder.customer.phone, orderType: paidOrder.customer.orderType,
@@ -373,7 +367,7 @@ const App: React.FC = () => {
              console.error("Error finalizing paid order:", error);
             addToast("Erro ao finalizar o pedido após o pagamento. Contate o suporte.", 'error');
         }
-    }, [addToast, setCart, setPayingOrder, setIsCartOpen]);
+    }, [addToast]);
 
     const handleClosePixModal = () => {
         if (payingOrder) {

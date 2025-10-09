@@ -42,7 +42,7 @@ export interface OrderDetails {
 
 // New Types for Order Management
 export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted' | 'awaiting-payment';
-export type PaymentStatus = 'pending' | 'paid' | 'paid_online';
+export type PaymentStatus = 'pending' | 'paid';
 
 export interface OrderCustomerDetails {
     name: string;
@@ -66,10 +66,6 @@ export interface Order {
     createdAt: any; // Firestore Timestamp
     pickupTimeEstimate?: string; // Added for pickup
     mercadoPagoPaymentId?: string; // To store the Mercado Pago payment ID
-    mercadoPagoDetails?: {
-        paymentId: string;
-        transactionId?: string | null;
-    };
 }
 
 
