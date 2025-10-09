@@ -333,7 +333,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const handleBackup = () => { try { const backupData = { products: allProducts, categories: allCategories, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); alert('Backup concluído!'); } catch (e) { console.error(e); alert("Falha no backup."); } };
     
     // ** REFACTORED FILTERING LOGIC **
-    // This centralized useMemo hook processes all orders based on the current UI state.
     const {
         pendingOrders,
         tabOrders,
@@ -341,64 +340,61 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         getTabCount,
     } = useMemo(() => {
         const pending: Order[] = [];
-        const active: Order[] = [];
-        const deleted: Order[] = [];
-
-        // First pass: Categorize all orders and apply the search term.
+        const otherOrders: Order[] = [];
+        
+        // 1. Separate "pending" orders from all others. This ensures the pending queue is never affected by filters.
         for (const order of orders) {
-            const searchTermLower = orderSearchTerm.toLowerCase();
+            if (order.status === 'pending') {
+                pending.push(order);
+            } else if (order.status !== 'awaiting-payment') {
+                otherOrders.push(order);
+            }
+        }
+        
+        // 2. Apply search and dropdown filters ONLY to the "otherOrders" list.
+        const searchTermLower = orderSearchTerm.toLowerCase();
+        let filteredOther = otherOrders.filter(order => {
             const matchesSearch = !searchTermLower ||
                 order.customer.name.toLowerCase().includes(searchTermLower) ||
                 order.customer.phone.toLowerCase().includes(searchTermLower);
 
-            if (!matchesSearch) continue;
+            if (!matchesSearch) return false;
 
-            if (order.status === 'pending') {
-                pending.push(order);
-            } else if (order.status === 'deleted') {
-                deleted.push(order);
-            } else if (order.status !== 'awaiting-payment') {
-                active.push(order);
-            }
-        }
-
-        // Second pass: Apply dropdown filters ONLY to the "active" (non-pending) orders.
-        const filteredActive = active.filter(order => {
             const matchesOrderType = !orderFilters.orderType || order.customer.orderType === orderFilters.orderType;
             const matchesPaymentMethod = !orderFilters.paymentMethod || order.paymentMethod === orderFilters.paymentMethod;
             const matchesPaymentStatus = !orderFilters.paymentStatus || order.paymentStatus === orderFilters.paymentStatus;
             const matchesOrderStatus = !orderFilters.orderStatus || order.status === orderFilters.orderStatus;
+            
             return matchesOrderType && matchesPaymentMethod && matchesPaymentStatus && matchesOrderStatus;
         });
 
-        // Third pass: From the filtered active list, get the orders for the currently selected tab.
+        const deleted = filteredOther.filter(o => o.status === 'deleted');
+        const active = filteredOther.filter(o => o.status !== 'deleted');
+
+        // 3. From the filtered active list, get the orders for the currently selected tab.
         let currentTabOrders: Order[] = [];
         switch (activeOrdersTab) {
             case 'pronto':
-                currentTabOrders = filteredActive.filter(o => o.status === 'ready' && o.customer.orderType === 'pickup');
+                currentTabOrders = active.filter(o => o.status === 'ready' && o.customer.orderType === 'pickup');
                 break;
             case 'emRota':
-                currentTabOrders = filteredActive.filter(o => o.status === 'ready' && o.customer.orderType === 'delivery');
+                currentTabOrders = active.filter(o => o.status === 'ready' && o.customer.orderType === 'delivery');
                 break;
             default:
-                currentTabOrders = filteredActive.filter(o => o.status === activeOrdersTab);
+                currentTabOrders = active.filter(o => o.status === activeOrdersTab);
                 break;
         }
         
-        // Helper function to get tab counts based on the already filtered active list.
+        // 4. Helper function to get tab counts based on the filtered active list.
         const getTabCountFunc = (tab: OrderTabKey) => {
             switch(tab) {
-                case 'pronto':
-                    return filteredActive.filter(o => o.status === 'ready' && o.customer.orderType === 'pickup').length;
-                case 'emRota':
-                     return filteredActive.filter(o => o.status === 'ready' && o.customer.orderType === 'delivery').length;
+                case 'pronto': return active.filter(o => o.status === 'ready' && o.customer.orderType === 'pickup').length;
+                case 'emRota': return active.filter(o => o.status === 'ready' && o.customer.orderType === 'delivery').length;
                 case 'accepted':
                 case 'reserved':
                 case 'completed':
-                case 'cancelled':
-                    return filteredActive.filter(o => o.status === tab).length;
-                default:
-                    return 0;
+                case 'cancelled': return active.filter(o => o.status === tab).length;
+                default: return 0;
             }
         };
 
