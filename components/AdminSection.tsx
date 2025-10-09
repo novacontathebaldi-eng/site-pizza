@@ -233,7 +233,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         }
     }, [activeOrdersTab]);
 
-
     const pendingOrdersCount = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
 
     // Effect for sound notification using HTML <audio> element
@@ -333,7 +332,26 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const handleSeedDatabase = async () => { if (window.confirm('Tem certeza? Isso adicionará dados iniciais.')) { try { await onSeedDatabase(); alert('Banco de dados populado!'); } catch (e) { console.error(e); alert("Erro ao popular o banco."); } } };
     const handleBackup = () => { try { const backupData = { products: allProducts, categories: allCategories, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); alert('Backup concluído!'); } catch (e) { console.error(e); alert("Falha no backup."); } };
     
-    const activeOrders = useMemo(() => orders.filter(o => o.status !== 'deleted' && o.status !== 'awaiting-payment'), [orders]);
+    // ** FIX: Isolate pending orders to ensure they always appear, regardless of filters **
+    const pendingOrders = useMemo(() => {
+        return orders.filter(o => {
+            if (o.status !== 'pending') return false;
+            
+            const searchTermLower = orderSearchTerm.toLowerCase();
+            // Also apply the main search term to the pending list
+            return !searchTermLower ||
+                o.customer.name.toLowerCase().includes(searchTermLower) ||
+                o.customer.phone.toLowerCase().includes(searchTermLower);
+        });
+    }, [orders, orderSearchTerm]);
+
+    // Active orders for the tabbed view now exclude pending orders
+    const activeOrders = useMemo(() => orders.filter(o => 
+        o.status !== 'pending' && 
+        o.status !== 'deleted' && 
+        o.status !== 'awaiting-payment'
+    ), [orders]);
+
     const deletedOrders = useMemo(() => orders.filter(o => o.status === 'deleted'), [orders]);
 
     const filteredOrders = useMemo(() => {
@@ -351,7 +369,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
             return matchesSearch && matchesOrderType && matchesPaymentMethod && matchesPaymentStatus && matchesOrderStatus;
         });
-    }, [orders, orderSearchTerm, orderFilters, isTrashVisible, activeOrders, deletedOrders]);
+    }, [activeOrders, deletedOrders, orderSearchTerm, orderFilters, isTrashVisible]);
 
     const getOrderTabCount = (tab: OrderTabKey) => {
         switch(tab) {
@@ -499,11 +517,11 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                     </div>
                                 </div>
 
-                                {filteredOrders.filter(o => o.status === 'pending').length > 0 && !isTrashVisible && (
+                                {pendingOrders.length > 0 && !isTrashVisible && (
                                     <div className="mb-6">
                                         <h4 className="font-bold text-lg mb-2 text-yellow-600">Pendentes</h4>
                                         <div className="space-y-4">
-                                            {filteredOrders.filter(o => o.status === 'pending').map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />)}
+                                            {pendingOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />)}
                                         </div>
                                     </div>
                                 )}
