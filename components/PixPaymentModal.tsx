@@ -66,7 +66,10 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
         const unsubscribe = db.collection('orders').doc(order.id)
             .onSnapshot(doc => {
                 const updatedOrder = doc.data() as Order;
-                if (updatedOrder && updatedOrder.paymentStatus === 'paid_online') {
+                // FIX: Changed the listener condition to be more robust.
+                // The backend webhook's primary job is to move the order status from 'awaiting-payment' to 'pending'.
+                // Listening for this state change is a reliable way to confirm the webhook has successfully processed the payment.
+                if (updatedOrder && updatedOrder.status === 'pending') {
                     setIsPaid(true);
                     if (timerRef.current) clearInterval(timerRef.current);
                     setTimeout(() => {
