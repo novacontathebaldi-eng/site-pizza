@@ -353,9 +353,9 @@ const App: React.FC = () => {
             addToast("Erro crítico ao processar pagamento. Contate o suporte.", 'error');
             return;
         }
+
         try {
-            // The webhook now handles the status update to 'pending'.
-            // This function is now only responsible for client-side actions.
+            await firebaseService.updateOrderStatus(paidOrder.id, 'pending');
             addToast("Pagamento confirmado! Seu pedido foi enviado para a pizzaria.", 'success');
 
             const details: OrderDetails = {
@@ -373,7 +373,7 @@ const App: React.FC = () => {
              console.error("Error finalizing paid order:", error);
             addToast("Erro ao finalizar o pedido após o pagamento. Contate o suporte.", 'error');
         }
-    }, [addToast]);
+    }, [addToast, setCart, setPayingOrder, setIsCartOpen]);
 
     const handleClosePixModal = () => {
         if (payingOrder) {

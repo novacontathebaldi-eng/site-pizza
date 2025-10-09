@@ -105,27 +105,24 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
   const {action, data} = request.body;
   logger.info("Webhook do Mercado Pago recebido:", request.body);
 
+  // We only care about payment updates
   if (action !== "payment.updated") {
     logger.info(`Ação '${action}' ignorada.`);
     response.status(200).send("OK");
     return;
   }
 
-  // FIX: Ensure the payment ID from the webhook is treated as a string.
-  const paymentIdFromWebhook = data?.id;
-  if (!paymentIdFromWebhook) {
+  const paymentId = data?.id;
+  if (!paymentId) {
     logger.warn("Webhook recebido sem ID de pagamento.");
     response.status(400).send("Bad Request: Missing payment ID");
     return;
   }
-  const paymentId = String(paymentIdFromWebhook);
 
   try {
+    // Security Best Practice: Fetch the payment from Mercado Pago to verify the webhook
     const payment = new Payment(client);
     const paymentInfo = await payment.get({id: paymentId});
-
-    // Added detailed logging for debugging
-    logger.info(`Informações do pagamento ${paymentId} obtidas do Mercado Pago:`, paymentInfo);
 
     if (!paymentInfo || !paymentInfo.external_reference) {
       logger.error(`Não foi possível obter informações do pagamento ${paymentId} ou falta referência externa.`);
@@ -137,29 +134,22 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
 
     if (paymentInfo.status === "approved") {
       const orderRef = db.collection("orders").doc(orderId);
-      
-      const transactionId = paymentInfo.transaction_details?.transaction_id ?? null;
-
       const updateData = {
-        status: "pending", // Update status directly to 'pending' for processing
         paymentStatus: "paid_online",
         mercadoPagoDetails: {
-          paymentId: paymentId,
-          transactionId: transactionId,
+          paymentId: paymentId.toString(),
+          transactionId: paymentInfo.transaction_details?.transaction_id || null,
         },
       };
-
       await orderRef.update(updateData);
-      logger.info(`Pedido ${orderId} (Pagamento MP: ${paymentId}) atualizado para 'pago' com status 'pending' via webhook.`);
+      logger.info(`Pedido ${orderId} (Pagamento MP: ${paymentId}) foi marcado como 'pago' com detalhes da transação via webhook.`);
     } else {
       logger.info(`Status do pagamento ${paymentId} é '${paymentInfo.status}'. Nenhuma ação tomada.`);
     }
 
     response.status(200).send("OK");
   } catch (error) {
-    // FIX: Enhanced error logging to capture more details from the Mercado Pago client response if it fails.
-    const errorMessage = error.cause instanceof Error ? error.cause.message : error.message;
-    logger.error(`Erro ao processar webhook para o pagamento ${paymentId}:`, errorMessage, {originalError: error});
+    logger.error(`Erro ao processar webhook para o pagamento ${paymentId}:`, error.cause || error.message);
     response.status(500).send("Internal Server Error");
   }
 });
