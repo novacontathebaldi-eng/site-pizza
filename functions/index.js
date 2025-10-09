@@ -33,27 +33,30 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
       throw new Error("Pedido não encontrado.");
     }
     const orderData = orderDoc.data();
-    const payment = new Payment(client);
 
-    // Check for existing, valid payment before creating a new one
-    if (orderData.mercadoPagoPaymentId && orderData.pixData) {
-      try {
-        const existingPayment = await payment.get({id: orderData.mercadoPagoPaymentId});
-        if (existingPayment && existingPayment.status === "pending" && new Date(existingPayment.date_of_expiration) > new Date()) {
-          logger.info(`Returning existing valid PIX from Firestore for order ${orderId}. Payment ID: ${existingPayment.id}`);
-          // Return the data we saved in Firestore, which is guaranteed to be correct
-          return orderData.pixData;
-        }
-      } catch (e) {
-        logger.warn(`Could not fetch existing payment ${orderData.mercadoPagoPaymentId}, creating a new one.`, e.message);
+    // Check if we have valid, unexpired PIX data already stored in Firestore
+    if (orderData.pixData && orderData.pixData.dateOfExpiration) {
+      const expirationDate = new Date(orderData.pixData.dateOfExpiration);
+      if (expirationDate > new Date()) {
+        logger.info(`Returning existing valid PIX from Firestore for order ${orderId}.`);
+        const pixData = orderData.pixData;
+        // Re-create the object to avoid any potential Firestore proxy/serialization issues
+        return {
+          qrCodeBase64: pixData.qrCodeBase64,
+          copyPaste: pixData.copyPaste,
+          dateOfExpiration: pixData.dateOfExpiration,
+        };
       }
+      logger.info(`Existing PIX for order ${orderId} has expired. Creating a new one.`);
     }
 
+    const payment = new Payment(client);
     // The notification URL for the webhook
     const notificationUrl = `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/mercadoPagoWebhook`;
 
     const paymentData = {
-      transaction_amount: orderData.total,
+      // Ensure transaction amount has exactly two decimal places
+      transaction_amount: Number(orderData.total.toFixed(2)),
       description: `Pedido #${orderId.substring(0, 8)} - ${orderData.customer.name}`,
       payment_method_id: "pix",
       payer: {
