@@ -135,7 +135,7 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
     if (paymentInfo.status === "approved") {
       const orderRef = db.collection("orders").doc(orderId);
       const updateData = {
-        paymentStatus: "paid",
+        paymentStatus: "paid_online",
         mercadoPagoDetails: {
           paymentId: paymentId.toString(),
           transactionId: paymentInfo.transaction_details?.transaction_id || null,
