@@ -152,11 +152,6 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
     return (
         <>
             <div className={`relative bg-white rounded-lg shadow-md border-l-4 ${config.color} overflow-hidden transition-opacity ${isArchived || status === 'deleted' ? 'opacity-70' : ''}`}>
-                 {order.paymentStatus === 'paid_online' && (
-                    <div className="absolute top-2 right-2 bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full animate-pulse border border-green-200">
-                        <i className="fas fa-check-circle mr-1"></i> PAGO PELO SITE
-                    </div>
-                )}
                 <div className="p-4">
                     <div className="flex justify-between items-start mb-4">
                         <div>
@@ -171,6 +166,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 <i className="fab fa-whatsapp text-2xl"></i>
                             </button>
                             <div className="text-right">
+                                {order.paymentStatus === 'paid_online' && (
+                                    <div className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full animate-pulse border border-green-200 mb-1 inline-block">
+                                        <i className="fas fa-check-circle mr-1"></i> PAGO PELO SITE
+                                    </div>
+                                )}
                                 <p className="font-bold text-2xl text-accent">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                                 <p className="text-sm text-gray-600">{items.reduce((acc, item) => acc + item.quantity, 0)} itens</p>
                             </div>
