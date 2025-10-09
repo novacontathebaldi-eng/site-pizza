@@ -138,7 +138,9 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
         paymentStatus: "paid_online",
         mercadoPagoDetails: {
           paymentId: paymentId.toString(),
-          transactionId: paymentInfo.transaction_details?.transaction_id || null,
+          // FIX: Corrected path to get PIX transaction ID.
+          // It's located in point_of_interaction.transaction_data, not transaction_details.
+          transactionId: paymentInfo.point_of_interaction?.transaction_data?.transaction_id || null,
         },
       };
       await orderRef.update(updateData);
