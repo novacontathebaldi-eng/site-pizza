@@ -333,11 +333,25 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const handleSeedDatabase = async () => { if (window.confirm('Tem certeza? Isso adicionará dados iniciais.')) { try { await onSeedDatabase(); alert('Banco de dados populado!'); } catch (e) { console.error(e); alert("Erro ao popular o banco."); } } };
     const handleBackup = () => { try { const backupData = { products: allProducts, categories: allCategories, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); alert('Backup concluído!'); } catch (e) { console.error(e); alert("Falha no backup."); } };
     
-    const activeOrders = useMemo(() => orders.filter(o => o.status !== 'deleted' && o.status !== 'awaiting-payment'), [orders]);
-    const deletedOrders = useMemo(() => orders.filter(o => o.status === 'deleted'), [orders]);
+    // ** FIX: Isolate pending orders to ensure they always show up, regardless of filters. **
+    // This list acts as a priority inbox for new orders.
+    const pendingOrders = useMemo(() => {
+        return orders.filter(order => {
+            if (order.status !== 'pending') return false;
+            // Also apply the search term to this list for consistency.
+            const searchTermLower = orderSearchTerm.toLowerCase();
+            return !searchTermLower ||
+                order.customer.name.toLowerCase().includes(searchTermLower) ||
+                order.customer.phone.toLowerCase().includes(searchTermLower);
+        });
+    }, [orders, orderSearchTerm]);
 
     const filteredOrders = useMemo(() => {
-        const source = isTrashVisible ? deletedOrders : activeOrders;
+        // Source for the filterable tabs: either trash or active orders (but NOT pending ones)
+        const source = isTrashVisible
+            ? orders.filter(o => o.status === 'deleted')
+            : orders.filter(o => o.status !== 'deleted' && o.status !== 'awaiting-payment' && o.status !== 'pending');
+
         return source.filter(order => {
             const searchTermLower = orderSearchTerm.toLowerCase();
             const matchesSearch = !searchTermLower ||
@@ -351,7 +365,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
             return matchesSearch && matchesOrderType && matchesPaymentMethod && matchesPaymentStatus && matchesOrderStatus;
         });
-    }, [orders, orderSearchTerm, orderFilters, isTrashVisible, activeOrders, deletedOrders]);
+    }, [orders, orderSearchTerm, orderFilters, isTrashVisible]);
 
     const getOrderTabCount = (tab: OrderTabKey) => {
         switch(tab) {
@@ -499,11 +513,11 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                     </div>
                                 </div>
 
-                                {filteredOrders.filter(o => o.status === 'pending').length > 0 && !isTrashVisible && (
+                                {pendingOrders.length > 0 && !isTrashVisible && (
                                     <div className="mb-6">
                                         <h4 className="font-bold text-lg mb-2 text-yellow-600">Pendentes</h4>
                                         <div className="space-y-4">
-                                            {filteredOrders.filter(o => o.status === 'pending').map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />)}
+                                            {pendingOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />)}
                                         </div>
                                     </div>
                                 )}
@@ -534,7 +548,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
                                     <div id="order-list-container" className="mt-4 space-y-4">
                                         {isTrashVisible ? (
-                                            deletedOrders.length > 0 ? deletedOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>
+                                             orders.filter(o => o.status === 'deleted').length > 0 ? orders.filter(o => o.status === 'deleted').map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>
                                         ) : (
                                             tabOrders.length > 0 ? tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>
                                         )}
