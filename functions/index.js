@@ -137,14 +137,12 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
       const updateData = {
         paymentStatus: "paid_online",
         mercadoPagoDetails: {
-          paymentId: paymentId.toString(),
-          // FIX: Corrected path to get PIX transaction ID.
-          // It's located in point_of_interaction.transaction_data, not transaction_details.
-          transactionId: paymentInfo.point_of_interaction?.transaction_data?.transaction_id || null,
+          paymentId: String(paymentInfo.id),
+          transactionId: paymentInfo.transaction_details?.transaction_id ?? null,
         },
       };
       await orderRef.update(updateData);
-      logger.info(`Pedido ${orderId} (Pagamento MP: ${paymentId}) foi marcado como 'pago' com detalhes da transação via webhook.`);
+      logger.info(`Pedido ${orderId} (Pagamento MP: ${paymentInfo.id}) foi marcado como 'pago' com detalhes da transação via webhook.`);
     } else {
       logger.info(`Status do pagamento ${paymentId} é '${paymentInfo.status}'. Nenhuma ação tomada.`);
     }

@@ -26,7 +26,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ isOpen, onClose, cartI
 
         // FIX: Explicitly type `p` as `Product` to ensure correct type inference for `productMap`.
         // This resolves an issue where the TypeScript compiler was treating the product object as `unknown`.
-        const productMap = new Map(products.map((p: Product) => [p.id, p]));
+        const productMap = new Map<string, Product>(products.map((p: Product) => [p.id, p]));
 
         const findCategoryByKeywords = (keywords: string[]) => {
             return categories.find(c => keywords.some(kw => c.name.toLowerCase().includes(kw)));
