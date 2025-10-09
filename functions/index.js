@@ -112,8 +112,8 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
     return;
   }
 
-  const paymentId = data?.id;
-  if (!paymentId) {
+  const paymentIdFromWebhook = data?.id;
+  if (!paymentIdFromWebhook) {
     logger.warn("Webhook recebido sem ID de pagamento.");
     response.status(400).send("Bad Request: Missing payment ID");
     return;
@@ -122,10 +122,13 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
   try {
     // Security Best Practice: Fetch the payment from Mercado Pago to verify the webhook
     const payment = new Payment(client);
-    const paymentInfo = await payment.get({id: paymentId});
+    // FIX: The payment ID from the webhook can be a number, but the SDK expects a string.
+    const paymentInfo = await payment.get({id: String(paymentIdFromWebhook)});
 
-    if (!paymentInfo || !paymentInfo.external_reference) {
-      logger.error(`Não foi possível obter informações do pagamento ${paymentId} ou falta referência externa.`);
+    // Use the verified data from here on.
+    const verifiedPaymentId = paymentInfo?.id;
+    if (!verifiedPaymentId || !paymentInfo.external_reference) {
+      logger.error(`Não foi possível obter informações do pagamento ${paymentIdFromWebhook} ou falta referência externa.`);
       response.status(404).send("Payment not found or missing reference");
       return;
     }
@@ -137,19 +140,20 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
       const updateData = {
         paymentStatus: "paid_online",
         mercadoPagoDetails: {
-          paymentId: String(paymentInfo.id),
-          transactionId: paymentInfo.transaction_details?.transaction_id ?? null,
+          paymentId: String(verifiedPaymentId),
+          // Safely get transaction_id and provide a fallback
+          transactionId: paymentInfo.transaction_details?.transaction_id ?? String(verifiedPaymentId),
         },
       };
       await orderRef.update(updateData);
-      logger.info(`Pedido ${orderId} (Pagamento MP: ${paymentInfo.id}) foi marcado como 'pago' com detalhes da transação via webhook.`);
+      logger.info(`Pedido ${orderId} (Pagamento MP: ${verifiedPaymentId}) foi marcado como 'paid_online' com sucesso via webhook.`);
     } else {
-      logger.info(`Status do pagamento ${paymentId} é '${paymentInfo.status}'. Nenhuma ação tomada.`);
+      logger.info(`Status do pagamento ${verifiedPaymentId} é '${paymentInfo.status}'. Nenhuma ação tomada.`);
     }
 
     response.status(200).send("OK");
   } catch (error) {
-    logger.error(`Erro ao processar webhook para o pagamento ${paymentId}:`, error.cause || error.message);
+    logger.error(`Erro ao processar webhook para o pagamento ${paymentIdFromWebhook}:`, error.cause || error.message);
     response.status(500).send("Internal Server Error");
   }
 });
