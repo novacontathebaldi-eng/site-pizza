@@ -232,7 +232,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
             }
         }
     }, [activeOrdersTab]);
-
+    
     const pendingOrdersCount = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
 
     // Effect for sound notification using HTML <audio> element
@@ -332,72 +332,86 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const handleSeedDatabase = async () => { if (window.confirm('Tem certeza? Isso adicionará dados iniciais.')) { try { await onSeedDatabase(); alert('Banco de dados populado!'); } catch (e) { console.error(e); alert("Erro ao popular o banco."); } } };
     const handleBackup = () => { try { const backupData = { products: allProducts, categories: allCategories, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); alert('Backup concluído!'); } catch (e) { console.error(e); alert("Falha no backup."); } };
     
-    // ** FIX: Isolate pending orders to ensure they always appear, regardless of filters **
-    const pendingOrders = useMemo(() => {
-        return orders.filter(o => {
-            if (o.status !== 'pending') return false;
-            
-            const searchTermLower = orderSearchTerm.toLowerCase();
-            // Also apply the main search term to the pending list
-            return !searchTermLower ||
-                o.customer.name.toLowerCase().includes(searchTermLower) ||
-                o.customer.phone.toLowerCase().includes(searchTermLower);
-        });
-    }, [orders, orderSearchTerm]);
+    // ** REFACTORED FILTERING LOGIC **
+    // This centralized useMemo hook processes all orders based on the current UI state.
+    const {
+        pendingOrders,
+        tabOrders,
+        deletedOrders,
+        getTabCount,
+    } = useMemo(() => {
+        const pending: Order[] = [];
+        const active: Order[] = [];
+        const deleted: Order[] = [];
 
-    // Active orders for the tabbed view now exclude pending orders
-    const activeOrders = useMemo(() => orders.filter(o => 
-        o.status !== 'pending' && 
-        o.status !== 'deleted' && 
-        o.status !== 'awaiting-payment'
-    ), [orders]);
-
-    const deletedOrders = useMemo(() => orders.filter(o => o.status === 'deleted'), [orders]);
-
-    const filteredOrders = useMemo(() => {
-        const source = isTrashVisible ? deletedOrders : activeOrders;
-        return source.filter(order => {
+        // First pass: Categorize all orders and apply the search term.
+        for (const order of orders) {
             const searchTermLower = orderSearchTerm.toLowerCase();
             const matchesSearch = !searchTermLower ||
                 order.customer.name.toLowerCase().includes(searchTermLower) ||
                 order.customer.phone.toLowerCase().includes(searchTermLower);
-            
+
+            if (!matchesSearch) continue;
+
+            if (order.status === 'pending') {
+                pending.push(order);
+            } else if (order.status === 'deleted') {
+                deleted.push(order);
+            } else if (order.status !== 'awaiting-payment') {
+                active.push(order);
+            }
+        }
+
+        // Second pass: Apply dropdown filters ONLY to the "active" (non-pending) orders.
+        const filteredActive = active.filter(order => {
             const matchesOrderType = !orderFilters.orderType || order.customer.orderType === orderFilters.orderType;
             const matchesPaymentMethod = !orderFilters.paymentMethod || order.paymentMethod === orderFilters.paymentMethod;
             const matchesPaymentStatus = !orderFilters.paymentStatus || order.paymentStatus === orderFilters.paymentStatus;
             const matchesOrderStatus = !orderFilters.orderStatus || order.status === orderFilters.orderStatus;
-
-            return matchesSearch && matchesOrderType && matchesPaymentMethod && matchesPaymentStatus && matchesOrderStatus;
+            return matchesOrderType && matchesPaymentMethod && matchesPaymentStatus && matchesOrderStatus;
         });
-    }, [activeOrders, deletedOrders, orderSearchTerm, orderFilters, isTrashVisible]);
 
-    const getOrderTabCount = (tab: OrderTabKey) => {
-        switch(tab) {
-            case 'pronto':
-                return filteredOrders.filter(o => o.status === 'ready' && o.customer.orderType === 'pickup').length;
-            case 'emRota':
-                 return filteredOrders.filter(o => o.status === 'ready' && o.customer.orderType === 'delivery').length;
-            case 'accepted':
-            case 'reserved':
-            case 'completed':
-            case 'cancelled':
-                return filteredOrders.filter(o => o.status === tab).length;
-            default:
-                return 0;
-        }
-    };
-    
-    const tabOrders = useMemo(() => {
+        // Third pass: From the filtered active list, get the orders for the currently selected tab.
+        let currentTabOrders: Order[] = [];
         switch (activeOrdersTab) {
             case 'pronto':
-                return filteredOrders.filter(o => o.status === 'ready' && o.customer.orderType === 'pickup');
+                currentTabOrders = filteredActive.filter(o => o.status === 'ready' && o.customer.orderType === 'pickup');
+                break;
             case 'emRota':
-                return filteredOrders.filter(o => o.status === 'ready' && o.customer.orderType === 'delivery');
+                currentTabOrders = filteredActive.filter(o => o.status === 'ready' && o.customer.orderType === 'delivery');
+                break;
             default:
-                return filteredOrders.filter(o => o.status === activeOrdersTab);
+                currentTabOrders = filteredActive.filter(o => o.status === activeOrdersTab);
+                break;
         }
-    }, [filteredOrders, activeOrdersTab]);
-    
+        
+        // Helper function to get tab counts based on the already filtered active list.
+        const getTabCountFunc = (tab: OrderTabKey) => {
+            switch(tab) {
+                case 'pronto':
+                    return filteredActive.filter(o => o.status === 'ready' && o.customer.orderType === 'pickup').length;
+                case 'emRota':
+                     return filteredActive.filter(o => o.status === 'ready' && o.customer.orderType === 'delivery').length;
+                case 'accepted':
+                case 'reserved':
+                case 'completed':
+                case 'cancelled':
+                    return filteredActive.filter(o => o.status === tab).length;
+                default:
+                    return 0;
+            }
+        };
+
+        return {
+            pendingOrders: pending,
+            tabOrders: currentTabOrders,
+            deletedOrders: deleted,
+            getTabCount: getTabCountFunc,
+        };
+
+    }, [orders, orderSearchTerm, orderFilters, activeOrdersTab]);
+
+
     const scrollToContent = (elementId: string) => {
         const element = document.getElementById(elementId);
         if (!element) return;
@@ -531,7 +545,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                         <div className="border-b">
                                             <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide px-8">
                                                 {!isTrashVisible && OrderStatusTabs.map(tabKey => {
-                                                    const count = getOrderTabCount(tabKey);
+                                                    const count = getTabCount(tabKey);
                                                     const showCounter = count > 0 && !['completed', 'cancelled'].includes(tabKey);
                                                     return (
                                                     <button 
