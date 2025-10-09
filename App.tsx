@@ -348,9 +348,17 @@ const App: React.FC = () => {
     };
 
     const handlePixPaymentSuccess = useCallback(async (paidOrder: Order) => {
-        // This function is now only responsible for client-side UI cleanup.
-        // The backend webhook handles all database updates.
+        if (!paidOrder || !paidOrder.id) {
+            console.error("handlePixPaymentSuccess called without a valid paidOrder object.");
+            addToast("Erro crítico ao processar pagamento. Contate o suporte.", 'error');
+            return;
+        }
+
         try {
+            // The backend has set status to 'pending' and paymentStatus to 'paid'.
+            // This final update ensures the correct label is shown in the admin panel.
+            await firebaseService.updateOrderPaymentStatus(paidOrder.id, 'paid_online');
+            
             addToast("Pagamento confirmado! Seu pedido foi enviado para a pizzaria.", 'success');
 
             const details: OrderDetails = {
@@ -365,8 +373,8 @@ const App: React.FC = () => {
             setPayingOrder(null);
             setIsCartOpen(false);
         } catch (error) {
-             console.error("Error during client-side cleanup after paid order:", error);
-            addToast("O pagamento foi confirmado, mas houve um erro ao finalizar. Contate o suporte se necessário.", 'error');
+             console.error("Error finalizing paid order:", error);
+            addToast("Erro ao finalizar o pedido após o pagamento. Contate o suporte.", 'error');
         }
     }, [addToast]);
 

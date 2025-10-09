@@ -136,7 +136,7 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
       const orderRef = db.collection("orders").doc(orderId);
       const updateData = {
         status: "pending", // Move order to the admin's pending queue.
-        paymentStatus: "paid_online", // Set the final payment status.
+        paymentStatus: "paid", // Use "paid" as the trigger for the frontend listener.
         mercadoPagoDetails: {
           paymentId: paymentId.toString(),
           transactionId: paymentInfo.transaction_details?.transaction_id || null,
