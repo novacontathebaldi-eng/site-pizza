@@ -54,11 +54,20 @@ function App() {
     const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState(false);
     
-    // Check for admin route
+    // Check for admin route on load and on hash change
     useEffect(() => {
-        if (window.location.pathname.startsWith('/admin')) {
-            setIsAdminOpen(true);
-        }
+        const checkAdminHash = () => {
+            if (window.location.hash === '#admin') {
+                setIsAdminOpen(true);
+            }
+        };
+
+        checkAdminHash(); // Check on initial load
+        window.addEventListener('hashchange', checkAdminHash); // Listen for changes
+
+        return () => {
+            window.removeEventListener('hashchange', checkAdminHash); // Cleanup
+        };
     }, []);
 
     // Initial data fetching
@@ -274,7 +283,7 @@ function App() {
 
     if (isAdminOpen) {
         return <AdminSection onExit={() => {
-            window.location.href = '/';
+            window.location.hash = ''; // Use hash to avoid reload
             setIsAdminOpen(false);
         }} />;
     }
@@ -310,6 +319,21 @@ function App() {
             </main>
             <Footer settings={settings} />
             
+             {/* --- Floating Cart Button --- */}
+            {cartItemCount > 0 && (
+                <div className="fixed bottom-5 right-5 z-40 animate-fade-in-up">
+                    <button 
+                        onClick={() => setIsCartOpen(true)}
+                        className="bg-accent text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transform transition-transform hover:scale-105">
+                        <i className="fas fa-shopping-bag text-xl"></i>
+                        <div className="text-left">
+                            <span className="text-sm block leading-tight">{cartItemCount} {cartItemCount > 1 ? 'itens' : 'item'}</span>
+                            <span className="font-semibold text-lg block leading-tight">Ver Pedido</span>
+                        </div>
+                    </button>
+                </div>
+            )}
+
             {/* --- Modals & Sidebars --- */}
             <CartSidebar
                 isOpen={isCartOpen}
