@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, StoreStatus } from '../types';
 import { ProductModal } from './ProductModal';
@@ -60,8 +61,8 @@ const SortableProductItem: React.FC<SortableProductItemProps> = ({ product, isCa
     } = useSortable({ id: product.id });
 
     const style = {
-        // FIX: Property 'Transform' does not exist on type 'typeof CSS'. Changed to 'transform'.
-        transform: CSS.transform.toString(transform),
+        // FIX: Corrected property access on the CSS utility. It should be `CSS.Transform`, not `CSS.transform`.
+        transform: CSS.Transform.toString(transform),
         transition,
         zIndex: isDragging ? 10 : 'auto',
         boxShadow: isDragging ? '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' : 'none',
@@ -116,8 +117,8 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
     } = useSortable({ id: category.id });
 
     const style = {
-        // FIX: Property 'Transform' does not exist on type 'typeof CSS'. Changed to 'transform'.
-        transform: CSS.transform.toString(transform),
+        // FIX: Corrected property access on the CSS utility. It should be `CSS.Transform`, not `CSS.transform`.
+        transform: CSS.Transform.toString(transform),
         transition,
         zIndex: isDragging ? 10 : 'auto',
         boxShadow: isDragging ? '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' : 'none',
