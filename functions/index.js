@@ -31,40 +31,49 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
   }
 
   const notificationUrl = `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/mercadoPagoWebhook`;
+  const totalAmountStr = orderData.total.toFixed(2);
 
   const orderPayload = {
+    type: "online",
     external_reference: orderId,
-    title: "Pedido Pizzaria Santa Sensação",
-    description: `Pedido #${orderId.substring(0, 8)}`,
-    total_amount: Number(orderData.total.toFixed(2)),
+    description: `Pedido #${orderId.substring(0, 8)} - Pizzaria Santa Sensação`,
     notification_url: notificationUrl,
+    total_amount: Number(totalAmountStr),
     items: orderData.items.map((item) => ({
       title: item.name,
-      description: `Tamanho: ${item.size}`,
       unit_price: Number(item.price.toFixed(2)),
       quantity: item.quantity,
-      total_amount: Number((item.price * item.quantity).toFixed(2)),
+      description: `Tamanho: ${item.size}`,
     })),
     payer: {
-      email: `cliente_${orderId.replace(/[^\w-]/g, "")}@santasensacao.me`,
-      first_name: orderData.customer.name.split(" ")[0],
-      last_name: orderData.customer.name.split(" ").slice(1).join(" ") || "Cliente",
+      email: `test_user_${orderId.replace(/[^\w-]/g, "")}@testuser.com`,
+      first_name: orderData.customer.name.split(" ")[0] || "Test",
+      last_name: orderData.customer.name.split(" ").slice(1).join(" ") || "User",
     },
-    transactions: [{
-      payment_method_id: "pix",
-      amount: Number(orderData.total.toFixed(2)),
-    }],
+    transactions: {
+      payments: [
+        {
+          amount: Number(totalAmountStr),
+          payment_method: {
+            id: "pix",
+            type: "bank_transfer",
+          },
+        },
+      ],
+    },
   };
 
+
   try {
+    logger.info(`Sending payload to Mercado Pago for order ${orderId}:`, {payload: orderPayload});
     const response = await mercadoPagoApi.post("/v1/orders", orderPayload, {
       headers: {
-        "X-Idempotency-Key": orderId,
+        "X-Idempotency-Key": orderId + Date.now(), // Ensure idempotency key is unique per attempt
       },
     });
 
     const mpOrder = response.data;
-    const pixPayment = mpOrder.transactions?.[0];
+    const pixPayment = mpOrder.transactions?.payments?.[0];
 
     if (!pixPayment || mpOrder.status !== "action_required") {
       logger.error("Invalid response from Mercado Pago when creating order.", {mpOrder});
@@ -81,7 +90,13 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
 
     await db.collection("orders").doc(orderId).update({
       mercadoPagoOrderId: mpOrder.id,
+      mercadoPagoTransactions: admin.firestore.FieldValue.arrayUnion({
+        id: pixPayment.id,
+        status: pixPayment.status,
+        status_detail: pixPayment.status_detail,
+      }),
     });
+
 
     logger.info(`Ordem PIX criada para o pedido ${orderId}, ID da Ordem MP: ${mpOrder.id}`);
 
@@ -91,7 +106,8 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
     };
   } catch (error) {
     logger.error(`Erro ao criar ordem no Mercado Pago para o pedido ${orderId}:`, error.response?.data || error.message);
-    throw new functions.https.HttpsError("internal", "Falha ao comunicar com o gateway de pagamento.");
+    const errorMessage = error.response?.data?.message || "Falha ao comunicar com o gateway de pagamento.";
+    throw new functions.https.HttpsError("internal", errorMessage);
   }
 });
 
@@ -154,7 +170,7 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
       }
 
       const orderRef = db.collection("orders").doc(firestoreOrderId);
-      const transaction = order.transactions?.[0] || order.transactions?.payments?.[0];
+      const transaction = order.transactions?.payments?.[0];
       const updateData = {
           mercadoPagoTransactions: admin.firestore.FieldValue.arrayUnion({
             id: transaction?.id,
@@ -177,14 +193,15 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
           paymentStatus: "refunded",
         });
         logger.info(`Pedido ${firestoreOrderId} (Ordem MP: ${order.id}) foi marcado como 'reembolsado' via webhook.`);
-      } else if (order.status === "cancelled" || order.status_detail === "cancelled_transaction") {
+      } else if (order.status === "cancelled" || order.status_detail === "canceled_transaction") {
         await orderRef.update({
           ...updateData,
           status: "cancelled",
         });
         logger.info(`Pedido ${firestoreOrderId} (Ordem MP: ${order.id}) foi marcado como 'cancelado' via webhook.`);
       } else {
-        logger.info(`Status da ordem ${order.id} é '${order.status}'. Nenhuma ação de pagamento tomada.`);
+        await orderRef.update(updateData);
+        logger.info(`Status da ordem ${order.id} é '${order.status}'. Nenhuma ação de pagamento tomada, apenas log da transação.`);
       }
     }
   } catch (error) {
