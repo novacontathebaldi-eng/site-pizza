@@ -135,15 +135,14 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
     if (paymentInfo.status === "approved") {
       const orderRef = db.collection("orders").doc(orderId);
       const updateData = {
-        status: "pending", // Move order to the admin's pending queue.
-        paymentStatus: "paid_online", // Use "paid" as the trigger for the frontend listener.
+        paymentStatus: "paid",
         mercadoPagoDetails: {
           paymentId: paymentId.toString(),
           transactionId: paymentInfo.transaction_details?.transaction_id || null,
         },
       };
       await orderRef.update(updateData);
-      logger.info(`Pedido ${orderId} (Pagamento MP: ${paymentId}) foi processado com sucesso via webhook.`);
+      logger.info(`Pedido ${orderId} (Pagamento MP: ${paymentId}) foi marcado como 'pago' com detalhes da transação via webhook.`);
     } else {
       logger.info(`Status do pagamento ${paymentId} é '${paymentInfo.status}'. Nenhuma ação tomada.`);
     }
