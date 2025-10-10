@@ -27,7 +27,7 @@ const client = new MercadoPagoConfig({
  * Cria uma Order no Mercado Pago.
  * Esta função é chamada pelo frontend para iniciar um pagamento PIX.
  */
-exports.createMercadoPagoOrder = onCall(, async (request) => {
+exports.createMercadoPagoOrder = onCall( async (request) => {
   const orderId = request.data.orderId;
   if (!orderId) {
     logger.error("Request missing orderId.");
@@ -94,7 +94,7 @@ exports.createMercadoPagoOrder = onCall(, async (request) => {
 /**
  * Webhook para receber notificações de status do Mercado Pago.
  */
-exports.mercadoPagoWebhook = onRequest(, async (req, res) => {
+exports.mercadoPagoWebhook = onRequest(  async (req, res) => {
   logger.info("Webhook do Mercado Pago recebido", {query: req.query, headers: req.headers, body: req.body});
   const topic = req.query.topic || req.body.topic || req.body.type;
 
