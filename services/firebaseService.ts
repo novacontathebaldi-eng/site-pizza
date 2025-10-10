@@ -163,17 +163,21 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
     await orderRef.delete();
 };
 
-// PIX Payment Function
-export const initiateMercadoPagoPixPayment = async (orderId: string): Promise<any> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    const createMercadoPagoOrder = functions.httpsCallable('createMercadoPagoOrder');
+// FIX: Add a function to call the Firebase Cloud Function for initiating a PIX payment.
+// This resolves the error in PixPaymentModal where this function was missing.
+export const initiateMercadoPagoPixPayment = async (orderId: string): Promise<{ qrCodeBase64: string; copyPaste: string }> => {
+    if (!functions) throw new Error("Firebase Functions are not initialized.");
+
+    const initiatePayment = functions.httpsCallable('initiateMercadoPagoPixPayment');
+    
     try {
-        const result = await createMercadoPagoOrder({ orderId });
-        return result.data;
-    } catch (error) {
-        console.error("Error calling createMercadoPagoOrder function:", error);
-        throw new Error("Não foi possível gerar a cobrança PIX. Tente novamente.");
+        const result = await initiatePayment({ orderId });
+        if (!result.data.qrCodeBase64 || !result.data.copyPaste) {
+            throw new Error("Resposta inválida do servidor ao gerar PIX.");
+        }
+        return result.data as { qrCodeBase64: string; copyPaste: string };
+    } catch (error: any) {
+        console.error("Error initiating Mercado Pago PIX payment:", error);
+        throw new Error(error.message || "Falha ao gerar os detalhes do pagamento PIX.");
     }
 };
