@@ -1,261 +1,155 @@
-const functions = require("firebase-functions/v2");
+/* eslint-disable max-len */
+const {onCall} = require("firebase-functions/v2/https");
+const {onRequest} = require("firebase-functions/v2/https");
+const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
-const axios = require("axios");
-const cors = require("cors")({origin: true});
-const crypto = require("crypto");
+const {MercadoPagoConfig, Payment} = require("mercadopago");
+require("dotenv").config();
 
-// --- INICIALIZAÇÃO ---
 admin.initializeApp();
 const db = admin.firestore();
 
-// --- CONFIGURAÇÃO DE SEGREDOS ---
-const MERCADO_PAGO_ACCESS_TOKEN = functions.params.defineString("MERCADO_PAGO_ACCESS_TOKEN");
-const MERCADO_PAGO_WEBHOOK_SECRET = functions.params.defineString("MERCADO_PAGO_WEBHOOK_SECRET");
-
-// Instância do Axios para a API do Mercado Pago
-const mercadoPagoApi = axios.create({
-  baseURL: "https://api.mercadopago.com",
-  headers: {
-    "Content-Type": "application/json",
-  },
+// Initialize Mercado Pago Client
+const client = new MercadoPagoConfig({
+  accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN,
 });
 
 /**
- * Adiciona o Access Token a cada requisição
+ * Creates a PIX payment order with Mercado Pago.
+ * This function is called from the frontend to initiate a payment.
  */
-mercadoPagoApi.interceptors.request.use((config) => {
-  const accessToken = MERCADO_PAGO_ACCESS_TOKEN.value();
-  if (!accessToken) {
-    throw new Error("Access Token do Mercado Pago não está configurado.");
-  }
-  config.headers.Authorization = `Bearer ${accessToken}`;
-  return config;
-});
-
-// ============================================================================
-// 1. CRIAR ORDEM DE PAGAMENTO (PIX) - CORRIGIDO
-// ============================================================================
-exports.createMercadoPagoOrder = functions.https.onCall(async (data, context) => {
-  const {orderId} = data;
+exports.createMercadoPagoOrder = onCall(async (request) => {
+  const orderId = request.data.orderId;
   if (!orderId) {
-    throw new functions.https.HttpsError("invalid-argument", "O ID do pedido é obrigatório.");
+    logger.error("Request missing orderId.");
+    throw new Error("O ID do pedido é obrigatório.");
   }
-
-  const orderRef = db.collection("orders").doc(orderId);
-  const orderDoc = await orderRef.get();
-
-  if (!orderDoc.exists) {
-    throw new functions.https.HttpsError("not-found", "Pedido não encontrado no banco de dados.");
-  }
-
-  const order = orderDoc.data();
-
-  // Payload 100% alinhado com a documentação da API de Orders
-  const orderData = {
-    external_reference: orderId,
-    title: `Pedido #${orderId.substring(0, 5)} - Santa Sensação`,
-    description: `Pedido realizado por ${order.customer.name}`,
-    notification_url: "https://mercadopagowebhook-lxwiyf7dla-uc.a.run.app",
-    total_amount: parseFloat(order.total.toFixed(2)),
-    items: order.items.map((item) => ({
-      title: item.name,
-      description: item.size,
-      quantity: item.quantity,
-      unit_price: parseFloat(item.price.toFixed(2)),
-      total_amount: parseFloat((item.price * item.quantity).toFixed(2)),
-      unit: "unit",
-    })),
-    // Para PIX, a documentação recomenda a API de Pagamentos
-    // que é mais direta. Vamos usar a estrutura correta para ela.
-    transaction_amount: parseFloat(order.total.toFixed(2)),
-    payment_method_id: 'pix',
-    payer: {
-      email: "test@testuser.com", // Obrigatório para o ambiente de teste
-      first_name: order.customer.name.split(" ")[0],
-      last_name: order.customer.name.split(" ").slice(1).join(" ") || "N/A",
-    },
-  };
 
   try {
-    // A API correta e mais simples para gerar um PIX direto é /v1/payments
-    const response = await mercadoPagoApi.post("/v1/payments", orderData, {
-      headers: {
-        "X-Idempotency-Key": orderId,
-      },
-    });
+    const orderDoc = await db.collection("orders").doc(orderId).get();
+    if (!orderDoc.exists) {
+      logger.error(`Order with ID ${orderId} not found.`);
+      throw new Error("Pedido não encontrado.");
+    }
+    const orderData = orderDoc.data();
 
-    const pixDetails = response.data.point_of_interaction?.transaction_data;
-    if (!pixDetails || !pixDetails.qr_code_base64 || !pixDetails.qr_code) {
-      throw new Error("Resposta do Mercado Pago não contém os dados do PIX.");
+    // The notification URL for the webhook
+    const notificationUrl = `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/mercadoPagoWebhook`;
+
+    const paymentData = {
+      transaction_amount: orderData.total,
+      description: `Pedido #${orderId.substring(0, 8)} - ${orderData.customer.name}`,
+      payment_method_id: "pix",
+      payer: {
+        // A real email is required, but since we don't collect it,
+        // we use a placeholder. This could be enhanced later.
+        email: `cliente_${orderId}@santasensacao.me`,
+        first_name: orderData.customer.name.split(" ")[0],
+        last_name: orderData.customer.name.split(" ").slice(1).join(" ") || "Cliente",
+        identification: {
+          type: "CPF",
+          // CPF is required for PIX transactions in Brazil.
+          // Since we don't collect it, we use a dummy value.
+          // For real transactions, this needs to be a valid CPF.
+          number: "00000000000",
+        },
+      },
+      notification_url: notificationUrl,
+      external_reference: orderId, // Link the payment to our order ID
+    };
+
+    const payment = new Payment(client);
+    const result = await payment.create({body: paymentData});
+
+    if (!result || !result.id) {
+        logger.error("Invalid response from Mercado Pago when creating payment.", {result});
+        throw new Error("Resposta inválida do gateway de pagamento.");
     }
 
-    // Salva os IDs importantes no nosso pedido no Firestore
-    await orderRef.update({
-      mercadoPagoOrderId: response.data.order?.id?.toString(),
-      mercadoPagoDetails: {
-        paymentId: response.data.id?.toString(),
-      },
+    const paymentId = result.id.toString();
+    const qrCodeBase64 = result.point_of_interaction?.transaction_data?.qr_code_base64;
+    const copyPaste = result.point_of_interaction?.transaction_data?.qr_code;
+
+    if (!qrCodeBase64 || !copyPaste) {
+        logger.error("Mercado Pago response missing PIX data.", {result});
+        throw new Error("Dados PIX não retornados pelo gateway de pagamento.");
+    }
+
+    // Save the Mercado Pago payment ID to our order for tracking
+    await db.collection("orders").doc(orderId).update({
+      mercadoPagoPaymentId: paymentId,
     });
+
+    logger.info(`Pagamento PIX criado para o pedido ${orderId}, ID do pagamento MP: ${paymentId}`);
 
     return {
-      qrCodeBase64: pixDetails.qr_code_base64,
-      copyPaste: pixDetails.qr_code,
+      qrCodeBase64,
+      copyPaste,
     };
   } catch (error) {
-    console.error("Erro detalhado ao criar pagamento no MP:", JSON.stringify(error.response?.data, null, 2));
-    const errorDetails = error.response?.data?.message || "Erro de comunicação com o Mercado Pago.";
-    throw new functions.https.HttpsError("internal", errorDetails);
+    logger.error(`Erro ao criar pagamento no Mercado Pago para o pedido ${orderId}:`, error.cause || error.message);
+    throw new Error("Falha ao comunicar com o gateway de pagamento.");
   }
 });
 
 
-// ============================================================================
-// 2. RECEBER NOTIFICAÇÕES (WEBHOOK) - CORRIGIDO
-// ============================================================================
-exports.mercadoPagoWebhook = functions.https.onRequest((req, res) => {
-  cors(req, res, async () => {
-    if (req.method !== "POST") {
-      return res.status(405).send("Method Not Allowed");
+/**
+ * Webhook to receive payment status updates from Mercado Pago.
+ */
+exports.mercadoPagoWebhook = onRequest(async (request, response) => {
+  if (request.method !== "POST") {
+    response.status(405).send("Method Not Allowed");
+    return;
+  }
+
+  const {action, data} = request.body;
+  logger.info("Webhook do Mercado Pago recebido:", request.body);
+
+  // We only care about payment updates
+  if (action !== "payment.updated") {
+    logger.info(`Ação '${action}' ignorada.`);
+    response.status(200).send("OK");
+    return;
+  }
+
+  const paymentId = data?.id;
+  if (!paymentId) {
+    logger.warn("Webhook recebido sem ID de pagamento.");
+    response.status(400).send("Bad Request: Missing payment ID");
+    return;
+  }
+
+  try {
+    // Security Best Practice: Fetch the payment from Mercado Pago to verify the webhook
+    const payment = new Payment(client);
+    const paymentInfo = await payment.get({id: paymentId});
+
+    if (!paymentInfo || !paymentInfo.external_reference) {
+      logger.error(`Não foi possível obter informações do pagamento ${paymentId} ou falta referência externa.`);
+      response.status(404).send("Payment not found or missing reference");
+      return;
     }
 
-    try {
-      const webhookSecret = MERCADO_PAGO_WEBHOOK_SECRET.value();
-      if (!webhookSecret) {
-        console.error("Segredo do Webhook não configurado.");
-        return res.status(500).send("Webhook secret not configured.");
-      }
+    const orderId = paymentInfo.external_reference;
 
-      const signature = req.headers["x-signature"];
-      const requestId = req.headers["x-request-id"];
-      const topic = req.body.topic || req.body.type; // Compatibilidade com ambos os formatos
-      const dataId = req.body.data?.id || req.query["data.id"];
-
-      if (!signature || !dataId) {
-        return res.status(400).send("Bad Request: Missing signature or data.id");
-      }
-
-      const [tsPart, v1Part] = signature.split(",");
-      const timestamp = tsPart.split("=")[1];
-      const receivedHash = v1Part.split("=")[1];
-      
-      const manifest = `id:${dataId};request-id:${requestId};ts:${timestamp};`;
-
-      const hmac = crypto.createHmac("sha256", webhookSecret);
-      hmac.update(manifest);
-      const calculatedHash = hmac.digest("hex");
-
-      if (!crypto.timingSafeEqual(Buffer.from(receivedHash), Buffer.from(calculatedHash))) {
-        console.error("Falha na validação da assinatura do webhook.");
-        return res.status(400).send("Invalid signature");
-      }
-
-      console.log("Assinatura do webhook validada com sucesso.");
-
-      // O evento 'payment' é o correto para a API de pagamentos
-      if (topic === "payment" && dataId) {
-        console.log(`Recebida notificação para o pagamento: ${dataId}`);
-
-        const paymentResponse = await mercadoPagoApi.get(`/v1/payments/${dataId}`);
-        const paymentData = paymentResponse.data;
-        const firestoreOrderId = paymentData.external_reference;
-
-        if (firestoreOrderId && paymentData.status === "approved") {
-          console.log(`Pagamento ${dataId} aprovado. Atualizando pedido ${firestoreOrderId} no Firestore.`);
-          const orderRef = db.collection("orders").doc(firestoreOrderId);
-          await orderRef.update({
-            paymentStatus: "paid_online",
-            status: "pending",
-            mercadoPagoDetails: {
-                paymentId: paymentData.id?.toString(),
-            }
-          });
-        }
-      }
-      return res.status(200).send("OK");
-
-    } catch (error) {
-      console.error("Erro no processamento do webhook:", error);
-      return res.status(500).send("Internal Server Error");
+    if (paymentInfo.status === "approved") {
+      const orderRef = db.collection("orders").doc(orderId);
+      const updateData = {
+        paymentStatus: "paid",
+        mercadoPagoDetails: {
+          paymentId: paymentId.toString(),
+          transactionId: paymentInfo.transaction_details?.transaction_id || null,
+        },
+      };
+      await orderRef.update(updateData);
+      logger.info(`Pedido ${orderId} (Pagamento MP: ${paymentId}) foi marcado como 'pago' com detalhes da transação via webhook.`);
+    } else {
+      logger.info(`Status do pagamento ${paymentId} é '${paymentInfo.status}'. Nenhuma ação tomada.`);
     }
-  });
-});
 
-
-// ============================================================================
-// 3. CANCELAR PAGAMENTO NO MERCADO PAGO - CORRIGIDO
-// ============================================================================
-exports.cancelMercadoPagoOrder = functions.https.onCall(async (data, context) => {
-  const { firestoreOrderId } = data;
-  if (!firestoreOrderId) {
-    throw new functions.https.HttpsError("invalid-argument", "ID do pedido é obrigatório.");
-  }
-
-  const orderRef = db.collection("orders").doc(firestoreOrderId);
-  const orderDoc = await orderRef.get();
-
-  if (!orderDoc.exists) {
-    throw new functions.https.HttpsError("not-found", "Pedido não encontrado.");
-  }
-  
-  const paymentId = orderDoc.data().mercadoPagoDetails?.paymentId;
-  if (!paymentId) {
-     await orderRef.update({ status: "cancelled" });
-     return { success: true, message: "Pedido cancelado no sistema (sem ID de pagamento MP para cancelar)." };
-  }
-  
-  try {
-    // O endpoint para cancelar um pagamento é /v1/payments/{id} com status cancelled
-    await mercadoPagoApi.put(`/v1/payments/${paymentId}`, { status: "cancelled" });
-
-    await orderRef.update({ status: "cancelled" });
-    return { success: true, message: "Pagamento cancelado com sucesso no Mercado Pago." };
-
+    response.status(200).send("OK");
   } catch (error) {
-    console.error("Erro ao cancelar no MP:", error.response?.data || error.message);
-    // Se o pagamento já expirou ou foi pago, o cancelamento pode falhar.
-    // Mesmo assim, cancelamos no nosso sistema.
-    await orderRef.update({ status: "cancelled" });
-    const errorDetails = error.response?.data?.message || "Erro desconhecido";
-    throw new functions.https.HttpsError("internal", `Falha no cancelamento MP: ${errorDetails}. Pedido cancelado no sistema.`);
-  }
-});
-
-
-// ============================================================================
-// 4. REEMBOLSAR PAGAMENTO NO MERCADO PAGO - CORRIGIDO
-// ============================================================================
-exports.refundMercadoPagoOrder = functions.https.onCall(async (data, context) => {
-  const { firestoreOrderId, amount } = data;
-  if (!firestoreOrderId) {
-    throw new functions.https.HttpsError("invalid-argument", "ID do pedido é obrigatório.");
-  }
-
-  const orderRef = db.collection("orders").doc(firestoreOrderId);
-  const orderDoc = await orderRef.get();
-
-  if (!orderDoc.exists) {
-    throw new functions.https.HttpsError("not-found", "Pedido não encontrado.");
-  }
-
-  const paymentId = orderDoc.data().mercadoPagoDetails?.paymentId;
-  if (!paymentId) {
-    throw new functions.https.HttpsError("failed-precondition", "ID de pagamento do Mercado Pago não encontrado.");
-  }
-  
-  try {
-    const refundPayload = amount ? { amount: parseFloat(amount) } : {};
-    
-    // O endpoint de reembolso é em /v1/payments/{id}/refunds
-    await mercadoPagoApi.post(`/v1/payments/${paymentId}/refunds`, refundPayload, {
-      headers: { "X-Idempotency-Key": `${firestoreOrderId}-refund-${Date.now()}` },
-    });
-
-    await orderRef.update({ paymentStatus: "refunded" });
-    return { success: true, message: "Reembolso processado com sucesso pelo Mercado Pago." };
-
-  } catch (error) {
-    console.error("Erro ao reembolsar no MP:", error.response?.data || error.message);
-    const errorDetails = error.response?.data?.message || "Erro desconhecido";
-    throw new functions.https.HttpsError("internal", `Falha no reembolso: ${errorDetails}`);
+    logger.error(`Erro ao processar webhook para o pagamento ${paymentId}:`, error.cause || error.message);
+    response.status(500).send("Internal Server Error");
   }
 });

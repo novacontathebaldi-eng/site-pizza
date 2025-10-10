@@ -9,8 +9,6 @@ interface OrderCardProps {
     onUpdateReservationTime: (orderId: string, reservationTime: string) => void;
     onDelete: (orderId: string) => void;
     onPermanentDelete: (orderId: string) => void;
-    onCancelMPOrder: (orderId: string) => void;
-    onRefundMPOrder: (orderId: string, total: number) => void;
 }
 
 // This is now a function to provide dynamic text based on the order type
@@ -47,8 +45,6 @@ const getPaymentStatusInfo = (order: Order): { text: string; isPaid: boolean } =
             return { text: 'Pago pelo SITE', isPaid: true };
         case 'paid':
             return { text: 'Pago', isPaid: true };
-        case 'refunded':
-            return { text: 'Reembolsado', isPaid: false };
         case 'pending':
         default:
             return { text: 'Pendente', isPaid: false };
@@ -56,7 +52,7 @@ const getPaymentStatusInfo = (order: Order): { text: string; isPaid: boolean } =
 };
 
 
-export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete, onCancelMPOrder, onRefundMPOrder }) => {
+export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete }) => {
     const { id, customer, items, total, paymentMethod, changeNeeded, changeAmount, notes, status, paymentStatus, createdAt, pickupTimeEstimate } = order;
     const config = getStatusConfig(order);
     const { text: paymentStatusText, isPaid } = getPaymentStatusInfo(order);
@@ -149,7 +145,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                 value={order.paymentStatus}
                 onChange={(e) => onUpdatePaymentStatus(id, e.target.value as PaymentStatus)}
                 className={`px-2 py-1 border rounded-md bg-white text-sm focus:ring-accent focus:border-accent font-semibold ${
-                    isPaid ? 'text-green-600' : paymentStatus === 'refunded' ? 'text-orange-600' : 'text-yellow-600'
+                    isPaid ? 'text-green-600' : 'text-yellow-600'
                 }`}
             >
                 <option value="pending">Pendente</option>
@@ -157,7 +153,6 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                 {order.paymentStatus === 'paid_online' && (
                     <option value="paid_online" disabled>Pago pelo Site</option>
                 )}
-                <option value="refunded">Reembolsado</option>
             </select>
         </div>
     );
@@ -229,7 +224,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 <p><strong>Método:</strong> {paymentMethodMap[paymentMethod]}</p>
                                 <p><strong>Status Pgto:</strong>
                                     <span className={`font-bold ml-1 ${
-                                        isPaid ? 'text-green-600' : paymentStatus === 'refunded' ? 'text-orange-600' : 'text-yellow-600'
+                                        isPaid ? 'text-green-600' : 'text-yellow-600'
                                     }`}>
                                         {paymentStatusText}
                                     </span>
@@ -242,21 +237,18 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                     {order.mercadoPagoDetails && (
                                         <div className="text-xs space-y-1">
                                             <div>
-                                                {order.mercadoPagoOrderId && <p><strong>ID Ordem MP:</strong> {order.mercadoPagoOrderId}</p>}
-                                                {order.mercadoPagoDetails.paymentId && <p><strong>ID Pagamento MP:</strong> {order.mercadoPagoDetails.paymentId}</p>}
                                                 {order.mercadoPagoDetails.transactionId && <p><strong>ID Transação:</strong> {order.mercadoPagoDetails.transactionId}</p>}
+                                                <p><strong>ID Pagamento:</strong> {order.mercadoPagoDetails.paymentId}</p>
                                             </div>
-                                            {(order.paymentStatus === 'paid' || order.paymentStatus === 'paid_online') && order.mercadoPagoDetails.paymentId && (
-                                                <a 
-                                                    href={`https://www.mercadopago.com.br/payments/${order.mercadoPagoDetails.paymentId}/receipt`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-2 text-sm bg-blue-100 text-blue-700 font-semibold py-1 px-2 rounded-md hover:bg-blue-200"
-                                                >
-                                                    <i className="fas fa-receipt"></i>
-                                                    <span>Ver Comprovante</span>
-                                                </a>
-                                            )}
+                                            <a 
+                                                href={`https://www.mercadopago.com.br/payments/${order.mercadoPagoDetails.paymentId}/receipt`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-2 text-sm bg-blue-100 text-blue-700 font-semibold py-1 px-2 rounded-md hover:bg-blue-200"
+                                            >
+                                                <i className="fas fa-receipt"></i>
+                                                <span>Ver Comprovante</span>
+                                            </a>
                                         </div>
                                     )}
                                     {notes && <p className="text-sm"><strong>Obs:</strong> {notes}</p>}
@@ -287,16 +279,6 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                         ) : (
                              <div className="flex flex-wrap items-center justify-end gap-3 w-full">
                                 {paymentStatusChanger}
-                                {status === 'awaiting-payment' && order.mercadoPagoOrderId && (
-                                    <button onClick={() => onCancelMPOrder(id)} className="bg-yellow-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-yellow-600" title="Cancelar ordem de pagamento no Mercado Pago">
-                                        <i className="fab fa-mercadopago mr-2"></i>Cancelar MP
-                                    </button>
-                                )}
-                                {(paymentStatus === 'paid' || paymentStatus === 'paid_online') && order.mercadoPagoOrderId && (
-                                    <button onClick={() => onRefundMPOrder(id, total)} className="bg-orange-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-orange-600" title="Reembolsar pagamento via Mercado Pago">
-                                        <i className="fab fa-mercadopago mr-2"></i>Reembolsar MP
-                                    </button>
-                                )}
                                 <div className="flex-grow"></div>
                                 
                                 {/* Next-step buttons */}

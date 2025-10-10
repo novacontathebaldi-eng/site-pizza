@@ -35,7 +35,7 @@ export const DynamicContentSection: React.FC<DynamicContentSectionProps> = ({ se
 
     const image = section.imageUrl ? (
         <div className="relative flex items-center justify-center">
-            <img src={section.imageUrl} alt={section.title} className="rounded-2xl shadow-xl w-full h-auto object-cover" loading="lazy" />
+            <img src={section.imageUrl} alt={section.title} className="rounded-2xl shadow-xl w-full h-auto object-cover" />
         </div>
     ) : null;
 

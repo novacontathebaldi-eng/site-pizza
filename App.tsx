@@ -621,37 +621,6 @@ const App: React.FC = () => {
         }
     }, [addToast]);
 
-    const handleCancelMercadoPagoOrder = useCallback(async (orderId: string) => {
-        if (!window.confirm("Tem certeza que deseja cancelar esta ordem de pagamento no Mercado Pago? Isso deve ser feito se o PIX expirou ou não será pago.")) return;
-        try {
-            const result = await firebaseService.cancelMercadoPagoOrder(orderId);
-            addToast(result.message, 'success');
-        } catch (error: any) {
-            console.error("Failed to cancel MP order:", error);
-            addToast(`Erro ao cancelar ordem: ${error.message}`, 'error');
-        }
-    }, [addToast]);
-
-    const handleRefundMercadoPagoOrder = useCallback(async (orderId: string, totalAmount: number) => {
-        const refundAmountStr = window.prompt(`Digite o valor para reembolso parcial ou deixe em branco para reembolso total (Total: R$ ${totalAmount.toFixed(2)}). Use ponto como separador decimal (ex: 10.50).`);
-
-        if (refundAmountStr === null) return; // User cancelled
-
-        const refundAmount = refundAmountStr ? parseFloat(refundAmountStr) : undefined;
-        if (refundAmount !== undefined && (isNaN(refundAmount) || refundAmount <= 0 || refundAmount > totalAmount)) {
-            addToast("Valor de reembolso inválido.", 'error');
-            return;
-        }
-
-        try {
-            const result = await firebaseService.refundMercadoPagoOrder(orderId, refundAmount);
-            addToast(result.message, 'success');
-        } catch (error: any) {
-            console.error("Failed to refund MP order:", error);
-            addToast(`Erro ao reembolsar: ${error.message}`, 'error');
-        }
-    }, [addToast]);
-
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
 
@@ -729,8 +698,6 @@ const App: React.FC = () => {
                     onUpdateOrderReservationTime={handleUpdateOrderReservationTime}
                     onDeleteOrder={handleDeleteOrder}
                     onPermanentDeleteOrder={handlePermanentDeleteOrder}
-                    onCancelMPOrder={handleCancelMercadoPagoOrder}
-                    onRefundMPOrder={handleRefundMercadoPagoOrder}
                 />
             </main>
 

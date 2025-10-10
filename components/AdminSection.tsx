@@ -35,8 +35,6 @@ interface AdminSectionProps {
     onUpdateOrderReservationTime: (orderId: string, reservationTime: string) => Promise<void>;
     onDeleteOrder: (orderId: string) => Promise<void>;
     onPermanentDeleteOrder: (orderId: string) => Promise<void>;
-    onCancelMPOrder: (orderId: string) => void;
-    onRefundMPOrder: (orderId: string, total: number) => void;
 }
 
 interface SortableProductItemProps {
@@ -150,7 +148,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
         onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
-        onDeleteOrder, onPermanentDeleteOrder, onCancelMPOrder, onRefundMPOrder
+        onDeleteOrder, onPermanentDeleteOrder
     } = props;
     
     const [user, setUser] = useState<firebase.User | null>(null);
@@ -505,7 +503,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                     <div className="mb-6">
                                         <h4 className="font-bold text-lg mb-2 text-yellow-600">Pendentes</h4>
                                         <div className="space-y-4">
-                                            {filteredOrders.filter(o => o.status === 'pending').map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} onCancelMPOrder={onCancelMPOrder} onRefundMPOrder={onRefundMPOrder} />)}
+                                            {filteredOrders.filter(o => o.status === 'pending').map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />)}
                                         </div>
                                     </div>
                                 )}
@@ -536,9 +534,9 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
                                     <div id="order-list-container" className="mt-4 space-y-4">
                                         {isTrashVisible ? (
-                                            deletedOrders.length > 0 ? deletedOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} onCancelMPOrder={onCancelMPOrder} onRefundMPOrder={onRefundMPOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>
+                                            deletedOrders.length > 0 ? deletedOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>
                                         ) : (
-                                            tabOrders.length > 0 ? tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} onCancelMPOrder={onCancelMPOrder} onRefundMPOrder={onRefundMPOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>
+                                            tabOrders.length > 0 ? tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>
                                         )}
                                     </div>
                                     
