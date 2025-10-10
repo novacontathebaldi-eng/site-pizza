@@ -1,155 +1,218 @@
-import React, { useState, useMemo } from 'react';
-import { CartItem, OrderCustomerDetails } from '../types';
+
+import React, { useState, useEffect } from 'react';
+import { CartItem, OrderDetails } from '../types';
 
 interface CheckoutModalProps {
     isOpen: boolean;
     onClose: () => void;
     cartItems: CartItem[];
-    onConfirmCheckout: (details: any) => void;
-    onInitiatePixPayment: (details: any) => void;
+    onConfirmCheckout: (details: OrderDetails) => void;
+    onInitiatePixPayment: (details: OrderDetails) => void;
 }
 
+const getSuggestedTimes = () => {
+    const now = new Date();
+    const suggestions = [];
+    for (let i = 1; i <= 4; i++) {
+        const suggestionTime = new Date(now.getTime() + i * 15 * 60000);
+        const hours = suggestionTime.getHours().toString().padStart(2, '0');
+        const minutes = suggestionTime.getMinutes().toString().padStart(2, '0');
+        suggestions.push(`${hours}:${minutes}`);
+    }
+    return suggestions;
+};
+
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, onInitiatePixPayment }) => {
-    const [details, setDetails] = useState<Omit<OrderCustomerDetails, 'orderType'>>({ name: '', phone: '', address: '' });
-    const [orderType, setOrderType] = useState<'delivery' | 'pickup' | 'local'>('delivery');
-    const [paymentMethod, setPaymentMethod] = useState<'pix' | 'cash' | 'credit' | 'debit'>('pix');
-    const [pixChoice, setPixChoice] = useState<'now' | 'later'>('now');
+    const [name, setName] = useState('');
+    const [phone, setPhone] = useState('');
+    const [orderType, setOrderType] = useState<'delivery' | 'pickup' | 'local' | ''>('');
+    const [address, setAddress] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState<'credit' | 'debit' | 'pix' | 'cash' | ''>('');
     const [changeNeeded, setChangeNeeded] = useState(false);
     const [changeAmount, setChangeAmount] = useState('');
     const [notes, setNotes] = useState('');
     const [reservationTime, setReservationTime] = useState('');
+    const [pixPaymentOption, setPixPaymentOption] = useState<'payNow' | 'payLater' | null>(null);
 
-    const total = useMemo(() => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0), [cartItems]);
+
+    const suggestedTimes = getSuggestedTimes();
+
+    useEffect(() => {
+        if (!isOpen) {
+            setName(''); setPhone(''); setOrderType(''); setAddress('');
+            setPaymentMethod(''); setChangeNeeded(false); setChangeAmount('');
+            setNotes(''); setReservationTime(''); setPixPaymentOption(null);
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        setDetails({ ...details, [e.target.name]: e.target.value });
-    };
+    const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const fullDetails = {
-            ...details,
-            orderType,
-            paymentMethod,
-            changeNeeded: paymentMethod === 'cash' && changeNeeded,
-            changeAmount: paymentMethod === 'cash' && changeNeeded ? changeAmount : '',
-            notes,
-            reservationTime: orderType === 'local' ? reservationTime : '',
-        };
+    const getOrderDetails = (): OrderDetails => ({
+        name, phone, orderType: orderType as 'delivery' | 'pickup' | 'local',
+        address, paymentMethod: paymentMethod as 'credit' | 'debit' | 'pix' | 'cash',
+        changeNeeded: paymentMethod === 'cash' && changeNeeded,
+        changeAmount, notes, reservationTime
+    });
 
-        if (paymentMethod === 'pix' && pixChoice === 'now') {
-            onInitiatePixPayment(fullDetails);
-        } else {
-            onConfirmCheckout(fullDetails);
+    const handlePaymentMethodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newMethod = e.target.value as any;
+        setPaymentMethod(newMethod);
+        if (newMethod !== 'pix') {
+            setPixPaymentOption(null);
         }
     };
+    
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const details = getOrderDetails();
+
+        if (paymentMethod === 'pix') {
+            if (pixPaymentOption === 'payNow') {
+                onInitiatePixPayment(details);
+            } else if (pixPaymentOption === 'payLater') {
+                onConfirmCheckout(details);
+            } else {
+                // This case should be prevented by the disabled button state
+                alert("Por favor, escolha se deseja pagar agora ou depois.");
+            }
+        } else {
+            onConfirmCheckout(details);
+        }
+    };
+    
+    const isSubmitDisabled = paymentMethod === 'pix' && !pixPaymentOption;
+    
+    const submitButtonText = (paymentMethod === 'pix' && pixPaymentOption === 'payNow')
+        ? 'Pagar e Finalizar Pedido'
+        : 'Enviar Pedido';
+        
+    const submitButtonIconClass = (paymentMethod === 'pix' && pixPaymentOption === 'payNow')
+        ? 'fab fa-pix'
+        : 'fab fa-whatsapp';
+
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
                 <div className="flex justify-between items-center p-5 border-b border-gray-200">
-                    <h2 className="text-2xl font-bold text-text-on-light"><i className="fas fa-check-circle mr-2"></i>Finalizar Pedido</h2>
+                    <h2 className="text-2xl font-bold text-text-on-light"><i className="fas fa-clipboard-check mr-2"></i>Finalizar Pedido</h2>
                     <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
                 </div>
                 <div className="overflow-y-auto p-6">
-                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {/* Left Side: Form */}
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold border-b pb-2">Seus Dados</h3>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-semibold mb-1" htmlFor="name">Nome Completo *</label>
-                                <input id="name" name="name" type="text" value={details.name} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" required />
+                                <label className="block text-sm font-semibold mb-1">Nome Completo *</label>
+                                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold mb-1" htmlFor="phone">Telefone (WhatsApp) *</label>
-                                <input id="phone" name="phone" type="tel" value={details.phone} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" required placeholder="(XX) XXXXX-XXXX"/>
-                            </div>
-
-                            <h3 className="text-lg font-semibold border-b pb-2 pt-2">Opções de Pedido</h3>
-                             <div className="flex flex-wrap gap-2">
-                                {(['delivery', 'pickup', 'local'] as const).map(type => (
-                                    <button key={type} type="button" onClick={() => setOrderType(type)} className={`flex-1 p-3 border-2 rounded-lg text-center text-sm font-semibold ${orderType === type ? 'border-accent bg-yellow-50' : 'border-gray-300'}`}>
-                                       { {delivery: 'Receber em Casa', pickup: 'Retirar no Local', local: 'Comer no Local'}[type] }
-                                    </button>
-                                ))}
-                            </div>
-                            {orderType === 'delivery' && (
-                                <div className="animate-fade-in-up">
-                                    <label className="block text-sm font-semibold mb-1" htmlFor="address">Endereço de Entrega *</label>
-                                    <textarea id="address" name="address" value={details.address} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" rows={3} required={orderType === 'delivery'} placeholder="Rua, Número, Bairro, Referência..."></textarea>
-                                </div>
-                            )}
-                            {orderType === 'local' && (
-                                <div className="animate-fade-in-up">
-                                    <label className="block text-sm font-semibold mb-1" htmlFor="reservationTime">Horário da Reserva (opcional)</label>
-                                    <input id="reservationTime" type="text" value={reservationTime} onChange={e => setReservationTime(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Ex: Mesa para 2 às 20h"/>
-                                </div>
-                            )}
-                             <div>
-                                <label className="block text-sm font-semibold mb-1" htmlFor="notes">Observações (opcional)</label>
-                                <textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} className="w-full px-3 py-2 border rounded-md" rows={2} placeholder="Ex: Pizza sem cebola, etc."></textarea>
+                                <label className="block text-sm font-semibold mb-1">Telefone/WhatsApp *</label>
+                                <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
                             </div>
                         </div>
-
-                        {/* Right Side: Order Summary & Payment */}
-                        <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
-                            <h3 className="text-lg font-semibold border-b pb-2">Resumo do Pedido</h3>
-                            <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
-                                {cartItems.map(item => (
-                                    <div key={item.id} className="flex justify-between items-center text-sm">
-                                        <div><span>{item.quantity}x </span><span className="font-semibold">{item.name}</span> <span className="text-gray-500">({item.size})</span></div>
-                                        <span className="font-medium">{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                    </div>
-                                ))}
+                        <div>
+                            <label className="block text-sm font-semibold mb-1">Tipo de Pedido *</label>
+                            <select value={orderType} onChange={e => setOrderType(e.target.value as any)} className="w-full px-3 py-2 border rounded-md bg-white" required>
+                                <option value="" disabled>Selecione...</option>
+                                <option value="delivery">Entrega</option>
+                                <option value="pickup">Retirada na loja</option>
+                                <option value="local">Consumir no local</option>
+                            </select>
+                        </div>
+                        {orderType === 'delivery' && (
+                            <div className="animate-fade-in-up">
+                                <label className="block text-sm font-semibold mb-1">Endereço de Entrega *</label>
+                                <textarea value={address} onChange={e => setAddress(e.target.value)} className="w-full px-3 py-2 border rounded-md" rows={2} required />
                             </div>
-                            <div className="border-t pt-3 flex justify-between items-center text-xl font-bold">
+                        )}
+                        {orderType === 'local' && (
+                             <div className="p-3 bg-gray-50 rounded-md border animate-fade-in-up">
+                                 <label className="block text-sm font-semibold mb-2">Horário da Reserva *</label>
+                                 <div className="flex flex-wrap items-center gap-2 mb-2">
+                                    <p className="text-xs text-gray-600">Sugestões:</p>
+                                    {suggestedTimes.map(time => (
+                                        <button type="button" key={time} onClick={() => setReservationTime(time)} className="px-2 py-1 text-xs font-semibold rounded-md bg-accent/20 text-accent hover:bg-accent/30">
+                                            {time}
+                                        </button>
+                                    ))}
+                                 </div>
+                                <input type="text" value={reservationTime} onChange={e => setReservationTime(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Ou digite o horário (ex: 20:30)" required />
+                            </div>
+                        )}
+                        <div>
+                            <label className="block text-sm font-semibold mb-1">Método de Pagamento *</label>
+                            <select value={paymentMethod} onChange={handlePaymentMethodChange} className="w-full px-3 py-2 border rounded-md bg-white" required>
+                                <option value="" disabled>Selecione...</option>
+                                <option value="credit">Cartão de Crédito</option>
+                                <option value="debit">Cartão de Débito</option>
+                                <option value="pix">PIX</option>
+                                <option value="cash">Dinheiro</option>
+                            </select>
+                        </div>
+                        
+                        {paymentMethod === 'pix' && (
+                            <div className="p-4 bg-blue-50 rounded-md border border-blue-200 animate-fade-in-up text-center">
+                                <p className="font-semibold mb-3">Como você prefere pagar com PIX?</p>
+                                <div className="flex justify-center gap-4">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setPixPaymentOption('payNow')} 
+                                        className={`font-bold py-2 px-6 rounded-lg transition-all border-2 ${pixPaymentOption === 'payNow' ? 'bg-accent text-white border-accent' : 'bg-white text-accent border-accent hover:bg-accent/10'}`}>
+                                        <i className="fas fa-qrcode mr-2"></i>Pagar Agora
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setPixPaymentOption('payLater')} 
+                                        className={`font-bold py-2 px-6 rounded-lg transition-all border-2 ${pixPaymentOption === 'payLater' ? 'bg-gray-600 text-white border-gray-600' : 'bg-white text-gray-600 border-gray-400 hover:bg-gray-100'}`}>
+                                        <i className="fas fa-hand-holding-usd mr-2"></i>Pagar Depois
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {paymentMethod === 'cash' && (
+                            <div className="p-3 bg-gray-50 rounded-md border animate-fade-in-up">
+                                <label className="flex items-center gap-2">
+                                    <input type="checkbox" checked={changeNeeded} onChange={e => setChangeNeeded(e.target.checked)} />
+                                    <span>Precisa de troco?</span>
+                                </label>
+                                {changeNeeded && (
+                                    <div className="mt-2">
+                                        <label className="block text-sm font-semibold mb-1">Pagar com qual valor?</label>
+                                        <input type="number" value={changeAmount} onChange={e => setChangeAmount(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Ex: 100" required />
+                                        <p className="text-xs text-gray-500 mt-1">Informe para que o entregador leve o troco correto.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                         <div>
+                            <label className="block text-sm font-semibold mb-1">Observações (opcional)</label>
+                            <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full px-3 py-2 border rounded-md" rows={2} />
+                        </div>
+                        <div className="p-4 bg-brand-ivory-50 rounded-lg my-4">
+                            <h3 className="font-bold mb-2">Resumo do Pedido</h3>
+                            {cartItems.map(item => (
+                                <div key={item.id} className="flex justify-between text-sm">
+                                    <span>{item.quantity}x {item.name} ({item.size})</span>
+                                    <span>{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                </div>
+                            ))}
+                            <div className="flex justify-between font-bold text-lg mt-2 pt-2 border-t">
                                 <span>Total:</span>
-                                <span className="text-accent">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                <span>{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                             </div>
-
-                            <h3 className="text-lg font-semibold border-b pb-2 pt-2">Forma de Pagamento</h3>
-                            <div className="grid grid-cols-2 gap-2">
-                                {(['pix', 'credit', 'debit', 'cash'] as const).map(method => (
-                                    <button key={method} type="button" onClick={() => setPaymentMethod(method)} className={`p-3 border-2 rounded-lg text-center text-sm font-semibold ${paymentMethod === method ? 'border-accent bg-yellow-50' : 'border-gray-300'}`}>
-                                        {{pix: 'PIX', credit: 'Crédito', debit: 'Débito', cash: 'Dinheiro'}[method]}
-                                    </button>
-                                ))}
-                            </div>
-
-                             {paymentMethod === 'pix' && (
-                                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg animate-fade-in-up">
-                                    <div className="flex items-center justify-around">
-                                        <label className="flex items-center gap-2 cursor-pointer">
-                                            <input type="radio" name="pixChoice" value="now" checked={pixChoice === 'now'} onChange={() => setPixChoice('now')} className="h-4 w-4 text-accent focus:ring-accent"/>
-                                            <span className="font-semibold">Pagar Agora</span>
-                                        </label>
-                                        <label className="flex items-center gap-2 cursor-pointer">
-                                            <input type="radio" name="pixChoice" value="later" checked={pixChoice === 'later'} onChange={() => setPixChoice('later')} className="h-4 w-4 text-accent focus:ring-accent"/>
-                                            <span className="font-semibold">Pagar na Entrega</span>
-                                        </label>
-                                    </div>
-                                </div>
-                            )}
-
-                            {paymentMethod === 'cash' && (
-                                <div className="p-3 bg-gray-100 border rounded-lg space-y-2 animate-fade-in-up">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="checkbox" checked={changeNeeded} onChange={() => setChangeNeeded(!changeNeeded)} className="h-4 w-4 rounded text-accent focus:ring-accent"/>
-                                        <span className="font-semibold">Precisa de troco?</span>
-                                    </label>
-                                    {changeNeeded && (
-                                        <input type="text" value={changeAmount} onChange={e => setChangeAmount(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Troco para quanto?" required={changeNeeded}/>
-                                    )}
-                                </div>
-                            )}
-
-                            <button type="submit" className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all">
-                                <i className="fas fa-paper-plane mr-2"></i>
-                                {paymentMethod === 'pix' && pixChoice === 'now' ? 'Finalizar e Pagar com PIX' : 'Enviar Pedido'}
-                            </button>
                         </div>
+
+                         <button 
+                            type="submit" 
+                            disabled={isSubmitDisabled}
+                            className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
+                        >
+                            <i className={`${submitButtonIconClass} mr-2`}></i>
+                            {submitButtonText}
+                        </button>
                     </form>
                 </div>
             </div>

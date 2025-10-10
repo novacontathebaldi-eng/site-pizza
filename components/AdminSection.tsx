@@ -1,19 +1,16 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, StoreStatus } from '../types';
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
 import { SiteCustomizationTab } from './SiteCustomizationTab';
 import { OrderCard } from './OrderCard';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
-// FIX: Add import for CSS from @dnd-kit/utilities
 import { CSS } from '@dnd-kit/utilities';
 import firebase from 'firebase/compat/app';
 import { auth } from '../services/firebase';
 import { SupportModal } from './SupportModal';
-import * as firebaseService from '../services/firebaseService';
-
+import notificationSound from '../assets/notf1.mp3';
 
 interface AdminSectionProps {
     allProducts: Product[];
@@ -38,7 +35,8 @@ interface AdminSectionProps {
     onUpdateOrderReservationTime: (orderId: string, reservationTime: string) => Promise<void>;
     onDeleteOrder: (orderId: string) => Promise<void>;
     onPermanentDeleteOrder: (orderId: string) => Promise<void>;
-    onExit: () => void;
+    onCancelMPOrder: (orderId: string) => void;
+    onRefundMPOrder: (orderId: string, total: number) => void;
 }
 
 interface SortableProductItemProps {
@@ -61,7 +59,6 @@ const SortableProductItem: React.FC<SortableProductItemProps> = ({ product, isCa
     } = useSortable({ id: product.id });
 
     const style = {
-        // FIX: Corrected property access on the CSS utility. It should be `CSS.Transform`, not `CSS.transform`.
         transform: CSS.Transform.toString(transform),
         transition,
         zIndex: isDragging ? 10 : 'auto',
@@ -117,7 +114,6 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
     } = useSortable({ id: category.id });
 
     const style = {
-        // FIX: Corrected property access on the CSS utility. It should be `CSS.Transform`, not `CSS.transform`.
         transform: CSS.Transform.toString(transform),
         transition,
         zIndex: isDragging ? 10 : 'auto',
@@ -154,15 +150,16 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
         onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
-        onDeleteOrder, onPermanentDeleteOrder, onExit
+        onDeleteOrder, onPermanentDeleteOrder, onCancelMPOrder, onRefundMPOrder
     } = props;
     
     const [user, setUser] = useState<firebase.User | null>(null);
     const [authLoading, setAuthLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('orders');
+    const [activeTab, setActiveTab] = useState('status');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | React.ReactNode>('');
+    const [showAdminPanel, setShowAdminPanel] = useState(window.location.hash === '#admin');
     const [isLoggingIn, setIsLoggingIn] = useState(false);
     
     const [localProducts, setLocalProducts] = useState<Product[]>(allProducts);
@@ -202,6 +199,12 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         }
         const unsubscribe = auth.onAuthStateChanged(user => { setUser(user); setAuthLoading(false); });
         return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        const handleHashChange = () => setShowAdminPanel(window.location.hash === '#admin');
+        window.addEventListener('hashchange', handleHashChange, false);
+        return () => window.removeEventListener('hashchange', handleHashChange, false);
     }, []);
 
     // Scroll main admin tabs into view
@@ -249,12 +252,16 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         setIsSoundEnabled(newState);
         localStorage.setItem('soundNotificationEnabled', String(newState));
 
+        // Mobile/iOS unlock: play and immediately pause on the first user interaction
+        // to grant permission for programmatic playback later.
         if (newState && audioRef.current) {
             const playPromise = audioRef.current.play();
             if (playPromise !== undefined) {
                 playPromise.then(_ => {
                     audioRef.current?.pause();
                 }).catch(error => {
+                    // Autoplay was prevented. This is expected on some browsers.
+                    // The user interaction of clicking the button is what matters.
                     console.info("Audio unlock interaction complete.", error);
                 });
             }
@@ -316,7 +323,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     
     const handleLogout = async () => {
         if (!auth) return;
-        try { await auth.signOut(); setEmail(''); setPassword(''); onExit(); }
+        try { await auth.signOut(); setEmail(''); setPassword(''); window.location.hash = ''; }
         catch (error) { console.error("Error signing out: ", error); }
     };
 
@@ -379,12 +386,14 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         const element = document.getElementById(elementId);
         if (!element) return;
     
-        const mainHeaderHeight = 80;
+        const mainHeaderHeight = 80; // Height of the main sticky header
         let totalOffset = mainHeaderHeight;
     
+        // Check if the sticky order tabs are visible and add their height
         if (activeTab === 'orders') {
             const orderTabsHeader = document.getElementById('sticky-order-tabs');
             if (orderTabsHeader) {
+                // Check if it's actually sticky (in the viewport)
                 const rect = orderTabsHeader.getBoundingClientRect();
                 if (rect.top <= mainHeaderHeight) {
                     totalOffset += orderTabsHeader.offsetHeight;
@@ -402,7 +411,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     };
 
     const handleMainTabClick = (tab: string) => {
-        setActiveTab(tab as any);
+        setActiveTab(tab);
         setTimeout(() => scrollToContent(`admin-content-${tab}`), 50);
     };
 
@@ -411,39 +420,20 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         setTimeout(() => scrollToContent('order-list-container'), 50);
     };
 
-    if (authLoading) return <div className="fixed inset-0 flex items-center justify-center bg-gray-100">Carregando...</div>;
-    if (!user) return (
-        <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-            <div className="w-full max-w-md bg-white rounded-lg shadow-md p-8">
-                <h1 className="text-2xl font-bold text-center mb-6">Login do Administrador</h1>
-                <form onSubmit={handleLogin}>
-                    <div className="mb-4">
-                        <label className="block text-sm font-medium mb-1" htmlFor="email">Email</label>
-                        <input type="email" id="email" name="email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full px-3 py-2 border rounded-md" />
-                    </div>
-                    <div className="mb-6">
-                        <label className="block text-sm font-medium mb-1" htmlFor="password">Senha</label>
-                        <input type="password" id="password" name="password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full px-3 py-2 border rounded-md" />
-                    </div>
-                    {error && <div className="text-red-600 mb-4 bg-red-50 p-3 rounded-lg border border-red-200">{error}</div>}
-                    <button type="submit" className="w-full bg-accent text-white font-bold py-3 rounded-lg hover:bg-opacity-90 disabled:bg-opacity-70 flex justify-center" disabled={isLoggingIn}>
-                        {isLoggingIn ? <i className="fas fa-spinner fa-spin"></i> : 'Entrar'}
-                    </button>
-                </form>
-                 <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
-            </div>
-        </div>
-    );
+
+    if (!showAdminPanel) return null;
+    if (authLoading) return <section id="admin" className="py-20 bg-brand-ivory-50"><div className="text-center"><i className="fas fa-spinner fa-spin text-4xl text-accent"></i></div></section>;
+    if (!user) return (<> <section id="admin" className="py-20 bg-brand-ivory-50"> <div className="container mx-auto px-4 max-w-md"> <div className="bg-white p-8 rounded-2xl shadow-lg border"> <h2 className="text-3xl font-bold text-center mb-6"><i className="fas fa-shield-alt mr-2"></i>Painel</h2> <form onSubmit={handleLogin}> <div className="mb-4"> <label className="block font-semibold mb-2" htmlFor="admin-email">Email</label> <input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> <div className="mb-6"> <label className="block font-semibold mb-2" htmlFor="admin-password">Senha</label> <input id="admin-password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> {error && <div className="text-red-600 mb-4 bg-red-50 p-3 rounded-lg border border-red-200">{error}</div>} <button type="submit" className="w-full bg-accent text-white font-bold py-3 rounded-lg hover:bg-opacity-90 disabled:bg-opacity-70 flex justify-center" disabled={isLoggingIn}>{isLoggingIn ? <i className="fas fa-spinner fa-spin"></i> : 'Entrar'}</button> </form> </div> </div> </section> <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} /> </>);
 
     const OrderStatusTabs: OrderTabKey[] = ['accepted', 'reserved', 'pronto', 'emRota', 'completed', 'cancelled'];
 
     return (
         <>
-            <audio ref={audioRef} src="/assets/notf1.mp3" preload="auto" />
-             <div className="min-h-screen bg-brand-ivory-50">
-                <div className="container mx-auto px-4 py-8">
-                    <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200">
-                        <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 pb-4 border-b">
+            <audio ref={audioRef} src={notificationSound} preload="auto" />
+            <section id="admin" className="py-20 bg-brand-ivory-50">
+                <div className="container mx-auto px-4">
+                    <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
+                        <div className="flex justify-between items-center mb-6 pb-4 border-b">
                             <div className="flex items-center gap-4">
                                 <h2 className="text-3xl font-bold">Painel Administrativo</h2>
                                 <button 
@@ -454,10 +444,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                     <i className={`fas ${isSoundEnabled ? 'fa-bell' : 'fa-bell-slash'}`}></i>
                                 </button>
                             </div>
-                            <div className="flex items-center gap-2 mt-4 sm:mt-0">
-                                <button onClick={onExit} className="text-gray-600 hover:text-gray-900 mr-2 font-semibold">Sair do Admin</button>
-                                <button onClick={handleLogout} className="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600"><i className="fas fa-sign-out-alt mr-2"></i>Logout</button>
-                            </div>
+                            <button onClick={handleLogout} className="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600"><i className="fas fa-sign-out-alt mr-2"></i>Sair</button>
                         </div>
                         <div className="border-b mb-6">
                             <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
@@ -479,11 +466,9 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                             </div>
                         </div>
 
-                        <div id="admin-content-status" className={`${activeTab === 'status' ? '' : 'hidden'}`}> 
-                            <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3> <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg"> <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer"> <input type="checkbox" id="store-status-toggle" className="sr-only peer" checked={isStoreOnline} onChange={e => onStoreStatusChange(e.target.checked)} /> <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600"></div> </label> <span className={`font-semibold text-lg ${isStoreOnline ? 'text-green-600' : 'text-red-600'}`}>{isStoreOnline ? 'Aberta' : 'Fechada'}</span> </div>
-                        </div>
+                        <div id="admin-content-status"> {activeTab === 'status' && ( <div> <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3> <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg"> <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer"> <input type="checkbox" id="store-status-toggle" className="sr-only peer" checked={isStoreOnline} onChange={e => onStoreStatusChange(e.target.checked)} /> <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600"></div> </label> <span className={`font-semibold text-lg ${isStoreOnline ? 'text-green-600' : 'text-red-600'}`}>{isStoreOnline ? 'Aberta' : 'Fechada'}</span> </div> </div> )} </div>
                         
-                        <div id="admin-content-orders" className={`${activeTab === 'orders' ? '' : 'hidden'}`}>
+                        <div id="admin-content-orders"> {activeTab === 'orders' && (
                              <div>
                                 <h3 className="text-xl font-bold mb-4">Gerenciar Pedidos</h3>
                                 <div className="bg-gray-50 p-3 rounded-lg border mb-4">
@@ -492,6 +477,27 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                             <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                                             <input type="text" placeholder="Buscar por nome ou telefone..." value={orderSearchTerm} onChange={e => setOrderSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-md" />
                                         </div>
+                                        <div className="hidden sm:flex items-center gap-3">
+                                            <select value={orderFilters.paymentStatus} onChange={e => setOrderFilters(f => ({...f, paymentStatus: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
+                                                <option value="">Status Pgto.</option> <option value="paid">Pago</option> <option value="pending">Pendente</option>
+                                            </select>
+                                            <select value={orderFilters.orderStatus} onChange={e => setOrderFilters(f => ({...f, orderStatus: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
+                                                <option value="">Status Pedido</option> <option value="completed">Finalizado</option> <option value="cancelled">Cancelado</option>
+                                            </select>
+                                            <select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="px-3 py-2 border rounded-md bg-white">
+                                                <option value="">Tipo</option> <option value="delivery">Entrega</option> <option value="pickup">Retirada</option> <option value="local">Local</option>
+                                            </select>
+                                        </div>
+                                        <div className="sm:hidden flex-shrink-0 relative">
+                                            <button onClick={() => setShowFilters(!showFilters)} className="w-10 h-10 bg-white border rounded-md flex items-center justify-center hover:bg-gray-100"><i className="fas fa-filter"></i></button>
+                                            <div className={`absolute top-full right-0 mt-2 bg-white border rounded-lg shadow-xl p-4 z-40 w-64 ${showFilters ? 'block' : 'hidden'}`}>
+                                                <div className="space-y-4">
+                                                    <div><label className="block text-sm font-semibold mb-1">Status Pgto.</label><select value={orderFilters.paymentStatus} onChange={e => setOrderFilters(f => ({...f, paymentStatus: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"><option value="">Todos</option><option value="paid">Pago</option><option value="pending">Pendente</option></select></div>
+                                                    <div><label className="block text-sm font-semibold mb-1">Status Pedido</label><select value={orderFilters.orderStatus} onChange={e => setOrderFilters(f => ({...f, orderStatus: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"><option value="">Todos</option><option value="completed">Finalizado</option><option value="cancelled">Cancelado</option></select></div>
+                                                    <div><label className="block text-sm font-semibold mb-1">Tipo</label><select value={orderFilters.orderType} onChange={e => setOrderFilters(f => ({...f, orderType: e.target.value}))} className="w-full px-3 py-2 border rounded-md bg-white"><option value="">Todos</option><option value="delivery">Entrega</option><option value="pickup">Retirada</option><option value="local">Consumo Local</option></select></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -499,7 +505,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                     <div className="mb-6">
                                         <h4 className="font-bold text-lg mb-2 text-yellow-600">Pendentes</h4>
                                         <div className="space-y-4">
-                                            {filteredOrders.filter(o => o.status === 'pending').map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />)}
+                                            {filteredOrders.filter(o => o.status === 'pending').map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} onCancelMPOrder={onCancelMPOrder} onRefundMPOrder={onRefundMPOrder} />)}
                                         </div>
                                     </div>
                                 )}
@@ -530,9 +536,9 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
                                     <div id="order-list-container" className="mt-4 space-y-4">
                                         {isTrashVisible ? (
-                                            deletedOrders.length > 0 ? deletedOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>
+                                            deletedOrders.length > 0 ? deletedOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} onCancelMPOrder={onCancelMPOrder} onRefundMPOrder={onRefundMPOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>
                                         ) : (
-                                            tabOrders.length > 0 ? tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>
+                                            tabOrders.length > 0 ? tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} onCancelMPOrder={onCancelMPOrder} onRefundMPOrder={onRefundMPOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>
                                         )}
                                     </div>
                                     
@@ -544,18 +550,18 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        )} </div>
                         
-                        <div id="admin-content-customization" className={`${activeTab === 'customization' ? '' : 'hidden'}`}> <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> </div>
-                        <div id="admin-content-products" className={`${activeTab === 'products' ? '' : 'hidden'}`}> <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Produtos</h3> <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Produto</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}> <div className="space-y-6"> {localCategories.map(category => { const categoryProducts = localProducts.filter(p => p.categoryId === category.id).sort((a, b) => a.orderIndex - b.orderIndex); return ( <div key={category.id}> <h4 className={`text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4> <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3 min-h-[50px]"> {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} />)} </div> </SortableContext> </div> ) })} </div> </DndContext> </div> </div>
-                        <div id="admin-content-categories" className={`${activeTab === 'categories' ? '' : 'hidden'}`}> <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Categorias</h3> <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Categoria</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}> <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localCategories.map(cat => <SortableCategoryItem key={cat.id} category={cat} onEdit={handleEditCategory} onDelete={onDeleteCategory} onStatusChange={onCategoryStatusChange} />)} </div> </SortableContext> </DndContext> </div> </div>
-                        <div id="admin-content-data" className={`${activeTab === 'data' ? '' : 'hidden'}`}> <div> <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus dados.</p> <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados iniciais. Use apenas uma vez.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> </div>
+                        <div id="admin-content-customization"> {activeTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> )} </div>
+                        <div id="admin-content-products"> {activeTab === 'products' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Produtos</h3> <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Produto</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}> <div className="space-y-6"> {localCategories.map(category => { const categoryProducts = localProducts.filter(p => p.categoryId === category.id).sort((a, b) => a.orderIndex - b.orderIndex); return ( <div key={category.id}> <h4 className={`text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4> <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3 min-h-[50px]"> {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} />)} </div> </SortableContext> </div> ) })} </div> </DndContext> </div> )} </div>
+                        <div id="admin-content-categories"> {activeTab === 'categories' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Categorias</h3> <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Categoria</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}> <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localCategories.map(cat => <SortableCategoryItem key={cat.id} category={cat} onEdit={handleEditCategory} onDelete={onDeleteCategory} onStatusChange={onCategoryStatusChange} />)} </div> </SortableContext> </DndContext> </div> )} </div>
+                        <div id="admin-content-data"> {activeTab === 'data' && ( <div> <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus dados.</p> <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados iniciais. Use apenas uma vez.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> )} </div>
                     </div>
                 </div>
-            </div>
-            {isProductModalOpen && <ProductModal isOpen={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} onSave={onSaveProduct} product={editingProduct} categories={allCategories} />}
-            {isCategoryModalOpen && <CategoryModal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} onSave={onSaveCategory} category={editingCategory} />}
-            {isSupportModalOpen && <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />}
+            </section>
+            <ProductModal isOpen={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} onSave={onSaveProduct} product={editingProduct} categories={allCategories} />
+            <CategoryModal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} onSave={onSaveCategory} category={editingCategory} />
+            <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
         </>
     );
 };

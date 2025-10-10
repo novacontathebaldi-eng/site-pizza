@@ -135,14 +135,12 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
 
     // --- Content Section Handlers ---
     const handleSectionChange = (id: string, field: keyof Omit<ContentSection, 'id' | 'list'>, value: any) => {
-        // FIX: Add guard for possibly undefined contentSections array to prevent crash.
-        const newSections = (formData.contentSections ?? []).map(s => s.id === id ? { ...s, [field]: value } : s);
+        const newSections = formData.contentSections.map(s => s.id === id ? { ...s, [field]: value } : s);
         setFormData({ ...formData, contentSections: newSections });
     };
 
     const handleSectionListItemChange = (sectionId: string, itemIndex: number, field: 'icon' | 'text', value: string) => {
-        // FIX: Add guard for possibly undefined contentSections array to prevent crash.
-        const newSections = (formData.contentSections ?? []).map(s => {
+        const newSections = formData.contentSections.map(s => {
             if (s.id === sectionId) {
                 const newList = [...s.list];
                 newList[itemIndex] = { ...newList[itemIndex], [field]: value };
@@ -154,8 +152,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
     };
 
     const handleAddSectionListItem = (sectionId: string) => {
-        // FIX: Add guard for possibly undefined contentSections array to prevent crash.
-        const newSections = (formData.contentSections ?? []).map(s => {
+        const newSections = formData.contentSections.map(s => {
             if (s.id === sectionId) {
                 const newItem = { id: `item-${sectionId}-${Date.now()}`, icon: 'fas fa-check-circle', text: '' };
                 return { ...s, list: [...s.list, newItem] };
@@ -166,8 +163,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
     };
 
     const handleRemoveSectionListItem = (sectionId: string, itemIndex: number) => {
-        // FIX: Add guard for possibly undefined contentSections array to prevent crash.
-         const newSections = (formData.contentSections ?? []).map(s => {
+         const newSections = formData.contentSections.map(s => {
             if (s.id === sectionId) {
                 return { ...s, list: s.list.filter((_, i) => i !== itemIndex) };
             }
@@ -179,8 +175,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
     const handleAddNewSection = () => {
         const newSection: ContentSection = {
             id: `section-${Date.now()}`,
-            // FIX: Add guard for possibly undefined contentSections array to prevent crash.
-            order: (formData.contentSections ?? []).length,
+            order: formData.contentSections.length,
             isVisible: true,
             imageUrl: '',
             isTagVisible: true,
@@ -190,57 +185,46 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
             description: '',
             list: []
         };
-        // FIX: Add guard for possibly undefined contentSections array to prevent crash on spread.
-        setFormData({ ...formData, contentSections: [...(formData.contentSections ?? []), newSection] });
+        setFormData({ ...formData, contentSections: [...formData.contentSections, newSection] });
     };
 
     const handleDeleteSection = (id: string) => {
         if (window.confirm('Tem certeza que deseja excluir esta seção?')) {
-            // FIX: Add guard for possibly undefined contentSections array to prevent crash.
-            setFormData({ ...formData, contentSections: (formData.contentSections ?? []).filter(s => s.id !== id) });
+            setFormData({ ...formData, contentSections: formData.contentSections.filter(s => s.id !== id) });
         }
     };
     
     const handleSectionDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
-        // FIX: Add guard for possibly undefined contentSections array to prevent crash.
-        const sections = formData.contentSections ?? [];
         if (over && active.id !== over.id) {
-            const oldIndex = sections.findIndex(s => s.id === active.id);
-            const newIndex = sections.findIndex(s => s.id === over.id);
-            if (oldIndex === -1 || newIndex === -1) return;
-            const reorderedSections = arrayMove(sections, oldIndex, newIndex);
+            const oldIndex = formData.contentSections.findIndex(s => s.id === active.id);
+            const newIndex = formData.contentSections.findIndex(s => s.id === over.id);
+            const reorderedSections = arrayMove(formData.contentSections, oldIndex, newIndex);
             setFormData({ ...formData, contentSections: reorderedSections.map((s, i) => ({...s, order: i})) });
         }
     };
 
     // --- Footer Link Handlers ---
     const handleFooterLinkChange = (id: string, field: keyof Omit<FooterLink, 'id'>, value: string | boolean) => {
-        // FIX: Add guard for possibly undefined footerLinks array to prevent crash.
-        const newLinks = (formData.footerLinks ?? []).map(link => link.id === id ? { ...link, [field]: value } : link);
+        const newLinks = formData.footerLinks.map(link => link.id === id ? { ...link, [field]: value } : link);
         setFormData({ ...formData, footerLinks: newLinks });
     };
 
     const handleAddFooterLink = () => {
         const newLink: FooterLink = { id: `footer-${Date.now()}`, icon: 'fas fa-link', text: 'Novo Link', url: '#', isVisible: true };
-        // FIX: Add guard for possibly undefined footerLinks array to prevent crash on spread.
-        setFormData({ ...formData, footerLinks: [...(formData.footerLinks ?? []), newLink] });
+        setFormData({ ...formData, footerLinks: [...formData.footerLinks, newLink] });
     };
 
     const handleRemoveFooterLink = (id: string) => {
-        // FIX: Add guard for possibly undefined footerLinks array to prevent crash.
-        setFormData({ ...formData, footerLinks: (formData.footerLinks ?? []).filter(l => l.id !== id) });
+        setFormData({ ...formData, footerLinks: formData.footerLinks.filter(l => l.id !== id) });
     };
 
     const handleFooterLinkDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
-        // FIX: Add guard for possibly undefined footerLinks array to prevent crash.
-        const links = formData.footerLinks ?? [];
         if (over && active.id !== over.id) {
-            const oldIndex = links.findIndex(l => l.id === active.id);
-            const newIndex = links.findIndex(l => l.id === over.id);
-            if (oldIndex === -1 || newIndex === -1) return;
-            setFormData({ ...formData, footerLinks: arrayMove(links, oldIndex, newIndex) });
+            const oldIndex = formData.footerLinks.findIndex(l => l.id === active.id);
+            const newIndex = formData.footerLinks.findIndex(l => l.id === over.id);
+            setFormData({ ...formData, footerLinks: arrayMove(formData.footerLinks, oldIndex, newIndex) });
         }
     };
 
@@ -287,9 +271,9 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                 <div className="p-4 border rounded-lg bg-gray-50/50">
                     <h3 className="text-lg font-bold mb-4 pb-2 border-b">Seções de Conteúdo da Página</h3>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
-                        <SortableContext items={(formData.contentSections ?? []).map(s => s.id)} strategy={verticalListSortingStrategy}>
+                        <SortableContext items={formData.contentSections.map(s => s.id)} strategy={verticalListSortingStrategy}>
                             <div className="space-y-3">
-                                {(formData.contentSections ?? []).map(section => (
+                                {formData.contentSections.map(section => (
                                     <SortableContentSectionItem 
                                         key={section.id} 
                                         section={section}
@@ -315,9 +299,9 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                  <div className="p-4 border rounded-lg bg-gray-50/50">
                     <h3 className="text-lg font-bold mb-4 pb-2 border-b">Links do Rodapé</h3>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleFooterLinkDragEnd}>
-                        <SortableContext items={(formData.footerLinks ?? []).map(l => l.id)} strategy={verticalListSortingStrategy}>
+                        <SortableContext items={formData.footerLinks.map(l => l.id)} strategy={verticalListSortingStrategy}>
                             <div className="space-y-3">
-                                {(formData.footerLinks ?? []).map(link => (
+                                {formData.footerLinks.map(link => (
                                     <SortableFooterLinkItem 
                                         key={link.id}
                                         link={link}

@@ -9,7 +9,7 @@ interface PixPaymentModalProps {
     onPaymentSuccess: (paidOrder: Order) => void;
 }
 
-const PIX_EXPIRATION_SECONDS = 300; // 5 minutos
+const PIX_EXPIRATION_SECONDS = 300; // 5 minutes
 
 export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose, onPaymentSuccess }) => {
     const [isLoading, setIsLoading] = useState(true);
@@ -20,7 +20,7 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
     const [copySuccess, setCopySuccess] = useState(false);
     const timerRef = useRef<number | null>(null);
 
-    // Efeito para gerar a cobrança PIX quando o modal abre
+    // Effect to generate PIX charge when modal opens
     useEffect(() => {
         if (order) {
             setIsLoading(true);
@@ -40,13 +40,13 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
         }
     }, [order]);
 
-    // Efeito para o cronômetro de contagem regressiva
+    // Effect for countdown timer
     useEffect(() => {
         if (!isLoading && pixData && !isPaid) {
             timerRef.current = window.setInterval(() => {
                 setTimeLeft(prev => {
                     if (prev <= 1) {
-                        if(timerRef.current) clearInterval(timerRef.current);
+                        clearInterval(timerRef.current!);
                         setError("O código PIX expirou. Por favor, feche e tente novamente.");
                         return 0;
                     }
@@ -59,19 +59,19 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
         };
     }, [isLoading, pixData, isPaid]);
 
-    // Efeito para "ouvir" a confirmação de pagamento em tempo real
+    // Effect to listen for payment confirmation in real-time
     useEffect(() => {
         if (!order || !db) return;
 
         const unsubscribe = db.collection('orders').doc(order.id)
             .onSnapshot(doc => {
                 const updatedOrder = doc.data() as Order;
-                if (updatedOrder && updatedOrder.paymentStatus === 'paid_online') {
+                if (updatedOrder && updatedOrder.paymentStatus === 'paid') {
                     setIsPaid(true);
                     if (timerRef.current) clearInterval(timerRef.current);
                     setTimeout(() => {
                         onPaymentSuccess({ ...updatedOrder, id: doc.id });
-                    }, 2500); // Espera um pouco para mostrar a mensagem de sucesso
+                    }, 2500); // Wait a bit to show success message
                 }
             });
 
@@ -117,7 +117,7 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                         <div className="py-12 text-green-600 animate-fade-in-up">
                             <i className="fas fa-check-circle text-6xl mb-4"></i>
                             <p className="text-2xl font-bold">Pagamento Aprovado!</p>
-                            <p className="text-gray-700">Seu pedido foi enviado para a cozinha!</p>
+                            <p className="text-gray-700">Seu pedido será finalizado em instantes...</p>
                         </div>
                     )}
                     {!isLoading && !error && !isPaid && pixData && (

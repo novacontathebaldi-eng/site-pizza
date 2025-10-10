@@ -1,12 +1,9 @@
-// This file defines the core data structures used throughout the application.
-
-// Represents a product in the menu
 export interface Product {
     id: string;
     name: string;
     description: string;
     categoryId: string;
-    prices: { [size: string]: number };
+    prices: { [key: string]: number };
     imageUrl: string;
     badge?: string;
     active: boolean;
@@ -14,7 +11,6 @@ export interface Product {
     stockStatus?: 'available' | 'out_of_stock';
 }
 
-// Represents a category of products
 export interface Category {
     id: string;
     name: string;
@@ -22,9 +18,8 @@ export interface Category {
     active: boolean;
 }
 
-// Represents an item in the shopping cart
 export interface CartItem {
-    id: string; // Unique ID for the cart item instance (e.g., product + size)
+    id: string;
     productId: string;
     name: string;
     size: string;
@@ -32,6 +27,22 @@ export interface CartItem {
     quantity: number;
     imageUrl: string;
 }
+
+export interface OrderDetails {
+    name: string;
+    phone: string;
+    orderType: 'delivery' | 'pickup' | 'local';
+    address: string;
+    paymentMethod: 'credit' | 'debit' | 'pix' | 'cash';
+    changeNeeded: boolean;
+    changeAmount?: string;
+    notes: string;
+    reservationTime?: string; // Added for dine-in
+}
+
+// New Types for Order Management
+export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted' | 'awaiting-payment';
+export type PaymentStatus = 'pending' | 'paid' | 'paid_online' | 'refunded';
 
 export interface OrderCustomerDetails {
     name: string;
@@ -41,52 +52,35 @@ export interface OrderCustomerDetails {
     reservationTime?: string;
 }
 
-
-// Expanded PaymentStatus to include online-specific statuses
-export type PaymentStatus = 'pending' | 'paid' | 'paid_online' | 'refunded' | 'partially_refunded' | 'failed';
-
-// Expanded OrderStatus to include a state for waiting on online payment
-// FIX: Added 'preparing' and 'delivering' to OrderStatus to align with usage in OrderCard.tsx.
-export type OrderStatus = 'awaiting-payment' | 'pending' | 'preparing' | 'delivering' | 'accepted' | 'reserved' | 'ready' | 'completed' | 'cancelled' | 'deleted';
-
-
-// Represents a customer order with added fields for payment gateway integration
 export interface Order {
     id: string;
     customer: OrderCustomerDetails;
     items: CartItem[];
     total: number;
-    paymentMethod: 'pix' | 'credit' | 'debit' | 'cash';
-    status: OrderStatus;
-    paymentStatus: PaymentStatus;
-    createdAt: any; // Firestore Timestamp
-
-    notes?: string;
+    paymentMethod: 'credit' | 'debit' | 'pix' | 'cash';
     changeNeeded?: boolean;
     changeAmount?: string;
-    pickupTimeEstimate?: string;
-
-    // Mercado Pago specific fields
-    mercadoPagoOrderId?: string;
-    mercadoPagoPaymentId?: string;
-    refunds?: {
-        id: string; // MP Refund ID
-        amount: number;
-        date: any; // Firestore Timestamp
-    }[];
+    notes?: string;
+    status: OrderStatus;
+    paymentStatus: PaymentStatus; // New field for payment status
+    createdAt: any; // Firestore Timestamp
+    pickupTimeEstimate?: string; // Added for pickup
+    mercadoPagoOrderId?: string; // To store the Mercado Pago order ID
+    mercadoPagoDetails?: {
+        paymentId: string; // The payment transaction ID from within the MP Order
+        transactionId?: string | null; // The acquirer's transaction ID
+    };
 }
 
 
-// Represents a list item within a dynamic content section
 export interface ContentSectionListItem {
     id: string;
     icon: string;
     text: string;
 }
 
-// Represents a dynamic, editable content section on the website
 export interface ContentSection {
-    id:string;
+    id: string;
     order: number;
     isVisible: boolean;
     imageUrl: string;
@@ -98,7 +92,6 @@ export interface ContentSection {
     list: ContentSectionListItem[];
 }
 
-// Represents a link in the website footer
 export interface FooterLink {
     id: string;
     icon: string;
@@ -107,7 +100,6 @@ export interface FooterLink {
     isVisible?: boolean;
 }
 
-// Represents the global settings for the website
 export interface SiteSettings {
     logoUrl: string;
     heroSlogan: string;
@@ -116,10 +108,4 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
-}
-
-// Represents the store's operational status
-export interface StoreStatus {
-    isOpen: boolean;
-    message?: string;
 }
