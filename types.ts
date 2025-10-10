@@ -1,9 +1,12 @@
+// This file defines the core data structures used throughout the application.
+
+// Represents a product in the menu
 export interface Product {
     id: string;
     name: string;
     description: string;
     categoryId: string;
-    prices: { [key: string]: number };
+    prices: { [size: string]: number };
     imageUrl: string;
     badge?: string;
     active: boolean;
@@ -11,6 +14,7 @@ export interface Product {
     stockStatus?: 'available' | 'out_of_stock';
 }
 
+// Represents a category of products
 export interface Category {
     id: string;
     name: string;
@@ -18,8 +22,9 @@ export interface Category {
     active: boolean;
 }
 
+// Represents an item in the shopping cart
 export interface CartItem {
-    id: string;
+    id: string; // Unique ID for the cart item instance (e.g., product + size)
     productId: string;
     name: string;
     size: string;
@@ -28,59 +33,31 @@ export interface CartItem {
     imageUrl: string;
 }
 
-export interface OrderDetails {
-    name: string;
-    phone: string;
-    orderType: 'delivery' | 'pickup' | 'local';
-    address: string;
-    paymentMethod: 'credit' | 'debit' | 'pix' | 'cash';
-    changeNeeded: boolean;
-    changeAmount?: string;
-    notes: string;
-    reservationTime?: string; // Added for dine-in
-}
-
-// New Types for Order Management
-export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted' | 'awaiting-payment';
-export type PaymentStatus = 'pending' | 'paid' | 'paid_online';
-
-export interface OrderCustomerDetails {
-    name: string;
-    phone: string;
-    orderType: 'delivery' | 'pickup' | 'local';
-    address?: string;
-    reservationTime?: string;
-}
-
+// Represents a customer order
 export interface Order {
     id: string;
-    customer: OrderCustomerDetails;
+    customerName: string;
+    customerPhone: string;
+    customerAddress: string;
     items: CartItem[];
     total: number;
-    paymentMethod: 'credit' | 'debit' | 'pix' | 'cash';
-    changeNeeded?: boolean;
-    changeAmount?: string;
-    notes?: string;
-    status: OrderStatus;
-    paymentStatus: PaymentStatus; // New field for payment status
+    status: 'pending' | 'preparing' | 'delivering' | 'completed' | 'cancelled';
+    paymentMethod: 'pix' | 'card' | 'cash';
+    paymentStatus: 'pending' | 'paid' | 'failed';
     createdAt: any; // Firestore Timestamp
-    pickupTimeEstimate?: string; // Added for pickup
-    mercadoPagoPaymentId?: string; // To store the Mercado Pago payment ID
-    mercadoPagoDetails?: {
-        paymentId: string;
-        transactionId?: string | null;
-    };
+    notes?: string;
 }
 
-
+// Represents a list item within a dynamic content section
 export interface ContentSectionListItem {
     id: string;
     icon: string;
     text: string;
 }
 
+// Represents a dynamic, editable content section on the website
 export interface ContentSection {
-    id: string;
+    id:string;
     order: number;
     isVisible: boolean;
     imageUrl: string;
@@ -92,6 +69,7 @@ export interface ContentSection {
     list: ContentSectionListItem[];
 }
 
+// Represents a link in the website footer
 export interface FooterLink {
     id: string;
     icon: string;
@@ -100,6 +78,7 @@ export interface FooterLink {
     isVisible?: boolean;
 }
 
+// Represents the global settings for the website
 export interface SiteSettings {
     logoUrl: string;
     heroSlogan: string;
@@ -108,4 +87,10 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
+}
+
+// Represents the store's operational status
+export interface StoreStatus {
+    isOpen: boolean;
+    message?: string;
 }
