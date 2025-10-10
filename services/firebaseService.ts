@@ -174,7 +174,9 @@ export const initiateMercadoPagoPixPayment = async (orderId: string): Promise<an
         return result.data;
     } catch (error) {
         console.error("Error calling createMercadoPagoOrder function:", error);
-        throw new Error(`Não foi possível gerar a cobrança PIX. Detalhe: ${(error as Error).message}`);
+        // Extract the more detailed error message from HttpsError
+        const detail = (error as any)?.details || (error as Error).message;
+        throw new Error(`Não foi possível gerar a cobrança PIX. Detalhe: ${detail}`);
     }
 };
 
