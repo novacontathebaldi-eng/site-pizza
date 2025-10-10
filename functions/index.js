@@ -7,11 +7,9 @@ const admin = require("firebase-admin");
 const axios = require("axios");
 const crypto = require("crypto");
 
-// Define parameters for environment variables.
-// These will be loaded from the .env file during deployment.
+// Define parameters for environment variables from .env file
 const MERCADO_PAGO_ACCESS_TOKEN = defineString("MERCADO_PAGO_ACCESS_TOKEN");
 const MERCADO_PAGO_WEBHOOK_SECRET = defineString("MERCADO_PAGO_WEBHOOK_SECRET");
-
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -24,20 +22,24 @@ const mercadoPagoApi = axios.create({
   },
 });
 
-// Add an interceptor to inject the access token into every request
+// Interceptor to inject the access token into every request
 mercadoPagoApi.interceptors.request.use((config) => {
-  config.headers.Authorization = `Bearer ${MERCADO_PAGO_ACCESS_TOKEN.value()}`;
+  const token = MERCADO_PAGO_ACCESS_TOKEN.value();
+  if (!token) {
+    logger.error("MERCADO_PAGO_ACCESS_TOKEN not configured.");
+    throw new HttpsError("failed-precondition", "A chave de acesso do gateway de pagamento não está configurada.");
+  }
+  config.headers.Authorization = `Bearer ${token}`;
   return config;
 }, (error) => {
   return Promise.reject(error);
 });
 
-
 /**
- * Creates a Mercado Pago Order for PIX payment using the modern v1/orders endpoint.
+ * Creates a Mercado Pago Order for PIX payment.
  */
 exports.createMercadoPagoOrder = onCall(async (request) => {
-  const orderId = request.data.orderId;
+  const {orderId} = request.data;
   if (!orderId) {
     logger.error("Request missing orderId.");
     throw new HttpsError("invalid-argument", "O ID do pedido é obrigatório.");
@@ -51,34 +53,36 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
     }
     const orderData = orderDoc.data();
 
-    const notificationUrl = `https://mercadopagowebhook-lxwiyf7dla-uc.a.run.app`;
+    // Ensure total is a number before using toFixed
+    const totalAmount = typeof orderData.total === "number" ? orderData.total : parseFloat(orderData.total);
+    if (isNaN(totalAmount)) {
+       throw new HttpsError("invalid-argument", "O valor total do pedido é inválido.");
+    }
 
     const orderPayload = {
-      type: "online", // Required field for online payments
+      type: "online",
       external_reference: orderId,
-      title: "Pedido na Pizzaria Santa Sensação",
       description: `Pedido #${orderId.substring(0, 8)} - ${orderData.customer.name}`,
-      notification_url: notificationUrl,
-      total_amount: orderData.total, // Required top-level field
+      notification_url: "https://mercadopagowebhook-lxwiyf7dla-uc.a.run.app",
+      total_amount: parseFloat(totalAmount.toFixed(2)),
       items: orderData.items.map((item) => ({
         title: `${item.name} (${item.size})`,
-        unit_price: item.price,
+        unit_price: parseFloat(item.price.toFixed(2)),
         quantity: item.quantity,
-        total_amount: item.price * item.quantity,
       })),
       payer: {
-        email: `cliente_${orderId.substring(0, 8)}@santasensacao.me`,
+        email: `test_${Date.now()}@testuser.com`,
         first_name: orderData.customer.name.split(" ")[0],
         last_name: orderData.customer.name.split(" ").slice(1).join(" ") || "Cliente",
-        entity_type: "individual", // Recommended for PIX
       },
-      transactions: { // Corrected structure
+      transactions: {
         payments: [{
-          amount: orderData.total,
+          amount: parseFloat(totalAmount.toFixed(2)),
           payment_method: {
-              id: "pix",
-              type: "bank_transfer",
+            id: "pix",
+            type: "bank_transfer",
           },
+          expiration_time: "PT5M", // 5 minutes expiration
         }],
       },
     };
@@ -86,20 +90,20 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
     const idempotencyKey = crypto.randomBytes(16).toString("hex");
 
     const response = await mercadoPagoApi.post("/v1/orders", orderPayload, {
-      headers: { "X-Idempotency-Key": idempotencyKey },
+      headers: {"X-Idempotency-Key": idempotencyKey},
     });
 
     const mpOrder = response.data;
 
     if (!mpOrder || !mpOrder.id) {
-      logger.error("Invalid response from Mercado Pago when creating order.", { responseData: mpOrder });
+      logger.error("Invalid response from Mercado Pago when creating order.", {responseData: mpOrder});
       throw new HttpsError("internal", "Resposta inválida do gateway de pagamento.");
     }
 
     const pixTransaction = mpOrder.transactions?.payments?.find((p) => p.payment_method?.id === "pix");
     if (!pixTransaction) {
-        logger.error("Mercado Pago response missing PIX payment data.", { responseData: mpOrder });
-        throw new HttpsError("internal", "Dados da transação PIX não encontrados na resposta.");
+      logger.error("Mercado Pago response missing PIX payment data.", {responseData: mpOrder});
+      throw new HttpsError("internal", "Dados da transação PIX não encontrados na resposta.");
     }
 
     const qrCodeBase64 = pixTransaction.payment_method?.qr_code_base64;
@@ -108,7 +112,7 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
     const mercadoPagoPaymentId = pixTransaction.id;
 
     if (!qrCodeBase64 || !copyPaste) {
-      logger.error("Mercado Pago response missing PIX data details.", { responseData: mpOrder });
+      logger.error("Mercado Pago response missing PIX data details.", {responseData: mpOrder});
       throw new HttpsError("internal", "Dados PIX não retornados pelo gateway de pagamento.");
     }
 
@@ -127,12 +131,15 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
     };
   } catch (error) {
     const errorData = error.response?.data;
-    const errorMessage = errorData?.message || error.message;
-    logger.error(`Erro ao criar ordem no Mercado Pago para o pedido ${orderId}:`, errorMessage, { errorData });
-    // Use HttpsError for clearer client-side error handling
-    throw new HttpsError("internal", errorMessage || "Falha ao comunicar com o gateway de pagamento.");
+    const errorMessage = errorData?.message || error.message || "Falha na comunicação com o gateway.";
+    const errorCauses = errorData?.causes?.map((c) => c.description).join(", ") || "Sem detalhes adicionais.";
+    const finalMessage = `${errorMessage} (${errorCauses})`;
+
+    logger.error(`Erro ao criar ordem no Mercado Pago para o pedido ${orderId}:`, finalMessage, {errorData});
+    throw new HttpsError("internal", finalMessage);
   }
 });
+
 
 /**
  * Webhook to receive order status updates from Mercado Pago.
@@ -179,23 +186,25 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
 
     const manifest = `id:${dataId.toLowerCase()};request-id:${requestId};ts:${ts};`;
     const secret = MERCADO_PAGO_WEBHOOK_SECRET.value();
+    if (!secret) {
+      logger.error("Falha na validação do Webhook: A chave secreta não está configurada.");
+      response.status(500).send("Internal Server Error: Webhook secret not configured.");
+      return;
+    }
 
     const hmac = crypto.createHmac("sha256", secret);
     hmac.update(manifest);
     const calculatedSignature = hmac.digest("hex");
 
-    if (crypto.timingSafeEqual(Buffer.from(calculatedSignature), Buffer.from(hash))) {
-      logger.info(`Assinatura do webhook para a ordem ${dataId} validada com sucesso.`);
-    } else {
+    if (!crypto.timingSafeEqual(Buffer.from(calculatedSignature), Buffer.from(hash))) {
       logger.error("Falha na validação do Webhook: Assinatura inválida.");
       response.status(400).send("Bad Request: Invalid signature");
       return;
     }
 
-    // Respond immediately to Mercado Pago before processing
+    logger.info(`Assinatura do webhook para a ordem ${dataId} validada com sucesso.`);
     response.status(200).send("OK");
 
-    // Process the notification after responding
     const mercadoPagoOrderId = dataId;
     const {data: mpOrder} = await mercadoPagoApi.get(`/v1/orders/${mercadoPagoOrderId}`);
 
@@ -238,9 +247,9 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
   } catch (error) {
     const errorMessage = error.response?.data?.message || error.message;
     logger.error("Erro ao processar webhook:", errorMessage, error.response?.data || error);
-    // Do not send error response here as we've already sent 200 OK
   }
 });
+
 
 /**
  * Cancels a Mercado Pago Order that has not been processed yet.
