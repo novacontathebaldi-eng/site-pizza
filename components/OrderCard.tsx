@@ -1,19 +1,30 @@
 import React, { useState } from 'react';
-import { Order } from '../types';
+import { Order, OrderStatus, PaymentStatus } from '../types';
 import * as firebaseService from '../services/firebaseService';
 import { ContactModal } from './ContactModal';
 
 interface OrderCardProps {
     order: Order;
+    onUpdateStatus: (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => Promise<void>;
+    onUpdatePaymentStatus: (orderId: string, paymentStatus: PaymentStatus) => Promise<void>;
+    onUpdateReservationTime: (orderId: string, reservationTime: string) => Promise<void>;
+    onDelete: (orderId: string) => Promise<void>;
+    onPermanentDelete: (orderId: string) => Promise<void>;
 }
 
-const statusConfig = {
+const statusConfig: { [key: string]: { label: string; color: string; icon: string } } = {
     pending: { label: 'Pendente', color: 'bg-yellow-500', icon: 'fas fa-clock' },
     preparing: { label: 'Preparando', color: 'bg-blue-500', icon: 'fas fa-blender' },
     delivering: { label: 'Em Entrega', color: 'bg-purple-500', icon: 'fas fa-motorcycle' },
     completed: { label: 'Concluído', color: 'bg-green-500', icon: 'fas fa-check-circle' },
     cancelled: { label: 'Cancelado', color: 'bg-red-500', icon: 'fas fa-times-circle' },
+    accepted: { label: 'Aceito', color: 'bg-indigo-500', icon: 'fas fa-check' },
+    reserved: { label: 'Reserva', color: 'bg-teal-500', icon: 'fas fa-calendar-check' },
+    ready: { label: 'Pronto', color: 'bg-orange-500', icon: 'fas fa-box-open' },
+    deleted: { label: 'Na Lixeira', color: 'bg-gray-500', icon: 'fas fa-trash-alt' },
+    'awaiting-payment': { label: 'Aguardando Pag.', color: 'bg-yellow-600', icon: 'fas fa-hourglass-half' },
 };
+
 
 // FIX: Added all possible `OrderStatus` keys to satisfy the type `{ [key in Order['status']]: Order['status'] | null }`.
 const nextStatus: { [key in Order['status']]: Order['status'] | null } = {
@@ -30,7 +41,7 @@ const nextStatus: { [key in Order['status']]: Order['status'] | null } = {
     deleted: null,
 };
 
-export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
+export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
     const [isContactModalOpen, setIsContactModalOpen] = useState(false);
@@ -45,7 +56,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
         
         setIsUpdating(true);
         try {
-            await firebaseService.updateOrderStatus(order.id, next);
+            await onUpdateStatus(order.id, next);
         } catch (error) {
             console.error("Failed to update status", error);
             alert("Falha ao atualizar status do pedido.");
@@ -60,7 +71,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
         if (window.confirm("Tem certeza que deseja cancelar este pedido?")) {
             setIsUpdating(true);
             try {
-                await firebaseService.updateOrderStatus(order.id, 'cancelled');
+                await onUpdateStatus(order.id, 'cancelled');
             } catch (error) {
                 console.error("Failed to cancel order", error);
                 alert("Falha ao cancelar o pedido.");

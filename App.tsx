@@ -12,7 +12,9 @@ import { PixPaymentModal } from './components/PixPaymentModal';
 import { PaymentFailureModal } from './components/PaymentFailureModal';
 import { SupportModal } from './components/SupportModal';
 import * as firebaseService from './services/firebaseService';
-import { Product, Category, SiteSettings, StoreStatus, CartItem, Order } from './types';
+import { Product, Category, SiteSettings, StoreStatus, CartItem, Order, OrderStatus, PaymentStatus } from './types';
+import { seedDatabase } from './services/seed';
+
 
 // Default settings to avoid rendering errors while loading
 const defaultSettings: SiteSettings = {
@@ -29,9 +31,11 @@ function App() {
     // --- Data State ---
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [allCategories, setAllCategories] = useState<Category[]>([]);
     const [settings, setSettings] = useState<SiteSettings>(defaultSettings);
     const [storeStatus, setStoreStatus] = useState<StoreStatus>({ isOpen: true });
     const [isLoading, setIsLoading] = useState(true);
+    const [orders, setOrders] = useState<Order[]>([]);
 
     // --- UI State ---
     const [isCartOpen, setIsCartOpen] = useState(false);
@@ -70,32 +74,39 @@ function App() {
         };
     }, []);
 
+    const refreshData = useCallback(async () => {
+        try {
+            const settingsData = await firebaseService.getSiteSettings();
+            if (settingsData) {
+                setSettings(settingsData);
+            }
+            const { products, categories, storeStatus } = await firebaseService.getProductsAndCategories();
+            setProducts(products);
+            setAllCategories(categories);
+            
+            const activeSortedCategories = categories.filter(c => c.active).sort((a,b) => a.order - b.order);
+            setCategories(activeSortedCategories);
+            
+            setStoreStatus(storeStatus);
+            if (activeSortedCategories.length > 0) {
+                setActiveCategoryId(prev => prev || activeSortedCategories[0].id);
+            }
+        } catch (error) {
+            console.error("Failed to fetch initial data:", error);
+        }
+    }, []);
+
     // Initial data fetching
     useEffect(() => {
         const fetchData = async () => {
-            try {
-                const settingsData = await firebaseService.getSiteSettings();
-                if (settingsData) {
-                    setSettings(settingsData);
-                }
-                const { products, categories, storeStatus } = await firebaseService.getProductsAndCategories();
-                setProducts(products);
-                
-                const activeSortedCategories = categories.filter(c => c.active).sort((a,b) => a.order - b.order);
-                setCategories(activeSortedCategories);
-                
-                setStoreStatus(storeStatus);
-                if (activeSortedCategories.length > 0) {
-                    setActiveCategoryId(activeSortedCategories[0].id);
-                }
-            } catch (error) {
-                console.error("Failed to fetch initial data:", error);
-            } finally {
-                setIsLoading(false);
-            }
+            setIsLoading(true);
+            await refreshData();
+            setIsLoading(false);
         };
 
         fetchData();
+
+        const unsubscribeOrders = firebaseService.onOrdersUpdate(setOrders);
         
         // Load cart from local storage
         try {
@@ -106,7 +117,11 @@ function App() {
         } catch (error) {
             console.error("Failed to load cart from localStorage", error);
         }
-    }, []);
+
+        return () => {
+            unsubscribeOrders();
+        };
+    }, [refreshData]);
 
     // Persist cart to local storage
     useEffect(() => {
@@ -277,15 +292,167 @@ function App() {
         [settings.contentSections]
     );
 
+    // --- ADMIN HANDLERS ---
+    const handleSaveProduct = async (product: Product) => {
+        const { id, ...data } = product;
+        if (id) {
+            await firebaseService.updateProduct(product);
+        } else {
+            await firebaseService.addProduct(data);
+        }
+        await refreshData();
+    };
+
+    const handleDeleteProduct = async (productId: string) => {
+        await firebaseService.deleteProduct(productId);
+        await refreshData();
+    };
+
+    const handleProductStatusChange = async (productId: string, active: boolean) => {
+        const product = products.find(p => p.id === productId);
+        if (product) {
+            await firebaseService.updateProduct({ ...product, active });
+            await refreshData();
+        }
+    };
+
+    const handleProductStockStatusChange = async (productId: string, stockStatus: 'available' | 'out_of_stock') => {
+        const product = products.find(p => p.id === productId);
+        if (product) {
+            await firebaseService.updateProduct({ ...product, stockStatus });
+            await refreshData();
+        }
+    };
+
+    const handleStoreStatusChange = async (isOnline: boolean) => {
+        await firebaseService.updateStoreStatus({ isOpen: isOnline });
+        await refreshData();
+    };
+
+    const handleSaveCategory = async (category: Category) => {
+        const { id, ...data } = category;
+        if (id) {
+            await firebaseService.updateCategory(category);
+        } else {
+            await firebaseService.addCategory({ ...data, order: allCategories.length, active: true });
+        }
+        await refreshData();
+    };
+
+    const handleDeleteCategory = async (categoryId: string) => {
+        await firebaseService.deleteCategory(categoryId);
+        await refreshData();
+    };
+
+    const handleCategoryStatusChange = async (categoryId: string, active: boolean) => {
+        const category = allCategories.find(c => c.id === categoryId);
+        if (category) {
+            await firebaseService.updateCategory({ ...category, active });
+            await refreshData();
+        }
+    };
+
+    const handleReorderProducts = async (productsToUpdate: { id: string; orderIndex: number }[]) => {
+        const promises = productsToUpdate.map(p => {
+            const product = products.find(prod => prod.id === p.id);
+            if (product) {
+                return firebaseService.updateProduct({ ...product, orderIndex: p.orderIndex });
+            }
+            return Promise.resolve();
+        });
+        await Promise.all(promises);
+        await refreshData();
+    };
+    
+    const handleReorderCategories = async (categoriesToUpdate: { id: string; order: number }[]) => {
+        await firebaseService.updateCategoriesOrder(categoriesToUpdate);
+        await refreshData();
+    };
+
+    const handleSeedDatabase = async () => {
+        await seedDatabase();
+        await refreshData();
+    };
+
+    const handleSaveSiteSettings = async (settings: SiteSettings, files: { [key: string]: File | null }) => {
+        const newSettings = { ...settings };
+        setIsLoading(true);
+        try {
+            for (const key in files) {
+                if (files[key]) {
+                    const url = await firebaseService.uploadImage(files[key] as File);
+                    if (key === 'logo') newSettings.logoUrl = url;
+                    else if (key === 'heroBg') newSettings.heroBgUrl = url;
+                    else {
+                        const section = newSettings.contentSections.find(s => s.id === key);
+                        if (section) section.imageUrl = url;
+                    }
+                }
+            }
+            await firebaseService.updateSiteSettings(newSettings);
+            await refreshData();
+        } catch (error) {
+            console.error("Failed to save site settings:", error);
+            alert("Falha ao salvar as configurações.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    const handleUpdateOrderStatus = async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => {
+        await firebaseService.updateOrderStatus(orderId, status);
+    };
+
+    const handleUpdateOrderPaymentStatus = async (orderId: string, paymentStatus: PaymentStatus) => {
+        await firebaseService.updateOrderPaymentStatus(orderId, paymentStatus);
+    };
+
+    const handleUpdateOrderReservationTime = async (orderId: string, reservationTime: string) => {
+        console.warn("Update reservation time not implemented in firebaseService");
+    };
+
+    const handleDeleteOrder = async (orderId: string) => {
+        await firebaseService.updateOrderStatus(orderId, 'deleted');
+    };
+
+    const handlePermanentDeleteOrder = async (orderId: string) => {
+        console.warn("Permanent delete order not implemented in firebaseService");
+    };
+
+
     if (isLoading) {
         return <div className="fixed inset-0 flex items-center justify-center bg-gray-100 text-lg font-semibold">Carregando...</div>;
     }
 
     if (isAdminOpen) {
-        return <AdminSection onExit={() => {
-            window.location.hash = ''; // Use hash to avoid reload
-            setIsAdminOpen(false);
-        }} />;
+        return <AdminSection 
+            allProducts={products}
+            allCategories={allCategories}
+            isStoreOnline={storeStatus.isOpen}
+            siteSettings={settings}
+            orders={orders}
+            onSaveProduct={handleSaveProduct}
+            onDeleteProduct={handleDeleteProduct}
+            onProductStatusChange={handleProductStatusChange}
+            onProductStockStatusChange={handleProductStockStatusChange}
+            onStoreStatusChange={handleStoreStatusChange}
+            onSaveCategory={handleSaveCategory}
+            onDeleteCategory={handleDeleteCategory}
+            onCategoryStatusChange={handleCategoryStatusChange}
+            onReorderProducts={handleReorderProducts}
+            onReorderCategories={handleReorderCategories}
+            onSeedDatabase={handleSeedDatabase}
+            onSaveSiteSettings={handleSaveSiteSettings}
+            onUpdateOrderStatus={handleUpdateOrderStatus}
+            onUpdateOrderPaymentStatus={handleUpdateOrderPaymentStatus}
+            onUpdateOrderReservationTime={handleUpdateOrderReservationTime}
+            onDeleteOrder={handleDeleteOrder}
+            onPermanentDeleteOrder={handlePermanentDeleteOrder}
+            onExit={() => {
+                window.location.hash = ''; // Use hash to avoid reload
+                setIsAdminOpen(false);
+             }} 
+        />;
     }
 
     return (
