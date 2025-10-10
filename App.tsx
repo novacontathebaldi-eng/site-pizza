@@ -1,115 +1,83 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { AdminSection } from './components/AdminSection';
+import { CartSidebar } from './components/CartSidebar';
+import { CheckoutModal } from './components/CheckoutModal';
+import { ContactSection } from './components/ContactSection';
+import { DynamicContentSection } from './components/DynamicContentSection';
+import { Footer } from './components/Footer';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
-import { ContactSection } from './components/ContactSection';
-import { Footer } from './components/Footer';
-import { CartSidebar } from './components/CartSidebar';
-import { CheckoutModal } from './components/CheckoutModal';
-import { AdminSection } from './components/AdminSection';
-import { DynamicContentSection } from './components/DynamicContentSection';
 import { PixPaymentModal } from './components/PixPaymentModal';
 import { PaymentFailureModal } from './components/PaymentFailureModal';
-import { SiteSettings, Product, Category, CartItem, StoreStatus, Order, OrderStatus, PaymentStatus, OrderCustomerDetails } from './types';
+import { SupportModal } from './components/SupportModal';
 import * as firebaseService from './services/firebaseService';
+import { Product, Category, SiteSettings, StoreStatus, CartItem, Order } from './types';
 
-interface Toast {
-    id: number;
-    message: string;
-    type: 'success' | 'error';
-}
-
-const generateWhatsAppMessage = (details: any, currentCart: CartItem[], total: number, isPaid: boolean) => {
-    const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumir no local' };
-    const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
-
-    let message = `*🍕 NOVO PEDIDO - PIZZARIA SANTA SENSAÇÃO 🍕*\n\n`;
-    if (isPaid) {
-        message += `*✅ JÁ PAGO VIA PIX PELO SITE*\n\n`;
-    }
-    message += `*👤 DADOS DO CLIENTE:*\n`;
-    message += `*Nome:* ${details.name}\n`;
-    message += `*Telefone:* ${details.phone}\n`;
-    message += `*Tipo de Pedido:* ${orderTypeMap[details.orderType]}\n`;
-    if (details.orderType === 'delivery') {
-        message += `*Endereço:* ${details.address}\n`;
-    }
-    if (details.orderType === 'local' && details.reservationTime) {
-        message += `*Horário da Reserva:* ${details.reservationTime}\n`;
-    }
-    message += `\n*🛒 ITENS DO PEDIDO:*\n`;
-    currentCart.forEach(item => {
-        message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2).replace('.', ',')}\n`;
-    });
-    message += `\n*💰 TOTAL: R$ ${total.toFixed(2).replace('.', ',')}*\n\n`;
-    message += `*💳 PAGAMENTO:*\n`;
-    message += `*Forma:* ${paymentMethodMap[details.paymentMethod]}\n`;
-    if (!isPaid && details.paymentMethod === 'cash') {
-        if (details.changeNeeded) {
-            message += `*Precisa de troco para:* R$ ${details.changeAmount}\n`;
-        } else {
-            message += `*Não precisa de troco.*\n`;
-        }
-    }
-    if (details.notes) {
-        message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
-    }
-    message += `\n_Pedido gerado pelo nosso site._`;
-    return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
+// Default settings to avoid rendering errors while loading
+const defaultSettings: SiteSettings = {
+    logoUrl: '',
+    heroSlogan: '',
+    heroTitle: '',
+    heroSubtitle: '',
+    heroBgUrl: '',
+    contentSections: [],
+    footerLinks: [],
 };
 
-
-const App: React.FC = () => {
-    // Data State
-    const [settings, setSettings] = useState<SiteSettings | null>(null);
+function App() {
+    // --- Data State ---
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [settings, setSettings] = useState<SiteSettings>(defaultSettings);
     const [storeStatus, setStoreStatus] = useState<StoreStatus>({ isOpen: true });
-    
-    // UI State
     const [isLoading, setIsLoading] = useState(true);
+
+    // --- UI State ---
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+    const [isPixModalOpen, setIsPixModalOpen] = useState(false);
+    const [isPaymentFailureOpen, setIsPaymentFailureOpen] = useState(false);
+    const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+    const [isAdminOpen, setIsAdminOpen] = useState(false);
     const [activeSection, setActiveSection] = useState('Início');
-    const [activeCategoryId, setActiveCategoryId] = useState('');
-    const [isAdminVisible, setIsAdminVisible] = useState(false);
-    
-    // Cart State
+    const [showSuccessToast, setShowSuccessToast] = useState(false);
+    const [successToastMessage, setSuccessToastMessage] = useState('');
+
+    // --- Cart & Order State ---
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
-    const cartItemCount = useMemo(() => cartItems.reduce((sum, item) => sum + item.quantity, 0), [cartItems]);
-    
-    // Menu navigation state
+    const [orderForPixPayment, setOrderForPixPayment] = useState<Order | null>(null);
+    const [lastCheckoutDetails, setLastCheckoutDetails] = useState<any>(null);
+
+    // --- Menu Navigation State ---
+    const [activeCategoryId, setActiveCategoryId] = useState('');
     const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState(false);
-
-    // PIX Payment Flow State
-    const [payingOrder, setPayingOrder] = useState<Order | null>(null);
-    const [isPixModalOpen, setIsPixModalOpen] = useState(false);
-    const [isPaymentFailureModalOpen, setIsPaymentFailureModalOpen] = useState(false);
     
-    // Toasts
-    const [toasts, setToasts] = useState<Toast[]>([]);
-    const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
-        const id = Date.now();
-        setToasts(prev => [...prev, { id, message, type }]);
-        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+    // Check for admin route
+    useEffect(() => {
+        if (window.location.pathname.startsWith('/admin')) {
+            setIsAdminOpen(true);
+        }
     }, []);
 
-    // Initial data load
+    // Initial data fetching
     useEffect(() => {
         const fetchData = async () => {
             try {
                 const settingsData = await firebaseService.getSiteSettings();
-                const { products: productsData, categories: categoriesData, storeStatus: statusData } = await firebaseService.getProductsAndCategories();
+                if (settingsData) {
+                    setSettings(settingsData);
+                }
+                const { products, categories, storeStatus } = await firebaseService.getProductsAndCategories();
+                setProducts(products);
                 
-                if (settingsData) setSettings(settingsData);
-                setProducts(productsData);
-                setCategories(categoriesData);
-                setStoreStatus(statusData);
-
-                if (categoriesData.length > 0) {
-                    const sortedActive = categoriesData.filter(c => c.active).sort((a,b) => a.order - b.order);
-                    if (sortedActive.length > 0) setActiveCategoryId(sortedActive[0].id);
+                const activeSortedCategories = categories.filter(c => c.active).sort((a,b) => a.order - b.order);
+                setCategories(activeSortedCategories);
+                
+                setStoreStatus(storeStatus);
+                if (activeSortedCategories.length > 0) {
+                    setActiveCategoryId(activeSortedCategories[0].id);
                 }
             } catch (error) {
                 console.error("Failed to fetch initial data:", error);
@@ -117,143 +85,203 @@ const App: React.FC = () => {
                 setIsLoading(false);
             }
         };
+
         fetchData();
+        
+        // Load cart from local storage
+        try {
+            const storedCart = localStorage.getItem('cartItems');
+            if (storedCart) {
+                setCartItems(JSON.parse(storedCart));
+            }
+        } catch (error) {
+            console.error("Failed to load cart from localStorage", error);
+        }
     }, []);
-    
-    const handleOrderPlaced = () => {
-        setCartItems([]);
-        setIsCheckoutOpen(false);
-    };
 
-    // --- PIX PAYMENT FLOW HANDLERS ---
-    const handleInitiatePixPayment = async (details: any) => {
-        setIsCheckoutOpen(false);
-        const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        
-        const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
-            customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.address, reservationTime: details.reservationTime },
-            items: cartItems,
-            total,
-            paymentMethod: 'pix',
-            status: 'awaiting-payment',
-            paymentStatus: 'pending',
-            notes: details.notes,
-            changeNeeded: false
-        };
-
+    // Persist cart to local storage
+    useEffect(() => {
         try {
-            const docRef = await firebaseService.addOrder(newOrderData);
-            const createdOrder: Order = { ...newOrderData, id: docRef.id, createdAt: new Date() };
-            setPayingOrder(createdOrder);
-            setIsPixModalOpen(true);
+            localStorage.setItem('cartItems', JSON.stringify(cartItems));
         } catch (error) {
-            console.error("Failed to pre-save order for PIX:", error);
-            addToast("Erro ao iniciar pagamento. Tente novamente.", 'error');
+            console.error("Failed to save cart to localStorage", error);
         }
-    };
-
-    const handlePixPaymentSuccess = useCallback((paidOrder: Order) => {
-        addToast("Pagamento confirmado! Seu pedido foi enviado.", 'success');
-        
-        const details = {
-            name: paidOrder.customer.name,
-            phone: paidOrder.customer.phone,
-            orderType: paidOrder.customer.orderType,
-            address: paidOrder.customer.address || '',
-            paymentMethod: 'pix',
-            notes: paidOrder.notes || '',
-        };
-        const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, true);
-        window.open(whatsappUrl, '_blank');
-        
-        setCartItems([]);
-        setIsPixModalOpen(false);
-        setPayingOrder(null);
-    }, [addToast]);
-
-    const handleClosePixModal = () => {
-        if (payingOrder) {
-            setIsPaymentFailureModalOpen(true);
-        }
-        setIsPixModalOpen(false);
-    };
+    }, [cartItems]);
     
-    const handlePayLaterFromFailure = async () => {
-        if (!payingOrder) return;
+    // Scrollspy for active header section
+    useEffect(() => {
+        const sections = document.querySelectorAll('section[id]');
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.id;
+                    let name = 'Início';
+                    if (id === 'cardapio') name = 'Cardápio';
+                    else if (id.startsWith('content-') || id === 'sobre') name = 'Sobre Nós';
+                    else if (id === 'contato') name = 'Contato';
+                    setActiveSection(name);
+                }
+            });
+        }, { rootMargin: '-50% 0px -50% 0px' });
         
-        await firebaseService.updateOrderStatus(payingOrder.id, 'pending');
-        
-        const details = { ...payingOrder.customer, paymentMethod: 'pix' };
-        const whatsappUrl = generateWhatsAppMessage(details, payingOrder.items, payingOrder.total, false);
-        window.open(whatsappUrl, '_blank');
-        
-        addToast("Pedido enviado! O pagamento será feito na entrega.", 'success');
-        
-        setCartItems([]);
-        setIsPaymentFailureModalOpen(false);
-        setPayingOrder(null);
+        sections.forEach(section => observer.observe(section));
+        return () => sections.forEach(section => observer.unobserve(section));
+    }, [isLoading]); // Rerun when sections are rendered
+
+    const showToast = (message: string) => {
+        setSuccessToastMessage(message);
+        setShowSuccessToast(true);
+        setTimeout(() => {
+            setShowSuccessToast(false);
+        }, 3000);
     };
 
-    // --- DEFAULT CHECKOUT HANDLER ---
-    const handleConfirmCheckout = async (details: any) => {
-        const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
-        const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
-            customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.address, reservationTime: details.reservationTime },
-            items: cartItems,
-            total,
-            paymentMethod: details.paymentMethod,
-            status: 'pending',
-            paymentStatus: 'pending',
-            notes: details.notes,
-            changeNeeded: details.changeNeeded,
-            changeAmount: details.changeAmount
-        };
-
-        try {
-            await firebaseService.addOrder(newOrderData);
-            addToast("Pedido enviado com sucesso!", 'success');
-            const whatsappUrl = generateWhatsAppMessage(details, cartItems, total, false);
-            window.open(whatsappUrl, '_blank');
-            handleOrderPlaced();
-        } catch (error) {
-            console.error("Failed to save order:", error);
-            addToast("Erro ao salvar pedido no sistema.", 'error');
-        }
-    };
-
-
-    // Cart Logic
-    const handleAddToCart = (product: Product, size: string, price: number) => {
-        const cartItemId = `${product.id}-${size}`;
-        const existingItem = cartItems.find(item => item.id === cartItemId);
-
-        if (existingItem) {
-            handleUpdateQuantity(cartItemId, existingItem.quantity + 1);
-        } else {
+    const handleAddToCart = useCallback((product: Product, size: string, price: number) => {
+        setCartItems(prevItems => {
+            const cartItemId = `${product.id}-${size}`;
+            const existingItem = prevItems.find(item => item.id === cartItemId);
+            if (existingItem) {
+                return prevItems.map(item =>
+                    item.id === cartItemId ? { ...item, quantity: item.quantity + 1 } : item
+                );
+            }
             const newItem: CartItem = {
-                id: cartItemId, productId: product.id, name: product.name,
-                size: size, price: price, quantity: 1, imageUrl: product.imageUrl,
+                id: cartItemId,
+                productId: product.id,
+                name: product.name,
+                size,
+                price,
+                quantity: 1,
+                imageUrl: product.imageUrl,
             };
-            setCartItems(prevItems => [...prevItems, newItem]);
-        }
-    };
+            return [...prevItems, newItem];
+        });
+        showToast(`${product.name} adicionado!`);
 
-    const handleUpdateQuantity = (itemId: string, newQuantity: number) => {
+        // Suggestion Logic
+        const currentCategoryIndex = categories.findIndex(c => c.id === activeCategoryId);
+        if (currentCategoryIndex > -1 && currentCategoryIndex < categories.length - 1) {
+            setSuggestedNextCategoryId(categories[currentCategoryIndex + 1].id);
+        } else {
+            // If it's the last category, show the finalize button trigger
+            setShowFinalizeButtonTrigger(true);
+        }
+
+    }, [activeCategoryId, categories]);
+
+    const handleUpdateCartQuantity = (itemId: string, newQuantity: number) => {
         if (newQuantity <= 0) {
             setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
         } else {
-            setCartItems(prevItems => prevItems.map(item => item.id === itemId ? { ...item, quantity: newQuantity } : item));
+            setCartItems(prevItems =>
+                prevItems.map(item =>
+                    item.id === itemId ? { ...item, quantity: newQuantity } : item
+                )
+            );
+        }
+    };
+
+    const clearCart = () => {
+        setCartItems([]);
+        localStorage.removeItem('cartItems');
+    };
+
+    const handleConfirmOrder = async (details: any, isPixNow: boolean) => {
+        const orderData: Omit<Order, 'id' | 'createdAt'> = {
+            customer: {
+                name: details.name,
+                phone: details.phone,
+                orderType: details.orderType,
+                address: details.address,
+                reservationTime: details.reservationTime,
+            },
+            items: cartItems,
+            total: cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+            paymentMethod: details.paymentMethod,
+            status: isPixNow ? 'awaiting-payment' : 'pending',
+            paymentStatus: 'pending',
+            notes: details.notes,
+            changeNeeded: details.changeNeeded,
+            changeAmount: details.changeAmount,
+        };
+        
+        try {
+            const docRef = await firebaseService.addOrder(orderData);
+            const newOrder: Order = { ...orderData, id: docRef.id, createdAt: new Date() }; // Approximate createdAt for local state
+            return newOrder;
+        } catch (error) {
+            console.error("Error adding order to Firestore:", error);
+            alert("Ocorreu um erro ao enviar seu pedido. Tente novamente.");
+            return null;
+        }
+    };
+
+    const handleInitiatePixPayment = async (details: any) => {
+        setIsCheckoutOpen(false);
+        setLastCheckoutDetails(details); // Save details for retry logic
+        const order = await handleConfirmOrder(details, true);
+        if (order) {
+            setOrderForPixPayment(order);
+            setIsPixModalOpen(true);
         }
     };
     
-    if (isLoading || !settings) { return <div className="fixed inset-0 flex items-center justify-center bg-gray-100">Carregando...</div>; }
+    const handleConfirmCheckout = async (details: any) => {
+        await handleConfirmOrder(details, false);
+        setIsCheckoutOpen(false);
+        clearCart();
+        showToast("Pedido enviado com sucesso!");
+    };
     
-    if (isAdminVisible) { return <AdminSection onExit={() => setIsAdminVisible(false)} />; }
+    const handlePaymentSuccess = (paidOrder: Order) => {
+        setIsPixModalOpen(false);
+        clearCart();
+        showToast("Pagamento aprovado! Seu pedido está na cozinha!");
+    };
+
+    const handlePaymentFailure = () => {
+        setIsPixModalOpen(false);
+        setIsPaymentFailureOpen(true);
+    };
+
+    const handleTryAgainPayment = () => {
+        setIsPaymentFailureOpen(false);
+        if (lastCheckoutDetails) {
+            handleInitiatePixPayment(lastCheckoutDetails);
+        }
+    };
+
+    const handlePayLater = async () => {
+        setIsPaymentFailureOpen(false);
+        if(orderForPixPayment) {
+            // Update order status to a regular pending order
+            await firebaseService.updateOrderStatus(orderForPixPayment.id, 'pending');
+        }
+        clearCart();
+        showToast("Seu pedido foi recebido! Pague na entrega.");
+    };
+
+    const cartItemCount = useMemo(() => cartItems.reduce((sum, item) => sum + item.quantity, 0), [cartItems]);
+    
+    const visibleContentSections = useMemo(() => 
+        settings.contentSections?.filter(s => s.isVisible).sort((a, b) => a.order - b.order) ?? [], 
+        [settings.contentSections]
+    );
+
+    if (isLoading) {
+        return <div className="fixed inset-0 flex items-center justify-center bg-gray-100 text-lg font-semibold">Carregando...</div>;
+    }
+
+    if (isAdminOpen) {
+        return <AdminSection onExit={() => {
+            window.location.href = '/';
+            setIsAdminOpen(false);
+        }} />;
+    }
 
     return (
-        <div className="bg-white">
-             <Header 
+        <>
+            <Header
                 cartItemCount={cartItemCount}
                 onCartClick={() => setIsCartOpen(true)}
                 activeSection={activeSection}
@@ -261,7 +289,7 @@ const App: React.FC = () => {
             />
             <main>
                 <HeroSection settings={settings} />
-                <MenuSection 
+                <MenuSection
                     categories={categories}
                     products={products}
                     onAddToCart={handleAddToCart}
@@ -275,70 +303,63 @@ const App: React.FC = () => {
                     showFinalizeButtonTrigger={showFinalizeButtonTrigger}
                     setShowFinalizeButtonTrigger={setShowFinalizeButtonTrigger}
                 />
-                
-                {(settings.contentSections ?? []).filter(s => s.isVisible).sort((a,b) => a.order - b.order).map((section, index) => (
-                    <DynamicContentSection key={section.id} section={section} order={index + 1} />
+                {visibleContentSections.map((section, index) => (
+                    <DynamicContentSection key={section.id} section={section} order={index} />
                 ))}
-
                 <ContactSection />
             </main>
             <Footer settings={settings} />
-
-            <CartSidebar 
+            
+            {/* --- Modals & Sidebars --- */}
+            <CartSidebar
                 isOpen={isCartOpen}
                 onClose={() => setIsCartOpen(false)}
                 cartItems={cartItems}
-                onUpdateQuantity={handleUpdateQuantity}
-                onCheckout={() => { setIsCartOpen(false); setIsCheckoutOpen(true); }}
+                onUpdateQuantity={handleUpdateCartQuantity}
+                onCheckout={() => {
+                    setIsCartOpen(false);
+                    setIsCheckoutOpen(true);
+                }}
                 isStoreOnline={storeStatus.isOpen}
                 categories={categories}
                 products={products}
                 setActiveCategoryId={setActiveCategoryId}
             />
-            
-            <CheckoutModal
-                isOpen={isCheckoutOpen}
-                onClose={() => setIsCheckoutOpen(false)}
-                cartItems={cartItems}
-                onConfirmCheckout={handleConfirmCheckout}
-                onInitiatePixPayment={handleInitiatePixPayment}
-            />
+             {isCheckoutOpen && (
+                <CheckoutModal
+                    isOpen={isCheckoutOpen}
+                    onClose={() => setIsCheckoutOpen(false)}
+                    cartItems={cartItems}
+                    onConfirmCheckout={handleConfirmCheckout}
+                    onInitiatePixPayment={handleInitiatePixPayment}
+                />
+            )}
+             {isPixModalOpen && orderForPixPayment && (
+                <PixPaymentModal
+                    order={orderForPixPayment}
+                    onClose={handlePaymentFailure} // Closing without paying is a failure/cancellation
+                    onPaymentSuccess={handlePaymentSuccess}
+                />
+            )}
+            {isPaymentFailureOpen && (
+                <PaymentFailureModal
+                    isOpen={isPaymentFailureOpen}
+                    onClose={() => setIsPaymentFailureOpen(false)}
+                    onTryAgain={handleTryAgainPayment}
+                    onPayLater={handlePayLater}
+                />
+            )}
+            {isSupportModalOpen && (
+                <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
+            )}
 
-            <PixPaymentModal 
-                order={payingOrder}
-                onClose={handleClosePixModal}
-                onPaymentSuccess={handlePixPaymentSuccess}
-            />
-
-            <PaymentFailureModal
-                isOpen={isPaymentFailureModalOpen}
-                onClose={() => setIsPaymentFailureModalOpen(false)}
-                onTryAgain={() => {
-                    setIsPaymentFailureModalOpen(false);
-                    setIsPixModalOpen(true); // Reopen the PIX modal to try again
-                }}
-                onPayLater={handlePayLaterFromFailure}
-            />
-             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]">
-                <div className="w-full flex flex-col items-center space-y-4 sm:items-end">
-                    {toasts.map((toast) => (
-                        <div key={toast.id} className="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden animate-fade-in-up">
-                            <div className="p-4">
-                                <div className="flex items-start">
-                                    <div className="flex-shrink-0">
-                                        {toast.type === 'success' ? (<i className="fas fa-check-circle h-6 w-6 text-green-500"></i>) : (<i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>)}
-                                    </div>
-                                    <div className="ml-3 w-0 flex-1 pt-0.5">
-                                        <p className="text-sm font-medium text-gray-900">{toast.message}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+            {/* --- Success Toast --- */}
+            <div className={`fixed bottom-5 left-1/2 -translate-x-1/2 bg-green-500 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-all duration-300 ${showSuccessToast ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5 pointer-events-none'}`}>
+                 <i className="fas fa-check-circle mr-2"></i>
+                 {successToastMessage}
             </div>
-        </div>
+        </>
     );
-};
+}
 
 export default App;

@@ -15,12 +15,19 @@ const statusConfig = {
     cancelled: { label: 'Cancelado', color: 'bg-red-500', icon: 'fas fa-times-circle' },
 };
 
+// FIX: Added all possible `OrderStatus` keys to satisfy the type `{ [key in Order['status']]: Order['status'] | null }`.
 const nextStatus: { [key in Order['status']]: Order['status'] | null } = {
     pending: 'preparing',
     preparing: 'delivering',
     delivering: 'completed',
     completed: null,
     cancelled: null,
+    // --- Added missing keys to satisfy the type ---
+    'awaiting-payment': null, // Should be updated programmatically on payment, not by admin.
+    accepted: 'preparing',
+    reserved: 'accepted',
+    ready: 'completed',
+    deleted: null,
 };
 
 export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
@@ -70,9 +77,9 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
                     <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                         <div className="flex-grow">
                              <div className="flex items-center gap-3">
-                                <span className={`flex-shrink-0 text-white text-xs font-bold py-1 px-3 rounded-full ${currentStatus.color}`}>
-                                    <i className={`${currentStatus.icon} mr-1.5`}></i>
-                                    {currentStatus.label}
+                                <span className={`flex-shrink-0 text-white text-xs font-bold py-1 px-3 rounded-full ${currentStatus?.color ?? 'bg-gray-500'}`}>
+                                    <i className={`${currentStatus?.icon ?? 'fas fa-question-circle'} mr-1.5`}></i>
+                                    {currentStatus?.label ?? order.status}
                                 </span>
                                  <p className="text-sm text-gray-500">
                                     Pedido #{order.id.substring(0, 6)} - {new Date(order.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -104,7 +111,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
                         <div>
                             <h4 className="font-semibold mb-2">Detalhes da Entrega:</h4>
                             {/* FIX: Access customer address from the nested 'customer' object. */}
-                            <p className="text-sm">{order.customer.address}</p>
+                            <p className="text-sm">{order.customer.address || `${order.customer.orderType}`}</p>
                             <button onClick={() => setIsContactModalOpen(true)} className="text-sm text-blue-600 hover:underline mt-1">Ver Telefone</button>
                         </div>
                         
