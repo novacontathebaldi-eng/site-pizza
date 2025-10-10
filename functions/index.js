@@ -19,7 +19,7 @@ if (!mercadopagoConfig || !mercadopagoConfig.accesstoken) {
   logger.error("Access Token do Mercado Pago não está configurado no Firebase Functions.");
 }
 const client = new MercadoPagoConfig({
-  accessToken: mercadopagoConfig ? mercadopagoConfig.accesstoken : process.env.MERCADO_PAGO_ACCESS_TOKEN,
+  accessToken: mercadopagoConfig ? mercadopagoConfig.accesstoken : "",
 });
 
 
@@ -27,7 +27,7 @@ const client = new MercadoPagoConfig({
  * Cria uma Order no Mercado Pago.
  * Esta função é chamada pelo frontend para iniciar um pagamento PIX.
  */
-exports.createMercadoPagoOrder = onCall( async (request) => {
+exports.createMercadoPagoOrder = onCall(async (request) => {
   const orderId = request.data.orderId;
   if (!orderId) {
     logger.error("Request missing orderId.");
@@ -94,7 +94,7 @@ exports.createMercadoPagoOrder = onCall( async (request) => {
 /**
  * Webhook para receber notificações de status do Mercado Pago.
  */
-exports.mercadoPagoWebhook = onRequest(  async (req, res) => {
+exports.mercadoPagoWebhook = onRequest(async (req, res) => {
   logger.info("Webhook do Mercado Pago recebido", {query: req.query, headers: req.headers, body: req.body});
   const topic = req.query.topic || req.body.topic || req.body.type;
 
@@ -107,7 +107,7 @@ exports.mercadoPagoWebhook = onRequest(  async (req, res) => {
     return res.status(400).send("Bad Request: Missing signature headers.");
   }
   
-  const secret = mercadopagoConfig ? mercadopagoConfig.webhook_secret : process.env.MERCADO_PAGO_WEBHOOK_SECRET;
+  const secret = mercadopagoConfig ? mercadopagoConfig.webhook_secret : "";
 
   if (!secret) {
     logger.error("A chave secreta do webhook do Mercado Pago não está configurada.");
