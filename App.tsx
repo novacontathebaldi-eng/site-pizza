@@ -355,8 +355,7 @@ const App: React.FC = () => {
         }
 
         try {
-            // The backend has set status to 'pending' and paymentStatus to 'paid'.
-            // This final update ensures the correct label is shown in the admin panel.
+            await firebaseService.updateOrderStatus(paidOrder.id, 'pending');
             await firebaseService.updateOrderPaymentStatus(paidOrder.id, 'paid_online');
             
             addToast("Pagamento confirmado! Seu pedido foi enviado para a pizzaria.", 'success');
@@ -376,7 +375,7 @@ const App: React.FC = () => {
              console.error("Error finalizing paid order:", error);
             addToast("Erro ao finalizar o pedido após o pagamento. Contate o suporte.", 'error');
         }
-    }, [addToast]);
+    }, [addToast, setCart, setPayingOrder, setIsCartOpen]);
 
     const handleClosePixModal = () => {
         if (payingOrder) {
