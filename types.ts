@@ -33,20 +33,49 @@ export interface CartItem {
     imageUrl: string;
 }
 
-// Represents a customer order
+export interface OrderCustomerDetails {
+    name: string;
+    phone: string;
+    orderType: 'delivery' | 'pickup' | 'local';
+    address?: string;
+    reservationTime?: string;
+}
+
+
+// Expanded PaymentStatus to include online-specific statuses
+export type PaymentStatus = 'pending' | 'paid' | 'paid_online' | 'refunded' | 'partially_refunded' | 'failed';
+
+// Expanded OrderStatus to include a state for waiting on online payment
+// FIX: Added 'preparing' and 'delivering' to OrderStatus to align with usage in OrderCard.tsx.
+export type OrderStatus = 'awaiting-payment' | 'pending' | 'preparing' | 'delivering' | 'accepted' | 'reserved' | 'ready' | 'completed' | 'cancelled' | 'deleted';
+
+
+// Represents a customer order with added fields for payment gateway integration
 export interface Order {
     id: string;
-    customerName: string;
-    customerPhone: string;
-    customerAddress: string;
+    customer: OrderCustomerDetails;
     items: CartItem[];
     total: number;
-    status: 'pending' | 'preparing' | 'delivering' | 'completed' | 'cancelled';
-    paymentMethod: 'pix' | 'card' | 'cash';
-    paymentStatus: 'pending' | 'paid' | 'failed';
+    paymentMethod: 'pix' | 'credit' | 'debit' | 'cash';
+    status: OrderStatus;
+    paymentStatus: PaymentStatus;
     createdAt: any; // Firestore Timestamp
+
     notes?: string;
+    changeNeeded?: boolean;
+    changeAmount?: string;
+    pickupTimeEstimate?: string;
+
+    // Mercado Pago specific fields
+    mercadoPagoOrderId?: string;
+    mercadoPagoPaymentId?: string;
+    refunds?: {
+        id: string; // MP Refund ID
+        amount: number;
+        date: any; // Firestore Timestamp
+    }[];
 }
+
 
 // Represents a list item within a dynamic content section
 export interface ContentSectionListItem {

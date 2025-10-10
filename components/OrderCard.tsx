@@ -78,7 +78,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
                                     Pedido #{order.id.substring(0, 6)} - {new Date(order.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                 </p>
                             </div>
-                            <h3 className="font-bold text-lg mt-2">{order.customerName}</h3>
+                            {/* FIX: Access customer name from the nested 'customer' object. */}
+                            <h3 className="font-bold text-lg mt-2">{order.customer.name}</h3>
                         </div>
                         <div className="flex flex-col sm:items-end sm:text-right flex-shrink-0">
                             <p className="text-2xl font-bold text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
@@ -102,7 +103,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
                         </div>
                         <div>
                             <h4 className="font-semibold mb-2">Detalhes da Entrega:</h4>
-                            <p className="text-sm">{order.customerAddress}</p>
+                            {/* FIX: Access customer address from the nested 'customer' object. */}
+                            <p className="text-sm">{order.customer.address}</p>
                             <button onClick={() => setIsContactModalOpen(true)} className="text-sm text-blue-600 hover:underline mt-1">Ver Telefone</button>
                         </div>
                         
@@ -131,7 +133,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
                     </div>
                 )}
             </div>
-            {isContactModalOpen && <ContactModal isOpen={true} onClose={() => setIsContactModalOpen(false)} customerName={order.customerName} customerPhone={order.customerPhone} />}
+            {/* FIX: Access customer name and phone from the nested 'customer' object. */}
+            {isContactModalOpen && <ContactModal isOpen={true} onClose={() => setIsContactModalOpen(false)} customerName={order.customer.name} customerPhone={order.customer.phone} />}
         </>
     );
 };

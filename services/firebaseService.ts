@@ -1,7 +1,48 @@
 // FIX: Import the firebase namespace to use for type annotations.
 import firebase from 'firebase/compat/app';
 import { db, storage, auth, functions } from './firebase';
-import { Product, Category, SiteSettings, Order, StoreStatus } from '../types';
+import { Product, Category, SiteSettings, Order, StoreStatus, OrderCustomerDetails } from '../types';
+
+if (!functions) {
+    throw new Error("Firebase Functions not initialized. Check your firebase.ts configuration.");
+}
+
+// --- CALLABLE FUNCTIONS (Mercado Pago) ---
+
+const createMercadoPagoOrderCallable = functions.httpsCallable('createMercadoPagoOrder');
+const cancelMercadoPagoOrderCallable = functions.httpsCallable('cancelMercadoPagoOrder');
+const refundMercadoPagoOrderCallable = functions.httpsCallable('refundMercadoPagoOrder');
+
+export const initiateMercadoPagoPixPayment = async (orderId: string): Promise<{ qrCodeBase64: string; copyPaste: string }> => {
+    try {
+        const result = await createMercadoPagoOrderCallable({ orderId });
+        return result.data as { qrCodeBase64: string; copyPaste: string };
+    } catch (error) {
+        console.error("Error calling createMercadoPagoOrder function:", error);
+        throw error;
+    }
+};
+
+export const cancelMercadoPagoOrder = async (orderId: string): Promise<any> => {
+     try {
+        const result = await cancelMercadoPagoOrderCallable({ orderId });
+        return result.data;
+    } catch (error) {
+        console.error("Error calling cancelMercadoPagoOrder function:", error);
+        throw error;
+    }
+};
+
+export const refundMercadoPagoOrder = async (orderId: string, amount?: number): Promise<any> => {
+    try {
+        const result = await refundMercadoPagoOrderCallable({ orderId, amount });
+        return result.data;
+    } catch (error) {
+        console.error("Error calling refundMercadoPagoOrder function:", error);
+        throw error;
+    }
+};
+
 
 /**
  * Uploads an image file to Firebase Storage.
@@ -53,7 +94,8 @@ export const getProductsAndCategories = async () => {
 
 export const getSiteSettings = async (): Promise<SiteSettings | null> => {
     if (!db) throw new Error("Firestore not initialized");
-    const doc = await db.collection('site_config').doc('settings').get();
+    // Corrected collection name from 'site_config' to 'store_config' to match other parts of the app
+    const doc = await db.collection('store_config').doc('site_settings').get();
     return doc.exists ? doc.data() as SiteSettings : null;
 };
 
@@ -96,12 +138,12 @@ export const deleteCategory = async (categoryId: string): Promise<void> => {
     await db.collection('categories').doc(categoryId).delete();
 };
 
-export const updateCategoriesOrder = async (categories: Category[]): Promise<void> => {
+export const updateCategoriesOrder = async (categories: {id: string, order: number}[]): Promise<void> => {
     if (!db) throw new Error("Firestore not initialized");
     const batch = db.batch();
-    categories.forEach((cat, index) => {
+    categories.forEach((cat) => {
         const docRef = db.collection('categories').doc(cat.id);
-        batch.update(docRef, { order: index });
+        batch.update(docRef, { order: cat.order });
     });
     await batch.commit();
 };
@@ -109,7 +151,7 @@ export const updateCategoriesOrder = async (categories: Category[]): Promise<voi
 // Site Settings
 export const updateSiteSettings = async (settings: SiteSettings): Promise<void> => {
     if (!db) throw new Error("Firestore not initialized");
-    await db.collection('site_config').doc('settings').set(settings, { merge: true });
+    await db.collection('store_config').doc('site_settings').set(settings, { merge: true });
 };
 
 // Store Status
@@ -119,26 +161,27 @@ export const updateStoreStatus = async (status: StoreStatus): Promise<void> => {
 };
 
 // Orders
-export const placeOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'status'>): Promise<Order> => {
+export const addOrder = async (orderData: Omit<Order, 'id' | 'createdAt'>): Promise<firebase.firestore.DocumentReference> => {
     if (!db) throw new Error("Firestore not initialized");
     const newOrder = {
         ...orderData,
-        status: 'pending' as const,
-        createdAt: new Date(),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     };
-    const docRef = await db.collection('orders').add(newOrder);
-    return { id: docRef.id, ...newOrder };
+    return db.collection('orders').add(newOrder);
 };
+
 
 export const onOrdersUpdate = (callback: (orders: Order[]) => void) => {
     if (!db) throw new Error("Firestore not initialized");
     return db.collection('orders').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
-        const orders: Order[] = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            // Convert Firestore Timestamp to Date if needed by the frontend
-            createdAt: doc.data().createdAt.toDate ? doc.data().createdAt.toDate() : new Date(), 
-        } as Order));
+        const orders: Order[] = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(), 
+            } as Order
+        });
         callback(orders);
     });
 };
@@ -146,4 +189,38 @@ export const onOrdersUpdate = (callback: (orders: Order[]) => void) => {
 export const updateOrderStatus = async (orderId: string, status: Order['status']): Promise<void> => {
     if (!db) throw new Error("Firestore not initialized");
     await db.collection('orders').doc(orderId).update({ status });
+};
+
+export const updateOrderPaymentStatus = async (orderId: string, paymentStatus: Order['paymentStatus']): Promise<void> => {
+    if (!db) throw new Error("Firestore not initialized");
+    await db.collection('orders').doc(orderId).update({ paymentStatus });
+};
+
+export const updateOrderAfterRefund = async (orderId: string, refundId: string, refundAmount: number): Promise<void> => {
+    if (!db) throw new Error("Firestore not initialized");
+    const orderRef = db.collection('orders').doc(orderId);
+    
+    await db.runTransaction(async (transaction) => {
+        const orderDoc = await transaction.get(orderRef);
+        if (!orderDoc.exists) {
+            throw new Error("Order not found!");
+        }
+        const orderData = orderDoc.data() as Order;
+
+        const newRefund = {
+            id: refundId,
+            amount: refundAmount,
+            date: new Date()
+        };
+
+        const existingRefunds = orderData.refunds || [];
+        const totalRefunded = existingRefunds.reduce((sum, r) => sum + r.amount, 0) + refundAmount;
+
+        const newPaymentStatus = totalRefunded >= orderData.total ? 'refunded' : 'partially_refunded';
+
+        transaction.update(orderRef, {
+            paymentStatus: newPaymentStatus,
+            refunds: firebase.firestore.FieldValue.arrayUnion(newRefund)
+        });
+    });
 };
