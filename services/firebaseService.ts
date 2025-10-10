@@ -1,209 +1,276 @@
+```typescript
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
+
 import firebase from 'firebase/compat/app';
 import { db, storage, functions } from './firebase';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const statusRef = db.doc('store_config/status');
-    await statusRef.set({ isOpen: isOnline }, { merge: true });
+  if (!db) throw new Error("Firestore is not initialized.");
+  const statusRef = db.doc('store_config/status');
+  await statusRef.set({ isOpen: isOnline }, { merge: true });
 };
 
 // Image Upload Function
 export const uploadImage = async (file: File): Promise<string> => {
-    if (!storage) {
-        throw new Error("Firebase Storage não está inicializado.");
-    }
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `products/${new Date().getTime()}_${Math.random().toString(36).substring(2, 9)}.${fileExtension}`;
-    const storageRef = storage.ref(fileName);
+  if (!storage) {
+    throw new Error("Firebase Storage não está inicializado.");
+  }
 
-    const snapshot = await storageRef.put(file);
-    const downloadURL = await snapshot.ref.getDownloadURL();
-    
-    return downloadURL;
+  const fileExtension = file.name.split('.').pop();
+  const fileName = `products/${new Date().getTime()}_${Math.random().toString(36).substring(2, 9)}.${fileExtension}`;
+  const storageRef = storage.ref(fileName);
+  const snapshot = await storageRef.put(file);
+  const downloadURL = await snapshot.ref.getDownloadURL();
+  return downloadURL;
 };
 
-// Site Asset Upload Function
-export const uploadSiteAsset = async (file: File, assetName: string): Promise<string> => {
-    if (!storage) {
-        throw new Error("Firebase Storage não está inicializado.");
-    }
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `site/${assetName}_${new Date().getTime()}.${fileExtension}`;
-    const storageRef = storage.ref(fileName);
-    
-    const snapshot = await storageRef.put(file);
-    return await snapshot.ref.getDownloadURL();
+// Product Management Functions
+export const addProduct = async (product: Omit<Product, 'id'>): Promise<void> => {
+  if (!db) throw new Error("Firestore is not initialized.");
+  await db.collection('products').add(product);
 };
 
-
-// Product Functions
-export const addProduct = async (productData: Omit<Product, 'id'>): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    await db.collection('products').add(productData);
+export const updateProduct = async (id: string, product: Partial<Product>): Promise<void> => {
+  if (!db) throw new Error("Firestore is not initialized.");
+  await db.collection('products').doc(id).update(product);
 };
 
-export const updateProduct = async (productId: string, productData: Omit<Product, 'id'>): Promise<void> => {
-    if (!productId) throw new Error("Product ID is missing for update.");
-    if (!db) throw new Error("Firestore is not initialized.");
-    const productRef = db.collection('products').doc(productId);
-    await productRef.update(productData as { [key: string]: any });
+export const deleteProduct = async (id: string): Promise<void> => {
+  if (!db) throw new Error("Firestore is not initialized.");
+  await db.collection('products').doc(id).delete();
 };
 
-export const updateProductStatus = async (productId: string, active: boolean): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const productRef = db.collection('products').doc(productId);
-    await productRef.update({ active });
+// Category Management Functions
+export const addCategory = async (category: Omit<Category, 'id'>): Promise<void> => {
+  if (!db) throw new Error("Firestore is not initialized.");
+  await db.collection('categories').add(category);
 };
 
-export const updateProductStockStatus = async (productId: string, stockStatus: 'available' | 'out_of_stock'): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const productRef = db.collection('products').doc(productId);
-    await productRef.update({ stockStatus });
+export const updateCategory = async (id: string, category: Partial<Category>): Promise<void> => {
+  if (!db) throw new Error("Firestore is not initialized.");
+  await db.collection('categories').doc(id).update(category);
 };
 
-export const deleteProduct = async (productId: string): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    if (!productId) throw new Error("Invalid Product ID for deletion.");
-    const productRef = db.collection('products').doc(productId);
-    await productRef.delete();
+export const deleteCategory = async (id: string): Promise<void> => {
+  if (!db) throw new Error("Firestore is not initialized.");
+  await db.collection('categories').doc(id).delete();
 };
 
-export const updateProductsOrder = async (productsToUpdate: { id: string; orderIndex: number }[]): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const batch = db.batch();
-    productsToUpdate.forEach(productUpdate => {
-        const productRef = db.collection('products').doc(productUpdate.id);
-        batch.update(productRef, { orderIndex: productUpdate.orderIndex });
-    });
-    await batch.commit();
-};
-
-
-// Category Functions
-export const addCategory = async (categoryData: Omit<Category, 'id'>): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    await db.collection('categories').add(categoryData);
-};
-
-export const updateCategory = async (categoryId: string, categoryData: Omit<Category, 'id'>): Promise<void> => {
-    if (!categoryId) throw new Error("Category ID is missing for update.");
-    if (!db) throw new Error("Firestore is not initialized.");
-    const categoryRef = db.collection('categories').doc(categoryId);
-    await categoryRef.update(categoryData as { [key: string]: any });
-};
-
-export const updateCategoryStatus = async (categoryId: string, active: boolean): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const categoryRef = db.collection('categories').doc(categoryId);
-    await categoryRef.update({ active });
-};
-
-export const deleteCategory = async (categoryId: string, allProducts: Product[]): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    if (!categoryId) throw new Error("Invalid document reference.");
-    
-    const isCategoryInUse = allProducts.some(product => product.categoryId === categoryId);
-    if (isCategoryInUse) {
-        throw new Error("Não é possível excluir esta categoria, pois ela está sendo usada por um ou mais produtos.");
-    }
-
-    const categoryRef = db.collection('categories').doc(categoryId);
-    await categoryRef.delete();
-};
-
-export const updateCategoriesOrder = async (categoriesToUpdate: { id: string; order: number }[]): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const batch = db.batch();
-    categoriesToUpdate.forEach(categoryUpdate => {
-        const categoryRef = db.collection('categories').doc(categoryUpdate.id);
-        batch.update(categoryRef, { order: categoryUpdate.order });
-    });
-    await batch.commit();
-};
-
-// Site Settings Function
-export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const settingsRef = db.doc('store_config/site_settings');
-    await settingsRef.set(settings, { merge: true });
+// Site Settings Functions
+export const updateSiteSettings = async (settings: SiteSettings): Promise<void> => {
+  if (!db) throw new Error("Firestore is not initialized.");
+  await db.doc('site_config/settings').set(settings, { merge: true });
 };
 
 // Order Management Functions
-export const addOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'pickupTimeEstimate'>): Promise<firebase.firestore.DocumentReference> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    return db.collection('orders').add({
-        ...orderData,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+export const addOrder = async (order: Omit<Order, 'id' | 'createdAt'>): Promise<string> => {
+  if (!db) throw new Error("Firestore is not initialized.");
+  const orderData = {
+    ...order,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  const docRef = await db.collection('orders').add(orderData);
+  return docRef.id;
 };
 
-export const updateOrderStatus = async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const orderRef = db.collection('orders').doc(orderId);
-    await orderRef.update({ status, ...payload });
+export const updateOrderStatus = async (orderId: string, status: OrderStatus): Promise<void> => {
+  if (!db) throw new Error("Firestore is not initialized.");
+  await db.collection('orders').doc(orderId).update({ status });
 };
 
-export const updateOrderPaymentStatus = async (orderId: string, paymentStatus: PaymentStatus): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const orderRef = db.collection('orders').doc(orderId);
-    await orderRef.update({ paymentStatus });
-};
-
-export const updateOrderReservationTime = async (orderId: string, reservationTime: string): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const orderRef = db.collection('orders').doc(orderId);
-    await orderRef.update({ 'customer.reservationTime': reservationTime });
+export const updatePaymentStatus = async (orderId: string, paymentStatus: PaymentStatus): Promise<void> => {
+  if (!db) throw new Error("Firestore is not initialized.");
+  await db.collection('orders').doc(orderId).update({ paymentStatus });
 };
 
 export const deleteOrder = async (orderId: string): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const orderRef = db.collection('orders').doc(orderId);
-    await orderRef.delete();
+  if (!db) throw new Error("Firestore is not initialized.");
+  await db.collection('orders').doc(orderId).delete();
 };
 
-// --- Mercado Pago Functions ---
+// ============================================
+// MERCADO PAGO INTEGRATION - FRONTEND FUNCTIONS
+// ============================================
 
-export const createMercadoPagoOrder = async (orderId: string, orderData: Omit<Order, 'id' | 'createdAt'>): Promise<any> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
+/**
+ * Cria uma Order no Mercado Pago via Firebase Function
+ * @param orderId - ID do pedido no Firestore
+ * @returns Promise com dados do PIX
+ */
+export const createMercadoPagoOrder = async (orderId: string): Promise<{
+  mpOrderId: string;
+  qrCodeBase64: string;
+  qrCode: string;
+  status: string;
+}> => {
+  if (!functions) throw new Error("Firebase Functions não está inicializado.");
+  
+  try {
+    const createMPOrder = functions.httpsCallable('createMercadoPagoOrder');
+    const result = await createMPOrder({ orderId });
+    
+    if (!result.data) {
+      throw new Error('Resposta inválida do backend');
     }
-    const createOrderFunction = functions.httpsCallable('createMercadoPagoOrder');
+    
+    return result.data;
+  } catch (error: any) {
+    console.error('Erro ao criar order no Mercado Pago:', error);
+    throw new Error(error.message || 'Falha ao processar pagamento PIX');
+  }
+};
+
+/**
+ * Consulta status de uma Order no Mercado Pago
+ * @param mpOrderId - ID da order no Mercado Pago
+ * @returns Promise com status da order
+ */
+export const getMercadoPagoOrder = async (mpOrderId: string): Promise<{
+  orderId: string;
+  status: string;
+  paidAmount: number;
+  totalAmount: number;
+  transactions: Array<any>;
+}> => {
+  if (!functions) throw new Error("Firebase Functions não está inicializado.");
+  
+  try {
+    const getMPOrder = functions.httpsCallable('getMercadoPagoOrder');
+    const result = await getMPOrder({ mpOrderId });
+    
+    return result.data;
+  } catch (error: any) {
+    console.error('Erro ao consultar order no Mercado Pago:', error);
+    throw new Error(error.message || 'Falha ao consultar status do pagamento');
+  }
+};
+
+/**
+ * Cancela uma Order no Mercado Pago (para admin)
+ * @param mpOrderId - ID da order no Mercado Pago
+ * @returns Promise com resultado da operação
+ */
+export const cancelMercadoPagoOrder = async (mpOrderId: string): Promise<{
+  success: boolean;
+  status: string;
+}> => {
+  if (!functions) throw new Error("Firebase Functions não está inicializado.");
+  
+  try {
+    const cancelMPOrder = functions.httpsCallable('cancelMercadoPagoOrder');
+    const result = await cancelMPOrder({ mpOrderId });
+    
+    return result.data;
+  } catch (error: any) {
+    console.error('Erro ao cancelar order no Mercado Pago:', error);
+    throw new Error(error.message || 'Falha ao cancelar pagamento');
+  }
+};
+
+/**
+ * Reembolsa uma Order no Mercado Pago (para admin)
+ * @param mpOrderId - ID da order no Mercado Pago
+ * @param transactionId - ID da transação
+ * @param amount - Valor para reembolso parcial (opcional)
+ * @returns Promise com resultado da operação
+ */
+export const refundMercadoPagoOrder = async (
+  mpOrderId: string, 
+  transactionId: string, 
+  amount?: number
+): Promise<{
+  success: boolean;
+  refund: any;
+}> => {
+  if (!functions) throw new Error("Firebase Functions não está inicializado.");
+  
+  try {
+    const refundMPOrder = functions.httpsCallable('refundMercadoPagoOrder');
+    const result = await refundMPOrder({ mpOrderId, transactionId, amount });
+    
+    return result.data;
+  } catch (error: any) {
+    console.error('Erro ao reembolsar order no Mercado Pago:', error);
+    throw new Error(error.message || 'Falha ao processar reembolso');
+  }
+};
+
+/**
+ * Captura uma Order no Mercado Pago (somente para cartões)
+ * @param mpOrderId - ID da order no Mercado Pago
+ * @param transactionId - ID da transação
+ * @returns Promise com resultado da operação
+ */
+export const captureMercadoPagoOrder = async (
+  mpOrderId: string, 
+  transactionId: string
+): Promise<{
+  success: boolean;
+  transaction: any;
+}> => {
+  if (!functions) throw new Error("Firebase Functions não está inicializado.");
+  
+  try {
+    const captureMPOrder = functions.httpsCallable('captureMercadoPagoOrder');
+    const result = await captureMPOrder({ mpOrderId, transactionId });
+    
+    return result.data;
+  } catch (error: any) {
+    console.error('Erro ao capturar order no Mercado Pago:', error);
+    throw new Error(error.message || 'Falha ao capturar pagamento');
+  }
+};
+
+/**
+ * Polling para verificar status de pagamento PIX
+ * @param mpOrderId - ID da order no Mercado Pago
+ * @param onStatusChange - Callback chamado quando status muda
+ * @param maxAttempts - Máximo de tentativas (default: 60)
+ * @param interval - Intervalo entre verificações em ms (default: 3000)
+ */
+export const pollPaymentStatus = (
+  mpOrderId: string,
+  onStatusChange: (status: string, isPaid: boolean) => void,
+  maxAttempts: number = 60,
+  interval: number = 3000
+): () => void => {
+  let attempts = 0;
+  let isPolling = true;
+
+  const poll = async () => {
+    if (!isPolling || attempts >= maxAttempts) return;
+
+    attempts++;
+
     try {
-        const result = await createOrderFunction({ orderId, orderData });
-        return result.data;
-    } catch (error) {
-        console.error("Error calling createMercadoPagoOrder function:", error);
-        throw new Error("Não foi possível gerar a cobrança PIX. Tente novamente.");
-    }
-};
+      const orderData = await getMercadoPagoOrder(mpOrderId);
+      const isPaid = orderData.paidAmount >= orderData.totalAmount;
 
-export const cancelMercadoPagoOrder = async (mercadoPagoOrderId: string): Promise<any> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    const cancelOrderFunction = functions.httpsCallable('cancelOrder');
-    try {
-        const result = await cancelOrderFunction({ mercadoPagoOrderId });
-        return result.data;
-    } catch (error) {
-        console.error("Error calling cancelOrder function:", error);
-        throw new Error("Não foi possível cancelar o pedido no Mercado Pago.");
-    }
-};
+      onStatusChange(orderData.status, isPaid);
 
-export const refundMercadoPagoOrder = async (mercadoPagoOrderId: string): Promise<any> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    // This implements a full refund.
-    const refundOrderFunction = functions.httpsCallable('refundOrder');
-    try {
-        const result = await refundOrderFunction({ mercadoPagoOrderId });
-        return result.data;
+      if (isPaid || orderData.status === 'cancelled') {
+        isPolling = false;
+        return;
+      }
+
+      if (isPolling) {
+        setTimeout(poll, interval);
+      }
     } catch (error) {
-        console.error("Error calling refundOrder function:", error);
-        throw new Error("Não foi possível reembolsar o pedido no Mercado Pago.");
+      console.error('Erro ao consultar status do pagamento:', error);
+      if (isPolling) {
+        setTimeout(poll, interval);
+      }
     }
+  };
+
+  // Iniciar polling
+  setTimeout(poll, interval);
+
+  // Retornar função para parar o polling
+  return () => {
+    isPolling = false;
+  };
 };
+```

@@ -1,155 +1,279 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Order } from '../types';
+```typescript
+import React, { useState, useEffect } from 'react';
+import { X, Copy, CheckCircle, XCircle, Clock, RefreshCw } from 'lucide-react';
 import * as firebaseService from '../services/firebaseService';
-import { db } from '../services/firebase';
 
 interface PixPaymentModalProps {
-    order: Order | null;
-    onClose: () => void;
-    onPaymentSuccess: (paidOrder: Order) => void;
+  isOpen: boolean;
+  onClose: () => void;
+  orderId: string;
+  orderTotal: number;
+  onPaymentSuccess: () => void;
+  onPaymentFailure: () => void;
 }
 
-const PIX_EXPIRATION_SECONDS = 300; // 5 minutes
+export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({
+  isOpen,
+  onClose,
+  orderId,
+  orderTotal,
+  onPaymentSuccess,
+  onPaymentFailure
+}) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pixData, setPixData] = useState<{
+    mpOrderId: string;
+    qrCodeBase64: string;
+    qrCode: string;
+    status: string;
+  } | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<'generating' | 'pending' | 'paid' | 'failed'>('generating');
+  const [copied, setCopied] = useState(false);
+  const [stopPolling, setStopPolling] = useState<(() => void) | null>(null);
+  const [timeLeft, setTimeLeft] = useState(600); // 10 minutos em segundos
+  
+  // Timer para expiração do PIX
+  useEffect(() => {
+    if (paymentStatus === 'pending' && timeLeft > 0) {
+      const timer = setTimeout(() => {
+        setTimeLeft(timeLeft - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (timeLeft === 0 && paymentStatus === 'pending') {
+      setPaymentStatus('failed');
+      setError('PIX expirado. Tente novamente.');
+    }
+  }, [timeLeft, paymentStatus]);
 
-export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose, onPaymentSuccess }) => {
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [pixData, setPixData] = useState<{ qrCodeBase64: string; copyPaste: string } | null>(null);
-    const [timeLeft, setTimeLeft] = useState(PIX_EXPIRATION_SECONDS);
-    const [isPaid, setIsPaid] = useState(false);
-    const [copySuccess, setCopySuccess] = useState(false);
-    const timerRef = useRef<number | null>(null);
+  // Formatar tempo restante
+  const formatTimeLeft = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
 
-    // Effect to generate PIX charge when modal opens
-    useEffect(() => {
-        if (order) {
-            setIsLoading(true);
-            setError(null);
-            setIsPaid(false);
-            setTimeLeft(PIX_EXPIRATION_SECONDS);
+  // Inicializar pagamento PIX
+  useEffect(() => {
+    if (isOpen && !pixData) {
+      initializePixPayment();
+    }
+  }, [isOpen]);
 
-            // FIX: The function was corrected from 'initiateMercadoPagoPixPayment' to the available 'createMercadoPagoOrder'.
-            // The call was also updated to pass the full order data, which is required by the backend function.
-            const { id, createdAt, ...orderData } = order;
-            firebaseService.createMercadoPagoOrder(id, orderData)
-                .then(data => {
-                    setPixData(data);
-                    setIsLoading(false);
-                })
-                .catch(err => {
-                    setError(err.message || 'Erro desconhecido ao gerar PIX.');
-                    setIsLoading(false);
-                });
-        }
-    }, [order]);
+  // Cleanup polling ao fechar modal
+  useEffect(() => {
+    if (!isOpen && stopPolling) {
+      stopPolling();
+      setStopPolling(null);
+    }
+  }, [isOpen, stopPolling]);
 
-    // Effect for countdown timer
-    useEffect(() => {
-        if (!isLoading && pixData && !isPaid) {
-            timerRef.current = window.setInterval(() => {
-                setTimeLeft(prev => {
-                    if (prev <= 1) {
-                        clearInterval(timerRef.current!);
-                        setError("O código PIX expirou. Por favor, feche e tente novamente.");
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-        }
-        return () => {
-            if (timerRef.current) clearInterval(timerRef.current);
-        };
-    }, [isLoading, pixData, isPaid]);
+  const initializePixPayment = async () => {
+    setIsLoading(true);
+    setError(null);
+    setPaymentStatus('generating');
 
-    // Effect to listen for payment confirmation in real-time
-    useEffect(() => {
-        if (!order || !db) return;
+    try {
+      // Chamar Firebase Function para criar Order no Mercado Pago
+      const result = await firebaseService.createMercadoPagoOrder(orderId);
+      
+      setPixData(result);
+      setPaymentStatus('pending');
+      setTimeLeft(600); // Reset timer
 
-        const unsubscribe = db.collection('orders').doc(order.id)
-            .onSnapshot(doc => {
-                const updatedOrder = doc.data() as Order;
-                if (updatedOrder && updatedOrder.paymentStatus === 'paid') {
-                    setIsPaid(true);
-                    if (timerRef.current) clearInterval(timerRef.current);
-                    setTimeout(() => {
-                        onPaymentSuccess({ ...updatedOrder, id: doc.id });
-                    }, 2500); // Wait a bit to show success message
-                }
-            });
+      // Iniciar polling de status
+      const pollStop = firebaseService.pollPaymentStatus(
+        result.mpOrderId,
+        (status, isPaid) => {
+          console.log('Status atualizado:', status, 'Pago:', isPaid);
+          
+          if (isPaid) {
+            setPaymentStatus('paid');
+            onPaymentSuccess();
+          } else if (status === 'cancelled' || status === 'expired') {
+            setPaymentStatus('failed');
+            setError('Pagamento cancelado ou expirado.');
+          }
+        },
+        60, // 60 tentativas (3 minutos de polling)
+        3000 // Verificar a cada 3 segundos
+      );
 
-        return () => unsubscribe();
-    }, [order, onPaymentSuccess]);
+      setStopPolling(() => pollStop);
+
+    } catch (error: any) {
+      console.error('Erro ao inicializar pagamento PIX:', error);
+      setError(error.message || 'Erro ao gerar PIX. Tente novamente.');
+      setPaymentStatus('failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const copyToClipboard = async () => {
+    if (pixData?.qrCode) {
+      try {
+        await navigator.clipboard.writeText(pixData.qrCode);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (error) {
+        console.error('Erro ao copiar PIX:', error);
+      }
+    }
+  };
+
+  const handleClose = () => {
+    if (stopPolling) {
+      stopPolling();
+      setStopPolling(null);
+    }
     
-    const handleCopyToClipboard = () => {
-        if (pixData?.copyPaste) {
-            navigator.clipboard.writeText(pixData.copyPaste).then(() => {
-                setCopySuccess(true);
-                setTimeout(() => setCopySuccess(false), 2000);
-            });
-        }
-    };
-
-    if (!order) return null;
+    // Reset states
+    setPixData(null);
+    setPaymentStatus('generating');
+    setError(null);
+    setTimeLeft(600);
+    setCopied(false);
     
-    const minutes = Math.floor(timeLeft / 60);
-    const seconds = timeLeft % 60;
+    onClose();
+  };
 
-    return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
-                <div className="flex justify-between items-center p-5 border-b border-gray-200">
-                    <h2 className="text-2xl font-bold text-text-on-light"><i className="fab fa-pix mr-2"></i>Pagar com PIX</h2>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl" disabled={isPaid}>&times;</button>
-                </div>
-                <div className="overflow-y-auto p-6 text-center">
-                    {isLoading && (
-                        <div className="py-12">
-                            <i className="fas fa-spinner fa-spin text-5xl text-accent"></i>
-                            <p className="mt-4 font-semibold text-gray-600">Gerando seu PIX seguro...</p>
-                        </div>
-                    )}
-                    {error && !isPaid && (
-                         <div className="py-12 text-red-600">
-                            <i className="fas fa-exclamation-triangle text-5xl mb-4"></i>
-                            <p className="font-bold">Ocorreu um erro</p>
-                            <p>{error}</p>
-                        </div>
-                    )}
-                    {isPaid && (
-                        <div className="py-12 text-green-600 animate-fade-in-up">
-                            <i className="fas fa-check-circle text-6xl mb-4"></i>
-                            <p className="text-2xl font-bold">Pagamento Aprovado!</p>
-                            <p className="text-gray-700">Seu pedido será finalizado em instantes...</p>
-                        </div>
-                    )}
-                    {!isLoading && !error && !isPaid && pixData && (
-                        <div className="space-y-4">
-                            <p>Escaneie o QR Code abaixo com o app do seu banco:</p>
-                            <div className="flex justify-center">
-                                <img src={`data:image/png;base64,${pixData.qrCodeBase64}`} alt="PIX QR Code" className="w-56 h-56 border-4 border-gray-200 rounded-lg" />
-                            </div>
-                            <div className="text-lg font-mono p-2 bg-gray-100 rounded">
-                                <span>{minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}</span>
-                            </div>
-                            <p className="text-sm text-gray-500">Ou use o PIX Copia e Cola:</p>
-                             <div className="relative">
-                                <input 
-                                    type="text" 
-                                    value={pixData.copyPaste} 
-                                    readOnly 
-                                    className="w-full text-xs text-center bg-gray-100 p-3 pr-12 border rounded-md"
-                                />
-                                <button onClick={handleCopyToClipboard} className="absolute top-1/2 right-2 -translate-y-1/2 bg-accent text-white w-8 h-8 rounded-md hover:bg-opacity-90">
-                                    <i className={copySuccess ? "fas fa-check" : "fas fa-copy"}></i>
-                                </button>
-                            </div>
-                            {copySuccess && <p className="text-sm text-green-600">Copiado para a área de transferência!</p>}
-                            <p className="text-xs text-gray-500 pt-4">Após o pagamento, a confirmação será automática nesta tela.</p>
-                        </div>
-                    )}
-                </div>
-            </div>
+  const handleTryAgain = () => {
+    setPixData(null);
+    setError(null);
+    initializePixPayment();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center p-6 border-b border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900">
+            Pagamento PIX
+          </h2>
+          <button
+            onClick={handleClose}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-    );
+
+        <div className="p-6">
+          {/* Status de Loading */}
+          {paymentStatus === 'generating' && (
+            <div className="text-center py-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+              </div>
+              <p className="text-lg font-medium text-gray-900">Gerando seu PIX seguro...</p>
+              <p className="text-sm text-gray-600 mt-2">Isso pode levar alguns segundos</p>
+            </div>
+          )}
+
+          {/* Erro */}
+          {error && paymentStatus === 'failed' && (
+            <div className="text-center py-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
+                <XCircle className="w-8 h-8 text-red-600" />
+              </div>
+              <p className="text-lg font-medium text-gray-900 mb-2">Ocorreu um erro</p>
+              <p className="text-sm text-red-600 mb-4">{error}</p>
+              <button
+                onClick={handleTryAgain}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Tentar Novamente
+              </button>
+            </div>
+          )}
+
+          {/* Pagamento Aprovado */}
+          {paymentStatus === 'paid' && (
+            <div className="text-center py-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+              <p className="text-lg font-medium text-green-600">Pagamento Aprovado!</p>
+              <p className="text-sm text-gray-600 mt-2">Seu pedido será finalizado em instantes...</p>
+            </div>
+          )}
+
+          {/* PIX Gerado */}
+          {pixData && paymentStatus === 'pending' && (
+            <div className="space-y-6">
+              {/* Timer */}
+              <div className="text-center">
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-orange-100 rounded-full mb-2">
+                  <Clock className="w-6 h-6 text-orange-600" />
+                </div>
+                <p className="text-sm font-medium text-gray-900">
+                  Tempo restante: {formatTimeLeft(timeLeft)}
+                </p>
+              </div>
+
+              {/* Valor */}
+              <div className="text-center bg-gray-50 rounded-lg p-4">
+                <p className="text-sm text-gray-600">Valor a pagar:</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {orderTotal.toLocaleString('pt-BR', { 
+                    style: 'currency', 
+                    currency: 'BRL' 
+                  })}
+                </p>
+              </div>
+
+              {/* Instruções */}
+              <div className="text-center">
+                <p className="text-sm font-medium text-gray-900 mb-2">
+                  Escaneie o QR Code abaixo com o app do seu banco:
+                </p>
+              </div>
+
+              {/* QR Code */}
+              <div className="flex justify-center">
+                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                  <img
+                    src={`data:image/png;base64,${pixData.qrCodeBase64}`}
+                    alt="QR Code PIX"
+                    className="w-48 h-48"
+                  />
+                </div>
+              </div>
+
+              {/* PIX Copia e Cola */}
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-gray-900 text-center">
+                  Ou use o PIX Copia e Cola:
+                </p>
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-600 break-all font-mono">
+                    {pixData.qrCode}
+                  </p>
+                </div>
+                <button
+                  onClick={copyToClipboard}
+                  className="w-full flex items-center justify-center space-x-2 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Copy className="w-4 h-4" />
+                  <span>{copied ? 'Copiado para a área de transferência!' : 'Copiar código PIX'}</span>
+                </button>
+              </div>
+
+              {/* Aviso */}
+              <div className="text-center">
+                <p className="text-xs text-gray-600">
+                  Após o pagamento, a confirmação será automática nesta tela.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 };
+```

@@ -355,8 +355,9 @@ const App: React.FC = () => {
         }
 
         try {
-            // The backend webhook has already updated the order status.
-            // We just handle the frontend logic here.
+            await firebaseService.updateOrderStatus(paidOrder.id, 'pending');
+            await firebaseService.updateOrderPaymentStatus(paidOrder.id, 'paid_online');
+            
             addToast("Pagamento confirmado! Seu pedido foi enviado para a pizzaria.", 'success');
 
             const details: OrderDetails = {
@@ -616,30 +617,6 @@ const App: React.FC = () => {
             } catch (error) {
                 console.error("Failed to permanently delete order:", error);
                 addToast("Erro ao apagar o pedido permanentemente.", 'error');
-            }
-        }
-    }, [addToast]);
-
-    const handleCancelMercadoPagoOrder = useCallback(async (mercadoPagoOrderId: string) => {
-        if (window.confirm("Tem certeza que deseja cancelar este pedido no Mercado Pago? Esta ação não pode ser desfeita.")) {
-            try {
-                await firebaseService.cancelMercadoPagoOrder(mercadoPagoOrderId);
-                addToast("Pedido cancelado no Mercado Pago com sucesso!", 'success');
-            } catch (error: any) {
-                console.error("Failed to cancel MP order:", error);
-                addToast(`Erro ao cancelar no MP: ${error.message}`, 'error');
-            }
-        }
-    }, [addToast]);
-
-    const handleRefundMercadoPagoOrder = useCallback(async (mercadoPagoOrderId: string) => {
-        if (window.confirm("Tem certeza que deseja reembolsar este pedido no Mercado Pago? Esta ação não pode ser desfeita.")) {
-            try {
-                await firebaseService.refundMercadoPagoOrder(mercadoPagoOrderId);
-                addToast("Reembolso solicitado ao Mercado Pago com sucesso!", 'success');
-            } catch (error: any) {
-                console.error("Failed to refund MP order:", error);
-                addToast(`Erro ao reembolsar no MP: ${error.message}`, 'error');
             }
         }
     }, [addToast]);
