@@ -9,6 +9,8 @@ interface OrderCardProps {
     onUpdateReservationTime: (orderId: string, reservationTime: string) => void;
     onDelete: (orderId: string) => void;
     onPermanentDelete: (orderId: string) => void;
+    onCancelMP?: (mercadoPagoOrderId: string) => void;
+    onRefundMP?: (mercadoPagoOrderId: string) => void;
 }
 
 // This is now a function to provide dynamic text based on the order type
@@ -45,6 +47,8 @@ const getPaymentStatusInfo = (order: Order): { text: string; isPaid: boolean } =
             return { text: 'Pago pelo SITE', isPaid: true };
         case 'paid':
             return { text: 'Pago', isPaid: true };
+        case 'refunded':
+            return { text: 'Reembolsado', isPaid: false };
         case 'pending':
         default:
             return { text: 'Pendente', isPaid: false };
@@ -52,7 +56,7 @@ const getPaymentStatusInfo = (order: Order): { text: string; isPaid: boolean } =
 };
 
 
-export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete }) => {
+export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete, onCancelMP, onRefundMP }) => {
     const { id, customer, items, total, paymentMethod, changeNeeded, changeAmount, notes, status, paymentStatus, createdAt, pickupTimeEstimate } = order;
     const config = getStatusConfig(order);
     const { text: paymentStatusText, isPaid } = getPaymentStatusInfo(order);
@@ -91,6 +95,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
     };
 
     const isArchived = status === 'completed' || status === 'cancelled';
+    const latestTransaction = useMemo(() => order.mercadoPagoTransactions?.[order.mercadoPagoTransactions.length - 1], [order.mercadoPagoTransactions]);
+
 
     // Logic for the status changer dropdown
     const statusOptionsMap: { [key in OrderStatus]?: string } = {
@@ -150,6 +156,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
             >
                 <option value="pending">Pendente</option>
                 <option value="paid">Pago</option>
+                 <option value="refunded">Reembolsado</option>
                 {order.paymentStatus === 'paid_online' && (
                     <option value="paid_online" disabled>Pago pelo Site</option>
                 )}
@@ -232,16 +239,16 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 {paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {changeNeeded ? `para R$ ${changeAmount}` : 'Não precisa'}</p> )}
                             </div>
 
-                            {(order.mercadoPagoDetails || notes) && (
+                            {(latestTransaction || notes) && (
                                 <div className="mt-2 pt-2 border-t border-gray-200 space-y-2">
-                                    {order.mercadoPagoDetails && (
+                                    {latestTransaction && (
                                         <div className="text-xs space-y-1">
                                             <div>
-                                                {order.mercadoPagoDetails.transactionId && <p><strong>ID Transação:</strong> {order.mercadoPagoDetails.transactionId}</p>}
-                                                <p><strong>ID Pagamento:</strong> {order.mercadoPagoDetails.paymentId}</p>
+                                                <p><strong>ID Ordem MP:</strong> {order.mercadoPagoOrderId}</p>
+                                                <p><strong>ID Transação MP:</strong> {latestTransaction.id}</p>
                                             </div>
                                             <a 
-                                                href={`https://www.mercadopago.com.br/payments/${order.mercadoPagoDetails.paymentId}/receipt`}
+                                                href={`https://www.mercadopago.com.br/payments/${latestTransaction.id}/receipt`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="inline-flex items-center gap-2 text-sm bg-blue-100 text-blue-700 font-semibold py-1 px-2 rounded-md hover:bg-blue-200"
@@ -273,6 +280,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                         ) : status === 'pending' ? (
                             <>
                                 <div className="flex-grow"></div>
+                                {onCancelMP && order.mercadoPagoOrderId && <button onClick={() => onCancelMP(order.mercadoPagoOrderId!)} className="bg-orange-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-orange-600"><i className="fas fa-ban mr-2"></i>Cancelar MP</button>}
                                 <button onClick={handleAccept} className="bg-green-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-green-600"><i className="fas fa-check mr-2"></i>Aceitar</button>
                                 <button onClick={() => onUpdateStatus(id, 'cancelled')} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Cancelar</button>
                             </>
@@ -281,9 +289,13 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 {paymentStatusChanger}
                                 <div className="flex-grow"></div>
                                 
-                                {/* Next-step buttons */}
                                 {status === 'accepted' && customer.orderType !== 'local' && <button onClick={() => onUpdateStatus(id, 'ready')} className="bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-blue-600"><i className="fas fa-box-open mr-2"></i>Pronto</button>}
                                 {(status === 'ready' || status === 'reserved') && <button onClick={() => onUpdateStatus(id, 'completed')} className="bg-purple-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-purple-600"><i className="fas fa-flag-checkered mr-2"></i>Finalizar</button>}
+                                
+                                {onRefundMP && order.mercadoPagoOrderId && isPaid && <button onClick={() => onRefundMP(order.mercadoPagoOrderId!)} className="bg-yellow-500 text-gray-800 font-semibold py-2 px-3 rounded-lg text-sm hover:bg-yellow-600"><i className="fas fa-undo mr-2"></i>Reembolsar MP</button>}
+                                {/* FIX: The condition `status === 'pending'` was unreachable in this code block due to parent conditional logic.
+It has been removed to fix the TypeScript error and avoid redundant checks, as the 'pending' case is handled elsewhere. */}
+                                {onCancelMP && order.mercadoPagoOrderId && (status === 'awaiting-payment') && <button onClick={() => onCancelMP(order.mercadoPagoOrderId!)} className="bg-orange-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-orange-600"><i className="fas fa-ban mr-2"></i>Cancelar MP</button>}
                                 
                                 {!isArchived && <button onClick={() => onUpdateStatus(id, 'cancelled')} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Cancelar</button>}
 

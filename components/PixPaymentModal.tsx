@@ -28,7 +28,10 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
             setIsPaid(false);
             setTimeLeft(PIX_EXPIRATION_SECONDS);
 
-            firebaseService.initiateMercadoPagoPixPayment(order.id)
+            // FIX: The function was corrected from 'initiateMercadoPagoPixPayment' to the available 'createMercadoPagoOrder'.
+            // The call was also updated to pass the full order data, which is required by the backend function.
+            const { id, createdAt, ...orderData } = order;
+            firebaseService.createMercadoPagoOrder(id, orderData)
                 .then(data => {
                     setPixData(data);
                     setIsLoading(false);

@@ -163,17 +163,47 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
     await orderRef.delete();
 };
 
-// PIX Payment Function
-export const initiateMercadoPagoPixPayment = async (orderId: string): Promise<any> => {
+// --- Mercado Pago Functions ---
+
+export const createMercadoPagoOrder = async (orderId: string, orderData: Omit<Order, 'id' | 'createdAt'>): Promise<any> => {
     if (!functions) {
         throw new Error("Firebase Functions is not initialized.");
     }
-    const createMercadoPagoOrder = functions.httpsCallable('createMercadoPagoOrder');
+    const createOrderFunction = functions.httpsCallable('createMercadoPagoOrder');
     try {
-        const result = await createMercadoPagoOrder({ orderId });
+        const result = await createOrderFunction({ orderId, orderData });
         return result.data;
     } catch (error) {
         console.error("Error calling createMercadoPagoOrder function:", error);
         throw new Error("Não foi possível gerar a cobrança PIX. Tente novamente.");
+    }
+};
+
+export const cancelMercadoPagoOrder = async (mercadoPagoOrderId: string): Promise<any> => {
+    if (!functions) {
+        throw new Error("Firebase Functions is not initialized.");
+    }
+    const cancelOrderFunction = functions.httpsCallable('cancelOrder');
+    try {
+        const result = await cancelOrderFunction({ mercadoPagoOrderId });
+        return result.data;
+    } catch (error) {
+        console.error("Error calling cancelOrder function:", error);
+        throw new Error("Não foi possível cancelar o pedido no Mercado Pago.");
+    }
+};
+
+export const refundMercadoPagoOrder = async (mercadoPagoOrderId: string): Promise<any> => {
+    if (!functions) {
+        throw new Error("Firebase Functions is not initialized.");
+    }
+    // This implements a full refund.
+    const refundOrderFunction = functions.httpsCallable('refundOrder');
+    try {
+        const result = await refundOrderFunction({ mercadoPagoOrderId });
+        return result.data;
+    } catch (error) {
+        console.error("Error calling refundOrder function:", error);
+        throw new Error("Não foi possível reembolsar o pedido no Mercado Pago.");
     }
 };
