@@ -52,76 +52,73 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
       throw new HttpsError("not-found", "Pedido não encontrado.");
     }
     const orderData = orderDoc.data();
-
     const totalAmount = typeof orderData.total === "number" ? orderData.total : parseFloat(orderData.total);
-    if (isNaN(totalAmount)) {
+
+    if (isNaN(totalAmount) || totalAmount <= 0) {
       throw new HttpsError("invalid-argument", "O valor total do pedido é inválido.");
     }
 
+    // This payload is now strictly compliant with the /v1/orders API documentation for PIX.
     const orderPayload = {
       type: "online",
       external_reference: orderId,
-      total_amount: parseFloat(totalAmount.toFixed(2)),
+      total_amount: totalAmount.toFixed(2),
       description: `Pedido #${orderId.substring(0, 6)} da Santa Sensação`,
       notification_url: "https://mercadopagowebhook-lxwiyf7dla-uc.a.run.app",
       items: orderData.items.map((item) => ({
         title: `${item.name} (${item.size})`,
-        unit_price: parseFloat(item.price.toFixed(2)),
+        description: item.name,
+        unit_price: item.price.toFixed(2),
         quantity: item.quantity,
-        description: `Item: ${item.name}`,
       })),
       payer: {
         email: `test_${Date.now()}@testuser.com`,
         first_name: orderData.customer.name.split(" ")[0],
         last_name: orderData.customer.name.split(" ").slice(1).join(" ") || "Cliente",
       },
-      transactions: [{
-        payment_method_id: "pix",
-        amount: parseFloat(totalAmount.toFixed(2)),
-        description: `Pagamento do Pedido #${orderId.substring(0, 6)}`,
-        // expiration_date must be in ISO_8601 format
-        date_of_expiration: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // 5 minutes expiration
-      }],
+      transactions: {
+        payments: [{
+          amount: totalAmount.toFixed(2),
+          payment_method: {
+            id: "pix",
+            type: "bank_transfer",
+          },
+          expiration_time: "P5M", // 5 minutes in ISO 8601 duration format
+        }],
+      },
     };
 
     const idempotencyKey = crypto.randomBytes(16).toString("hex");
 
     const response = await mercadoPagoApi.post("/v1/orders", orderPayload, {
-      headers: {
-        "X-Idempotency-Key": idempotencyKey,
-      },
+      headers: {"X-Idempotency-Key": idempotencyKey},
     });
 
     const mpOrder = response.data;
-    const paymentInfo = mpOrder?.payments?.[0];
+    const paymentInfo = mpOrder?.transactions?.payments?.[0];
 
-    if (!mpOrder || !mpOrder.id || !paymentInfo?.transaction_info?.qr_code_base64) {
+    if (!paymentInfo || !paymentInfo.payment_method?.qr_code_base64) {
       logger.error("Invalid response from Mercado Pago when creating order.", {responseData: mpOrder});
       throw new HttpsError("internal", "Resposta inválida do gateway de pagamento ao gerar PIX.");
     }
 
-    const {qr_code_base64: qrCodeBase64, qr_code: copyPaste} = paymentInfo.transaction_info;
-    const mercadoPagoOrderId = mpOrder.id;
-    const mercadoPagoPaymentId = paymentInfo.id;
+    const {qr_code_base64: qrCodeBase64, qr_code: copyPaste} = paymentInfo.payment_method;
 
     await db.collection("orders").doc(orderId).update({
-      mercadoPagoOrderId: mercadoPagoOrderId,
+      mercadoPagoOrderId: mpOrder.id,
       mercadoPagoDetails: {
-        paymentId: mercadoPagoPaymentId,
+        paymentId: paymentInfo.id,
       },
     });
 
-    logger.info(`Ordem PIX criada para o pedido ${orderId}, ID da Ordem MP: ${mercadoPagoOrderId}`);
+    logger.info(`Ordem PIX criada para o pedido ${orderId}, ID da Ordem MP: ${mpOrder.id}`);
 
-    return {
-      qrCodeBase64,
-      copyPaste,
-    };
+    return {qrCodeBase64, copyPaste};
   } catch (error) {
     const errorData = error.response?.data;
     const errorMessage = errorData?.message || error.message || "Falha na comunicação com o gateway.";
     const errorCauses = errorData?.causes?.map((c) => c.description).join(", ") || "Sem detalhes adicionais.";
-    const finalMessage = `${errorMessage} ${errorCauses ? `(${errorCauses})` : ""}`;
+    const finalMessage = `${errorMessage} (${errorCauses})`;
 
     logger.error(`Erro ao criar ordem no Mercado Pago para o pedido ${orderId}:`, finalMessage, {errorData});
     throw new HttpsError("internal", finalMessage);
@@ -142,17 +139,45 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
   logger.info("Webhook do Mercado Pago recebido:", {headers: request.headers, body: request.body});
 
   try {
+    // Webhook validation
+    const signatureHeader = request.headers["x-signature"];
+    const requestId = request.headers["x-request-id"];
+    const dataId = request.query["data.id"];
+
+    if (!signatureHeader || !requestId || !dataId) {
+      logger.warn("Webhook ignorado: Cabeçalhos de validação ausentes.");
+      response.status(400).send("Bad Request: Missing validation headers.");
+      return;
+    }
+
+    const parts = signatureHeader.split(",").reduce((acc, part) => {
+      const [key, value] = part.split("=");
+      acc[key.trim()] = value.trim();
+      return acc;
+    }, {});
+    const ts = parts.ts;
+    const v1 = parts.v1;
+
+    const manifest = `id:${dataId};request-id:${requestId};ts:${ts};`;
+    const hmac = crypto.createHmac("sha256", MERCADO_PAGO_WEBHOOK_SECRET.value());
+    hmac.update(manifest);
+    const sha = hmac.digest("hex");
+
+    if (crypto.timingSafeEqual(Buffer.from(sha), Buffer.from(v1))) {
+      logger.info(`Validação de Webhook bem-sucedida para data.id: ${dataId}`);
+    } else {
+      logger.error(`Falha na validação do Webhook para data.id: ${dataId}. Assinaturas não correspondem.`);
+      response.status(403).send("Forbidden: Invalid signature.");
+      return;
+    }
+
+    // Process the event
     const topic = request.body.type;
     const mercadoPagoOrderId = request.body.data?.id;
 
     if (topic !== "order") {
       logger.warn(`Webhook ignorado: Tópico '${topic}' não é 'order'.`);
       response.status(200).send("OK (Ignored, not an order event)");
-      return;
-    }
-    if (!mercadoPagoOrderId) {
-      logger.warn("Webhook de ordem ignorado: data.id ausente.");
-      response.status(200).send("OK (Ignored, no data.id)");
       return;
     }
 
@@ -183,7 +208,8 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
         paymentStatus: "paid_online",
         mercadoPagoDetails: {
           ...currentOrderData.mercadoPagoDetails,
-          transactionId: paymentInfo?.id || null, // Payment ID from the order
+          paymentId: paymentInfo?.id || currentOrderData.mercadoPagoDetails?.paymentId || null,
+          transactionId: paymentInfo?.id || null, // For simplicity, using paymentId as transactionId too
         },
       };
       await orderRef.update(updateData);
@@ -201,6 +227,7 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
   } catch (error) {
     const errorMessage = error.response?.data?.message || error.message;
     logger.error("Erro ao processar webhook do Mercado Pago:", errorMessage, error.response?.data || error);
+    // Respond with 200 to prevent Mercado Pago from retrying on internal errors.
     response.status(200).send("OK (Error logged)");
   }
 });
@@ -225,7 +252,7 @@ exports.cancelMercadoPagoOrder = onCall(async (request) => {
     const response = await mercadoPagoApi.post(`/v1/orders/${mercadoPagoOrderId}/cancel`);
 
     if (response.data.status === "cancelled") {
-      await db.collection("orders").doc(firestoreOrderId).update({status: "cancelled"});
+      await db.collection("orders").doc(firestoreOrderId).update({status: "cancelled", paymentStatus: "pending"});
       logger.info(`Ordem MP ${mercadoPagoOrderId} para o pedido ${firestoreOrderId} cancelada com sucesso.`);
       return {success: true, message: "Ordem do Mercado Pago cancelada."};
     } else {
@@ -253,12 +280,12 @@ exports.refundMercadoPagoOrder = onCall(async (request) => {
 
     const {mercadoPagoOrderId, mercadoPagoDetails} = orderDoc.data();
     if (!mercadoPagoOrderId) throw new HttpsError("failed-precondition", "ID da Ordem do Mercado Pago não encontrado para este pedido.");
+    if (!mercadoPagoDetails?.paymentId) {
+      throw new HttpsError("failed-precondition", "ID de Pagamento do MP não encontrado. O reembolso não pode ser processado.");
+    }
 
-    let refundPayload = {}; // Empty for full refund
+    let refundPayload = {}; // Empty body for full refund
     if (amount && amount > 0) {
-      if (!mercadoPagoDetails?.paymentId) {
-        throw new HttpsError("failed-precondition", "ID de Pagamento do MP necessário para reembolso parcial.");
-      }
       refundPayload = {
         transactions: [{
           id: mercadoPagoDetails.paymentId,
@@ -269,6 +296,7 @@ exports.refundMercadoPagoOrder = onCall(async (request) => {
 
     const idempotencyKey = crypto.randomBytes(16).toString("hex");
 
+    // The endpoint is /refundS not /refund
     const response = await mercadoPagoApi.post(`/v1/orders/${mercadoPagoOrderId}/refunds`, refundPayload, {
       headers: {"X-Idempotency-Key": idempotencyKey},
     });
