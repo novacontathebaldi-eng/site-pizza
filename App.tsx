@@ -127,12 +127,11 @@ const App: React.FC = () => {
     const [activeMenuCategory, setActiveMenuCategory] = useState<string>('');
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [siteSettings, setSiteSettings] = useState<SiteSettings>(defaultSiteSettings);
-    // FIX: Add state to manage the PIX payment flow modals and data.
-    const [pendingOrderForPix, setPendingOrderForPix] = useState<Order | null>(null);
-    const [isPixModalOpen, setIsPixModalOpen] = useState(false);
-    const [isPaymentFailureModalOpen, setIsPaymentFailureModalOpen] = useState(false);
     const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
     const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
+    const [payingOrder, setPayingOrder] = useState<Order | null>(null);
+    const [showPaymentFailureModal, setShowPaymentFailureModal] = useState<boolean>(false);
+    const [pixRetryKey, setPixRetryKey] = useState<number>(0);
     
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
@@ -301,31 +300,6 @@ const App: React.FC = () => {
         });
     }, []);
     
-    // FIX: Add a dedicated handler to initiate the PIX payment flow.
-    const handleInitiatePixPayment = async (details: OrderDetails) => {
-        setIsCheckoutModalOpen(false); // Close checkout modal immediately
-        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        
-        // Create an order with a special status to indicate it's waiting for online payment.
-        const newOrderData: Omit<Order, 'id' | 'createdAt' | 'pickupTimeEstimate'> = {
-            customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.orderType === 'delivery' ? details.address : '', reservationTime: details.orderType === 'local' ? details.reservationTime : '', },
-            items: cart, total, paymentMethod: details.paymentMethod,
-            changeNeeded: false, changeAmount: '',
-            notes: details.notes || '', status: 'awaiting-payment' as OrderStatus, paymentStatus: 'pending' as PaymentStatus,
-        };
-
-        try {
-            const docRef = await firebaseService.addOrder(newOrderData);
-            // Firestore's `createdAt` is a server timestamp, so we just use a client-side date for the local state.
-            const pendingOrder: Order = { ...newOrderData, id: docRef.id, createdAt: new Date() };
-            setPendingOrderForPix(pendingOrder);
-            setIsPixModalOpen(true);
-        } catch (error) {
-            console.error("Failed to create order for PIX payment:", error);
-            addToast("Erro ao iniciar o pagamento com PIX. Tente novamente.", 'error');
-        }
-    };
-
     const handleCheckout = async (details: OrderDetails) => {
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         const whatsappUrl = generateWhatsAppMessage(details, cart, total, false);
@@ -351,6 +325,98 @@ const App: React.FC = () => {
         setIsCheckoutModalOpen(false);
         setIsCartOpen(false);
     };
+
+    const handleInitiatePixPayment = async (details: OrderDetails) => {
+        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
+            customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.orderType === 'delivery' ? details.address : '', reservationTime: details.orderType === 'local' ? details.reservationTime : '', },
+            items: cart, total, paymentMethod: 'pix',
+            notes: details.notes || '', status: 'awaiting-payment' as OrderStatus, paymentStatus: 'pending' as PaymentStatus,
+        };
+
+        try {
+            const docRef = await firebaseService.addOrder(newOrderData);
+            const createdOrder: Order = { ...newOrderData, id: docRef.id, createdAt: new Date() };
+            addToast("Pedido pré-salvo, aguardando pagamento.", 'success');
+            setIsCheckoutModalOpen(false);
+            setPayingOrder(createdOrder);
+            setPixRetryKey(k => k + 1);
+        } catch (error) {
+            console.error("Failed to pre-save order:", error);
+            addToast("Erro ao iniciar pagamento. Tente novamente.", 'error');
+        }
+    };
+
+    const handlePixPaymentSuccess = useCallback(async (paidOrder: Order) => {
+        if (!paidOrder || !paidOrder.id) {
+            console.error("handlePixPaymentSuccess called without a valid paidOrder object.");
+            addToast("Erro crítico ao processar pagamento. Contate o suporte.", 'error');
+            return;
+        }
+
+        try {
+            await firebaseService.updateOrderStatus(paidOrder.id, 'pending');
+            await firebaseService.updateOrderPaymentStatus(paidOrder.id, 'paid_online');
+            
+            addToast("Pagamento confirmado! Seu pedido foi enviado para a pizzaria.", 'success');
+
+            const details: OrderDetails = {
+                name: paidOrder.customer.name, phone: paidOrder.customer.phone, orderType: paidOrder.customer.orderType,
+                address: paidOrder.customer.address || '', paymentMethod: 'pix', changeNeeded: false,
+                notes: paidOrder.notes || '', reservationTime: paidOrder.customer.reservationTime || ''
+            };
+            const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, true);
+            window.open(whatsappUrl, '_blank');
+
+            setCart([]);
+            setPayingOrder(null);
+            setIsCartOpen(false);
+        } catch (error) {
+             console.error("Error finalizing paid order:", error);
+            addToast("Erro ao finalizar o pedido após o pagamento. Contate o suporte.", 'error');
+        }
+    }, [addToast, setCart, setPayingOrder, setIsCartOpen]);
+
+    const handleClosePixModal = () => {
+        if (payingOrder) {
+            setShowPaymentFailureModal(true);
+        }
+    };
+    
+    const handleTryAgainPix = () => {
+        setShowPaymentFailureModal(false);
+        setPixRetryKey(k => k + 1);
+    };
+
+    const handlePayLaterFromFailure = async () => {
+        if (!payingOrder) return;
+    
+        const orderToUpdate = { ...payingOrder };
+        setShowPaymentFailureModal(false);
+        setPayingOrder(null);
+
+        try {
+            await firebaseService.updateOrderStatus(orderToUpdate.id, 'pending');
+    
+            const details: OrderDetails = {
+                name: orderToUpdate.customer.name, phone: orderToUpdate.customer.phone, orderType: orderToUpdate.customer.orderType,
+                address: orderToUpdate.customer.address || '', paymentMethod: 'pix',
+                changeNeeded: false, changeAmount: '',
+                notes: orderToUpdate.notes || '', reservationTime: orderToUpdate.customer.reservationTime || ''
+            };
+            const whatsappUrl = generateWhatsAppMessage(details, orderToUpdate.items, orderToUpdate.total, false);
+            window.open(whatsappUrl, '_blank');
+            
+            addToast("Pedido enviado! O pagamento será feito depois.", 'success');
+            setCart([]);
+            setIsCartOpen(false);
+
+        } catch (error) {
+            console.error("Failed to update order to pending:", error);
+            addToast("Erro ao processar o pedido. Tente novamente.", 'error');
+        }
+    };
+
 
     const handleSaveProduct = useCallback(async (product: Product) => {
         try {
@@ -675,69 +741,23 @@ const App: React.FC = () => {
                 onClose={() => setIsCheckoutModalOpen(false)}
                 cartItems={cart}
                 onConfirmCheckout={handleCheckout}
-                // FIX: Pass the new PIX handler to the checkout modal.
                 onInitiatePixPayment={handleInitiatePixPayment}
             />
-            
-            {/* FIX: Render the PIX and Payment Failure modals to manage the online payment flow. */}
-            <PixPaymentModal
-                order={pendingOrderForPix}
-                onClose={() => {
-                    setIsPixModalOpen(false);
-                    if (pendingOrderForPix) {
-                        // If the user closes the modal without paying, ask them what to do next.
-                        setIsPaymentFailureModalOpen(true);
-                    }
-                }}
-                onPaymentSuccess={(paidOrder) => {
-                    setIsPixModalOpen(false);
-                    setPendingOrderForPix(null);
-                    addToast('Pagamento confirmado! Seu pedido está sendo preparado.', 'success');
-                    
-                    const orderDetails: OrderDetails = {
-                        name: paidOrder.customer.name, phone: paidOrder.customer.phone,
-                        orderType: paidOrder.customer.orderType, address: paidOrder.customer.address || '',
-                        paymentMethod: 'pix', changeNeeded: false,
-                        notes: paidOrder.notes || '', reservationTime: paidOrder.customer.reservationTime || '',
-                    };
-                    const whatsappUrl = generateWhatsAppMessage(orderDetails, paidOrder.items, paidOrder.total, true);
-                    window.open(whatsappUrl, '_blank');
-                    setCart([]);
-                    setIsCartOpen(false);
-                }}
+             <PixPaymentModal
+                key={pixRetryKey}
+                order={payingOrder}
+                onClose={handleClosePixModal}
+                onPaymentSuccess={handlePixPaymentSuccess}
             />
 
             <PaymentFailureModal
-                isOpen={isPaymentFailureModalOpen}
+                isOpen={showPaymentFailureModal}
                 onClose={() => {
-                    setIsPaymentFailureModalOpen(false);
-                    setPendingOrderForPix(null);
+                    setShowPaymentFailureModal(false);
+                    setPayingOrder(null);
                 }}
-                onTryAgain={() => {
-                    setIsPaymentFailureModalOpen(false);
-                    setIsPixModalOpen(true); // Re-open PIX modal for another try.
-                }}
-                onPayLater={() => {
-                    if (pendingOrderForPix) {
-                        // Change the order status so it appears as a regular pending order in the admin panel.
-                        firebaseService.updateOrderStatus(pendingOrderForPix.id, 'pending');
-                        
-                        const orderDetails: OrderDetails = {
-                            name: pendingOrderForPix.customer.name, phone: pendingOrderForPix.customer.phone,
-                            orderType: pendingOrderForPix.customer.orderType, address: pendingOrderForPix.customer.address || '',
-                            paymentMethod: 'pix', changeNeeded: false, 
-                            notes: pendingOrderForPix.notes || '', reservationTime: pendingOrderForPix.customer.reservationTime || '',
-                        };
-                        // Send a WhatsApp message indicating payment will be made later.
-                        const whatsappUrl = generateWhatsAppMessage(orderDetails, pendingOrderForPix.items, pendingOrderForPix.total, false);
-                        window.open(whatsappUrl, '_blank');
-                        addToast('Seu pedido foi salvo. O pagamento será feito no balcão.', 'success');
-                    }
-                    setIsPaymentFailureModalOpen(false);
-                    setPendingOrderForPix(null);
-                    setCart([]);
-                    setIsCartOpen(false);
-                }}
+                onTryAgain={handleTryAgainPix}
+                onPayLater={handlePayLaterFromFailure}
             />
             
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]">
