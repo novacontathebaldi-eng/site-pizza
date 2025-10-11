@@ -98,7 +98,8 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
     
-    const pixDeepLink = pixData ? `pix://qr/${pixData.copyPaste}` : '#';
+    // FIX: URL-encode the copyPaste string to prevent "invalid address" errors on browsers like Safari.
+    const pixDeepLink = pixData ? `pix://qr/${encodeURIComponent(pixData.copyPaste.trim())}` : '#';
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
@@ -130,20 +131,7 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                     )}
                     {!isLoading && !error && !isPaid && pixData && (
                         <div className="space-y-4">
-                            {isMobile && (
-                                <div className="animate-fade-in-up mb-6">
-                                     <a 
-                                        href={pixDeepLink} 
-                                        className="w-full inline-block bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all transform hover:scale-105"
-                                    >
-                                        <i className="fas fa-mobile-alt mr-2"></i>
-                                        Pagar com App do Banco
-                                    </a>
-                                    <p className="text-xs text-gray-500 mt-2">Clique para ser redirecionado ao seu app e finalizar o pagamento.</p>
-                                </div>
-                            )}
-
-                            <p>{isMobile ? 'Ou escaneie' : 'Escaneie'} o QR Code abaixo com o app do seu banco:</p>
+                            <p>Escaneie o QR Code abaixo com o app do seu banco:</p>
                             <div className="flex justify-center">
                                 <img src={`data:image/png;base64,${pixData.qrCodeBase64}`} alt="PIX QR Code" className="w-56 h-56 border-4 border-gray-200 rounded-lg" />
                             </div>
@@ -163,6 +151,26 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                                 </button>
                             </div>
                             {copySuccess && <p className="text-sm text-green-600">Copiado para a área de transferência!</p>}
+
+                            {/* Mobile-only Deep Link Button - Repositioned for better UX */}
+                            {isMobile && (
+                                <div className="animate-fade-in-up pt-4">
+                                    <div className="relative flex py-2 items-center">
+                                        <div className="flex-grow border-t border-gray-200"></div>
+                                        <span className="flex-shrink mx-4 text-gray-400 text-sm">OU</span>
+                                        <div className="flex-grow border-t border-gray-200"></div>
+                                    </div>
+                                    <a 
+                                        href={pixDeepLink} 
+                                        className="w-full inline-block bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all transform hover:scale-105"
+                                    >
+                                        <i className="fas fa-mobile-alt mr-2"></i>
+                                        Pagar com App do Banco
+                                    </a>
+                                    <p className="text-xs text-gray-500 mt-2">Clique para ser redirecionado e finalizar o pagamento.</p>
+                                </div>
+                            )}
+
                             <p className="text-xs text-gray-500 pt-4">Após o pagamento, a confirmação será automática nesta tela.</p>
                         </div>
                     )}
