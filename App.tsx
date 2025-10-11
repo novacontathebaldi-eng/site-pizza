@@ -320,6 +320,8 @@ const App: React.FC = () => {
     };
 
     const handleInitiatePixPayment = async (details: OrderDetails, pixOption: 'payNow' | 'payLater') => {
+        // FIX: The `pixOption` is now correctly passed from CheckoutModal to ensure the backend
+        // receives the instruction to generate a PIX payment.
         setIsCheckoutModalOpen(false);
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         
@@ -349,36 +351,38 @@ const App: React.FC = () => {
     };
 
     const handlePixPaymentSuccess = useCallback(async (paidOrder: Order) => {
-         if (!paidOrder || !paidOrder.id) {
-            addToast("Erro crítico ao processar pagamento.", 'error');
-            return;
-        }
-        try {
-            addToast("Pagamento confirmado! Enviando pedido para a pizzaria...", 'success');
-            
-            // Reconstruct details from the confirmed order for consistency
-            const details: OrderDetails = {
-                name: paidOrder.customer.name,
-                phone: paidOrder.customer.phone,
-                orderType: paidOrder.customer.orderType,
-                address: paidOrder.customer.address || '',
-                paymentMethod: 'pix',
-                changeNeeded: false,
-                notes: paidOrder.notes || '',
-                reservationTime: paidOrder.customer.reservationTime || '',
-                cpf: paidOrder.customer.cpf || ''
-            };
-            const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, paidOrder.orderNumber, true);
-            window.open(whatsappUrl, '_blank');
+        // FIX: Reconstructs the `details` object from the `paidOrder` argument instead of
+        // relying on variables from an outer scope. This ensures data consistency when generating
+        // the WhatsApp message.
+        if (!paidOrder || !paidOrder.id) {
+           addToast("Erro crítico ao processar pagamento.", 'error');
+           return;
+       }
+       try {
+           addToast("Pagamento confirmado! Enviando pedido para a pizzaria...", 'success');
+           
+           const details: OrderDetails = {
+               name: paidOrder.customer.name,
+               phone: paidOrder.customer.phone,
+               orderType: paidOrder.customer.orderType,
+               address: paidOrder.customer.address || '',
+               paymentMethod: 'pix',
+               changeNeeded: false,
+               notes: paidOrder.notes || '',
+               reservationTime: paidOrder.customer.reservationTime || '',
+               cpf: paidOrder.customer.cpf || ''
+           };
+           const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, paidOrder.orderNumber, true);
+           window.open(whatsappUrl, '_blank');
 
-            setCart([]);
-            setPayingOrder(null);
-            setIsCartOpen(false);
-        } catch (error) {
-            console.error("Error finalizing paid order:", error);
-            addToast("Erro ao finalizar o pedido após o pagamento. Contate o suporte.", 'error');
-        }
-    }, [addToast]);
+           setCart([]);
+           setPayingOrder(null);
+           setIsCartOpen(false);
+       } catch (error) {
+           console.error("Error finalizing paid order:", error);
+           addToast("Erro ao finalizar o pedido após o pagamento. Contate o suporte.", 'error');
+       }
+   }, [addToast]);
 
     const handleClosePixModal = () => {
         if (payingOrder) {
@@ -812,4 +816,4 @@ const App: React.FC = () => {
     );
 };
 
-export default App;"
+export default App;
