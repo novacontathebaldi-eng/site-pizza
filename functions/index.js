@@ -1,6 +1,5 @@
 /* eslint-disable max-len */
 const {onCall, onRequest} = require("firebase-functions/v2/https");
-const {runWith} = require("firebase-functions");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago");
@@ -28,7 +27,7 @@ const client = new MercadoPagoConfig({accessToken});
 /**
  * Creates an order in Firestore and optionally initiates a PIX payment.
  */
-exports.createOrder = runWith({secrets}).onCall(async (request) => {
+exports.createOrder = onCall({secrets}, async (request) => {
   const {details, cart, total} = request.data;
 
   // 1. Validate input
@@ -230,7 +229,7 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
 /**
  * Processes a full refund for a given order.
  */
-exports.refundPayment = runWith({secrets}).onCall(async (request) => {
+exports.refundPayment = onCall({secrets}, async (request) => {
   const {orderId} = request.data;
   if (!orderId) {
     throw new Error("O ID do pedido é obrigatório para o estorno.");
