@@ -18,17 +18,23 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
     const [isPaid, setIsPaid] = useState(false);
     const [copySuccess, setCopySuccess] = useState(false);
     const timerRef = useRef<number | null>(null);
+    const [isMobile, setIsMobile] = useState(false);
+
+    // Effect to detect mobile device on client-side
+    useEffect(() => {
+        const userAgent = typeof window.navigator === "undefined" ? "" : navigator.userAgent;
+        const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+        setIsMobile(mobileRegex.test(userAgent));
+    }, []);
 
     // Effect to set up PIX data from the order prop when modal opens
     useEffect(() => {
         if (order) {
-            setIsLoading(false); // Data is passed in via props, no async loading needed here.
+            setIsLoading(false);
             setError(null);
             setIsPaid(false);
             setTimeLeft(PIX_EXPIRATION_SECONDS);
 
-            // FIX: The PIX data is now generated *before* this modal opens and passed in the `order` prop.
-            // This removes the call to the non-existent `initiateMercadoPagoPixPayment` function.
             const qrCodeBase64 = order.mercadoPagoDetails?.qrCodeBase64;
             const copyPaste = order.mercadoPagoDetails?.qrCode;
 
@@ -91,6 +97,8 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
     
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
+    
+    const pixDeepLink = pixData ? `pix://qr/${pixData.copyPaste}` : '#';
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
@@ -122,7 +130,20 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                     )}
                     {!isLoading && !error && !isPaid && pixData && (
                         <div className="space-y-4">
-                            <p>Escaneie o QR Code abaixo com o app do seu banco:</p>
+                            {isMobile && (
+                                <div className="animate-fade-in-up mb-6">
+                                     <a 
+                                        href={pixDeepLink} 
+                                        className="w-full inline-block bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all transform hover:scale-105"
+                                    >
+                                        <i className="fas fa-mobile-alt mr-2"></i>
+                                        Pagar com App do Banco
+                                    </a>
+                                    <p className="text-xs text-gray-500 mt-2">Clique para ser redirecionado ao seu app e finalizar o pagamento.</p>
+                                </div>
+                            )}
+
+                            <p>{isMobile ? 'Ou escaneie' : 'Escaneie'} o QR Code abaixo com o app do seu banco:</p>
                             <div className="flex justify-center">
                                 <img src={`data:image/png;base64,${pixData.qrCodeBase64}`} alt="PIX QR Code" className="w-56 h-56 border-4 border-gray-200 rounded-lg" />
                             </div>
