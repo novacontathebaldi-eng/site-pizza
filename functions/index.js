@@ -1,4 +1,3 @@
-```javascript
 /* eslint-disable max-len */
 const {onCall} = require("firebase-functions/v2/https");
 const {onRequest} = require("firebase-functions/v2/https");
@@ -59,7 +58,7 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
       })),
       payer: {
         email: `cliente${orderId.substring(0, 8)}@santasensacao.com.br`,
-        first_name: orderData.customer.name.split(" ")[0],
+        first_name: orderData.customer.name.split(" "),
         last_name: orderData.customer.name.split(" ").slice(1).join(" ") || "Cliente",
       },
       total_amount: orderData.total,
@@ -72,7 +71,7 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
               description: `Pedido #${orderId.substring(0, 8)} - ${orderData.customer.name}`,
               payer: {
                 email: `cliente${orderId.substring(0, 8)}@santasensacao.com.br`,
-                first_name: orderData.customer.name.split(" ")[0],
+                first_name: orderData.customer.name.split(" "),
                 last_name: orderData.customer.name.split(" ").slice(1).join(" ") || "Cliente",
                 identification: {
                   type: "CPF",
@@ -96,8 +95,8 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
     }
 
     const mpOrder = response.data;
-    const transaction = mpOrder.transactions?.[0];
-    const payment = transaction?.payments?.[0];
+    const transaction = mpOrder.transactions?.;
+    const payment = transaction?.payments?.;
 
     // Extrair dados do QR Code PIX
     const qrCodeBase64 = payment?.point_of_interaction?.transaction_data?.qr_code_base64;
@@ -117,10 +116,10 @@ exports.createMercadoPagoOrder = onCall(async (request) => {
           id: t.id?.toString(),
           type: t.type || "payment",
           amount: t.total_amount || 0,
-          status: t.payments?.[0]?.status || "pending",
-          paymentMethodId: t.payments?.[0]?.payment_method_id,
-          qrCode: t.payments?.[0]?.point_of_interaction?.transaction_data?.qr_code,
-          qrCodeBase64: t.payments?.[0]?.point_of_interaction?.transaction_data?.qr_code_base64,
+          status: t.payments?.?.status || "pending",
+          paymentMethodId: t.payments?.?.payment_method_id,
+          qrCode: t.payments?.?.point_of_interaction?.transaction_data?.qr_code,
+          qrCodeBase64: t.payments?.?.point_of_interaction?.transaction_data?.qr_code_base64,
         })),
         totalAmount: mpOrder.total_amount,
         paidAmount: mpOrder.paid_amount || 0,
@@ -343,7 +342,7 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
           id: t.id?.toString(),
           type: t.type || "payment",
           amount: t.total_amount || 0,
-          status: t.payments?.[0]?.status || "pending",
+          status: t.payments?.?.status || "pending",
         })),
       };
 
@@ -361,4 +360,3 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
     response.status(200).send("OK");
   }
 });
-```

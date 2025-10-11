@@ -1,4 +1,3 @@
-```typescript
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 
 import firebase from 'firebase/compat/app';
@@ -273,4 +272,3 @@ export const pollPaymentStatus = (
     isPolling = false;
   };
 };
-```

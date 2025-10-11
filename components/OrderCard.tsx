@@ -1,4 +1,3 @@
-```typescript
 import React, { useState } from 'react';
 import { Clock, MapPin, User, Phone, CheckCircle, XCircle, RefreshCw, CreditCard, DollarSign } from 'lucide-react';
 import { Order, OrderStatus, PaymentStatus } from '../types';
@@ -128,9 +127,9 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   };
 
   const handleRefund = async (isPartial: boolean = false) => {
-    if (!mercadoPagoOrder?.orderId || !mercadoPagoOrder.transactions[0]?.id || !isAdmin) return;
+    if (!mercadoPagoOrder?.orderId || !mercadoPagoOrder.transactions?.id || !isAdmin) return;
 
-    const transactionId = mercadoPagoOrder.transactions[0].id;
+    const transactionId = mercadoPagoOrder.transactions.id;
     let refundAmount: number | undefined = undefined;
 
     if (isPartial) {
@@ -163,9 +162,9 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   };
 
   const handleCapture = async () => {
-    if (!mercadoPagoOrder?.orderId || !mercadoPagoOrder.transactions[0]?.id || !isAdmin) return;
+    if (!mercadoPagoOrder?.orderId || !mercadoPagoOrder.transactions?.id || !isAdmin) return;
 
-    const transactionId = mercadoPagoOrder.transactions[0].id;
+    const transactionId = mercadoPagoOrder.transactions.id;
 
     setActionLoading('capture');
     try {
@@ -266,9 +265,9 @@ export const OrderCard: React.FC<OrderCardProps> = ({
             <p className="text-xs text-blue-700">
               **ID Transação:** {mercadoPagoOrder.orderId}
             </p>
-            {mercadoPagoOrder.transactions[0]?.id && (
+            {mercadoPagoOrder.transactions?.id && (
               <p className="text-xs text-blue-700">
-                **ID Pagamento:** {mercadoPagoOrder.transactions[0].id}
+                **ID Pagamento:** {mercadoPagoOrder.transactions.id}
               </p>
             )}
           </div>
@@ -393,4 +392,3 @@ export const OrderCard: React.FC<OrderCardProps> = ({
     </div>
   );
 };
-```

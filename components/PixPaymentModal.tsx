@@ -1,4 +1,3 @@
-```typescript
 import React, { useState, useEffect } from 'react';
 import { X, Copy, CheckCircle, XCircle, Clock, RefreshCw } from 'lucide-react';
 import * as firebaseService from '../services/firebaseService';
@@ -276,4 +275,3 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({
     </div>
   );
 };
-```
