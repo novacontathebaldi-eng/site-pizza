@@ -1,7 +1,7 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
 import { db, storage, functions } from './firebase';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem } from './types';
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -140,13 +140,13 @@ export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promi
  * @param total The total amount of the order.
  * @returns An object containing the new order's ID, its number, and PIX data if applicable.
  */
-export const createOrder = async (details: OrderDetails, cart: CartItem[], total: number): Promise<{ orderId: string, orderNumber: number, pixData?: any }> => {
+export const createOrder = async (details: OrderDetails, cart: CartItem[], total: number, pixOption?: 'payNow' | 'payLater'): Promise<{ orderId: string, orderNumber: number, pixData?: any }> => {
     if (!functions) {
         throw new Error("Firebase Functions is not initialized.");
     }
     const createOrderFunction = functions.httpsCallable('createOrder');
     try {
-        const result = await createOrderFunction({ details, cart, total });
+        const result = await createOrderFunction({ details, cart, total, pixOption });
         return result.data;
     } catch (error) {
         console.error("Error calling createOrder function:", error);

@@ -305,7 +305,7 @@ const App: React.FC = () => {
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
         try {
-            const { orderId, orderNumber } = await firebaseService.createOrder(details, cart, total);
+            const { orderId, orderNumber } = await firebaseService.createOrder(details, cart, total, 'payLater');
             addToast(`Pedido #${orderNumber} criado! Enviando para o WhatsApp...`, 'success');
             
             const whatsappUrl = generateWhatsAppMessage(details, cart, total, orderNumber, false);
@@ -319,16 +319,20 @@ const App: React.FC = () => {
         }
     };
 
-    const handleInitiatePixPayment = async (details: OrderDetails) => {
+    const handleInitiatePixPayment = async (details: OrderDetails, pixOption: 'payNow' | 'payLater') => {
         setIsCheckoutModalOpen(false);
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         
         try {
-            const { orderId, pixData } = await firebaseService.createOrder(details, cart, total);
+            const { orderId, orderNumber, pixData } = await firebaseService.createOrder(details, cart, total, pixOption);
             
+            if (!pixData || !pixData.qrCodeBase64) {
+                 throw new Error("A resposta do servidor não incluiu os dados do PIX.");
+            }
+
             const newOrder: Order = {
                 id: orderId,
-                orderNumber: 0, // temp, will be in Firestore
+                orderNumber: orderNumber,
                 customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.address },
                 items: cart, total, paymentMethod: 'pix', status: 'awaiting-payment', paymentStatus: 'pending',
                 createdAt: new Date(),
@@ -340,6 +344,7 @@ const App: React.FC = () => {
         } catch (error: any) {
             console.error("Failed to initiate PIX payment:", error);
             addToast(error.message || "Erro ao iniciar pagamento PIX.", 'error');
+            setPayingOrder(null);
         }
     };
 

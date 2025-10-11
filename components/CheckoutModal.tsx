@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { CartItem, OrderDetails } from '../types';
 
@@ -7,7 +6,7 @@ interface CheckoutModalProps {
     onClose: () => void;
     cartItems: CartItem[];
     onConfirmCheckout: (details: OrderDetails) => void;
-    onInitiatePixPayment: (details: OrderDetails) => void;
+    onInitiatePixPayment: (details: OrderDetails, pixOption: 'payNow' | 'payLater') => void;
 }
 
 const getSuggestedTimes = () => {
@@ -71,7 +70,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
 
         if (paymentMethod === 'pix') {
             if (pixPaymentOption === 'payNow') {
-                onInitiatePixPayment(details);
+                onInitiatePixPayment(details, 'payNow');
             } else if (pixPaymentOption === 'payLater') {
                 onConfirmCheckout(details);
             } else {
