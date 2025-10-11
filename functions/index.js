@@ -1,5 +1,6 @@
 /* eslint-disable max-len */
 const {onCall, onRequest} = require("firebase-functions/v2/https");
+const {runWith} = require("firebase-functions");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago");
@@ -9,19 +10,8 @@ require("dotenv").config();
 admin.initializeApp();
 const db = admin.firestore();
 
-// --- ATENÇÃO ---
-// Suas credenciais do Mercado Pago devem ser configuradas como secrets no Firebase.
-// Para emulação local, crie um arquivo .env na pasta /functions com o conteúdo:
-// MERCADO_PAGO_ACCESS_TOKEN="SEU_ACCESS_TOKEN"
-// MERCADO_PAGO_WEBHOOK_SECRET="SUA_SECRET_PARA_WEBHOOK"
-//
-// Para produção, execute no seu terminal (na pasta do projeto):
-// firebase functions:secrets:set MERCADO_PAGO_ACCESS_TOKEN
-// (cole seu Access Token quando solicitado)
-// firebase functions:secrets:set MERCADO_PAGO_WEBHOOK_SECRET
-// (cole sua Webhook Secret quando solicitado)
-// E adicione `runWith({ secrets: ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET"] })`
-// em cada função que usa as secrets.
+// Define os secrets que as funções irão usar.
+const secrets = ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET"];
 
 const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
 const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
@@ -38,7 +28,7 @@ const client = new MercadoPagoConfig({accessToken});
 /**
  * Creates an order in Firestore and optionally initiates a PIX payment.
  */
-exports.createOrder = onCall(async (request) => {
+exports.createOrder = runWith({secrets}).onCall(async (request) => {
   const {details, cart, total} = request.data;
 
   // 1. Validate input
@@ -89,6 +79,7 @@ exports.createOrder = onCall(async (request) => {
     status: orderStatus,
     paymentStatus: "pending",
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    mercadoPagoDetails: {}, // Initialize the object
   };
 
   // 4. Create the order document
@@ -102,6 +93,8 @@ exports.createOrder = onCall(async (request) => {
       throw new Error("CPF é obrigatório para pagamento com PIX.");
     }
 
+    // A URL do webhook deve ser a URL da sua função implantada.
+    // Ex: https://us-central1-YOUR-PROJECT-ID.cloudfunctions.net/mercadoPagoWebhook
     const notificationUrl = `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/mercadoPagoWebhook`;
 
     const paymentData = {
@@ -140,6 +133,8 @@ exports.createOrder = onCall(async (request) => {
       // Save payment details to our order
       await orderRef.update({
         "mercadoPagoDetails.paymentId": paymentId,
+        "mercadoPagoDetails.qrCodeBase64": qrCodeBase64,
+        "mercadoPagoDetails.qrCode": copyPaste,
       });
 
       logger.info(`Pagamento PIX criado para o pedido #${orderNumber}, ID MP: ${paymentId}`);
@@ -163,7 +158,7 @@ exports.createOrder = onCall(async (request) => {
 /**
  * Webhook to receive payment status updates from Mercado Pago.
  */
-exports.mercadoPagoWebhook = onRequest(async (request, response) => {
+exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
   if (request.method !== "POST") {
     return response.status(405).send("Method Not Allowed");
   }
@@ -235,7 +230,7 @@ exports.mercadoPagoWebhook = onRequest(async (request, response) => {
 /**
  * Processes a full refund for a given order.
  */
-exports.refundPayment = onCall(async (request) => {
+exports.refundPayment = runWith({secrets}).onCall(async (request) => {
   const {orderId} = request.data;
   if (!orderId) {
     throw new Error("O ID do pedido é obrigatório para o estorno.");
