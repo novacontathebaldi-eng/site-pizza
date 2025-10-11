@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Order, OrderStatus, PaymentStatus, getOrderActions } from '../types';
-import * as firebaseService from '../services/firebaseService';
+import { Order, OrderStatus, PaymentStatus } from '../types';
 
 interface OrderCardProps {
   order: Order;
@@ -12,7 +11,7 @@ interface OrderCardProps {
   addToast: (message: string, type: 'success' | 'error') => void;
 }
 
-const OrderCard: React.FC<OrderCardProps> = ({
+export const OrderCard: React.FC<OrderCardProps> = ({
   order,
   onStatusChange,
   onPaymentStatusChange,
@@ -22,9 +21,6 @@ const OrderCard: React.FC<OrderCardProps> = ({
   addToast,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [refundAmount, setRefundAmount] = useState('');
-  const [showRefundModal, setShowRefundModal] = useState(false);
 
   const formatDate = (date: any) => {
     if (!date) return '';
@@ -60,67 +56,6 @@ const OrderCard: React.FC<OrderCardProps> = ({
       default: return `${baseClass} bg-gray-100 text-gray-800`;
     }
   };
-
-  // Handle Mercado Pago order cancellation
-  const handleCancelPayment = async () => {
-    if (!order.mercadoPagoOrderId) {
-      addToast('ID do pagamento não encontrado.', 'error');
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      await firebaseService.cancelMercadoPagoOrder(order.mercadoPagoOrderId, order.id);
-      addToast('Pagamento cancelado com sucesso!', 'success');
-    } catch (error: any) {
-      addToast(error.message || 'Erro ao cancelar pagamento.', 'error');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // Handle Mercado Pago order refund
-  const handleRefund = async (amount?: number) => {
-    if (!order.mercadoPagoOrderId) {
-      addToast('ID do pagamento não encontrado.', 'error');
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      await firebaseService.refundMercadoPagoOrder(order.mercadoPagoOrderId, order.id, amount);
-      const message = amount ? 
-        `Estorno parcial de R$ ${amount.toFixed(2).replace('.', ',')} realizado!` :
-        'Estorno total realizado com sucesso!';
-      addToast(message, 'success');
-      setShowRefundModal(false);
-      setRefundAmount('');
-    } catch (error: any) {
-      addToast(error.message || 'Erro ao processar estorno.', 'error');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // Handle view payment receipt
-  const handleViewReceipt = async () => {
-    if (!order.mercadoPagoPaymentId) {
-      addToast('ID do pagamento não encontrado.', 'error');
-      return;
-    }
-
-    try {
-      const result = await firebaseService.getPaymentReceipt(order.mercadoPagoPaymentId);
-      window.open(result.receiptUrl, '_blank');
-    } catch (error: any) {
-      addToast(error.message || 'Erro ao gerar comprovante.', 'error');
-    }
-  };
-
-  // Order actions based on payment status
-  const canCancel = order.paymentStatus === 'pending' && order.status !== 'completed';
-  const canRefund = order.paymentStatus === 'paid';
-  const canViewReceipt = order.mercadoPagoPaymentId && (order.paymentStatus === 'paid' || order.paymentStatus === 'refunded' || order.paymentStatus === 'partially_refunded');
 
   return (
     <div className="bg-white rounded-lg shadow-md border border-gray-200 mb-4 overflow-hidden">
@@ -202,24 +137,6 @@ const OrderCard: React.FC<OrderCardProps> = ({
                 </span>
               </div>
             )}
-            
-            {order.mercadoPagoDetails.transactionId && (
-              <div>
-                <span className="font-medium text-gray-700">ID Transação:</span>
-                <br />
-                <span className="text-gray-600 font-mono text-xs">
-                  {order.mercadoPagoDetails.transactionId}
-                </span>
-              </div>
-            )}
-            
-            {order.paidAt && (
-              <div>
-                <span className="font-medium text-gray-700">Pago em:</span>
-                <br />
-                <span className="text-gray-600 text-xs">{formatDate(order.paidAt)}</span>
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -267,60 +184,13 @@ const OrderCard: React.FC<OrderCardProps> = ({
               <div className="text-sm text-gray-600 space-y-1">
                 <p><strong>Criado em:</strong> {formatDate(order.createdAt)}</p>
                 {order.updatedAt && <p><strong>Atualizado em:</strong> {formatDate(order.updatedAt)}</p>}
-                {order.refundedAmount && (
-                  <p><strong>Valor Estornado:</strong> R$ {order.refundedAmount.toFixed(2).replace('.', ',')}</p>
-                )}
               </div>
             </div>
           </div>
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-200">
-            {/* Payment Actions */}
-            {canViewReceipt && (
-              <button
-                onClick={handleViewReceipt}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
-              >
-                <i className="fas fa-receipt mr-2"></i>
-                Ver Comprovante
-              </button>
-            )}
-
-            {canCancel && (
-              <button
-                onClick={handleCancelPayment}
-                disabled={isProcessing}
-                className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700 transition-colors disabled:opacity-50"
-              >
-                <i className="fas fa-times mr-2"></i>
-                {isProcessing ? 'Cancelando...' : 'Cancelar Pagamento'}
-              </button>
-            )}
-
-            {canRefund && (
-              <button
-                onClick={() => handleRefund()}
-                disabled={isProcessing}
-                className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 transition-colors disabled:opacity-50"
-              >
-                <i className="fas fa-undo mr-2"></i>
-                {isProcessing ? 'Processando...' : 'Estorno Total'}
-              </button>
-            )}
-
-            {canRefund && (
-              <button
-                onClick={() => setShowRefundModal(true)}
-                disabled={isProcessing}
-                className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-700 transition-colors disabled:opacity-50"
-              >
-                <i className="fas fa-edit mr-2"></i>
-                Estorno Parcial
-              </button>
-            )}
-
-            {/* Status Change Actions (existing functionality) */}
+            {/* Status Change Actions */}
             {order.status === 'pending' && (
               <>
                 <button
@@ -383,61 +253,9 @@ const OrderCard: React.FC<OrderCardProps> = ({
           </div>
         </div>
       )}
-
-      {/* Partial Refund Modal */}
-      {showRefundModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 max-w-90vw">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Estorno Parcial</h3>
-            
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Valor do Estorno (R$)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                max={order.total}
-                value={refundAmount}
-                onChange={(e) => setRefundAmount(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="0,00"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Máximo: R$ {order.total.toFixed(2).replace('.', ',')}
-              </p>
-            </div>
-
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowRefundModal(false);
-                  setRefundAmount('');
-                }}
-                className="px-4 py-2 text-gray-600 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  const amount = parseFloat(refundAmount);
-                  if (amount > 0 && amount <= order.total) {
-                    handleRefund(amount);
-                  }
-                }}
-                disabled={!refundAmount || parseFloat(refundAmount) <= 0 || parseFloat(refundAmount) > order.total}
-                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50"
-              >
-                Confirmar Estorno
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
 
-// IMPORTANTE: Export default aqui
+// Export default também - compatibilidade
 export default OrderCard;
