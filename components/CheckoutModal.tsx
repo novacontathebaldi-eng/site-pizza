@@ -25,6 +25,7 @@ const getSuggestedTimes = () => {
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, onInitiatePixPayment }) => {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
+    const [cpf, setCpf] = useState('');
     const [orderType, setOrderType] = useState<'delivery' | 'pickup' | 'local' | ''>('');
     const [address, setAddress] = useState('');
     const [paymentMethod, setPaymentMethod] = useState<'credit' | 'debit' | 'pix' | 'cash' | ''>('');
@@ -39,7 +40,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
 
     useEffect(() => {
         if (!isOpen) {
-            setName(''); setPhone(''); setOrderType(''); setAddress('');
+            setName(''); setPhone(''); setCpf(''); setOrderType(''); setAddress('');
             setPaymentMethod(''); setChangeNeeded(false); setChangeAmount('');
             setNotes(''); setReservationTime(''); setPixPaymentOption(null);
         }
@@ -50,7 +51,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
     const getOrderDetails = (): OrderDetails => ({
-        name, phone, orderType: orderType as 'delivery' | 'pickup' | 'local',
+        name, phone, cpf, orderType: orderType as 'delivery' | 'pickup' | 'local',
         address, paymentMethod: paymentMethod as 'credit' | 'debit' | 'pix' | 'cash',
         changeNeeded: paymentMethod === 'cash' && changeNeeded,
         changeAmount, notes, reservationTime
@@ -74,7 +75,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
             } else if (pixPaymentOption === 'payLater') {
                 onConfirmCheckout(details);
             } else {
-                // This case should be prevented by the disabled button state
                 alert("Por favor, escolha se deseja pagar agora ou depois.");
             }
         } else {
@@ -82,7 +82,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
         }
     };
     
-    const isSubmitDisabled = paymentMethod === 'pix' && !pixPaymentOption;
+    const isSubmitDisabled = (paymentMethod === 'pix' && !pixPaymentOption) || (paymentMethod === 'pix' && pixPaymentOption === 'payNow' && !cpf);
     
     const submitButtonText = (paymentMethod === 'pix' && pixPaymentOption === 'payNow')
         ? 'Pagar e Finalizar Pedido'
@@ -153,22 +153,31 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                         </div>
                         
                         {paymentMethod === 'pix' && (
-                            <div className="p-4 bg-blue-50 rounded-md border border-blue-200 animate-fade-in-up text-center">
-                                <p className="font-semibold mb-3">Como você prefere pagar com PIX?</p>
-                                <div className="flex justify-center gap-4">
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setPixPaymentOption('payNow')} 
-                                        className={`font-bold py-2 px-6 rounded-lg transition-all border-2 ${pixPaymentOption === 'payNow' ? 'bg-accent text-white border-accent' : 'bg-white text-accent border-accent hover:bg-accent/10'}`}>
-                                        <i className="fas fa-qrcode mr-2"></i>Pagar Agora
-                                    </button>
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setPixPaymentOption('payLater')} 
-                                        className={`font-bold py-2 px-6 rounded-lg transition-all border-2 ${pixPaymentOption === 'payLater' ? 'bg-gray-600 text-white border-gray-600' : 'bg-white text-gray-600 border-gray-400 hover:bg-gray-100'}`}>
-                                        <i className="fas fa-hand-holding-usd mr-2"></i>Pagar Depois
-                                    </button>
+                            <div className="p-4 bg-blue-50 rounded-md border border-blue-200 animate-fade-in-up space-y-3">
+                                <div className="text-center">
+                                    <p className="font-semibold mb-3">Como você prefere pagar com PIX?</p>
+                                    <div className="flex justify-center gap-4">
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setPixPaymentOption('payNow')} 
+                                            className={`font-bold py-2 px-6 rounded-lg transition-all border-2 ${pixPaymentOption === 'payNow' ? 'bg-accent text-white border-accent' : 'bg-white text-accent border-accent hover:bg-accent/10'}`}>
+                                            <i className="fas fa-qrcode mr-2"></i>Pagar Agora
+                                        </button>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setPixPaymentOption('payLater')} 
+                                            className={`font-bold py-2 px-6 rounded-lg transition-all border-2 ${pixPaymentOption === 'payLater' ? 'bg-gray-600 text-white border-gray-600' : 'bg-white text-gray-600 border-gray-400 hover:bg-gray-100'}`}>
+                                            <i className="fas fa-hand-holding-usd mr-2"></i>Pagar Depois
+                                        </button>
+                                    </div>
                                 </div>
+                                {pixPaymentOption === 'payNow' && (
+                                     <div className="animate-fade-in-up">
+                                        <label className="block text-sm font-semibold mb-1" htmlFor="cpf">CPF (para o PIX) *</label>
+                                        <input id="cpf" type="text" value={cpf} onChange={e => setCpf(e.target.value.replace(/\D/g, ''))} className="w-full px-3 py-2 border rounded-md" placeholder="000.000.000-00" required />
+                                        <p className="text-xs text-gray-500 mt-1">Necessário para gerar a cobrança PIX.</p>
+                                    </div>
+                                )}
                             </div>
                         )}
 

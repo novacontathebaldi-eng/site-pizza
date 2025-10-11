@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Order } from '../types';
-import * as firebaseService from '../services/firebaseService';
 import { db } from '../services/firebase';
 
 interface PixPaymentModalProps {
@@ -20,23 +19,24 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
     const [copySuccess, setCopySuccess] = useState(false);
     const timerRef = useRef<number | null>(null);
 
-    // Effect to generate PIX charge when modal opens
+    // Effect to set up PIX data from the order prop when modal opens
     useEffect(() => {
         if (order) {
-            setIsLoading(true);
+            setIsLoading(false); // Data is passed in via props, no async loading needed here.
             setError(null);
             setIsPaid(false);
             setTimeLeft(PIX_EXPIRATION_SECONDS);
 
-            firebaseService.initiateMercadoPagoPixPayment(order.id)
-                .then(data => {
-                    setPixData(data);
-                    setIsLoading(false);
-                })
-                .catch(err => {
-                    setError(err.message || 'Erro desconhecido ao gerar PIX.');
-                    setIsLoading(false);
-                });
+            // FIX: The PIX data is now generated *before* this modal opens and passed in the `order` prop.
+            // This removes the call to the non-existent `initiateMercadoPagoPixPayment` function.
+            const qrCodeBase64 = order.mercadoPagoDetails?.qrCodeBase64;
+            const copyPaste = order.mercadoPagoDetails?.qrCode;
+
+            if (qrCodeBase64 && copyPaste) {
+                setPixData({ qrCodeBase64, copyPaste });
+            } else {
+                setError('Não foi possível carregar os dados do PIX. Por favor, feche e tente novamente.');
+            }
         }
     }, [order]);
 
@@ -66,7 +66,7 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
         const unsubscribe = db.collection('orders').doc(order.id)
             .onSnapshot(doc => {
                 const updatedOrder = doc.data() as Order;
-                if (updatedOrder && updatedOrder.paymentStatus === 'paid') {
+                if (updatedOrder && updatedOrder.paymentStatus === 'paid_online') {
                     setIsPaid(true);
                     if (timerRef.current) clearInterval(timerRef.current);
                     setTimeout(() => {

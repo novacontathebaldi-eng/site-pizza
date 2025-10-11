@@ -1,3 +1,5 @@
+import firebase from 'firebase/compat/app';
+
 export interface Product {
     id: string;
     name: string;
@@ -37,12 +39,13 @@ export interface OrderDetails {
     changeNeeded: boolean;
     changeAmount?: string;
     notes: string;
-    reservationTime?: string; // Added for dine-in
+    reservationTime?: string;
+    cpf?: string; // CPF do cliente para pagamentos PIX
 }
 
 // New Types for Order Management
 export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted' | 'awaiting-payment';
-export type PaymentStatus = 'pending' | 'paid' | 'paid_online';
+export type PaymentStatus = 'pending' | 'paid' | 'paid_online' | 'refunded';
 
 export interface OrderCustomerDetails {
     name: string;
@@ -50,10 +53,12 @@ export interface OrderCustomerDetails {
     orderType: 'delivery' | 'pickup' | 'local';
     address?: string;
     reservationTime?: string;
+    cpf?: string;
 }
 
 export interface Order {
     id: string;
+    orderNumber: number; // Número sequencial do pedido
     customer: OrderCustomerDetails;
     items: CartItem[];
     total: number;
@@ -62,13 +67,17 @@ export interface Order {
     changeAmount?: string;
     notes?: string;
     status: OrderStatus;
-    paymentStatus: PaymentStatus; // New field for payment status
-    createdAt: any; // Firestore Timestamp
-    pickupTimeEstimate?: string; // Added for pickup
-    mercadoPagoPaymentId?: string; // To store the Mercado Pago payment ID
+    paymentStatus: PaymentStatus;
+    createdAt: firebase.firestore.Timestamp | any; // Firestore Timestamp
+    pickupTimeEstimate?: string;
     mercadoPagoDetails?: {
         paymentId: string;
+        status?: string;
+        statusDetail?: string;
+        qrCodeBase64?: string;
+        qrCode?: string;
         transactionId?: string | null;
+        refunds?: any[]; // Armazena informações de estorno
     };
 }
 

@@ -9,6 +9,7 @@ interface OrderCardProps {
     onUpdateReservationTime: (orderId: string, reservationTime: string) => void;
     onDelete: (orderId: string) => void;
     onPermanentDelete: (orderId: string) => void;
+    onRefund: (orderId: string) => void;
 }
 
 // This is now a function to provide dynamic text based on the order type
@@ -39,24 +40,26 @@ const getStatusConfig = (order: Order): { text: string; icon: string; color: str
 const paymentMethodMap = { credit: 'Crédito', debit: 'Débito', pix: 'PIX', cash: 'Dinheiro' };
 const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo no Local' };
 
-const getPaymentStatusInfo = (order: Order): { text: string; isPaid: boolean } => {
+const getPaymentStatusInfo = (order: Order): { text: string; isPaid: boolean; isRefunded: boolean } => {
+    if (order.paymentStatus === 'refunded') {
+        return { text: 'Estornado', isPaid: false, isRefunded: true };
+    }
     switch (order.paymentStatus) {
         case 'paid_online':
-            return { text: 'Pago pelo SITE', isPaid: true };
+            return { text: 'Pago pelo SITE', isPaid: true, isRefunded: false };
         case 'paid':
-            return { text: 'Pago', isPaid: true };
+            return { text: 'Pago', isPaid: true, isRefunded: false };
         case 'pending':
         default:
-            return { text: 'Pendente', isPaid: false };
+            return { text: 'Pendente', isPaid: false, isRefunded: false };
     }
 };
 
 
-export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete }) => {
-    const { id, customer, items, total, paymentMethod, changeNeeded, changeAmount, notes, status, paymentStatus, createdAt, pickupTimeEstimate } = order;
+export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete, onRefund }) => {
+    const { id, orderNumber, customer, items, total, paymentMethod, changeNeeded, changeAmount, notes, status, paymentStatus, createdAt, pickupTimeEstimate, mercadoPagoDetails } = order;
     const config = getStatusConfig(order);
-    const { text: paymentStatusText, isPaid } = getPaymentStatusInfo(order);
-
+    const { text: paymentStatusText, isPaid, isRefunded } = getPaymentStatusInfo(order);
 
     const [isContactModalOpen, setIsContactModalOpen] = useState(false);
     const [isEditingTime, setIsEditingTime] = useState(false);
@@ -68,7 +71,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
 
     const formatTimestamp = (timestamp: any): string => {
         if (!timestamp) return 'N/A';
-        const date = timestamp.toDate();
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
         return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
     };
     
@@ -118,6 +121,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
         return statusOptionsMap[status] || status; // Fallback to the default map
     };
 
+    const canRefund = paymentStatus === 'paid_online' && !isRefunded;
 
     const statusChanger = (
         <div className="flex items-center gap-2">
@@ -137,7 +141,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
         </div>
     );
     
-    const paymentStatusChanger = !isArchived && (
+    const paymentStatusChanger = !isArchived && !isRefunded && (
         <div className="flex items-center gap-2">
             <label htmlFor={`payment-status-select-${order.id}`} className="text-sm font-semibold text-gray-700 whitespace-nowrap">Pgto:</label>
             <select
@@ -168,7 +172,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 <i className={`${config.icon} ${config.color.replace('border', 'text')}`}></i>
                                 <span>{config.text}</span>
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">Pedido recebido em: {formatTimestamp(createdAt)}</p>
+                            <p className="text-sm font-bold text-gray-500 mt-1">Pedido #{orderNumber}</p>
+                            <p className="text-xs text-gray-500">Recebido em: {formatTimestamp(createdAt)}</p>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                             <div className="flex items-start gap-2">
@@ -180,9 +185,14 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                     <i className="fab fa-whatsapp text-2xl"></i>
                                 </button>
                             </div>
-                            {isPaid && order.paymentStatus === 'paid_online' && (
+                            {isPaid && paymentStatus === 'paid_online' && (
                                 <div className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full animate-pulse border border-green-200 inline-flex items-center justify-center whitespace-nowrap">
                                     <i className="fas fa-check-circle mr-1"></i> PAGO PELO SITE
+                                </div>
+                            )}
+                            {isRefunded && (
+                                <div className="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded-full border border-yellow-200">
+                                   <i className="fas fa-undo-alt mr-1"></i> ESTORNADO
                                 </div>
                             )}
                         </div>
@@ -222,9 +232,9 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                             <h4 className="font-bold mb-2"><i className="fas fa-credit-card mr-2"></i>Pagamento</h4>
                             <div className="space-y-1 flex-grow">
                                 <p><strong>Método:</strong> {paymentMethodMap[paymentMethod]}</p>
-                                <p><strong>Status Pgto:</strong>
+                                <p><strong>Status:</strong>
                                     <span className={`font-bold ml-1 ${
-                                        isPaid ? 'text-green-600' : 'text-yellow-600'
+                                        isRefunded ? 'text-yellow-800' : isPaid ? 'text-green-600' : 'text-yellow-600'
                                     }`}>
                                         {paymentStatusText}
                                     </span>
@@ -232,26 +242,20 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 {paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {changeNeeded ? `para R$ ${changeAmount}` : 'Não precisa'}</p> )}
                             </div>
 
-                            {(order.mercadoPagoDetails || notes) && (
+                             {mercadoPagoDetails?.paymentId && (
                                 <div className="mt-2 pt-2 border-t border-gray-200 space-y-2">
-                                    {order.mercadoPagoDetails && (
-                                        <div className="text-xs space-y-1">
-                                            <div>
-                                                {order.mercadoPagoDetails.transactionId && <p><strong>ID Transação:</strong> {order.mercadoPagoDetails.transactionId}</p>}
-                                                <p><strong>ID Pagamento:</strong> {order.mercadoPagoDetails.paymentId}</p>
-                                            </div>
-                                            <a 
-                                                href={`https://www.mercadopago.com.br/payments/${order.mercadoPagoDetails.paymentId}/receipt`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-2 text-sm bg-blue-100 text-blue-700 font-semibold py-1 px-2 rounded-md hover:bg-blue-200"
-                                            >
-                                                <i className="fas fa-receipt"></i>
-                                                <span>Ver Comprovante</span>
-                                            </a>
-                                        </div>
-                                    )}
-                                    {notes && <p className="text-sm"><strong>Obs:</strong> {notes}</p>}
+                                    <div className="text-xs space-y-1">
+                                         <p><strong>ID Pagamento:</strong> {mercadoPagoDetails.paymentId}</p>
+                                    </div>
+                                    <a 
+                                        href={`https://www.mercadopago.com.br/payments/${mercadoPagoDetails.paymentId}/receipt`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 text-sm bg-blue-100 text-blue-700 font-semibold py-1 px-2 rounded-md hover:bg-blue-200"
+                                    >
+                                        <i className="fas fa-receipt"></i>
+                                        <span>Ver Comprovante</span>
+                                    </a>
                                 </div>
                             )}
                         </div>
@@ -263,6 +267,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                             {items.map(item => (<li key={item.id} className="flex justify-between p-2 bg-gray-50 rounded"><span>{item.quantity}x {item.name} ({item.size})</span><span>{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>))}
                         </ul>
                     </div>
+                     {notes && <p className="text-sm mt-3 p-2 bg-yellow-50 rounded-md border border-yellow-200"><strong>Obs:</strong> {notes}</p>}
 
                     <div className="flex flex-wrap items-center justify-end gap-2 mt-4 pt-4 border-t">
                         {status === 'deleted' ? (
@@ -279,13 +284,16 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                         ) : (
                              <div className="flex flex-wrap items-center justify-end gap-3 w-full">
                                 {paymentStatusChanger}
+                                {canRefund && (
+                                     <button onClick={() => onRefund(id)} className="bg-yellow-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-yellow-600"><i className="fas fa-undo-alt mr-2"></i>Estornar</button>
+                                )}
                                 <div className="flex-grow"></div>
                                 
                                 {/* Next-step buttons */}
                                 {status === 'accepted' && customer.orderType !== 'local' && <button onClick={() => onUpdateStatus(id, 'ready')} className="bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-blue-600"><i className="fas fa-box-open mr-2"></i>Pronto</button>}
                                 {(status === 'ready' || status === 'reserved') && <button onClick={() => onUpdateStatus(id, 'completed')} className="bg-purple-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-purple-600"><i className="fas fa-flag-checkered mr-2"></i>Finalizar</button>}
                                 
-                                {!isArchived && <button onClick={() => onUpdateStatus(id, 'cancelled')} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Cancelar</button>}
+                                {!isArchived && !isRefunded && <button onClick={() => onUpdateStatus(id, 'cancelled')} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Cancelar</button>}
 
                                 {statusChanger}
 

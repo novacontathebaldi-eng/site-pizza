@@ -1,7 +1,7 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
 import { db, storage, functions } from './firebase';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem } from './types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -130,13 +130,28 @@ export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promi
     await settingsRef.set(settings, { merge: true });
 };
 
-// Order Management Functions
-export const addOrder = async (orderData: Omit<Order, 'id' | 'createdAt' | 'pickupTimeEstimate'>): Promise<firebase.firestore.DocumentReference> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    return db.collection('orders').add({
-        ...orderData,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+// --- Order Management Functions (Calling Cloud Functions) ---
+
+/**
+ * Creates an order document in Firestore and, if it's a PIX payment,
+ * initiates the payment with Mercado Pago.
+ * @param details The customer and order details from the checkout form.
+ * @param cart The items in the shopping cart.
+ * @param total The total amount of the order.
+ * @returns An object containing the new order's ID, its number, and PIX data if applicable.
+ */
+export const createOrder = async (details: OrderDetails, cart: CartItem[], total: number): Promise<{ orderId: string, orderNumber: number, pixData?: any }> => {
+    if (!functions) {
+        throw new Error("Firebase Functions is not initialized.");
+    }
+    const createOrderFunction = functions.httpsCallable('createOrder');
+    try {
+        const result = await createOrderFunction({ details, cart, total });
+        return result.data;
+    } catch (error) {
+        console.error("Error calling createOrder function:", error);
+        throw new Error("Não foi possível criar o pedido. Tente novamente.");
+    }
 };
 
 export const updateOrderStatus = async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>): Promise<void> => {
@@ -163,17 +178,23 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
     await orderRef.delete();
 };
 
-// PIX Payment Function
-export const initiateMercadoPagoPixPayment = async (orderId: string): Promise<any> => {
+
+/**
+ * Calls a cloud function to process a full refund for a given order via Mercado Pago.
+ * @param orderId The ID of the order to be refunded.
+ * @returns The result from the cloud function, typically a success message.
+ */
+export const refundPayment = async (orderId: string): Promise<any> => {
     if (!functions) {
         throw new Error("Firebase Functions is not initialized.");
     }
-    const createMercadoPagoOrder = functions.httpsCallable('createMercadoPagoOrder');
+    const refundPaymentFunction = functions.httpsCallable('refundPayment');
     try {
-        const result = await createMercadoPagoOrder({ orderId });
+        const result = await refundPaymentFunction({ orderId });
         return result.data;
     } catch (error) {
-        console.error("Error calling createMercadoPagoOrder function:", error);
-        throw new Error("Não foi possível gerar a cobrança PIX. Tente novamente.");
+        console.error("Error calling refundPayment function:", error);
+        // The error from the cloud function is more user-friendly
+        throw error;
     }
 };

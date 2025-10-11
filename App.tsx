@@ -74,11 +74,11 @@ const defaultSiteSettings: SiteSettings = {
     ]
 };
 
-const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, isPaid: boolean) => {
+const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, orderNumber: number, isPaid: boolean) => {
     const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumir no local' };
     const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
 
-    let message = `*🍕 NOVO PEDIDO - PIZZARIA SANTA SENSAÇÃO 🍕*\n\n`;
+    let message = `*🍕 NOVO PEDIDO #${orderNumber} - SANTA SENSAÇÃO 🍕*\n\n`;
     if (isPaid) {
         message += `*✅ JÁ PAGO VIA PIX PELO SITE*\n\n`;
     }
@@ -301,113 +301,113 @@ const App: React.FC = () => {
     }, []);
     
     const handleCheckout = async (details: OrderDetails) => {
+        setIsCheckoutModalOpen(false);
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        const whatsappUrl = generateWhatsAppMessage(details, cart, total, false);
-        window.open(whatsappUrl, '_blank');
-        
-        const newOrder = {
-            customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.orderType === 'delivery' ? details.address : '', reservationTime: details.orderType === 'local' ? details.reservationTime : '', },
-            items: cart, total, paymentMethod: details.paymentMethod,
-            changeNeeded: details.paymentMethod === 'cash' ? details.changeNeeded : false,
-            changeAmount: details.paymentMethod === 'cash' && details.changeNeeded ? details.changeAmount : '',
-            notes: details.notes || '', status: 'pending' as OrderStatus, paymentStatus: 'pending' as PaymentStatus,
-        };
 
         try {
-            await firebaseService.addOrder(newOrder);
-            addToast("Pedido salvo no sistema!", 'success');
-        } catch (error) {
-            console.error("Failed to save order:", error);
-            addToast("Erro ao salvar pedido no sistema.", 'error');
+            const { orderId, orderNumber } = await firebaseService.createOrder(details, cart, total);
+            addToast(`Pedido #${orderNumber} criado! Enviando para o WhatsApp...`, 'success');
+            
+            const whatsappUrl = generateWhatsAppMessage(details, cart, total, orderNumber, false);
+            window.open(whatsappUrl, '_blank');
+            
+            setCart([]);
+            setIsCartOpen(false);
+        } catch (error: any) {
+            console.error("Failed to create order:", error);
+            addToast(error.message || "Erro ao criar pedido.", 'error');
         }
-        
-        setCart([]);
-        setIsCheckoutModalOpen(false);
-        setIsCartOpen(false);
     };
 
     const handleInitiatePixPayment = async (details: OrderDetails) => {
+        setIsCheckoutModalOpen(false);
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        const newOrderData: Omit<Order, 'id' | 'createdAt'> = {
-            customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.orderType === 'delivery' ? details.address : '', reservationTime: details.orderType === 'local' ? details.reservationTime : '', },
-            items: cart, total, paymentMethod: 'pix',
-            notes: details.notes || '', status: 'awaiting-payment' as OrderStatus, paymentStatus: 'pending' as PaymentStatus,
-        };
-
+        
         try {
-            const docRef = await firebaseService.addOrder(newOrderData);
-            const createdOrder: Order = { ...newOrderData, id: docRef.id, createdAt: new Date() };
-            addToast("Pedido pré-salvo, aguardando pagamento.", 'success');
-            setIsCheckoutModalOpen(false);
-            setPayingOrder(createdOrder);
+            const { orderId, pixData } = await firebaseService.createOrder(details, cart, total);
+            
+            const newOrder: Order = {
+                id: orderId,
+                orderNumber: 0, // temp, will be in Firestore
+                customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.address },
+                items: cart, total, paymentMethod: 'pix', status: 'awaiting-payment', paymentStatus: 'pending',
+                createdAt: new Date(),
+                mercadoPagoDetails: { paymentId: '', qrCodeBase64: pixData.qrCodeBase64, qrCode: pixData.copyPaste }
+            };
+
+            setPayingOrder(newOrder);
             setPixRetryKey(k => k + 1);
-        } catch (error) {
-            console.error("Failed to pre-save order:", error);
-            addToast("Erro ao iniciar pagamento. Tente novamente.", 'error');
+        } catch (error: any) {
+            console.error("Failed to initiate PIX payment:", error);
+            addToast(error.message || "Erro ao iniciar pagamento PIX.", 'error');
         }
     };
 
     const handlePixPaymentSuccess = useCallback(async (paidOrder: Order) => {
-        if (!paidOrder || !paidOrder.id) {
-            console.error("handlePixPaymentSuccess called without a valid paidOrder object.");
-            addToast("Erro crítico ao processar pagamento. Contate o suporte.", 'error');
+         if (!paidOrder || !paidOrder.id) {
+            addToast("Erro crítico ao processar pagamento.", 'error');
             return;
         }
-
         try {
-            await firebaseService.updateOrderStatus(paidOrder.id, 'pending');
-            await firebaseService.updateOrderPaymentStatus(paidOrder.id, 'paid_online');
+            addToast("Pagamento confirmado! Enviando pedido para a pizzaria...", 'success');
             
-            addToast("Pagamento confirmado! Seu pedido foi enviado para a pizzaria.", 'success');
+            const orderSnapshot = await db.collection('orders').doc(paidOrder.id).get();
+            const finalOrderData = orderSnapshot.data() as Order;
 
             const details: OrderDetails = {
-                name: paidOrder.customer.name, phone: paidOrder.customer.phone, orderType: paidOrder.customer.orderType,
-                address: paidOrder.customer.address || '', paymentMethod: 'pix', changeNeeded: false,
-                notes: paidOrder.notes || '', reservationTime: paidOrder.customer.reservationTime || ''
+                name: finalOrderData.customer.name, phone: finalOrderData.customer.phone, orderType: finalOrderData.customer.orderType,
+                address: finalOrderData.customer.address || '', paymentMethod: 'pix', changeNeeded: false,
+                notes: finalOrderData.notes || '', reservationTime: finalOrderData.customer.reservationTime || ''
             };
-            const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, true);
+            const whatsappUrl = generateWhatsAppMessage(details, finalOrderData.items, finalOrderData.total, finalOrderData.orderNumber, true);
             window.open(whatsappUrl, '_blank');
 
             setCart([]);
             setPayingOrder(null);
             setIsCartOpen(false);
         } catch (error) {
-             console.error("Error finalizing paid order:", error);
+            console.error("Error finalizing paid order:", error);
             addToast("Erro ao finalizar o pedido após o pagamento. Contate o suporte.", 'error');
         }
-    }, [addToast, setCart, setPayingOrder, setIsCartOpen]);
+    }, [addToast]);
 
     const handleClosePixModal = () => {
         if (payingOrder) {
             setShowPaymentFailureModal(true);
+        } else {
+            setPayingOrder(null); // Just close if something went wrong before order was set
         }
     };
     
     const handleTryAgainPix = () => {
         setShowPaymentFailureModal(false);
+        // Re-opens the PixPaymentModal by setting a new key
         setPixRetryKey(k => k + 1);
     };
 
     const handlePayLaterFromFailure = async () => {
         if (!payingOrder) return;
     
-        const orderToUpdate = { ...payingOrder };
+        const orderToUpdateId = payingOrder.id;
         setShowPaymentFailureModal(false);
         setPayingOrder(null);
 
         try {
-            await firebaseService.updateOrderStatus(orderToUpdate.id, 'pending');
-    
+            // Update status in Firestore and send to WhatsApp
+            await firebaseService.updateOrderStatus(orderToUpdateId, 'pending');
+            const orderSnapshot = await db.collection('orders').doc(orderToUpdateId).get();
+            const finalOrderData = orderSnapshot.data() as Order;
+            
             const details: OrderDetails = {
-                name: orderToUpdate.customer.name, phone: orderToUpdate.customer.phone, orderType: orderToUpdate.customer.orderType,
-                address: orderToUpdate.customer.address || '', paymentMethod: 'pix',
+                name: finalOrderData.customer.name, phone: finalOrderData.customer.phone, orderType: finalOrderData.customer.orderType,
+                address: finalOrderData.customer.address || '', paymentMethod: 'pix',
                 changeNeeded: false, changeAmount: '',
-                notes: orderToUpdate.notes || '', reservationTime: orderToUpdate.customer.reservationTime || ''
+                notes: finalOrderData.notes || '', reservationTime: finalOrderData.customer.reservationTime || ''
             };
-            const whatsappUrl = generateWhatsAppMessage(details, orderToUpdate.items, orderToUpdate.total, false);
+            const whatsappUrl = generateWhatsAppMessage(details, finalOrderData.items, finalOrderData.total, finalOrderData.orderNumber, false);
             window.open(whatsappUrl, '_blank');
             
-            addToast("Pedido enviado! O pagamento será feito depois.", 'success');
+            addToast("Pedido enviado! O pagamento será feito na entrega/retirada.", 'success');
             setCart([]);
             setIsCartOpen(false);
 
@@ -620,6 +620,18 @@ const App: React.FC = () => {
             }
         }
     }, [addToast]);
+    
+    const handleRefundOrder = useCallback(async (orderId: string) => {
+         if (window.confirm("Tem certeza que deseja estornar o valor total deste pagamento? Esta ação não pode ser desfeita.")) {
+            try {
+                await firebaseService.refundPayment(orderId);
+                addToast("Estorno solicitado com sucesso!", 'success');
+            } catch (error: any) {
+                console.error("Failed to refund order:", error);
+                addToast(error.message || "Erro ao solicitar estorno.", 'error');
+            }
+        }
+    }, [addToast]);
 
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
@@ -698,6 +710,7 @@ const App: React.FC = () => {
                     onUpdateOrderReservationTime={handleUpdateOrderReservationTime}
                     onDeleteOrder={handleDeleteOrder}
                     onPermanentDeleteOrder={handlePermanentDeleteOrder}
+                    onRefundOrder={handleRefundOrder}
                 />
             </main>
 
