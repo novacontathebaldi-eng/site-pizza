@@ -167,20 +167,30 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
     // 1. Validate Signature for security
     const signature = request.headers["x-signature"];
     const requestId = request.headers["x-request-id"];
-    const receivedTopic = request.body.topic || request.body.type;
+    const receivedTopic = request.body.type;
 
-    if (!signature || !requestId || receivedTopic !== "payment") {
-      logger.warn("Webhook ignorado: Faltando headers ou tópico inválido.", {headers: request.headers, body: request.body});
-      return response.status(200).send("OK");
+    // The 'data.id' for signature validation comes from the query parameters
+    const paymentIdFromQuery = request.query["data.id"];
+
+    if (!signature || !requestId || !paymentIdFromQuery || receivedTopic !== "payment") {
+      logger.warn("Webhook ignorado: Faltando headers, data.id no query, ou tópico inválido.", {
+        headers: request.headers,
+        query: request.query,
+        body: request.body,
+      });
+      return response.status(200).send("OK"); // Respond OK to prevent retries
     }
 
     const [ts, hash] = signature.split(",").map((part) => part.split("=")[1]);
-    const manifest = `id:${request.body.data.id};request-id:${requestId};ts:${ts};`;
+    
+    // The manifest MUST be built from query params as per Mercado Pago docs.
+    const manifest = `id:${paymentIdFromQuery};request-id:${requestId};ts:${ts};`;
+    
     const hmac = crypto.createHmac("sha256", webhookSecret);
     hmac.update(manifest);
     const expectedHash = hmac.digest("hex");
 
-    if (expectedHash !== hash) {
+    if (crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expectedHash)) === false) {
       logger.error("Falha na validação da assinatura do Webhook.");
       return response.status(401).send("Invalid Signature");
     }
