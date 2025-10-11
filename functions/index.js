@@ -4,7 +4,6 @@ const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago");
 const crypto = require("crypto");
-require("dotenv").config();
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -12,23 +11,18 @@ const db = admin.firestore();
 // Define os secrets que as funções irão usar.
 const secrets = ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET"];
 
-const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
-const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
-
-if (!accessToken) {
-  logger.error("MERCADO_PAGO_ACCESS_TOKEN não está configurado.");
-}
-if (!webhookSecret) {
-  logger.error("MERCADO_PAGO_WEBHOOK_SECRET não está configurado.");
-}
-
-const client = new MercadoPagoConfig({accessToken});
-
 /**
  * Creates an order in Firestore and optionally initiates a PIX payment.
  */
 exports.createOrder = onCall({secrets}, async (request) => {
-  const {details, cart, total} = request.data;
+  const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+  if (!accessToken) {
+    logger.error("MERCADO_PAGO_ACCESS_TOKEN não está configurado.");
+    throw new Error("Erro de configuração interna do servidor.");
+  }
+  const client = new MercadoPagoConfig({accessToken});
+
+  const {details, cart, total, pixOption} = request.data;
 
   // 1. Validate input
   if (!details || !cart || !total) {
@@ -56,7 +50,7 @@ exports.createOrder = onCall({secrets}, async (request) => {
 
 
   // 3. Prepare order data for Firestore
-  const isPixPayNow = details.paymentMethod === "pix" && request.data.pixOption === "payNow";
+  const isPixPayNow = details.paymentMethod === "pix" && pixOption === "payNow";
   const orderStatus = isPixPayNow ? "awaiting-payment" : "pending";
 
   const orderData = {
@@ -92,9 +86,7 @@ exports.createOrder = onCall({secrets}, async (request) => {
       throw new Error("CPF é obrigatório para pagamento com PIX.");
     }
 
-    // A URL do webhook deve ser a URL da sua função implantada.
-    // Ex: https://us-central1-YOUR-PROJECT-ID.cloudfunctions.net/mercadoPagoWebhook
-    const notificationUrl = `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/mercadoPagoWebhook`;
+    const notificationUrl = `https://${process.env.GCLOUD_REGION}-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/mercadoPagoWebhook`;
 
     const paymentData = {
       transaction_amount: total,
@@ -158,6 +150,15 @@ exports.createOrder = onCall({secrets}, async (request) => {
  * Webhook to receive payment status updates from Mercado Pago.
  */
 exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
+  const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
+  const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+
+  if (!webhookSecret || !accessToken) {
+    logger.error("Secrets do Mercado Pago não estão configurados no ambiente da função.");
+    return response.status(500).send("Internal Server Error: Missing configuration.");
+  }
+  const client = new MercadoPagoConfig({accessToken});
+
   if (request.method !== "POST") {
     return response.status(405).send("Method Not Allowed");
   }
@@ -230,6 +231,13 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
  * Processes a full refund for a given order.
  */
 exports.refundPayment = onCall({secrets}, async (request) => {
+  const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+  if (!accessToken) {
+    logger.error("MERCADO_PAGO_ACCESS_TOKEN não está configurado.");
+    throw new Error("Erro de configuração interna do servidor.");
+  }
+  const client = new MercadoPagoConfig({accessToken});
+
   const {orderId} = request.data;
   if (!orderId) {
     throw new Error("O ID do pedido é obrigatório para o estorno.");
@@ -271,6 +279,7 @@ exports.refundPayment = onCall({secrets}, async (request) => {
     return {success: true, message: "Pagamento estornado com sucesso!"};
   } catch (error) {
     logger.error(`Falha ao estornar o pedido ${orderId}:`, error.cause || error);
-    throw new Error(error.cause?.message || "Erro ao processar o estorno.");
+    const errorMessage = error.cause?.error?.message || error.cause?.message || "Erro ao processar o estorno.";
+    throw new Error(errorMessage);
   }
 });
