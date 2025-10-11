@@ -1,23 +1,22 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus } from './types';
+import { db } from './services/firebase';
+import * as firebaseService from './services/firebaseService';
+// FIX: Corrected import for seedDatabase from its actual location to resolve property not found error.
+import { seedDatabase } from './services/seed';
+import { Product, Category, SiteSettings, CartItem, OrderDetails, Order, OrderStatus, PaymentStatus } from './types';
+
+// Import Components
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
-import { DynamicContentSection } from './components/DynamicContentSection';
 import { ContactSection } from './components/ContactSection';
-import { AdminSection } from './components/AdminSection';
 import { Footer } from './components/Footer';
 import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
+import { AdminSection } from './components/AdminSection';
+import { DynamicContentSection } from './components/DynamicContentSection';
 import { PixPaymentModal } from './components/PixPaymentModal';
 import { PaymentFailureModal } from './components/PaymentFailureModal';
-import { db } from './services/firebase';
-import * as firebaseService from './services/firebaseService';
-import { seedDatabase } from './services/seed';
-// Static assets for default values
-import defaultLogo from './assets/logo.png';
-import defaultHeroBg from './assets/ambiente-pizzaria.webp';
-import defaultAboutImg from './assets/sobre-imagem.webp';
 
 interface Toast {
     id: number;
@@ -25,115 +24,46 @@ interface Toast {
     type: 'success' | 'error';
 }
 
-const defaultSiteSettings: SiteSettings = {
-    logoUrl: defaultLogo,
-    heroSlogan: "A pizza nº 1 do ES",
-    heroTitle: "Pizzaria Santa Sensação",
-    heroSubtitle: "A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.",
-    heroBgUrl: defaultHeroBg,
-    contentSections: [
-        {
-            id: 'section-1',
-            order: 0,
-            isVisible: true,
-            isTagVisible: true,
-            tagIcon: "fas fa-award",
-            imageUrl: defaultAboutImg,
-            tag: "Nossa Conquista",
-            title: "A Melhor Pizza do Estado, Assinada por um Mestre",
-            description: "Em parceria com o renomado mestre pizzaiolo Luca Lonardi, a Santa Sensação eleva a pizza a um novo patamar. Fomos os grandes vencedores do concurso Panshow 2025, um reconhecimento que celebra nossa dedicação aos ingredientes frescos, massa de fermentação natural e, acima de tudo, a paixão por criar sabores inesquecíveis. Cada pizza que sai do nosso forno a lenha carrega a assinatura de um campeão e a promessa de uma experiência única.",
-            list: [
-                { id: 'item-1-1', icon: "fas fa-award", text: "Vencedora do Panshow 2025" },
-                { id: 'item-1-2', icon: "fas fa-user-check", text: "Assinada pelo Mestre Luca Lonardi" },
-                { id: 'item-1-3', icon: "fas fa-leaf", text: "Ingredientes frescos e selecionados" },
-                { id: 'item-1-4', icon: "fas fa-fire-alt", text: "Forno a lenha tradicional" }
-            ]
-        },
-        {
-            id: 'section-2',
-            order: 1,
-            isVisible: true,
-            isTagVisible: true,
-            tagIcon: 'fas fa-seedling',
-            imageUrl: 'https://picsum.photos/seed/ingredients/800/600',
-            tag: "Qualidade e Tradição",
-            title: "Ingredientes Frescos, Sabor Incomparável",
-            description: "Nossa paixão pela pizza começa na escolha de cada ingrediente. Trabalhamos com produtores locais para garantir o frescor e a qualidade que você sente em cada fatia. Da nossa massa de fermentação lenta aos tomates italianos, tudo é pensado para criar uma experiência única.",
-            list: [
-                { id: 'item-2-1', icon: 'fas fa-bread-slice', text: "Massa de fermentação natural de 48h" },
-                { id: 'item-2-2', icon: 'fas fa-pepper-hot', text: "Tomates italianos San Marzano" },
-                { id: 'item-2-3', icon: 'fas fa-cheese', text: "Mozzarella fresca e queijos selecionados" },
-                { id: 'item-2-4', icon: 'fas fa-leaf', text: "Manjericão e ervas da nossa horta" }
-            ]
-        }
-    ],
-    footerLinks: [
-        { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996500341', isVisible: true },
-        { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/santasensacao.sl', isVisible: true },
-        { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin', isVisible: true }
-    ]
+const defaultSettings: SiteSettings = {
+    logoUrl: '/logo-placeholder.png',
+    heroSlogan: 'A melhor pizza da região',
+    heroTitle: 'Santa Sensação Pizzaria',
+    heroSubtitle: 'Qualidade e sabor que você nunca viu. Peça agora e se surpreenda!',
+    heroBgUrl: '/hero-bg-placeholder.jpg',
+    contentSections: [],
+    footerLinks: [],
 };
 
-const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, orderNumber: number, isPaid: boolean) => {
-    const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumir no local' };
-    const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
-
-    let message = `*🍕 NOVO PEDIDO #${orderNumber} - SANTA SENSAÇÃO 🍕*\n\n`;
-    if (isPaid) {
-        message += `*✅ JÁ PAGO VIA PIX PELO SITE*\n\n`;
-    }
-    message += `*👤 DADOS DO CLIENTE:*\n`;
-    message += `*Nome:* ${details.name}\n`;
-    message += `*Telefone:* ${details.phone}\n`;
-    message += `*Tipo de Pedido:* ${orderTypeMap[details.orderType]}\n`;
-    if (details.orderType === 'delivery') {
-        message += `*Endereço:* ${details.address}\n`;
-    }
-    if (details.orderType === 'local' && details.reservationTime) {
-        message += `*Horário da Reserva:* ${details.reservationTime}\n`;
-    }
-    message += `\n*🛒 ITENS DO PEDIDO:*\n`;
-    currentCart.forEach(item => {
-        message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2).replace('.', ',')}\n`;
-    });
-    message += `\n*💰 TOTAL: R$ ${total.toFixed(2).replace('.', ',')}*\n\n`;
-    message += `*💳 PAGAMENTO:*\n`;
-    message += `*Forma:* ${paymentMethodMap[details.paymentMethod]}\n`;
-    if (!isPaid && details.paymentMethod === 'cash') {
-        if (details.changeNeeded) {
-            message += `*Precisa de troco para:* R$ ${details.changeAmount}\n`;
-        } else {
-            message += `*Não precisa de troco.*\n`;
-        }
-    }
-    if (details.notes) {
-        message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
-    }
-    message += `\n_Pedido gerado pelo nosso site._`;
-    return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
-};
-
-const App: React.FC = () => {
+function App() {
+    // Data state
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [isStoreOnline, setIsStoreOnline] = useState(true);
+    const [siteSettings, setSiteSettings] = useState<SiteSettings>(defaultSettings);
     const [orders, setOrders] = useState<Order[]>([]);
-    const [isStoreOnline, setIsStoreOnline] = useState<boolean>(true);
-    const [cart, setCart] = useState<CartItem[]>([]);
-    const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
-    const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState<boolean>(false);
-    const [isLoading, setIsLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
+
+    // UI State
+    const [loading, setLoading] = useState(true);
+    const [isCartOpen, setIsCartOpen] = useState(false);
+    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+    const [isPixModalOpen, setIsPixModalOpen] = useState(false);
+    const [isPaymentFailureModalOpen, setIsPaymentFailureModalOpen] = useState(false);
+    const [isCreatingPixPayment, setIsCreatingPixPayment] = useState(false);
     const [activeSection, setActiveSection] = useState('Início');
-    const [activeMenuCategory, setActiveMenuCategory] = useState<string>('');
+    const [activeCategoryId, setActiveCategoryId] = useState('');
     const [toasts, setToasts] = useState<Toast[]>([]);
-    const [siteSettings, setSiteSettings] = useState<SiteSettings>(defaultSiteSettings);
-    const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
-    const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
-    const [payingOrder, setPayingOrder] = useState<Order | null>(null);
-    const [showPaymentFailureModal, setShowPaymentFailureModal] = useState<boolean>(false);
-    const [pixRetryKey, setPixRetryKey] = useState<number>(0);
-    const [isCreatingPixPayment, setIsCreatingPixPayment] = useState<boolean>(false);
+
+    // Cart State
+    const [cartItems, setCartItems] = useState<CartItem[]>([]);
     
+    // Order State
+    const [payingOrder, setPayingOrder] = useState<Order | null>(null);
+    // FIX: Added missing state variables that were used in handlers and passed as props.
+    const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
+    const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState(false);
+    const [pixData, setPixData] = useState<{ qrCodeBase64: string; qrCode: string; } | null>(null);
+    
+    // Toast notifications
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
         setToasts(prevToasts => [...prevToasts, { id, message, type }]);
@@ -142,562 +72,291 @@ const App: React.FC = () => {
         }, 4000);
     }, []);
 
+    // Local Storage for Cart
     useEffect(() => {
-        const savedCart = localStorage.getItem('santaSensacaoCart');
+        const savedCart = localStorage.getItem('pizzariaCart');
         if (savedCart) {
-            setCart(JSON.parse(savedCart));
+            setCartItems(JSON.parse(savedCart));
         }
     }, []);
-
     useEffect(() => {
-        const sectionIds = ['inicio', 'cardapio', 'sobre', 'contato'];
-        const sectionElements = sectionIds.map(id => document.getElementById(id));
-        
-        const observerOptions = {
-            root: null,
-            rootMargin: '-80px 0px -60% 0px',
-            threshold: 0
+        localStorage.setItem('pizzariaCart', JSON.stringify(cartItems));
+    }, [cartItems]);
+    
+    // Data Fetching from Firebase
+    useEffect(() => {
+        if (!db) {
+            setLoading(false);
+            return;
         };
+        const unsubscribes = [
+            db.collection('products').orderBy('orderIndex').onSnapshot(snapshot => {
+                const productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+                setProducts(productsData);
+            }),
+            db.collection('categories').orderBy('order').onSnapshot(snapshot => {
+                const categoriesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
+                setCategories(categoriesData);
+                if (!activeCategoryId && categoriesData.length > 0) {
+                    const firstActive = categoriesData.find(c => c.active);
+                    if (firstActive) setActiveCategoryId(firstActive.id);
+                }
+            }),
+            db.doc('store_config/status').onSnapshot(doc => {
+                setIsStoreOnline(doc.data()?.isOpen ?? true);
+            }),
+            db.doc('store_config/site_settings').onSnapshot(doc => {
+                if (doc.exists) setSiteSettings(doc.data() as SiteSettings);
+            }),
+            db.collection('orders').orderBy('createdAt', 'desc').limit(50).onSnapshot(snapshot => {
+                const ordersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+                setOrders(ordersData);
+            })
+        ];
 
+        setLoading(false);
+        return () => unsubscribes.forEach(unsub => unsub());
+    }, [activeCategoryId]);
+
+    // Active Section Tracking for Header
+    useEffect(() => {
+        const sections = document.querySelectorAll('section');
+        const options = { rootMargin: '-40% 0px -60% 0px' };
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
-                    const idToTitle: { [key: string]: string } = {
-                        'inicio': 'Início',
-                        'cardapio': 'Cardápio',
-                        'sobre': 'Sobre Nós',
-                        'contato': 'Contato'
-                    };
-                    setActiveSection(idToTitle[entry.target.id] || 'Início');
+                    const id = entry.target.id;
+                    const name = { 'inicio': 'Início', 'cardapio': 'Cardápio', 'sobre': 'Sobre Nós', 'contato': 'Contato' }[id];
+                    if (name) setActiveSection(name);
                 }
             });
-        }, observerOptions);
+        }, options);
+        sections.forEach(section => observer.observe(section));
+        return () => sections.forEach(section => observer.unobserve(section));
+    }, [loading]); 
 
-        sectionElements.forEach(el => {
-            if (el) observer.observe(el);
-        });
-
-        return () => {
-            sectionElements.forEach(el => {
-                if (el) observer.unobserve(el);
-            });
-        };
-    }, []);
-
-    useEffect(() => {
-        if (!db) {
-            setError("Falha na conexão com o banco de dados.");
-            setIsLoading(false);
-            return;
-        }
-
-        const handleConnectionError = (err: Error, context: string) => {
-            console.error(`Error fetching ${context}:`, err);
-            setError("Não foi possível conectar ao banco de dados.");
-            setIsLoading(false);
-        };
-        
-        const settingsDocRef = db.doc('store_config/site_settings');
-        const unsubSettings = settingsDocRef.onSnapshot(doc => {
-            if (doc.exists) {
-                 const data = doc.data() as Partial<SiteSettings>;
-                 setSiteSettings(prev => ({ ...defaultSiteSettings, ...prev, ...data }));
-            }
-        }, err => handleConnectionError(err, "site settings"));
-
-        const statusDocRef = db.doc('store_config/status');
-        const unsubStatus = statusDocRef.onSnapshot(doc => {
-            const data = doc.data();
-            if (data) setIsStoreOnline(data.isOpen);
-        }, err => handleConnectionError(err, "store status"));
-
-        const categoriesQuery = db.collection('categories').orderBy('order');
-        const unsubCategories = categoriesQuery.onSnapshot(snapshot => {
-            const fetchedCategories: Category[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
-            setCategories(fetchedCategories);
-        }, err => handleConnectionError(err, "categories"));
-
-        const productsQuery = db.collection('products').orderBy('orderIndex');
-        const unsubProducts = productsQuery.onSnapshot(snapshot => {
-            const fetchedProducts: Product[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-            setProducts(fetchedProducts);
-            setIsLoading(false);
-            setError(null);
-        }, err => handleConnectionError(err, "products"));
-
-        const ordersQuery = db.collection('orders').orderBy('createdAt', 'desc');
-        const unsubOrders = ordersQuery.onSnapshot(snapshot => {
-            const fetchedOrders: Order[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-            setOrders(fetchedOrders);
-        }, err => handleConnectionError(err, "orders"));
-
-        return () => {
-            unsubSettings();
-            unsubStatus();
-            unsubCategories();
-            unsubProducts();
-            unsubOrders();
-        };
-    }, []);
-
-    useEffect(() => {
-        if (categories.length > 0 && !activeMenuCategory) {
-            const firstActiveCategory = categories.find(c => c.active);
-            if (firstActiveCategory) {
-                setActiveMenuCategory(firstActiveCategory.id);
-            }
-        }
-    }, [categories, activeMenuCategory]);
-    
-    useEffect(() => {
-        localStorage.setItem('santaSensacaoCart', JSON.stringify(cart));
-    }, [cart]);
-
-    const handleAddToCart = useCallback((product: Product, size: string, price: number) => {
-        setCart(prevCart => {
-            const existingItemIndex = prevCart.findIndex(item => item.productId === product.id && item.size === size);
-            if (existingItemIndex > -1) {
-                const updatedCart = [...prevCart];
-                updatedCart[existingItemIndex].quantity += 1;
-                return updatedCart;
+    // Cart Logic Handlers
+    const handleAddToCart = (product: Product, size: string, price: number) => {
+        const itemId = `${product.id}-${size}`;
+        setCartItems(prevItems => {
+            const existingItem = prevItems.find(item => item.id === itemId);
+            if (existingItem) {
+                return prevItems.map(item => item.id === itemId ? { ...item, quantity: item.quantity + 1 } : item);
             } else {
-                const newItem: CartItem = {
-                    id: `${product.id}-${size}`,
-                    productId: product.id,
-                    name: product.name,
-                    size,
-                    price,
-                    quantity: 1,
-                    imageUrl: product.imageUrl,
-                };
-                return [...prevCart, newItem];
+                return [...prevItems, { id: itemId, productId: product.id, name: product.name, size, price, quantity: 1, imageUrl: product.imageUrl }];
             }
         });
-        
-        const sortedActiveCategories = [...categories].sort((a,b) => a.order - b.order).filter(c => c.active);
-        const currentCategoryIndex = sortedActiveCategories.findIndex(c => c.id === product.categoryId);
-        const lastCategoryId = sortedActiveCategories.length > 0 ? sortedActiveCategories[sortedActiveCategories.length - 1].id : null;
 
-        if (product.categoryId === lastCategoryId) {
-            setShowFinalizeButtonTrigger(true);
-            setSuggestedNextCategoryId(null); 
+        const sortedActiveCategories = categories.filter(c => c.active).sort((a, b) => a.order - b.order);
+        const currentIndex = sortedActiveCategories.findIndex(c => c.id === product.categoryId);
+        
+        if (currentIndex !== -1 && currentIndex < sortedActiveCategories.length - 1) {
+            setSuggestedNextCategoryId(sortedActiveCategories[currentIndex + 1].id);
         } else {
-            if (currentCategoryIndex > -1 && currentCategoryIndex < sortedActiveCategories.length - 1) {
-                const nextCategory = sortedActiveCategories[currentCategoryIndex + 1];
-                setSuggestedNextCategoryId(nextCategory.id);
-            } else {
-                setSuggestedNextCategoryId(null);
-            }
-        }
-
-    }, [categories]);
-
-    const handleUpdateCartQuantity = useCallback((itemId: string, newQuantity: number) => {
-        setCart(prevCart => {
-            if (newQuantity <= 0) {
-                return prevCart.filter(item => item.id !== itemId);
-            }
-            return prevCart.map(item => item.id === itemId ? { ...item, quantity: newQuantity } : item);
-        });
-    }, []);
-    
-    const handleCheckout = async (details: OrderDetails) => {
-        setIsCheckoutModalOpen(false);
-        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
-        try {
-            const { orderId, orderNumber } = await firebaseService.createOrder(details, cart, total, 'payLater');
-            addToast(`Pedido #${orderNumber} criado! Enviando para o WhatsApp...`, 'success');
-            
-            const whatsappUrl = generateWhatsAppMessage(details, cart, total, orderNumber, false);
-            window.open(whatsappUrl, '_blank');
-            
-            setCart([]);
-            setIsCartOpen(false);
-        } catch (error: any) {
-            console.error("Failed to create order:", error);
-            addToast(error.message || "Erro ao criar pedido.", 'error');
+            setSuggestedNextCategoryId(null);
+            setShowFinalizeButtonTrigger(true);
         }
     };
 
+    const handleUpdateQuantity = (itemId: string, newQuantity: number) => {
+        if (newQuantity <= 0) {
+            setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
+        } else {
+            setCartItems(prevItems => prevItems.map(item => item.id === itemId ? { ...item, quantity: newQuantity } : item));
+        }
+    };
+
+    const cartItemCount = useMemo(() => cartItems.reduce((sum, item) => sum + item.quantity, 0), [cartItems]);
+    
+    // Checkout and Payment Flow Handlers
+    const handleCheckout = () => {
+        setIsCartOpen(false);
+        setIsCheckoutOpen(true);
+    };
+
+    const handleConfirmCheckout = async (details: OrderDetails) => {
+        const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        try {
+            await firebaseService.createOrder(details, cartItems, total, details.paymentMethod === 'pix' ? 'payLater' : undefined);
+            addToast('Pedido enviado com sucesso!', 'success');
+            setIsCheckoutOpen(false);
+            setCartItems([]);
+        } catch (error) {
+            console.error(error);
+            addToast('Falha ao enviar o pedido.', 'error');
+        }
+    };
+    
     const handleInitiatePixPayment = async (details: OrderDetails, pixOption: 'payNow' | 'payLater') => {
-        setIsCheckoutModalOpen(false);
+        if (pixOption === 'payLater') {
+            handleConfirmCheckout(details);
+            return;
+        }
+
         setIsCreatingPixPayment(true);
-        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        setIsCheckoutOpen(false);
+        const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
         
         try {
-            const { orderId, orderNumber, pixData } = await firebaseService.createOrder(details, cart, total, pixOption);
+            const { orderId, orderNumber, pixData: receivedPixData } = await firebaseService.createOrder(details, cartItems, total, pixOption);
             
-            if (!pixData || !pixData.qrCodeBase64) {
-                 throw new Error("A resposta do servidor não incluiu os dados do PIX.");
+            // Re-fetch the order from Firestore to have the complete object with timestamp
+            const orderDoc = await db?.collection('orders').doc(orderId).get();
+            if (!orderDoc?.exists) throw new Error("Failed to retrieve created order.");
+            
+            setPayingOrder({ id: orderId, ...(orderDoc.data() as Omit<Order, 'id'>) });
+            
+            if (receivedPixData) {
+                setPixData(receivedPixData);
+                setIsPixModalOpen(true);
             }
-
-            const newOrder: Order = {
-                id: orderId,
-                orderNumber: orderNumber,
-                customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.address, cpf: details.cpf },
-                items: cart, total, paymentMethod: 'pix', status: 'awaiting-payment', paymentStatus: 'pending',
-                createdAt: new Date(),
-                mercadoPagoDetails: { paymentId: '', qrCodeBase64: pixData.qrCodeBase64, qrCode: pixData.copyPaste }
-            };
-
-            setPayingOrder(newOrder);
-            setPixRetryKey(k => k + 1);
-        } catch (error: any) {
-            console.error("Failed to initiate PIX payment:", error);
-            addToast(error.message || "Erro ao iniciar pagamento PIX.", 'error');
-            setPayingOrder(null);
+        } catch (error) {
+            console.error("Error initiating PIX payment:", error);
+            addToast('Falha ao gerar PIX. Tente novamente.', 'error');
+            setIsPaymentFailureModalOpen(true);
         } finally {
             setIsCreatingPixPayment(false);
         }
     };
-
+    
     const handlePixPaymentSuccess = useCallback(async (paidOrder: Order) => {
-        if (!paidOrder || !paidOrder.id) {
-           addToast("Erro crítico ao processar pagamento.", 'error');
-           return;
-       }
-       try {
-           addToast("Pagamento confirmado! Enviando pedido para a pizzaria...", 'success');
-           
-           const details: OrderDetails = {
-               name: paidOrder.customer.name,
-               phone: paidOrder.customer.phone,
-               orderType: paidOrder.customer.orderType,
-               address: paidOrder.customer.address || '',
-               paymentMethod: 'pix',
-               changeNeeded: false,
-               notes: paidOrder.notes || '',
-               reservationTime: paidOrder.customer.reservationTime || '',
-               cpf: paidOrder.customer.cpf || ''
-           };
-           const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, paidOrder.orderNumber, true);
-           window.open(whatsappUrl, '_blank');
-
-           setCart([]);
-           setPayingOrder(null);
-           setIsCartOpen(false);
-       } catch (error) {
-           console.error("Error finalizing paid order:", error);
-           addToast("Erro ao finalizar o pedido após o pagamento. Contate o suporte.", 'error');
-       }
-   }, [addToast]);
-
-    const handleClosePixModal = () => {
-        if (payingOrder) {
-            setShowPaymentFailureModal(true);
-        } else {
-            setPayingOrder(null); // Just close if something went wrong before order was set
-        }
-    };
-    
-    const handleTryAgainPix = () => {
-        setShowPaymentFailureModal(false);
-        // Re-opens the PixPaymentModal by setting a new key
-        setPixRetryKey(k => k + 1);
-    };
-
-    const handlePayLaterFromFailure = async () => {
-        if (!payingOrder) return;
-    
-        const orderToUpdateId = payingOrder.id;
-        setShowPaymentFailureModal(false);
-        setPayingOrder(null);
-
-        try {
-            // Update status in Firestore and send to WhatsApp
-            await firebaseService.updateOrderStatus(orderToUpdateId, 'pending');
-            const orderSnapshot = await db.collection('orders').doc(orderToUpdateId).get();
-            const finalOrderData = orderSnapshot.data() as Order;
-            
-            const details: OrderDetails = {
-                name: finalOrderData.customer.name, phone: finalOrderData.customer.phone, orderType: finalOrderData.customer.orderType,
-                address: finalOrderData.customer.address || '', paymentMethod: 'pix',
-                changeNeeded: false, changeAmount: '',
-                notes: finalOrderData.notes || '', reservationTime: finalOrderData.customer.reservationTime || ''
-            };
-            const whatsappUrl = generateWhatsAppMessage(details, finalOrderData.items, finalOrderData.total, finalOrderData.orderNumber, false);
-            window.open(whatsappUrl, '_blank');
-            
-            addToast("Pedido enviado! O pagamento será feito na entrega/retirada.", 'success');
-            setCart([]);
-            setIsCartOpen(false);
-
-        } catch (error) {
-            console.error("Failed to update order to pending:", error);
-            addToast("Erro ao processar o pedido. Tente novamente.", 'error');
-        }
-    };
-
-
-    const handleSaveProduct = useCallback(async (product: Product) => {
-        try {
-            const { id, ...dataToSave } = product;
-            if (id) {
-                await firebaseService.updateProduct(id, dataToSave);
-                addToast("Produto atualizado com sucesso!", 'success');
-            } else {
-                await firebaseService.addProduct({ ...dataToSave, orderIndex: products.length, stockStatus: 'available' });
-                addToast("Produto adicionado com sucesso!", 'success');
-            }
-        } catch (error) {
-            console.error("Failed to save product:", error);
-            addToast("Erro ao salvar produto. Tente novamente.", 'error');
-        }
-    }, [products.length, addToast]);
-    
-    const handleDeleteProduct = useCallback(async (productId: string) => {
-        try {
-            await firebaseService.deleteProduct(productId);
-            addToast("Produto deletado com sucesso!", 'success');
-        } catch (error) {
-            console.error("Failed to delete product:", error);
-            addToast("Erro ao deletar produto. Tente novamente.", 'error');
-        }
+        setIsPixModalOpen(false);
+        setCartItems([]);
+        addToast("Pagamento confirmado! Seu pedido foi enviado.", 'success');
+        // The WhatsApp message is now triggered by the webhook updating the status.
+        // The frontend's job is done.
     }, [addToast]);
     
-    const handleProductStatusChange = useCallback(async (productId: string, active: boolean) => {
-        try {
-            await firebaseService.updateProductStatus(productId, active);
-            addToast(`Produto ${active ? 'ativado' : 'desativado'}.`, 'success');
-        } catch (error) {
-            console.error("Failed to update product status:", error);
-            addToast("Erro ao atualizar status do produto.", 'error');
-        }
-    }, [addToast]);
+    // FIX: Added a useEffect to listen for payment confirmation, replacing the logic that was incorrectly expected in PixPaymentModal.
+    useEffect(() => {
+        if (!db || !payingOrder?.id || !isPixModalOpen) return;
 
-    const handleProductStockStatusChange = useCallback(async (productId: string, stockStatus: 'available' | 'out_of_stock') => {
-        try {
-            await firebaseService.updateProductStockStatus(productId, stockStatus);
-            addToast(`Estoque do produto atualizado.`, 'success');
-        } catch (error) {
-            console.error("Failed to update product stock status:", error);
-            addToast("Erro ao atualizar estoque do produto.", 'error');
-        }
-    }, [addToast]);
-
-    const handleStoreStatusChange = useCallback(async (isOnline: boolean) => {
-        try {
-            await firebaseService.updateStoreStatus(isOnline);
-            addToast("Status da loja atualizado.", 'success');
-        } catch (error) {
-            console.error("Failed to update store status:", error);
-            addToast("Erro ao atualizar status da loja.", 'error');
-        }
-    }, [addToast]);
-    
-    const handleSaveCategory = useCallback(async (category: Category) => {
-        try {
-            const { id, ...dataToSave } = category;
-            if (id) {
-                await firebaseService.updateCategory(id, dataToSave);
-                addToast("Categoria atualizada com sucesso!", 'success');
-            } else {
-                await firebaseService.addCategory({ ...dataToSave, order: categories.length });
-                addToast("Categoria adicionada com sucesso!", 'success');
-            }
-        } catch (error) {
-            console.error("Failed to save category:", error);
-            addToast("Erro ao salvar categoria.", 'error');
-        }
-    }, [categories.length, addToast]);
-    
-    const handleDeleteCategory = useCallback(async (categoryId: string) => {
-        try {
-            await firebaseService.deleteCategory(categoryId, products);
-            addToast("Categoria deletada com sucesso!", 'success');
-        } catch (error: any) {
-            console.error("Failed to delete category:", error);
-            addToast(`Erro ao deletar categoria: ${error.message}`, 'error');
-        }
-    }, [products, addToast]);
-    
-    const handleCategoryStatusChange = useCallback(async (categoryId: string, active: boolean) => {
-        try {
-            await firebaseService.updateCategoryStatus(categoryId, active);
-            addToast(`Categoria ${active ? 'ativada' : 'desativada'}.`, 'success');
-        } catch (error) {
-            console.error("Failed to update category status:", error);
-            addToast("Erro ao atualizar status da categoria.", 'error');
-        }
-    }, [addToast]);
-
-    const handleReorderProducts = useCallback(async (productsToUpdate: { id: string; orderIndex: number }[]) => {
-        try {
-            await firebaseService.updateProductsOrder(productsToUpdate);
-            addToast("Ordem dos produtos atualizada.", 'success');
-        } catch (error) {
-            console.error("Failed to reorder products:", error);
-            addToast("Erro ao reordenar produtos.", 'error');
-        }
-    }, [addToast]);
-
-    const handleReorderCategories = useCallback(async (categoriesToUpdate: { id: string; order: number }[]) => {
-        try {
-            await firebaseService.updateCategoriesOrder(categoriesToUpdate);
-            addToast("Ordem das categorias atualizada.", 'success');
-        } catch (error) {
-            console.error("Failed to reorder categories:", error);
-            addToast("Erro ao reordenar categorias.", 'error');
-        }
-    }, [addToast]);
-
-    const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => {
-        try {
-            const settingsToUpdate = JSON.parse(JSON.stringify(settings)); // Deep copy
-
-            for (const key in files) {
-                const file = files[key];
-                if (file) {
-                    const url = await firebaseService.uploadSiteAsset(file, key);
-                    
-                    if (key === 'logo') {
-                        settingsToUpdate.logoUrl = url;
-                    } else if (key === 'heroBg') {
-                        settingsToUpdate.heroBgUrl = url;
-                    } else { // It's a content section file, key is the section ID
-                        const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
-                        if (sectionIndex > -1) {
-                            settingsToUpdate.contentSections[sectionIndex].imageUrl = url;
-                        }
-                    }
+        const unsubscribe = db.collection('orders').doc(payingOrder.id).onSnapshot(doc => {
+            if (doc.exists) {
+                const updatedOrder = { id: doc.id, ...doc.data() } as Order;
+                if (updatedOrder.paymentStatus === 'paid_online') {
+                    handlePixPaymentSuccess(updatedOrder);
+                    unsubscribe();
                 }
             }
+        });
 
-            await firebaseService.updateSiteSettings(settingsToUpdate);
-            addToast("Personalização do site salva com sucesso!", 'success');
-        } catch (error) {
-            console.error("Failed to save site settings:", error);
-            addToast("Erro ao salvar as configurações do site.", 'error');
+        return () => unsubscribe();
+    }, [payingOrder, isPixModalOpen, handlePixPaymentSuccess]);
+
+    const handleClosePixModal = () => {
+        setIsPixModalOpen(false);
+        if (payingOrder?.paymentStatus === 'pending') {
+            setIsPaymentFailureModalOpen(true);
         }
-    }, [addToast]);
-    
-    const handleUpdateOrderStatus = useCallback(async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => {
-        try {
-            let finalStatus = status;
-            const order = orders.find(o => o.id === orderId);
+    };
 
-            if (status === 'accepted' && order?.customer.orderType === 'local') {
-                finalStatus = 'reserved';
-            }
-            
-            await firebaseService.updateOrderStatus(orderId, finalStatus, payload);
-            addToast("Status do pedido atualizado!", 'success');
-        } catch (error) {
-            console.error("Failed to update order status:", error);
-            addToast("Erro ao atualizar o status do pedido.", 'error');
-        }
-    }, [orders, addToast]);
-
-    const handleUpdateOrderPaymentStatus = useCallback(async (orderId: string, paymentStatus: PaymentStatus) => {
-        try {
-            await firebaseService.updateOrderPaymentStatus(orderId, paymentStatus);
-            addToast("Status de pagamento atualizado!", 'success');
-        } catch (error) {
-            console.error("Failed to update order payment status:", error);
-            addToast("Erro ao atualizar o status de pagamento.", 'error');
-        }
-    }, [addToast]);
-
-    const handleUpdateOrderReservationTime = useCallback(async (orderId: string, reservationTime: string) => {
-        try {
-            await firebaseService.updateOrderReservationTime(orderId, reservationTime);
-            addToast("Horário da reserva atualizado!", 'success');
-        } catch (error) {
-            console.error("Failed to update reservation time:", error);
-            addToast("Erro ao atualizar horário da reserva.", 'error');
-        }
-    }, [addToast]);
-
-    const handleDeleteOrder = useCallback(async (orderId: string) => {
-        if (window.confirm("Tem certeza que deseja apagar este pedido? Após apagar, o pedido será enviado para a lixeira 🗑️")) {
+    // Admin Handlers (memoized for performance)
+    const memoizedAdminHandlers = useMemo(() => ({
+        onSaveProduct: async (product: Product) => {
+            const { id, ...dataToSave } = product;
+            if (id) await firebaseService.updateProduct(id, dataToSave);
+            else await firebaseService.addProduct(dataToSave);
+            addToast(`Produto ${id ? 'atualizado' : 'adicionado'}!`, 'success');
+        },
+        onDeleteProduct: async (id: string) => { await firebaseService.deleteProduct(id); addToast('Produto deletado!', 'success'); },
+        onProductStatusChange: firebaseService.updateProductStatus,
+        onProductStockStatusChange: firebaseService.updateProductStockStatus,
+        onStoreStatusChange: firebaseService.updateStoreStatus,
+        onSaveCategory: async (category: Category) => {
+            const { id, ...dataToSave } = category;
+            if (id) await firebaseService.updateCategory(id, dataToSave);
+            else await firebaseService.addCategory({ ...dataToSave, order: categories.length });
+            addToast(`Categoria ${id ? 'atualizada' : 'adicionada'}!`, 'success');
+        },
+        onDeleteCategory: async (id: string) => { 
             try {
-                await firebaseService.updateOrderStatus(orderId, 'deleted');
-                addToast("Pedido movido para a lixeira.", 'success');
-            } catch (error) {
-                console.error("Failed to move order to trash:", error);
-                addToast("Erro ao mover pedido para a lixeira.", 'error');
+                await firebaseService.deleteCategory(id, products);
+                addToast('Categoria deletada!', 'success');
+            } catch (e: any) {
+                addToast(e.message, 'error');
             }
-        }
-    }, [addToast]);
-
-    const handlePermanentDeleteOrder = useCallback(async (orderId: string) => {
-        if (window.confirm("Este pedido será apagado PERMANENTEMENTE. Esta ação não pode ser desfeita. Continuar?")) {
-            try {
-                await firebaseService.deleteOrder(orderId);
-                addToast("Pedido apagado permanentemente.", 'success');
-            } catch (error) {
-                console.error("Failed to permanently delete order:", error);
-                addToast("Erro ao apagar o pedido permanentemente.", 'error');
-            }
-        }
-    }, [addToast]);
-    
-    const handleRefundOrder = useCallback(async (orderId: string) => {
-         if (window.confirm("Tem certeza que deseja estornar o valor total deste pagamento? Esta ação não pode ser desfeita.")) {
+        },
+        onCategoryStatusChange: firebaseService.updateCategoryStatus,
+        onReorderProducts: firebaseService.updateProductsOrder,
+        onReorderCategories: firebaseService.updateCategoriesOrder,
+        // FIX: Changed firebaseService.seedDatabase to the correctly imported seedDatabase function.
+        onSeedDatabase: seedDatabase,
+        onSaveSiteSettings,
+        onUpdateOrderStatus: firebaseService.updateOrderStatus,
+        onUpdateOrderPaymentStatus: firebaseService.updateOrderPaymentStatus,
+        onUpdateOrderReservationTime: firebaseService.updateOrderReservationTime,
+        onDeleteOrder: (id: string) => firebaseService.updateOrderStatus(id, 'deleted'),
+        onPermanentDeleteOrder: firebaseService.deleteOrder,
+        onRefundOrder: async (orderId: string) => {
+            if (!window.confirm("Estornar o pagamento deste pedido? Esta ação não pode ser desfeita.")) return;
             try {
                 await firebaseService.refundPayment(orderId);
-                addToast("Estorno solicitado com sucesso!", 'success');
+                addToast("Pedido estornado com sucesso!", 'success');
             } catch (error: any) {
-                console.error("Failed to refund order:", error);
-                addToast(error.message || "Erro ao solicitar estorno.", 'error');
+                addToast(`Falha ao estornar: ${error.message || 'Erro desconhecido.'}`, 'error');
+            }
+        },
+    }), [products, categories.length, addToast]);
+
+    async function onSaveSiteSettings(settings: SiteSettings, files: { [key: string]: File | null }) {
+        let updatedSettings = { ...settings };
+        for (const key in files) {
+            const file = files[key];
+            if (file) {
+                try {
+                    const downloadURL = await firebaseService.uploadSiteAsset(file, key);
+                    if (key === 'logo') updatedSettings.logoUrl = downloadURL;
+                    else if (key === 'heroBg') updatedSettings.heroBgUrl = downloadURL;
+                    else {
+                        const sectionIndex = updatedSettings.contentSections.findIndex(s => s.id === key);
+                        if (sectionIndex > -1) updatedSettings.contentSections[sectionIndex].imageUrl = downloadURL;
+                    }
+                } catch (error) {
+                    addToast(`Falha ao enviar a imagem para ${key}.`, 'error');
+                    return;
+                }
             }
         }
-    }, [addToast]);
+        await firebaseService.updateSiteSettings(updatedSettings);
+        addToast('Configurações salvas!', 'success');
+    }
 
-
-    const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
+    if (loading) {
+        return <div className="min-h-screen flex items-center justify-center"><i className="fas fa-spinner fa-spin text-4xl text-accent"></i></div>;
+    }
 
     return (
-        <div className="flex flex-col min-h-screen">
-            <Header cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} activeSection={activeSection} settings={siteSettings} />
-            
-            <div id="status-banner" className={`bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
-                <i className="fas fa-times-circle mr-2"></i>
-                Desculpe, estamos fechados no momento.
-            </div>
-
-            <main className="flex-grow">
-                <HeroSection settings={siteSettings} />
-                
-                {error && (
-                    <div className="container mx-auto px-4 py-8">
-                        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-6 rounded-lg shadow-md" role="alert">
-                            <p className="font-bold text-lg mb-2">Falha na Conexão</p>
-                            <p className="mb-4">{error}</p>
-                        </div>
-                    </div>
-                )}
-
-                {isLoading ? (
-                    <div className="text-center py-20">
-                        <i className="fas fa-spinner fa-spin text-5xl text-accent"></i>
-                        <p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p>
-                    </div>
-                ) : !error && (
-                    <MenuSection 
-                        categories={categories} 
-                        products={products} 
-                        onAddToCart={handleAddToCart}
-                        isStoreOnline={isStoreOnline}
-                        activeCategoryId={activeMenuCategory}
-                        setActiveCategoryId={setActiveMenuCategory}
-                        suggestedNextCategoryId={suggestedNextCategoryId}
-                        setSuggestedNextCategoryId={setSuggestedNextCategoryId}
-                        cartItemCount={cartTotalItems}
-                        onCartClick={() => setIsCartOpen(true)}
-                        showFinalizeButtonTrigger={showFinalizeButtonTrigger}
-                        setShowFinalizeButtonTrigger={setShowFinalizeButtonTrigger}
-                    />
-                )}
-                <div id="sobre">
-                    {siteSettings.contentSections
-                        ?.filter(section => section.isVisible)
-                        .sort((a, b) => a.order - b.order)
-                        .map((section, index) => (
-                            <DynamicContentSection key={section.id} section={section} order={index} />
-                    ))}
+        <>
+            {isCreatingPixPayment && (
+                 <div className="fixed inset-0 bg-black/70 z-[100] flex flex-col items-center justify-center text-white">
+                    <i className="fas fa-spinner fa-spin text-5xl"></i>
+                    <p className="mt-4 text-xl font-semibold">Conectando ao sistema de pagamento...</p>
+                    <p className="text-sm">Por favor, aguarde.</p>
                 </div>
+            )}
+            <Header cartItemCount={cartItemCount} onCartClick={() => setIsCartOpen(true)} activeSection={activeSection} settings={siteSettings} />
+            <main>
+                <HeroSection settings={siteSettings} />
+                <MenuSection
+                    categories={categories}
+                    products={products}
+                    onAddToCart={handleAddToCart}
+                    isStoreOnline={isStoreOnline}
+                    activeCategoryId={activeCategoryId}
+                    setActiveCategoryId={setActiveCategoryId}
+                    suggestedNextCategoryId={suggestedNextCategoryId}
+                    setSuggestedNextCategoryId={setSuggestedNextCategoryId}
+                    cartItemCount={cartItemCount}
+                    onCartClick={handleCheckout}
+                    showFinalizeButtonTrigger={showFinalizeButtonTrigger}
+                    setShowFinalizeButtonTrigger={setShowFinalizeButtonTrigger}
+                />
+                
+                {siteSettings.contentSections?.filter(s => s.isVisible).sort((a,b) => a.order - b.order).map((section, index) => 
+                     <DynamicContentSection key={section.id} section={section} order={index} />
+                )}
+
                 <ContactSection />
                 <AdminSection 
                     allProducts={products}
@@ -705,111 +364,66 @@ const App: React.FC = () => {
                     isStoreOnline={isStoreOnline}
                     siteSettings={siteSettings}
                     orders={orders}
-                    onSaveProduct={handleSaveProduct}
-                    onDeleteProduct={handleDeleteProduct}
-                    onProductStatusChange={handleProductStatusChange}
-                    onProductStockStatusChange={handleProductStockStatusChange}
-                    onStoreStatusChange={handleStoreStatusChange}
-                    onSaveCategory={handleSaveCategory}
-                    onDeleteCategory={handleDeleteCategory}
-                    onCategoryStatusChange={handleCategoryStatusChange}
-                    onReorderProducts={handleReorderProducts}
-                    onReorderCategories={handleReorderCategories}
-                    onSeedDatabase={seedDatabase}
-                    onSaveSiteSettings={handleSaveSiteSettings}
-                    onUpdateOrderStatus={handleUpdateOrderStatus}
-                    onUpdateOrderPaymentStatus={handleUpdateOrderPaymentStatus}
-                    onUpdateOrderReservationTime={handleUpdateOrderReservationTime}
-                    onDeleteOrder={handleDeleteOrder}
-                    onPermanentDeleteOrder={handlePermanentDeleteOrder}
-                    onRefundOrder={handleRefundOrder}
+                    {...memoizedAdminHandlers}
                 />
             </main>
-
-            <Footer settings={siteSettings} />
-
-            {cart.length > 0 && (
-                <div className="fixed bottom-5 right-5 z-40">
-                    <button 
-                        onClick={() => setIsCartOpen(true)}
-                        className="bg-accent text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transform transition-transform hover:scale-105 animate-fade-in-up">
-                        <i className="fas fa-shopping-bag text-xl"></i>
-                        <div className="text-left">
-                            <span className="text-sm block leading-tight">{cartTotalItems} {cartTotalItems > 1 ? 'itens' : 'item'}</span>
-                            <span className="font-semibold text-lg block leading-tight">Ver Pedido</span>
-                        </div>
-                    </button>
-                </div>
-            )}
+            <Footer settings={siteSettings}/>
 
             <CartSidebar 
                 isOpen={isCartOpen}
                 onClose={() => setIsCartOpen(false)}
-                cartItems={cart}
-                onUpdateQuantity={handleUpdateCartQuantity}
-                onCheckout={() => {
-                    if (!isStoreOnline) {
-                        addToast("A loja está fechada. Não é possível finalizar o pedido.", 'error');
-                        return;
-                    }
-                    setIsCartOpen(false);
-                    setIsCheckoutModalOpen(true);
-                }}
+                cartItems={cartItems}
+                onUpdateQuantity={handleUpdateQuantity}
+                onCheckout={handleCheckout}
                 isStoreOnline={isStoreOnline}
                 categories={categories}
                 products={products}
-                setActiveCategoryId={setActiveMenuCategory}
-            />
-
-            <CheckoutModal 
-                isOpen={isCheckoutModalOpen}
-                onClose={() => setIsCheckoutModalOpen(false)}
-                cartItems={cart}
-                onConfirmCheckout={handleCheckout}
-                onInitiatePixPayment={handleInitiatePixPayment}
-            />
-             <PixPaymentModal
-                key={pixRetryKey}
-                order={payingOrder}
-                onClose={handleClosePixModal}
-                onPaymentSuccess={handlePixPaymentSuccess}
-            />
-
-            <PaymentFailureModal
-                isOpen={showPaymentFailureModal}
-                onClose={() => {
-                    setShowPaymentFailureModal(false);
-                    setPayingOrder(null);
-                }}
-                onTryAgain={handleTryAgainPix}
-                onPayLater={handlePayLaterFromFailure}
+                setActiveCategoryId={setActiveCategoryId}
             />
             
-            {isCreatingPixPayment && (
-                <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8">
-                        <i className="fas fa-spinner fa-spin text-5xl text-accent"></i>
-                        <p className="mt-6 font-semibold text-lg text-gray-700">Conectando com o Mercado Pago...</p>
-                        <p className="mt-2 text-sm text-gray-500">Estamos gerando seu PIX seguro. Por favor, aguarde um instante.</p>
-                    </div>
-                </div>
+            {isCheckoutOpen && (
+                <CheckoutModal 
+                    isOpen={isCheckoutOpen}
+                    onClose={() => setIsCheckoutOpen(false)}
+                    cartItems={cartItems}
+                    onConfirmCheckout={handleConfirmCheckout}
+                    onInitiatePixPayment={handleInitiatePixPayment}
+                />
             )}
-
+            
+            {/* FIX: Corrected props for PixPaymentModal to match its definition. Removed 'order' and 'onPaymentSuccess' and added 'isOpen', 'pixData', and 'orderNumber'. */}
+            {isPixModalOpen && payingOrder && pixData && (
+                <PixPaymentModal
+                    isOpen={isPixModalOpen}
+                    onClose={handleClosePixModal}
+                    pixData={pixData}
+                    orderNumber={payingOrder.orderNumber}
+                />
+            )}
+            
+            <PaymentFailureModal
+                isOpen={isPaymentFailureModalOpen}
+                onClose={() => { setIsPaymentFailureModalOpen(false); setPayingOrder(null); }}
+                onTryAgain={() => {
+                    setIsPaymentFailureModalOpen(false);
+                    const details = payingOrder?.customer as OrderDetails;
+                    if(details) handleInitiatePixPayment(details, 'payNow');
+                }}
+                onPayLater={() => {
+                    setIsPaymentFailureModalOpen(false);
+                    const details = payingOrder?.customer as OrderDetails;
+                    if (details) handleConfirmCheckout(details);
+                }}
+            />
+             {/* Toast Container */}
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]">
                 <div className="w-full flex flex-col items-center space-y-4 sm:items-end">
                     {toasts.map((toast) => (
-                        <div
-                            key={toast.id}
-                            className="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden animate-fade-in-up"
-                        >
+                        <div key={toast.id} className="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden animate-fade-in-up">
                             <div className="p-4">
                                 <div className="flex items-start">
                                     <div className="flex-shrink-0">
-                                        {toast.type === 'success' ? (
-                                            <i className="fas fa-check-circle h-6 w-6 text-green-500"></i>
-                                        ) : (
-                                            <i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>
-                                        )}
+                                        {toast.type === 'success' ? (<i className="fas fa-check-circle h-6 w-6 text-green-500"></i>) : (<i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>)}
                                     </div>
                                     <div className="ml-3 w-0 flex-1 pt-0.5">
                                         <p className="text-sm font-medium text-gray-900">{toast.message}</p>
@@ -820,9 +434,8 @@ const App: React.FC = () => {
                     ))}
                 </div>
             </div>
-
-        </div>
+        </>
     );
-};
+}
 
 export default App;
