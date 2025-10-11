@@ -61,8 +61,6 @@ const OrderCard: React.FC<OrderCardProps> = ({
     }
   };
 
-  const orderActions = getOrderActions(order);
-
   // Handle Mercado Pago order cancellation
   const handleCancelPayment = async () => {
     if (!order.mercadoPagoOrderId) {
@@ -118,6 +116,11 @@ const OrderCard: React.FC<OrderCardProps> = ({
       addToast(error.message || 'Erro ao gerar comprovante.', 'error');
     }
   };
+
+  // Order actions based on payment status
+  const canCancel = order.paymentStatus === 'pending' && order.status !== 'completed';
+  const canRefund = order.paymentStatus === 'paid';
+  const canViewReceipt = order.mercadoPagoPaymentId && (order.paymentStatus === 'paid' || order.paymentStatus === 'refunded' || order.paymentStatus === 'partially_refunded');
 
   return (
     <div className="bg-white rounded-lg shadow-md border border-gray-200 mb-4 overflow-hidden">
@@ -274,7 +277,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-200">
             {/* Payment Actions */}
-            {orderActions.canViewReceipt && (
+            {canViewReceipt && (
               <button
                 onClick={handleViewReceipt}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors"
@@ -284,7 +287,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
               </button>
             )}
 
-            {orderActions.canCancel && (
+            {canCancel && (
               <button
                 onClick={handleCancelPayment}
                 disabled={isProcessing}
@@ -295,7 +298,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
               </button>
             )}
 
-            {orderActions.canRefund && (
+            {canRefund && (
               <button
                 onClick={() => handleRefund()}
                 disabled={isProcessing}
@@ -306,7 +309,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
               </button>
             )}
 
-            {orderActions.canRefundPartial && (
+            {canRefund && (
               <button
                 onClick={() => setShowRefundModal(true)}
                 disabled={isProcessing}
@@ -337,7 +340,6 @@ const OrderCard: React.FC<OrderCardProps> = ({
               </>
             )}
 
-            {/* Other status transitions... */}
             {order.status === 'accepted' && (
               <button
                 onClick={() => onStatusChange(order.id, 'preparing')}
@@ -437,4 +439,5 @@ const OrderCard: React.FC<OrderCardProps> = ({
   );
 };
 
+// IMPORTANTE: Export default aqui
 export default OrderCard;

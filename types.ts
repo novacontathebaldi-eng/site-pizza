@@ -4,6 +4,7 @@ export interface Product {
   description: string;
   categoryId: string;
   imageUrl: string;
+  badge?: string; // ADDED: campo para selo de destaque
   prices: { [key: string]: number }; // e.g., { small: 25, medium: 35, large: 45 }
   orderIndex: number;
   active: boolean;

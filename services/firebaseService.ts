@@ -88,6 +88,18 @@ export const updateProductsOrder = async (productsToUpdate: { id: string; orderI
   await batch.commit();
 };
 
+// Upload image function - ADDED
+export const uploadImage = async (file: File): Promise<string> => {
+  const timestamp = Date.now();
+  const fileName = `product_${timestamp}_${file.name}`;
+  const storageRef = ref(storage, `products/${fileName}`);
+  
+  await uploadBytes(storageRef, file);
+  const downloadURL = await getDownloadURL(storageRef);
+  
+  return downloadURL;
+};
+
 // Category operations
 export const addCategory = async (categoryData: Partial<Category>) => {
   const categoriesRef = collection(db, 'categories');
