@@ -1,394 +1,301 @@
-import React, { useState } from 'react';
-import { Clock, MapPin, User, Phone, CheckCircle, XCircle, RefreshCw, CreditCard, DollarSign } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Order, OrderStatus, PaymentStatus } from '../types';
-import * as firebaseService from '../services/firebaseService';
+import { ContactModal } from './ContactModal';
 
 interface OrderCardProps {
-  order: Order;
-  onStatusUpdate: (orderId: string, newStatus: OrderStatus) => void;
-  onPaymentStatusUpdate: (orderId: string, newPaymentStatus: PaymentStatus) => void;
-  isAdmin?: boolean;
+    order: Order;
+    onUpdateStatus: (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => void;
+    onUpdatePaymentStatus: (orderId: string, paymentStatus: PaymentStatus) => void;
+    onUpdateReservationTime: (orderId: string, reservationTime: string) => void;
+    onDelete: (orderId: string) => void;
+    onPermanentDelete: (orderId: string) => void;
 }
 
-export const OrderCard: React.FC<OrderCardProps> = ({
-  order,
-  onStatusUpdate,
-  onPaymentStatusUpdate,
-  isAdmin = false
-}) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+// This is now a function to provide dynamic text based on the order type
+const getStatusConfig = (order: Order): { text: string; icon: string; color: string; } => {
+    const staticConfig: { [key in OrderStatus]: { text: string; icon: string; color: string; } } = {
+        pending: { text: 'Pendente', icon: 'fas fa-hourglass-start', color: 'border-yellow-500' },
+        accepted: { text: 'Aceito / Em Preparo', icon: 'fas fa-cogs', color: 'border-blue-500' },
+        reserved: { text: 'Reserva (No Local)', icon: 'fas fa-chair', color: 'border-teal-500' },
+        ready: { text: 'Pronto / Em Rota', icon: 'fas fa-shipping-fast', color: 'border-purple-500' }, // Default text
+        completed: { text: 'Finalizado', icon: 'fas fa-check-circle', color: 'border-green-500' },
+        cancelled: { text: 'Cancelado', icon: 'fas fa-times-circle', color: 'border-red-500' },
+        deleted: { text: 'Na Lixeira', icon: 'fas fa-trash-alt', color: 'border-gray-500' },
+        'awaiting-payment': { text: 'Aguardando Pgto', icon: 'fas fa-clock', color: 'border-gray-400' },
+    };
 
-  const {
-    id,
-    customer,
-    items,
-    total,
-    paymentMethod,
-    changeNeeded,
-    changeAmount,
-    notes,
-    status,
-    paymentStatus,
-    createdAt,
-    pickupTimeEstimate,
-    mercadoPagoOrder
-  } = order;
-
-  const formatTimestamp = (timestamp: any) => {
-    if (!timestamp) return 'Data não disponível';
-    
-    let date: Date;
-    if (timestamp.toDate) {
-      date = timestamp.toDate();
-    } else if (timestamp instanceof Date) {
-      date = timestamp;
-    } else {
-      date = new Date(timestamp);
+    if (order.status === 'ready') {
+        if (order.customer.orderType === 'pickup') {
+            return { ...staticConfig.ready, text: 'Pronto para Retirada' };
+        }
+        if (order.customer.orderType === 'delivery') {
+            return { ...staticConfig.ready, text: 'Saiu para Entrega' };
+        }
     }
     
-    return date.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+    return staticConfig[order.status] || staticConfig.pending;
+};
 
-  const getStatusColor = (status: OrderStatus) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'accepted': return 'bg-blue-100 text-blue-800';
-      case 'ready': return 'bg-purple-100 text-purple-800';
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      case 'awaiting-payment': return 'bg-orange-100 text-orange-800';
-      default: return 'bg-gray-100 text-gray-800';
+const paymentMethodMap = { credit: 'Crédito', debit: 'Débito', pix: 'PIX', cash: 'Dinheiro' };
+const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo no Local' };
+
+const getPaymentStatusInfo = (order: Order): { text: string; isPaid: boolean } => {
+    switch (order.paymentStatus) {
+        case 'paid_online':
+            return { text: 'Pago pelo SITE', isPaid: true };
+        case 'paid':
+            return { text: 'Pago', isPaid: true };
+        case 'pending':
+        default:
+            return { text: 'Pendente', isPaid: false };
     }
-  };
+};
 
-  const getPaymentStatusColor = (paymentStatus: PaymentStatus) => {
-    switch (paymentStatus) {
-      case 'paid':
-      case 'paid_online': return 'bg-green-100 text-green-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'refunded':
-      case 'partially_refunded': return 'bg-orange-100 text-orange-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
 
-  const orderTypeMap = {
-    delivery: 'Entrega',
-    pickup: 'Retirada',
-    local: 'Local'
-  };
+export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete }) => {
+    const { id, customer, items, total, paymentMethod, changeNeeded, changeAmount, notes, status, paymentStatus, createdAt, pickupTimeEstimate } = order;
+    const config = getStatusConfig(order);
+    const { text: paymentStatusText, isPaid } = getPaymentStatusInfo(order);
 
-  const paymentMethodMap = {
-    pix: 'PIX',
-    credit: 'Cartão Crédito',
-    debit: 'Cartão Débito',
-    cash: 'Dinheiro'
-  };
 
-  const statusMap = {
-    'pending': 'Pendente',
-    'accepted': 'Aceito',
-    'ready': 'Pronto',
-    'completed': 'Finalizado',
-    'cancelled': 'Cancelado',
-    'awaiting-payment': 'Aguardando Pagamento'
-  };
+    const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+    const [isEditingTime, setIsEditingTime] = useState(false);
+    const [newTime, setNewTime] = useState(customer.reservationTime || '');
 
-  const paymentStatusMap = {
-    'pending': 'Pendente',
-    'paid': 'Pago',
-    'paid_online': 'Pago Online',
-    'partially_paid': 'Pago Parcial',
-    'refunded': 'Reembolsado',
-    'partially_refunded': 'Reembolso Parcial'
-  };
+    useEffect(() => {
+        setNewTime(customer.reservationTime || '');
+    }, [customer.reservationTime]);
 
-  // Operações do Mercado Pago para Admin
-  const handleCancelPayment = async () => {
-    if (!mercadoPagoOrder?.orderId || !isAdmin) return;
+    const formatTimestamp = (timestamp: any): string => {
+        if (!timestamp) return 'N/A';
+        const date = timestamp.toDate();
+        return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
+    };
+    
+    const handleAccept = () => {
+        let payload = {};
+        if (customer.orderType === 'pickup') {
+            const now = new Date();
+            const pickupTime = new Date(now.getTime() + 30 * 60000); // 30 minutes estimate
+            const formattedTime = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(pickupTime);
+            payload = { pickupTimeEstimate: `~${formattedTime}` };
+        }
+        onUpdateStatus(id, 'accepted', payload);
+    };
+    
+    const handleTimeSave = () => {
+        if (newTime !== customer.reservationTime) {
+            onUpdateReservationTime(id, newTime);
+        }
+        setIsEditingTime(false);
+    };
 
-    setActionLoading('cancel');
-    try {
-      await firebaseService.cancelMercadoPagoOrder(mercadoPagoOrder.orderId);
-      onPaymentStatusUpdate(id, 'pending');
-      alert('Pagamento cancelado com sucesso!');
-    } catch (error: any) {
-      alert(`Erro ao cancelar pagamento: ${error.message}`);
-    } finally {
-      setActionLoading(null);
-    }
-  };
+    const isArchived = status === 'completed' || status === 'cancelled';
 
-  const handleRefund = async (isPartial: boolean = false) => {
-    if (!mercadoPagoOrder?.orderId || !mercadoPagoOrder.transactions?.id || !isAdmin) return;
+    // Logic for the status changer dropdown
+    const statusOptionsMap: { [key in OrderStatus]?: string } = {
+        pending: 'Pendente',
+        accepted: 'Aceito',
+        reserved: 'Reserva',
+        ready: 'Pronto/Em Rota',
+        completed: 'Finalizado',
+        cancelled: 'Cancelado',
+    };
 
-    const transactionId = mercadoPagoOrder.transactions.id;
-    let refundAmount: number | undefined = undefined;
+    const allowedStatusesForOrderType = useMemo<OrderStatus[]>(() => {
+        if (customer.orderType === 'local') {
+            return ['pending', 'reserved', 'completed', 'cancelled'];
+        }
+        return ['pending', 'accepted', 'ready', 'completed', 'cancelled'];
+    }, [customer.orderType]);
+    
+    // Helper function to get the correct label for the dropdown based on order type.
+    const getStatusLabelForDropdown = (status: OrderStatus, orderType: 'delivery' | 'pickup' | 'local'): string => {
+        if (status === 'ready') {
+            if (orderType === 'delivery') return 'Em Rota';
+            if (orderType === 'pickup') return 'Pronto';
+        }
+        return statusOptionsMap[status] || status; // Fallback to the default map
+    };
 
-    if (isPartial) {
-      const amountStr = prompt('Digite o valor para reembolso parcial (em R$):');
-      if (!amountStr) return;
-      refundAmount = parseFloat(amountStr.replace(',', '.'));
-      if (isNaN(refundAmount) || refundAmount <= 0) {
-        alert('Valor inválido!');
-        return;
-      }
-    }
 
-    setActionLoading(isPartial ? 'partial-refund' : 'full-refund');
-    try {
-      await firebaseService.refundMercadoPagoOrder(
-        mercadoPagoOrder.orderId, 
-        transactionId, 
-        refundAmount
-      );
-      
-      const newStatus = isPartial ? 'partially_refunded' : 'refunded';
-      onPaymentStatusUpdate(id, newStatus);
-      
-      alert(`Reembolso ${isPartial ? 'parcial' : 'total'} processado com sucesso!`);
-    } catch (error: any) {
-      alert(`Erro ao processar reembolso: ${error.message}`);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleCapture = async () => {
-    if (!mercadoPagoOrder?.orderId || !mercadoPagoOrder.transactions?.id || !isAdmin) return;
-
-    const transactionId = mercadoPagoOrder.transactions.id;
-
-    setActionLoading('capture');
-    try {
-      await firebaseService.captureMercadoPagoOrder(mercadoPagoOrder.orderId, transactionId);
-      onPaymentStatusUpdate(id, 'paid_online');
-      alert('Pagamento capturado com sucesso!');
-    } catch (error: any) {
-      alert(`Erro ao capturar pagamento: ${error.message}`);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleStatusChange = async (newStatus: OrderStatus) => {
-    setIsLoading(true);
-    try {
-      await firebaseService.updateOrderStatus(id, newStatus);
-      onStatusUpdate(id, newStatus);
-    } catch (error) {
-      console.error('Erro ao atualizar status:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
-      {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h3 className="font-semibold text-lg text-gray-900">Pedido #{id.substring(0, 8)}</h3>
-          <p className="text-sm text-gray-600">
-            Pedido recebido em: {formatTimestamp(createdAt)}
-          </p>
+    const statusChanger = (
+        <div className="flex items-center gap-2">
+            <label htmlFor={`status-select-${order.id}`} className="text-sm font-semibold text-gray-700 whitespace-nowrap">Alterar status:</label>
+            <select
+                id={`status-select-${order.id}`}
+                value={order.status}
+                onChange={(e) => onUpdateStatus(id, e.target.value as OrderStatus)}
+                className="px-3 py-2 border rounded-md bg-white text-sm focus:ring-accent focus:border-accent"
+            >
+                {Object.keys(statusOptionsMap)
+                    .filter((key): key is OrderStatus => allowedStatusesForOrderType.includes(key as OrderStatus))
+                    .map((key) => (
+                        <option key={key} value={key}>{getStatusLabelForDropdown(key, customer.orderType)}</option>
+                    ))}
+            </select>
         </div>
-        <div className="text-right">
-          <p className="text-lg font-bold text-green-600">
-            {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-          </p>
-          <p className="text-sm text-gray-600">
-            {items.reduce((acc, item) => acc + item.quantity, 0)} itens
-          </p>
+    );
+    
+    const paymentStatusChanger = !isArchived && (
+        <div className="flex items-center gap-2">
+            <label htmlFor={`payment-status-select-${order.id}`} className="text-sm font-semibold text-gray-700 whitespace-nowrap">Pgto:</label>
+            <select
+                id={`payment-status-select-${order.id}`}
+                value={order.paymentStatus}
+                onChange={(e) => onUpdatePaymentStatus(id, e.target.value as PaymentStatus)}
+                className={`px-2 py-1 border rounded-md bg-white text-sm focus:ring-accent focus:border-accent font-semibold ${
+                    isPaid ? 'text-green-600' : 'text-yellow-600'
+                }`}
+            >
+                <option value="pending">Pendente</option>
+                <option value="paid">Pago</option>
+                {order.paymentStatus === 'paid_online' && (
+                    <option value="paid_online" disabled>Pago pelo Site</option>
+                )}
+            </select>
         </div>
-      </div>
+    );
 
-      {/* Customer Info */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4 border-y border-gray-100">
-        <div className="space-y-2">
-          <p className="text-sm">
-            <User className="inline w-4 h-4 mr-1" />
-            **Nome:** {customer.name}
-          </p>
-          <p className="text-sm">
-            <Phone className="inline w-4 h-4 mr-1" />
-            **Telefone:** {customer.phone}
-          </p>
-          {customer.orderType === 'delivery' && customer.address && (
-            <p className="text-sm">
-              <MapPin className="inline w-4 h-4 mr-1" />
-              **Endereço:** {customer.address}
-            </p>
-          )}
-        </div>
-        <div className="space-y-2">
-          <p className="text-sm">
-            **Pedido:** {orderTypeMap[customer.orderType]}
-          </p>
-          {customer.orderType === 'local' && customer.reservationTime && (
-            <p className="text-sm">
-              <Clock className="inline w-4 h-4 mr-1" />
-              **Reserva:** {customer.reservationTime}
-            </p>
-          )}
-          {customer.orderType === 'pickup' && pickupTimeEstimate && (
-            <p className="text-sm">
-              <Clock className="inline w-4 h-4 mr-1" />
-              **Retirada:** {pickupTimeEstimate}
-            </p>
-          )}
-        </div>
-      </div>
 
-      {/* Payment Info */}
-      <div className="space-y-2">
-        <p className="text-sm">
-          **Método:** {paymentMethodMap[paymentMethod]}
-        </p>
-        {paymentMethod === 'cash' && (
-          <p className="text-sm">
-            **Troco:** {changeNeeded ? `para R$ ${changeAmount}` : 'Não precisa'}
-          </p>
-        )}
-        
-        {/* Mercado Pago Details */}
-        {mercadoPagoOrder && (
-          <div className="bg-blue-50 p-3 rounded-md space-y-1">
-            <p className="text-xs font-medium text-blue-800">Detalhes Mercado Pago:</p>
-            <p className="text-xs text-blue-700">
-              **ID Transação:** {mercadoPagoOrder.orderId}
-            </p>
-            {mercadoPagoOrder.transactions?.id && (
-              <p className="text-xs text-blue-700">
-                **ID Pagamento:** {mercadoPagoOrder.transactions.id}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
+    return (
+        <>
+            <div className={`relative bg-white rounded-lg shadow-md border-l-4 ${config.color} overflow-hidden transition-opacity ${isArchived || status === 'deleted' ? 'opacity-70' : ''}`}>
+                <div className="p-4">
+                    <div className="flex justify-between items-start mb-4">
+                        <div>
+                            <div className="flex items-center gap-3 text-lg font-bold">
+                                <i className={`${config.icon} ${config.color.replace('border', 'text')}`}></i>
+                                <span>{config.text}</span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">Pedido recebido em: {formatTimestamp(createdAt)}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                            <div className="flex items-start gap-2">
+                                <div className="text-right">
+                                    <p className="font-bold text-2xl text-accent">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                    <p className="text-sm text-gray-600">{items.reduce((acc, item) => acc + item.quantity, 0)} itens</p>
+                                </div>
+                                <button onClick={() => setIsContactModalOpen(true)} className="w-10 h-10 bg-green-100 text-green-600 rounded-full flex items-center justify-center hover:bg-green-200 transition-colors flex-shrink-0" aria-label="Contato com cliente">
+                                    <i className="fab fa-whatsapp text-2xl"></i>
+                                </button>
+                            </div>
+                            {isPaid && order.paymentStatus === 'paid_online' && (
+                                <div className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full animate-pulse border border-green-200 inline-flex items-center justify-center whitespace-nowrap">
+                                    <i className="fas fa-check-circle mr-1"></i> PAGO PELO SITE
+                                </div>
+                            )}
+                        </div>
+                    </div>
 
-      {/* Notes */}
-      {notes && (
-        <div className="bg-gray-50 p-3 rounded-md">
-          <p className="text-sm">
-            **Obs:** {notes}
-          </p>
-        </div>
-      )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
+                        <div className="bg-gray-50 p-3 rounded-md">
+                            <h4 className="font-bold mb-2"><i className="fas fa-user mr-2"></i>Cliente</h4>
+                            <p><strong>Nome:</strong> {customer.name}</p>
+                            <p><strong>Telefone:</strong> {customer.phone}</p>
+                            <p><strong>Pedido:</strong> {orderTypeMap[customer.orderType]}</p>
+                            {customer.orderType === 'delivery' && customer.address && <p><strong>Endereço:</strong> {customer.address}</p>}
+                            {customer.orderType === 'local' && customer.reservationTime && (
+                                <div className="flex items-center gap-2">
+                                    <strong>Reserva:</strong> 
+                                    {isEditingTime ? (
+                                        <input 
+                                            type="text" 
+                                            value={newTime} 
+                                            onChange={(e) => setNewTime(e.target.value)} 
+                                            onBlur={handleTimeSave}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleTimeSave()}
+                                            className="px-2 py-0.5 border rounded-md w-24" 
+                                            autoFocus
+                                        />
+                                    ) : (
+                                        <>
+                                            <span>{customer.reservationTime}</span>
+                                            <button onClick={() => setIsEditingTime(true)} className="text-xs text-blue-600 hover:underline"><i className="fas fa-edit"></i></button>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                            {customer.orderType === 'pickup' && pickupTimeEstimate && <p><strong>Retirada:</strong> <span className="font-bold text-accent">{pickupTimeEstimate}</span></p>}
+                        </div>
+                         <div className="bg-gray-50 p-3 rounded-md flex flex-col">
+                            <h4 className="font-bold mb-2"><i className="fas fa-credit-card mr-2"></i>Pagamento</h4>
+                            <div className="space-y-1 flex-grow">
+                                <p><strong>Método:</strong> {paymentMethodMap[paymentMethod]}</p>
+                                <p><strong>Status Pgto:</strong>
+                                    <span className={`font-bold ml-1 ${
+                                        isPaid ? 'text-green-600' : 'text-yellow-600'
+                                    }`}>
+                                        {paymentStatusText}
+                                    </span>
+                                </p>
+                                {paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {changeNeeded ? `para R$ ${changeAmount}` : 'Não precisa'}</p> )}
+                            </div>
 
-      {/* Status */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(status)}`}>
-          {statusMap[status]}
-        </span>
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusColor(paymentStatus)}`}>
-          **Status Pgto:** {paymentStatusMap[paymentStatus]}
-        </span>
-      </div>
+                            {(order.mercadoPagoDetails || notes) && (
+                                <div className="mt-2 pt-2 border-t border-gray-200 space-y-2">
+                                    {order.mercadoPagoDetails && (
+                                        <div className="text-xs space-y-1">
+                                            <div>
+                                                {order.mercadoPagoDetails.transactionId && <p><strong>ID Transação:</strong> {order.mercadoPagoDetails.transactionId}</p>}
+                                                <p><strong>ID Pagamento:</strong> {order.mercadoPagoDetails.paymentId}</p>
+                                            </div>
+                                            <a 
+                                                href={`https://www.mercadopago.com.br/payments/${order.mercadoPagoDetails.paymentId}/receipt`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-2 text-sm bg-blue-100 text-blue-700 font-semibold py-1 px-2 rounded-md hover:bg-blue-200"
+                                            >
+                                                <i className="fas fa-receipt"></i>
+                                                <span>Ver Comprovante</span>
+                                            </a>
+                                        </div>
+                                    )}
+                                    {notes && <p className="text-sm"><strong>Obs:</strong> {notes}</p>}
+                                </div>
+                            )}
+                        </div>
+                    </div>
 
-      {/* Admin Actions */}
-      {isAdmin && (
-        <div className="pt-4 border-t border-gray-200 space-y-4">
-          {/* Status Actions */}
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium text-gray-700">Atualizar Status:</h4>
-            <div className="flex flex-wrap gap-2">
-              {['pending', 'accepted', 'ready', 'completed', 'cancelled'].map((newStatus) => (
-                <button
-                  key={newStatus}
-                  onClick={() => handleStatusChange(newStatus as OrderStatus)}
-                  disabled={isLoading || status === newStatus}
-                  className={`px-3 py-1 text-xs rounded border transition-colors ${
-                    status === newStatus
-                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                      : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
-                  }`}
-                >
-                  {statusMap[newStatus as OrderStatus]}
-                </button>
-              ))}
+                    <div>
+                        <h4 className="font-bold mb-2"><i className="fas fa-shopping-basket mr-2"></i>Itens do Pedido</h4>
+                        <ul className="space-y-1 text-sm">
+                            {items.map(item => (<li key={item.id} className="flex justify-between p-2 bg-gray-50 rounded"><span>{item.quantity}x {item.name} ({item.size})</span><span>{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>))}
+                        </ul>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-end gap-2 mt-4 pt-4 border-t">
+                        {status === 'deleted' ? (
+                             <>
+                                <button onClick={() => onUpdateStatus(id, 'completed')} className="bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-blue-600"><i className="fas fa-undo mr-2"></i>Restaurar</button>
+                                <button onClick={() => onPermanentDelete(id)} className="bg-red-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-red-600"><i className="fas fa-trash-alt mr-2"></i>Apagar Perm.</button>
+                            </>
+                        ) : status === 'pending' ? (
+                            <>
+                                <div className="flex-grow"></div>
+                                <button onClick={handleAccept} className="bg-green-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-green-600"><i className="fas fa-check mr-2"></i>Aceitar</button>
+                                <button onClick={() => onUpdateStatus(id, 'cancelled')} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Cancelar</button>
+                            </>
+                        ) : (
+                             <div className="flex flex-wrap items-center justify-end gap-3 w-full">
+                                {paymentStatusChanger}
+                                <div className="flex-grow"></div>
+                                
+                                {/* Next-step buttons */}
+                                {status === 'accepted' && customer.orderType !== 'local' && <button onClick={() => onUpdateStatus(id, 'ready')} className="bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-blue-600"><i className="fas fa-box-open mr-2"></i>Pronto</button>}
+                                {(status === 'ready' || status === 'reserved') && <button onClick={() => onUpdateStatus(id, 'completed')} className="bg-purple-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-purple-600"><i className="fas fa-flag-checkered mr-2"></i>Finalizar</button>}
+                                
+                                {!isArchived && <button onClick={() => onUpdateStatus(id, 'cancelled')} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Cancelar</button>}
+
+                                {statusChanger}
+
+                                {isArchived && <button onClick={() => onDelete(id)} className="text-red-500 font-semibold py-2 px-3 rounded-lg text-xs hover:bg-red-50"><i className="fas fa-trash mr-2"></i>Mover p/ Lixeira</button>}
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
-          </div>
-
-          {/* Mercado Pago Actions */}
-          {mercadoPagoOrder && paymentMethod === 'pix' && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-gray-700">Operações de Pagamento:</h4>
-              <div className="flex flex-wrap gap-2">
-                {/* Cancel Payment */}
-                {paymentStatus === 'pending' && (
-                  <button
-                    onClick={handleCancelPayment}
-                    disabled={actionLoading === 'cancel'}
-                    className="flex items-center space-x-1 px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
-                  >
-                    {actionLoading === 'cancel' ? (
-                      <RefreshCw className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <XCircle className="w-3 h-3" />
-                    )}
-                    <span>Cancelar</span>
-                  </button>
-                )}
-
-                {/* Capture Payment (for credit cards) */}
-                {paymentMethod === 'credit' && paymentStatus === 'pending' && (
-                  <button
-                    onClick={handleCapture}
-                    disabled={actionLoading === 'capture'}
-                    className="flex items-center space-x-1 px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
-                  >
-                    {actionLoading === 'capture' ? (
-                      <RefreshCw className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <CreditCard className="w-3 h-3" />
-                    )}
-                    <span>Capturar</span>
-                  </button>
-                )}
-
-                {/* Refund Actions */}
-                {(paymentStatus === 'paid' || paymentStatus === 'paid_online') && (
-                  <>
-                    <button
-                      onClick={() => handleRefund(false)}
-                      disabled={actionLoading === 'full-refund'}
-                      className="flex items-center space-x-1 px-3 py-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors"
-                    >
-                      {actionLoading === 'full-refund' ? (
-                        <RefreshCw className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <DollarSign className="w-3 h-3" />
-                      )}
-                      <span>Reembolso Total</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => handleRefund(true)}
-                      disabled={actionLoading === 'partial-refund'}
-                      className="flex items-center space-x-1 px-3 py-1 text-xs bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 transition-colors"
-                    >
-                      {actionLoading === 'partial-refund' ? (
-                        <RefreshCw className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <DollarSign className="w-3 h-3" />
-                      )}
-                      <span>Reembolso Parcial</span>
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+            <ContactModal isOpen={isContactModalOpen} onClose={() => setIsContactModalOpen(false)} customerName={customer.name} customerPhone={customer.phone} />
+        </>
+    );
 };
