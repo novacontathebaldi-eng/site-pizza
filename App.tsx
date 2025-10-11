@@ -132,6 +132,7 @@ const App: React.FC = () => {
     const [payingOrder, setPayingOrder] = useState<Order | null>(null);
     const [showPaymentFailureModal, setShowPaymentFailureModal] = useState<boolean>(false);
     const [pixRetryKey, setPixRetryKey] = useState<number>(0);
+    const [isCreatingPixPayment, setIsCreatingPixPayment] = useState<boolean>(false);
     
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
@@ -320,9 +321,8 @@ const App: React.FC = () => {
     };
 
     const handleInitiatePixPayment = async (details: OrderDetails, pixOption: 'payNow' | 'payLater') => {
-        // FIX: The `pixOption` is now correctly passed from CheckoutModal to ensure the backend
-        // receives the instruction to generate a PIX payment.
         setIsCheckoutModalOpen(false);
+        setIsCreatingPixPayment(true);
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         
         try {
@@ -347,13 +347,12 @@ const App: React.FC = () => {
             console.error("Failed to initiate PIX payment:", error);
             addToast(error.message || "Erro ao iniciar pagamento PIX.", 'error');
             setPayingOrder(null);
+        } finally {
+            setIsCreatingPixPayment(false);
         }
     };
 
     const handlePixPaymentSuccess = useCallback(async (paidOrder: Order) => {
-        // FIX: Reconstructs the `details` object from the `paidOrder` argument instead of
-        // relying on variables from an outer scope. This ensures data consistency when generating
-        // the WhatsApp message.
         if (!paidOrder || !paidOrder.id) {
            addToast("Erro crítico ao processar pagamento.", 'error');
            return;
@@ -786,6 +785,16 @@ const App: React.FC = () => {
                 onPayLater={handlePayLaterFromFailure}
             />
             
+            {isCreatingPixPayment && (
+                <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8">
+                        <i className="fas fa-spinner fa-spin text-5xl text-accent"></i>
+                        <p className="mt-6 font-semibold text-lg text-gray-700">Conectando com o Mercado Pago...</p>
+                        <p className="mt-2 text-sm text-gray-500">Estamos gerando seu PIX seguro. Por favor, aguarde um instante.</p>
+                    </div>
+                </div>
+            )}
+
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]">
                 <div className="w-full flex flex-col items-center space-y-4 sm:items-end">
                     {toasts.map((toast) => (
