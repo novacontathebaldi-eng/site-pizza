@@ -333,7 +333,7 @@ const App: React.FC = () => {
             const newOrder: Order = {
                 id: orderId,
                 orderNumber: orderNumber,
-                customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.address },
+                customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.address, cpf: details.cpf },
                 items: cart, total, paymentMethod: 'pix', status: 'awaiting-payment', paymentStatus: 'pending',
                 createdAt: new Date(),
                 mercadoPagoDetails: { paymentId: '', qrCodeBase64: pixData.qrCodeBase64, qrCode: pixData.copyPaste }
@@ -356,15 +356,19 @@ const App: React.FC = () => {
         try {
             addToast("Pagamento confirmado! Enviando pedido para a pizzaria...", 'success');
             
-            const orderSnapshot = await db.collection('orders').doc(paidOrder.id).get();
-            const finalOrderData = orderSnapshot.data() as Order;
-
+            // Reconstruct details from the confirmed order for consistency
             const details: OrderDetails = {
-                name: finalOrderData.customer.name, phone: finalOrderData.customer.phone, orderType: finalOrderData.customer.orderType,
-                address: finalOrderData.customer.address || '', paymentMethod: 'pix', changeNeeded: false,
-                notes: finalOrderData.notes || '', reservationTime: finalOrderData.customer.reservationTime || ''
+                name: paidOrder.customer.name,
+                phone: paidOrder.customer.phone,
+                orderType: paidOrder.customer.orderType,
+                address: paidOrder.customer.address || '',
+                paymentMethod: 'pix',
+                changeNeeded: false,
+                notes: paidOrder.notes || '',
+                reservationTime: paidOrder.customer.reservationTime || '',
+                cpf: paidOrder.customer.cpf || ''
             };
-            const whatsappUrl = generateWhatsAppMessage(details, finalOrderData.items, finalOrderData.total, finalOrderData.orderNumber, true);
+            const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, paidOrder.orderNumber, true);
             window.open(whatsappUrl, '_blank');
 
             setCart([]);
@@ -808,4 +812,4 @@ const App: React.FC = () => {
     );
 };
 
-export default App;
+export default App;"

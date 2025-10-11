@@ -85,8 +85,11 @@ exports.createOrder = onCall({secrets}, async (request) => {
     if (!details.cpf) {
       throw new Error("CPF é obrigatório para pagamento com PIX.");
     }
-
-    const notificationUrl = `https://${process.env.GCLOUD_REGION}-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/mercadoPagoWebhook`;
+    
+    // FIX: Use process.env.FUNCTION_REGION which is a standard populated env var for v2 functions.
+    const region = process.env.FUNCTION_REGION || 'us-central1';
+    const notificationUrl = `https://${region}-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/mercadoPagoWebhook`;
+    logger.info(`Usando a URL de notificação: ${notificationUrl}`);
 
     const paymentData = {
       transaction_amount: total,
