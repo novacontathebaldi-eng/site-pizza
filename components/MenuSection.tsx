@@ -1,5 +1,4 @@
-
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { Product, Category } from '../types';
 import { MenuItemCard } from './MenuItemCard';
 
@@ -10,12 +9,8 @@ interface MenuSectionProps {
     isStoreOnline: boolean;
     activeCategoryId: string;
     setActiveCategoryId: (id: string) => void;
-    suggestedNextCategoryId: string | null;
-    setSuggestedNextCategoryId: (id: string | null) => void;
     cartItemCount: number;
     onCartClick: () => void;
-    showFinalizeButtonTrigger: boolean;
-    setShowFinalizeButtonTrigger: (show: boolean) => void;
 }
 
 const categoryIcons: { [key: string]: string } = {
@@ -29,74 +24,59 @@ const categoryIcons: { [key: string]: string } = {
 export const MenuSection: React.FC<MenuSectionProps> = ({ 
     categories, products, onAddToCart, isStoreOnline, 
     activeCategoryId, setActiveCategoryId, 
-    suggestedNextCategoryId, setSuggestedNextCategoryId, 
-    cartItemCount, onCartClick,
-    showFinalizeButtonTrigger, setShowFinalizeButtonTrigger
+    cartItemCount, onCartClick
 }) => {
-    const filteredProducts = useMemo(() => 
-        products.filter(p => p.categoryId === activeCategoryId && p.active),
-        [products, activeCategoryId]
-    );
+    const categoryRefs = useRef<Map<string, HTMLElement | null>>(new Map());
 
-    const sortedCategories = useMemo(() => 
-        [...categories].sort((a, b) => a.order - b.order),
+    const sortedActiveCategories = useMemo(() => 
+        [...categories].filter(c => c.active).sort((a, b) => a.order - b.order),
         [categories]
     );
-    
-    const sortedActiveCategories = useMemo(() => 
-        sortedCategories.filter(c => c.active),
-        [sortedCategories]
-    );
 
-    const lastCategoryId = sortedActiveCategories.length > 0 
-        ? sortedActiveCategories[sortedActiveCategories.length - 1].id 
-        : null;
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        setActiveCategoryId(entry.target.id.replace('category-section-', ''));
+                    }
+                });
+            },
+            {
+                rootMargin: '-120px 0px -50% 0px', // Top offset for sticky header, bottom to trigger earlier
+                threshold: 0,
+            }
+        );
 
-    const showFinalizeButton = activeCategoryId === lastCategoryId && cartItemCount > 0 && !suggestedNextCategoryId && showFinalizeButtonTrigger;
+        const currentRefs = categoryRefs.current;
+        currentRefs.forEach((el) => {
+            if (el) observer.observe(el);
+        });
 
-    const scrollToProductList = () => {
-        const productList = document.getElementById('category-product-list');
+        return () => {
+            currentRefs.forEach((el) => {
+                if (el) observer.unobserve(el);
+            });
+            observer.disconnect();
+        };
+    }, [sortedActiveCategories, setActiveCategoryId]);
+
+    const handleTabClick = (e: React.MouseEvent<HTMLAnchorElement>, categoryId: string) => {
+        e.preventDefault();
+        const element = document.getElementById(`category-section-${categoryId}`);
         const stickyHeader = document.getElementById('sticky-menu-header');
-        if (productList && stickyHeader) {
-            const headerOffset = stickyHeader.offsetHeight + 80; // 80 for main header
-            const elementPosition = productList.getBoundingClientRect().top;
+        
+        if (element && stickyHeader) {
+            const headerOffset = stickyHeader.offsetHeight + 80; // Main header + sticky menu header
+            const elementPosition = element.getBoundingClientRect().top;
             const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-            
+
             window.scrollTo({
-              top: offsetPosition,
-              behavior: 'smooth'
+                top: offsetPosition,
+                behavior: 'smooth'
             });
         }
     };
-    
-    const scrollTabIntoView = (id: string) => {
-        const activeTabElement = document.getElementById(`category-tab-${id}`);
-        if (activeTabElement) {
-            activeTabElement.scrollIntoView({
-                behavior: 'smooth',
-                block: 'nearest',
-                inline: 'center'
-            });
-        }
-    };
-
-    const handleCategoryClick = (id: string) => {
-        setActiveCategoryId(id);
-        setSuggestedNextCategoryId(null);
-        setShowFinalizeButtonTrigger(false); // Reset trigger on manual navigation
-        scrollTabIntoView(id);
-        setTimeout(scrollToProductList, 100);
-    };
-
-    const handleSuggestionClick = () => {
-        if (suggestedNextCategoryId) {
-            setActiveCategoryId(suggestedNextCategoryId);
-            scrollTabIntoView(suggestedNextCategoryId);
-            setSuggestedNextCategoryId(null);
-            setTimeout(scrollToProductList, 100);
-        }
-    };
-
 
     return (
         <section id="cardapio" className="py-20 bg-white">
@@ -112,11 +92,11 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                 <div id="sticky-menu-header" className="sticky top-20 bg-white/95 backdrop-blur-sm z-30 -mx-4 shadow-sm">
                     <div className="border-b border-gray-200">
                         <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide px-2 sm:px-4 lg:flex-wrap lg:justify-center lg:overflow-x-visible">
-                            {sortedCategories.filter(c => c.active).map(category => (
-                                <button 
+                            {sortedActiveCategories.map(category => (
+                                <a 
                                     key={category.id} 
-                                    id={`category-tab-${category.id}`}
-                                    onClick={() => handleCategoryClick(category.id)}
+                                    href={`#category-section-${category.id}`}
+                                    onClick={(e) => handleTabClick(e, category.id)}
                                     className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors
                                         ${activeCategoryId === category.id 
                                             ? 'border-b-2 border-accent text-accent' 
@@ -125,61 +105,51 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                                 >
                                     <i className={`${categoryIcons[category.id] || 'fas fa-utensils'} w-5 text-center`}></i>
                                     <span>{category.name}</span>
-                                </button>
+                                </a>
                             ))}
                         </div>
                     </div>
-                    
-                    {(suggestedNextCategoryId || showFinalizeButton) && (
-                        <div className="text-center py-3 border-t border-gray-200 animate-fade-in-up">
-                            {suggestedNextCategoryId && (
-                                <div className="relative inline-flex items-center group">
-                                    <button
-                                        onClick={handleSuggestionClick}
-                                        className="bg-accent text-white font-bold py-2 pl-6 pr-12 rounded-lg shadow-lg transition-all transform hover:scale-105"
-                                    >
-                                        Avançar para a Próxima Etapa
-                                        <i className="fas fa-arrow-right ml-2"></i>
-                                    </button>
-                                    <button
-                                        onClick={() => setSuggestedNextCategoryId(null)}
-                                        className="absolute top-1/2 -translate-y-1/2 right-0 w-10 h-full flex items-center justify-center text-white/70 hover:text-white rounded-r-lg opacity-50 group-hover:opacity-100 transition-opacity"
-                                        aria-label="Dispensar sugestão"
-                                    >
-                                        &times;
-                                    </button>
-                                </div>
-                            )}
-                            {showFinalizeButton && (
-                                <button
-                                    onClick={onCartClick}
-                                    className="bg-accent text-white font-bold py-2 px-6 rounded-lg shadow-lg transition-all transform hover:scale-105"
-                                >
-                                    <i className="fas fa-shopping-bag mr-2"></i>
-                                    Ver e Finalizar o Pedido
-                                </button>
-                            )}
-                        </div>
-                    )}
                 </div>
 
+                <div className="pt-8 space-y-12">
+                    {sortedActiveCategories.map(category => {
+                        const categoryProducts = products.filter(p => p.categoryId === category.id && p.active);
+                        if (categoryProducts.length === 0) return null;
 
-                {filteredProducts.length > 0 ? (
-                    <div id="category-product-list" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pt-8">
-                        {filteredProducts.map(product => (
-                            <MenuItemCard 
-                                key={product.id} 
-                                product={product} 
-                                onAddToCart={onAddToCart}
-                                isStoreOnline={isStoreOnline}
-                            />
-                        ))}
-                    </div>
-                ) : (
-                    <div id="category-product-list" className="text-center py-16 pt-8">
-                         <i className="fas fa-utensils text-5xl text-gray-300 mb-4"></i>
-                        <p className="text-xl text-gray-500">Nenhum item encontrado nesta categoria.</p>
-                        <p className="text-gray-400 mt-2">Selecione outra categoria para ver mais delícias!</p>
+                        return (
+                            <div 
+                                key={category.id} 
+                                id={`category-section-${category.id}`} 
+                                // FIX: The ref callback function must return `void`. The original code was implicitly
+                                // returning the result of `.set()`, which is the Map object itself. Wrapping the
+                                // statement in curly braces ensures the function returns nothing, fixing the type error.
+                                ref={(el) => { categoryRefs.current.set(category.id, el); }}
+                            >
+                                <h3 className="text-3xl font-bold text-brand-olive-600 mb-6 border-l-4 border-accent pl-4">{category.name}</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                    {categoryProducts.map(product => (
+                                        <MenuItemCard 
+                                            key={product.id} 
+                                            product={product} 
+                                            onAddToCart={onAddToCart}
+                                            isStoreOnline={isStoreOnline}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {cartItemCount > 0 && (
+                     <div className="mt-16 text-center">
+                        <button
+                            onClick={onCartClick}
+                            className="bg-accent text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-all transform hover:scale-105 text-lg"
+                        >
+                            <i className="fas fa-shopping-bag mr-2"></i>
+                            Ver e Finalizar o Pedido ({cartItemCount})
+                        </button>
                     </div>
                 )}
             </div>

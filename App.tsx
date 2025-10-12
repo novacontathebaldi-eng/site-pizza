@@ -127,8 +127,6 @@ const App: React.FC = () => {
     const [activeMenuCategory, setActiveMenuCategory] = useState<string>('');
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [siteSettings, setSiteSettings] = useState<SiteSettings>(defaultSiteSettings);
-    const [suggestedNextCategoryId, setSuggestedNextCategoryId] = useState<string | null>(null);
-    const [showFinalizeButtonTrigger, setShowFinalizeButtonTrigger] = useState<boolean>(false);
     const [payingOrder, setPayingOrder] = useState<Order | null>(null);
     const [showPaymentFailureModal, setShowPaymentFailureModal] = useState<boolean>(false);
     const [pixRetryKey, setPixRetryKey] = useState<number>(0);
@@ -273,24 +271,7 @@ const App: React.FC = () => {
                 return [...prevCart, newItem];
             }
         });
-        
-        const sortedActiveCategories = [...categories].sort((a,b) => a.order - b.order).filter(c => c.active);
-        const currentCategoryIndex = sortedActiveCategories.findIndex(c => c.id === product.categoryId);
-        const lastCategoryId = sortedActiveCategories.length > 0 ? sortedActiveCategories[sortedActiveCategories.length - 1].id : null;
-
-        if (product.categoryId === lastCategoryId) {
-            setShowFinalizeButtonTrigger(true);
-            setSuggestedNextCategoryId(null); 
-        } else {
-            if (currentCategoryIndex > -1 && currentCategoryIndex < sortedActiveCategories.length - 1) {
-                const nextCategory = sortedActiveCategories[currentCategoryIndex + 1];
-                setSuggestedNextCategoryId(nextCategory.id);
-            } else {
-                setSuggestedNextCategoryId(null);
-            }
-        }
-
-    }, [categories]);
+    }, []);
 
     const handleUpdateCartQuantity = useCallback((itemId: string, newQuantity: number) => {
         setCart(prevCart => {
@@ -682,12 +663,8 @@ const App: React.FC = () => {
                         isStoreOnline={isStoreOnline}
                         activeCategoryId={activeMenuCategory}
                         setActiveCategoryId={setActiveMenuCategory}
-                        suggestedNextCategoryId={suggestedNextCategoryId}
-                        setSuggestedNextCategoryId={setSuggestedNextCategoryId}
                         cartItemCount={cartTotalItems}
                         onCartClick={() => setIsCartOpen(true)}
-                        showFinalizeButtonTrigger={showFinalizeButtonTrigger}
-                        setShowFinalizeButtonTrigger={setShowFinalizeButtonTrigger}
                     />
                 )}
                 <div id="sobre">
@@ -825,4 +802,6 @@ const App: React.FC = () => {
     );
 };
 
+// FIX: Added a default export for the App component. The index.tsx file was trying
+// to import it as a default, but it was not exported, causing an error.
 export default App;
