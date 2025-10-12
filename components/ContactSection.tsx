@@ -3,8 +3,8 @@ import React from 'react';
 export const ContactSection: React.FC = () => {
     const address = "Rua Porfilio Furtado, 178, Centro - Santa Leopoldina, ES";
     const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
-    // Usando uma imagem de um ambiente de pizzaria para ilustrar
-    const facadeImageUrl = "https://images.unsplash.com/photo-1579532582937-16c108930bf6?q=80&w=1974&auto=format&fit=crop";
+    // Vou colocar um botão no personalizar para carlinhos mudar isso fácil heheheh
+    const facadeImageUrl = "https://lh3.googleusercontent.com/rd-gg-dl/AJfQ9KQkqkOtWs_hgFShtIOEArHEh8_xXooWu13P5CFqJ69NVReJXJ3WwvoSTDTDO8FUNKKUu1_gV4MrN8nji0cEdCnudLaz6WCWk9NK-Y3tW6JQa_KumwVZMiTgG1WKu9bq3ynTPyw_KWw_HnI8IbhR6ZWkaTJ3SM8IuC5Zf9cwfEMYmcLZkknimqSHA9ZCnNafgeDy0LRHs9wBf1xAozBJFKveB5r3QCzSltnieMzxKW90L3JYRw0zCYC8wRmWx1XD-Dld5TisTzadNrbka9xXO51x21dnmrj7h-0EkDFR5OWyZrUhCGwsq_mQDokC2uIfxu_MkdeK-g0W0m6JyXAjAcEfqAE3fTQ5ustRuzUwSTwvpAnkjQ_cKhluE8XzTKUBzk10rJogSfiqhFpo06oHJDHw9iMhX0Zs2nt1_yunIXzoMySet5hMSnVZRT4XiQPEjTc9MdScndBIQ5WiIDycCdgNXDh6b7guRnz_kU6Rbzg0dXsR2XgIaP8SPVCsYdS7uUp9kRUYVM07FqGkwMNZZs6kop1fpkZlS46rm64DdEwZ4X5uzGIkJxA_gtpXA4FcuRfp8AhRFei2lwgDbUtA5pQEUFc7Hy4s8iOslUL8jXqbp4ZVqUfe29FkzclTJLyDVoHPC9DkRjvMeM-d_-w--0MpOE9cLOUJLHQqRHAOmjsHMoOXDSAGXPWYiHqiHALl7gdye28wtnUe05oW44XDI6z7h4PNvv6SUEJzQluvmUG7iz5mme7DSGtgcI8AFGfWKuRZ51Ql4CWmc5-kPNfpJ50g_rb6FXe5ol0N-606jQ5GoQMvpCVHJQeiQk_kvTEQub6fnB4oiOM67aG9NMP-91jqf-lLnf5OifjWWLc0Lf9YZTzSaWX02oYWrppxlIf-TQ4viNWMtUvO1rk0Qu5_2vBdQzRbZk_62-gda3nw4d9CkXzolof_I4kIHRes-BUyF0iAzY7FPYQmRW9Xe7cPO5gmw7DgEmlZuoHK_wyxn73mV7nkqqS_a761li7jE8U0D2W6CRAzeJ9ZrlNEHLhDwXei9cJW3qpAdp0ZdqxjeqiExQ_M0OCCIe1OLmo8OgcrJe7t6-bqabmIvxATIfrG2UYiuIv5j6bwfhjgM09W-CxanS5MoSVjUdwOGZa4_z4zrwOoPK8nwEFzngi1Lx9cIuouBq5GADwQNs3AzSHW8TsjOxnNG91Jgk-JIJFpZ0b7monkgDhi1NY6DmYXo__D7PokTTCJ_K79ERBoo2b0jfvYHPW4DVpgrJJiTSRA3S5LtZdqoUS3_YX81VNt49LpkLvjEoY3cXXUqBuLqFtXZ5Dm5IK5QLRsI8TtyYI9BM9qafNsyuIJ9JHt55yDaSAxVNznVS6GpKAUTt67f0qIiBTlQgM41Rnv1Gu9=s1024-rj?authuser=4";
 
     return (
         <section id="contato" className="py-20 bg-white">
@@ -14,7 +14,7 @@ export const ContactSection: React.FC = () => {
                         <i className="fas fa-map-marked-alt mr-2"></i>Venha nos Visitar
                     </span>
                     <h2 className="text-4xl font-bold text-text-on-light">Nossa Casa</h2>
-                    <p className="text-lg text-gray-600 mt-2 max-w-2xl mx-auto">Estamos no coração de Santa Leopoldina, prontos para te receber com a melhor pizza da sua vida!</p>
+                    <p className="text-lg text-gray-600 mt-2 max-w-2xl mx-auto">Estamos no coração de Santa Leopoldina, prontos para te receber com a melhor pizza do estado!</p>
                 </div>
 
                 <div className="grid lg:grid-cols-2 gap-12 items-stretch bg-brand-ivory-50 p-6 sm:p-8 rounded-2xl shadow-lg border border-brand-gold-600/20">
