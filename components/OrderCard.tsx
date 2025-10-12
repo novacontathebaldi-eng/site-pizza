@@ -248,7 +248,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                          <p><strong>ID Pagamento:</strong> {mercadoPagoDetails.paymentId}</p>
                                     </div>
                                     <a 
-                                        href={`https://www.mercadopago.com.br/payments/${mercadoPagoDetails.paymentId}/receipt`}
+                                        href={`https://www.mercadopago.com.br/money-out/transfer/api/receipt/pix_pdf/${mercadoPagoDetails.paymentId}/pix_account/pix_payment.pdf`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="inline-flex items-center gap-2 text-sm bg-blue-100 text-blue-700 font-semibold py-1 px-2 rounded-md hover:bg-blue-200"
