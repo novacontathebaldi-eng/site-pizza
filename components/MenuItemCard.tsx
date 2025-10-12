@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Product } from '../types';
 
 interface MenuItemCardProps {
@@ -7,127 +7,73 @@ interface MenuItemCardProps {
     isStoreOnline: boolean;
 }
 
-const sizeOrder = ['P', 'M', 'G', 'Única'];
-
 export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart, isStoreOnline }) => {
-    const prices = product.prices ?? {};
-    const hasPrices = Object.keys(prices).length > 0;
     const isOutOfStock = product.stockStatus === 'out_of_stock';
+    const sizes = useMemo(() => Object.keys(product.prices), [product.prices]);
+    const [selectedSize, setSelectedSize] = useState(sizes[0] || '');
 
-    const sortedSizes = useMemo(() => {
-        if (!hasPrices) return [];
-        return Object.keys(prices).sort((a, b) => {
-            const indexA = sizeOrder.indexOf(a);
-            const indexB = sizeOrder.indexOf(b);
-            if (indexA === -1) return 1;
-            if (indexB === -1) return -1;
-            return indexA - indexB;
-        });
-    }, [prices, hasPrices]);
+    const price = product.prices[selectedSize];
 
-    const [selectedSize, setSelectedSize] = useState<string>(sortedSizes[0] || '');
-    const [wasAdded, setWasAdded] = useState(false);
-    const timerRef = useRef<number | null>(null);
-
-    // Garante que o tamanho selecionado seja resetado quando o produto mudar (ex: ao filtrar)
-    useEffect(() => {
-        setSelectedSize(sortedSizes[0] || '');
-    }, [product, sortedSizes]);
-
-    // Limpa o timer se o componente for desmontado
-    useEffect(() => {
-        return () => {
-            if (timerRef.current) {
-                clearTimeout(timerRef.current);
-            }
-        };
-    }, []);
-    
     const handleAddToCart = () => {
-        if (!isStoreOnline || !selectedSize || wasAdded || !hasPrices || isOutOfStock) return;
-        const price = prices[selectedSize];
+        if (!isStoreOnline || isOutOfStock || price === undefined) return;
         onAddToCart(product, selectedSize, price);
-        setWasAdded(true);
-
-        if (timerRef.current) {
-            clearTimeout(timerRef.current);
-        }
-
-        timerRef.current = window.setTimeout(() => {
-            setWasAdded(false);
-        }, 1500);
     };
 
-    const formatPrice = (price: number) => {
-        return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const formatPrice = (value: number) => {
+        return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     };
-
-    const buttonClass = wasAdded
-        ? 'bg-green-500 text-white font-bold py-2 px-5 rounded-lg transition-all cursor-default'
-        : 'bg-accent text-white font-bold py-2 px-5 rounded-lg transition-all transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed';
-        
-    const displayPrice = hasPrices ? formatPrice(prices[selectedSize] || prices[sortedSizes[0]]) : "Indisponível";
 
     return (
-        <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col overflow-hidden border border-gray-200">
+        <div className={`bg-brand-ivory-50 rounded-2xl shadow-md hover:shadow-lg transition-shadow flex flex-col border border-brand-green-300/50 ${isOutOfStock ? 'opacity-50' : ''}`}>
             <div className="relative">
-                <img src={product.imageUrl} alt={product.name} className="w-full aspect-square object-cover" />
+                <img src={product.imageUrl} alt={product.name} className="w-full h-48 object-cover rounded-t-2xl" loading="lazy" />
                 {product.badge && (
-                    <span className="absolute top-2 right-2 bg-accent text-white px-2 py-0.5 text-xs font-bold rounded-full">{product.badge}</span>
+                    <span className="absolute top-3 right-3 bg-accent text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                        {product.badge}
+                    </span>
                 )}
                  {isOutOfStock && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                        <span className="bg-red-600 text-white px-4 py-1 font-bold rounded-full text-sm">ESGOTADO</span>
+                    <div className="absolute inset-0 bg-black/60 rounded-t-2xl flex items-center justify-center">
+                        <span className="text-white font-bold text-lg bg-red-600 px-4 py-2 rounded-lg transform -rotate-6">ESGOTADO</span>
                     </div>
                 )}
             </div>
-            <div className="p-4 flex flex-col flex-grow">
-                <div className="flex-grow">
-                    <h3 className="text-lg font-bold text-text-on-light mb-1">{product.name}</h3>
-                    <p className="text-gray-500 text-xs mb-3 line-clamp-2">{product.description}</p>
-                    
-                    {hasPrices && sortedSizes.length > 1 && (
-                        <div className="flex flex-wrap gap-1 mb-3">
-                            {sortedSizes.map(size => (
+            <div className="p-4 flex-grow flex flex-col">
+                <h3 className="text-lg font-bold text-text-on-light mb-2">{product.name}</h3>
+                <p className="text-sm text-gray-600 mb-4 flex-grow">{product.description}</p>
+
+                {sizes.length > 1 && (
+                    <div className="mb-4">
+                        <p className="text-sm font-semibold mb-2">Tamanho:</p>
+                        <div className="flex flex-wrap gap-2">
+                            {sizes.map(size => (
                                 <button
                                     key={size}
                                     onClick={() => setSelectedSize(size)}
-                                    className={`px-2 py-1 text-[11px] font-semibold rounded-md border transition-colors ${
+                                    className={`px-3 py-1 text-sm font-semibold rounded-full border-2 transition-colors ${
                                         selectedSize === size
-                                            ? 'bg-brand-olive-600 text-white border-brand-olive-600'
-                                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:border-brand-olive-600'
+                                            ? 'bg-accent text-white border-accent'
+                                            : 'bg-white text-gray-700 border-gray-300 hover:border-accent'
                                     }`}
-                                    disabled={isOutOfStock}
                                 >
                                     {size}
                                 </button>
                             ))}
                         </div>
-                    )}
-                </div>
+                    </div>
+                )}
 
-                <div className="mt-auto pt-2 flex justify-between items-center">
-                    <span className="text-xl font-bold text-accent">
-                        {displayPrice}
+                <div className="flex justify-between items-center mt-auto pt-4 border-t border-brand-green-300/30">
+                    <span className="text-2xl font-bold text-accent">
+                        {price !== undefined ? formatPrice(price) : '...'}
                     </span>
-                    <button 
+                    <button
                         onClick={handleAddToCart}
-                        disabled={!isStoreOnline || wasAdded || !hasPrices || isOutOfStock}
-                        className={buttonClass}
+                        disabled={!isStoreOnline || isOutOfStock || price === undefined}
+                        className="bg-accent text-white font-bold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:scale-100"
                     >
-                        {isOutOfStock ? (
-                            'Esgotado'
-                        ) : wasAdded ? (
-                            <>
-                                <i className="fas fa-check mr-1"></i>
-                                Adicionado!
-                            </>
-                        ) : (
-                            <>
-                                <i className="fas fa-plus mr-1"></i>
-                                Adicionar
-                            </>
-                        )}
+                         <i className={`fas ${!isStoreOnline ? 'fa-clock' : isOutOfStock ? 'fa-box' : 'fa-plus'} mr-2`}></i>
+                        {!isStoreOnline ? 'Fechado' : isOutOfStock ? 'Esgotado' : 'Adicionar'}
                     </button>
                 </div>
             </div>
