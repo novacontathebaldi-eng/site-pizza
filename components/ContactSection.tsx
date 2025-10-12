@@ -55,16 +55,43 @@ export const ContactSection: React.FC = () => {
                     />
                 </div>
                 
-                <div className="mt-16">
-                    <iframe
-                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3748.241517983617!2d-40.53186832476562!3d-20.040217981387614!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xb8567115982877%3A0x1994e098805f778d!2sR.%20Porf%C3%ADrio%20Furtado%2C%20178%20-%20Santa%20Leopoldina%2C%20ES%2C%2029640-000!5e0!3m2!1sen!2sbr!4v1719503456789!5m2!1sen!2sbr"
-                        className="w-full h-96 rounded-2xl shadow-lg border border-brand-green-300/50"
-                        style={{ border: 0 }}
-                        allowFullScreen={true}
-                        loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
-                        title="Mapa da localização da Pizzaria Santa Sensação"
-                    ></iframe>
+                {/* Mapa Section */}
+                <div className="mt-20">
+                    <div className="text-center mb-8">
+                        <h3 className="text-3xl font-bold text-text-on-light">Venha nos Visitar</h3>
+                        <p className="text-lg text-gray-600">No coração de Santa Leopoldina.</p>
+                    </div>
+
+                    <div className="bg-brand-ivory-50 p-4 rounded-2xl shadow-lg border-2 border-brand-gold-600 max-w-4xl mx-auto">
+                        <iframe
+                            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3748.241517983617!2d-40.53186832476562!3d-20.040217981387614!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xb8567115982877%3A0x1994e098805f778d!2sR.%20Porf%C3%ADrio%20Furtado%2C%20178%20-%20Santa%20Leopoldina%2C%20ES%2C%2029640-000!5e0!3m2!1sen!2sbr!4v1719503456789!5m2!1sen!2sbr"
+                            className="w-full h-96 rounded-xl"
+                            style={{ border: 0 }}
+                            allowFullScreen={true}
+                            loading="lazy"
+                            referrerPolicy="no-referrer-when-downgrade"
+                            title="Mapa da localização da Pizzaria Santa Sensação"
+                        ></iframe>
+                    </div>
+
+                    <div className="mt-8 text-center max-w-4xl mx-auto">
+                        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200 inline-flex items-center justify-center gap-3 text-lg mb-6">
+                            <i className="fas fa-map-marker-alt text-accent"></i>
+                            <span className="font-semibold text-text-on-light">Rua Porfilio Furtado, 178<br/>Centro - Santa Leopoldina, ES</span>
+                        </div>
+                        
+                        <div>
+                            <a 
+                              href="https://www.google.com/maps/dir/?api=1&destination=-20.040218,-40.531868" 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="inline-block bg-accent text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-opacity-90 transition-all transform hover:scale-105"
+                            >
+                              <i className="fas fa-directions mr-2"></i>
+                              Como Chegar
+                            </a>
+                        </div>
+                    </div>
                 </div>
 
             </div>
