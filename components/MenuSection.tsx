@@ -27,12 +27,14 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
     cartItemCount, onCartClick
 }) => {
     const categoryRefs = useRef<Map<string, HTMLElement | null>>(new Map());
+    const tabRefs = useRef<Map<string, HTMLAnchorElement | null>>(new Map());
 
     const sortedActiveCategories = useMemo(() => 
         [...categories].filter(c => c.active).sort((a, b) => a.order - b.order),
         [categories]
     );
 
+    // Effect for the main scroll-spy functionality (updates active tab based on page scroll)
     useEffect(() => {
         const observer = new IntersectionObserver(
             (entries) => {
@@ -60,6 +62,18 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
             observer.disconnect();
         };
     }, [sortedActiveCategories, setActiveCategoryId]);
+
+    // New Effect: Automatically scrolls the active tab to the center of the tab bar
+    useEffect(() => {
+        const activeTab = tabRefs.current.get(activeCategoryId);
+        if (activeTab) {
+            activeTab.scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest',
+                inline: 'center'
+            });
+        }
+    }, [activeCategoryId]);
 
     const handleTabClick = (e: React.MouseEvent<HTMLAnchorElement>, categoryId: string) => {
         e.preventDefault();
@@ -95,6 +109,10 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                             {sortedActiveCategories.map(category => (
                                 <a 
                                     key={category.id} 
+                                    // FIX: The ref callback was incorrectly returning a Map object.
+                                    // It has been wrapped in a block body `{}` to ensure it returns `void`,
+                                    // which is the expected return type for a ref callback.
+                                    ref={(el) => { tabRefs.current.set(category.id, el); }}
                                     href={`#category-section-${category.id}`}
                                     onClick={(e) => handleTabClick(e, category.id)}
                                     className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors
@@ -120,9 +138,6 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                             <div 
                                 key={category.id} 
                                 id={`category-section-${category.id}`} 
-                                // FIX: The ref callback function must return `void`. The original code was implicitly
-                                // returning the result of `.set()`, which is the Map object itself. Wrapping the
-                                // statement in curly braces ensures the function returns nothing, fixing the type error.
                                 ref={(el) => { categoryRefs.current.set(category.id, el); }}
                             >
                                 <h3 className="text-3xl font-bold text-brand-olive-600 mb-6 border-l-4 border-accent pl-4">{category.name}</h3>
