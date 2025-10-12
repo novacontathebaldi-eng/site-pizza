@@ -2,7 +2,7 @@
 const {onCall, onRequest} = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
-const {MercadoPagoConfig, Payment} = require("mercadopago");
+const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago");
 const crypto = require("crypto");
 
 admin.initializeApp();
@@ -86,6 +86,7 @@ exports.createOrder = onCall({secrets}, async (request) => {
       throw new Error("CPF é obrigatório para pagamento com PIX.");
     }
     
+    // FIX: Use process.env.FUNCTION_REGION which is a standard populated env var for v2 functions.
     const region = process.env.FUNCTION_REGION || 'us-central1';
     const notificationUrl = `https://${region}-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/mercadoPagoWebhook`;
     logger.info(`Usando a URL de notificação: ${notificationUrl}`);
@@ -118,11 +119,9 @@ exports.createOrder = onCall({secrets}, async (request) => {
       const paymentId = result.id?.toString();
       const qrCodeBase64 = result.point_of_interaction?.transaction_data?.qr_code_base64;
       const copyPaste = result.point_of_interaction?.transaction_data?.qr_code;
-      const ticketUrl = result.point_of_interaction?.transaction_data?.ticket_url;
 
-
-      if (!paymentId || !qrCodeBase64 || !copyPaste || !ticketUrl) {
-        throw new Error("Dados PIX essenciais não retornados pelo Mercado Pago.");
+      if (!paymentId || !qrCodeBase64 || !copyPaste) {
+        throw new Error("Dados PIX não retornados pelo Mercado Pago.");
       }
 
       // Save payment details to our order
@@ -130,7 +129,6 @@ exports.createOrder = onCall({secrets}, async (request) => {
         "mercadoPagoDetails.paymentId": paymentId,
         "mercadoPagoDetails.qrCodeBase64": qrCodeBase64,
         "mercadoPagoDetails.qrCode": copyPaste,
-        "mercadoPagoDetails.ticketUrl": ticketUrl,
       });
 
       logger.info(`Pagamento PIX criado para o pedido #${orderNumber}, ID MP: ${paymentId}`);
@@ -138,7 +136,7 @@ exports.createOrder = onCall({secrets}, async (request) => {
       return {
         orderId,
         orderNumber,
-        pixData: {qrCodeBase64, copyPaste, ticketUrl},
+        pixData: {qrCodeBase64, copyPaste},
       };
     } catch (error) {
       logger.error(`Erro ao criar pagamento MP para o pedido #${orderNumber}:`, error.cause || error);
@@ -275,12 +273,12 @@ exports.refundPayment = onCall({secrets}, async (request) => {
     }
 
     logger.info(`Iniciando estorno para o pedido ${orderId}, Pagamento MP: ${paymentId}`);
-    
-    // Mercado Pago SDK does not have a refund class, you call it on the payment object
-    const payment = new Payment(client);
-    await payment.refund({ payment_id: paymentId });
+
+    const refund = new PaymentRefund(client);
+    await refund.create({payment_id: paymentId});
 
     // For confirmation, fetch the payment again from Mercado Pago
+    const payment = new Payment(client);
     const updatedPaymentInfo = await payment.get({id: paymentId});
 
     await db.collection("orders").doc(orderId).update({

@@ -76,7 +76,6 @@ export interface Order {
         statusDetail?: string;
         qrCodeBase64?: string;
         qrCode?: string;
-        ticketUrl?: string; // URL de fallback para pagamento
         transactionId?: string | null;
         refunds?: any[]; // Armazena informações de estorno
     };

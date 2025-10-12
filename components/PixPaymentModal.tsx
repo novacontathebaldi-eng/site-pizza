@@ -13,31 +13,28 @@ const PIX_EXPIRATION_SECONDS = 300; // 5 minutes
 export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose, onPaymentSuccess }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [pixData, setPixData] = useState<{ qrCodeBase64: string; copyPaste: string } | null>(null);
     const [timeLeft, setTimeLeft] = useState(PIX_EXPIRATION_SECONDS);
     const [isPaid, setIsPaid] = useState(false);
     const [copySuccess, setCopySuccess] = useState(false);
     const timerRef = useRef<number | null>(null);
-    const [isMobile, setIsMobile] = useState(false);
-
-    // Effect to detect mobile device on client-side
-    useEffect(() => {
-        const userAgent = typeof window.navigator === "undefined" ? "" : navigator.userAgent;
-        const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
-        setIsMobile(mobileRegex.test(userAgent));
-    }, []);
 
     // Effect to set up PIX data from the order prop when modal opens
     useEffect(() => {
         if (order) {
-            setIsLoading(false);
+            setIsLoading(false); // Data is passed in via props, no async loading needed here.
             setError(null);
             setIsPaid(false);
             setTimeLeft(PIX_EXPIRATION_SECONDS);
 
+            // FIX: The PIX data is now generated *before* this modal opens and passed in the `order` prop.
+            // This removes the call to the non-existent `initiateMercadoPagoPixPayment` function.
             const qrCodeBase64 = order.mercadoPagoDetails?.qrCodeBase64;
             const copyPaste = order.mercadoPagoDetails?.qrCode;
 
-            if (!qrCodeBase64 || !copyPaste) {
+            if (qrCodeBase64 && copyPaste) {
+                setPixData({ qrCodeBase64, copyPaste });
+            } else {
                 setError('Não foi possível carregar os dados do PIX. Por favor, feche e tente novamente.');
             }
         }
@@ -45,7 +42,7 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
 
     // Effect for countdown timer
     useEffect(() => {
-        if (!isLoading && order?.mercadoPagoDetails?.qrCode && !isPaid) {
+        if (!isLoading && pixData && !isPaid) {
             timerRef.current = window.setInterval(() => {
                 setTimeLeft(prev => {
                     if (prev <= 1) {
@@ -60,7 +57,7 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);
         };
-    }, [isLoading, order, isPaid]);
+    }, [isLoading, pixData, isPaid]);
 
     // Effect to listen for payment confirmation in real-time
     useEffect(() => {
@@ -82,9 +79,8 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
     }, [order, onPaymentSuccess]);
     
     const handleCopyToClipboard = () => {
-        const copyPaste = order?.mercadoPagoDetails?.qrCode;
-        if (copyPaste) {
-            navigator.clipboard.writeText(copyPaste).then(() => {
+        if (pixData?.copyPaste) {
+            navigator.clipboard.writeText(pixData.copyPaste).then(() => {
                 setCopySuccess(true);
                 setTimeout(() => setCopySuccess(false), 2000);
             });
@@ -95,10 +91,6 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
     
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
-    
-    // CORREÇÃO: O deep link não deve ser codificado. O sistema operacional espera a string "crua".
-    const pixDeepLink = order.mercadoPagoDetails?.qrCode ? `pix://qr/${order.mercadoPagoDetails.qrCode.trim()}` : '#';
-    const pixData = order.mercadoPagoDetails;
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
@@ -111,7 +103,7 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                     {isLoading && (
                         <div className="py-12">
                             <i className="fas fa-spinner fa-spin text-5xl text-accent"></i>
-                            <p className="mt-4 font-semibold text-gray-600">Carregando PIX...</p>
+                            <p className="mt-4 font-semibold text-gray-600">Gerando seu PIX seguro...</p>
                         </div>
                     )}
                     {error && !isPaid && (
@@ -128,7 +120,7 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                             <p className="text-gray-700">Seu pedido será finalizado em instantes...</p>
                         </div>
                     )}
-                    {!isLoading && !error && !isPaid && pixData?.qrCodeBase64 && (
+                    {!isLoading && !error && !isPaid && pixData && (
                         <div className="space-y-4">
                             <p>Escaneie o QR Code abaixo com o app do seu banco:</p>
                             <div className="flex justify-center">
@@ -141,7 +133,7 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                              <div className="relative">
                                 <input 
                                     type="text" 
-                                    value={pixData.qrCode} 
+                                    value={pixData.copyPaste} 
                                     readOnly 
                                     className="w-full text-xs text-center bg-gray-100 p-3 pr-12 border rounded-md"
                                 />
@@ -150,34 +142,6 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                                 </button>
                             </div>
                             {copySuccess && <p className="text-sm text-green-600">Copiado para a área de transferência!</p>}
-
-                            {isMobile && (
-                                <div className="animate-fade-in-up pt-4 space-y-4">
-                                    <div className="relative flex py-2 items-center">
-                                        <div className="flex-grow border-t border-gray-200"></div>
-                                        <span className="flex-shrink mx-4 text-gray-400 text-sm font-bold">OU</span>
-                                        <div className="flex-grow border-t border-gray-200"></div>
-                                    </div>
-
-                                    {/* Botão Principal para Mobile (Deep Link) */}
-                                    <a 
-                                        href={pixDeepLink} 
-                                        className="w-full inline-block bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all transform hover:scale-105"
-                                    >
-                                        <i className="fas fa-mobile-alt mr-2"></i>
-                                        Pagar com App do Banco
-                                    </a>
-                                    <p className="text-xs text-gray-500">Clique para ser redirecionado ao seu app e finalizar o pagamento.</p>
-                                    
-                                    {/* Botão de Fallback (Plano B) */}
-                                    {pixData.ticketUrl && (
-                                        <a href={pixData.ticketUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
-                                            Se o botão acima não funcionar, clique aqui para abrir a página de pagamento.
-                                        </a>
-                                    )}
-                                </div>
-                            )}
-
                             <p className="text-xs text-gray-500 pt-4">Após o pagamento, a confirmação será automática nesta tela.</p>
                         </div>
                     )}

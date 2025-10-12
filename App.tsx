@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus } from './types';
 import { Header } from './components/Header';
@@ -322,11 +321,6 @@ const App: React.FC = () => {
     };
 
     const handleInitiatePixPayment = async (details: OrderDetails, pixOption: 'payNow' | 'payLater') => {
-        if (pixOption === 'payLater') {
-            handleCheckout(details);
-            return;
-        }
-        
         setIsCheckoutModalOpen(false);
         setIsCreatingPixPayment(true);
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -344,12 +338,7 @@ const App: React.FC = () => {
                 customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.address, cpf: details.cpf },
                 items: cart, total, paymentMethod: 'pix', status: 'awaiting-payment', paymentStatus: 'pending',
                 createdAt: new Date(),
-                mercadoPagoDetails: { 
-                    paymentId: '', // Will be filled by webhook if needed, but not essential for modal
-                    qrCodeBase64: pixData.qrCodeBase64, 
-                    qrCode: pixData.copyPaste,
-                    ticketUrl: pixData.ticketUrl, // Storing the fallback URL
-                }
+                mercadoPagoDetails: { paymentId: '', qrCodeBase64: pixData.qrCodeBase64, qrCode: pixData.copyPaste }
             };
 
             setPayingOrder(newOrder);
@@ -371,17 +360,17 @@ const App: React.FC = () => {
        try {
            addToast("Pagamento confirmado! Enviando pedido para a pizzaria...", 'success');
            
-            const details: OrderDetails = {
-                name: paidOrder.customer.name,
-                phone: paidOrder.customer.phone,
-                orderType: paidOrder.customer.orderType,
-                address: paidOrder.customer.address || '',
-                paymentMethod: 'pix',
-                changeNeeded: false,
-                notes: paidOrder.notes || '',
-                reservationTime: paidOrder.customer.reservationTime || '',
-                cpf: paidOrder.customer.cpf || ''
-            };
+           const details: OrderDetails = {
+               name: paidOrder.customer.name,
+               phone: paidOrder.customer.phone,
+               orderType: paidOrder.customer.orderType,
+               address: paidOrder.customer.address || '',
+               paymentMethod: 'pix',
+               changeNeeded: false,
+               notes: paidOrder.notes || '',
+               reservationTime: paidOrder.customer.reservationTime || '',
+               cpf: paidOrder.customer.cpf || ''
+           };
            const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, paidOrder.orderNumber, true);
            window.open(whatsappUrl, '_blank');
 
@@ -836,6 +825,4 @@ const App: React.FC = () => {
     );
 };
 
-// FIX: Add default export to the App component.
-// This resolves the import error in `index.tsx` and related compilation issues.
 export default App;
