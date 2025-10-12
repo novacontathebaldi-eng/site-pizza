@@ -66,7 +66,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
     // New Effect: Automatically scrolls the active tab to the center of the tab bar
     useEffect(() => {
         const activeTab = tabRefs.current.get(activeCategoryId);
-        if (activeTab) {
+        if (activeTab && window.scrollY > 0) {
             activeTab.scrollIntoView({
                 behavior: 'smooth',
                 block: 'nearest',
