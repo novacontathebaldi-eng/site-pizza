@@ -54,6 +54,19 @@ export const ContactSection: React.FC = () => {
                         text="Quarta a Domingo<br>19h às 22h"
                     />
                 </div>
+                
+                <div className="mt-16">
+                    <iframe
+                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3748.241517983617!2d-40.53186832476562!3d-20.040217981387614!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xb8567115982877%3A0x1994e098805f778d!2sR.%20Porf%C3%ADrio%20Furtado%2C%20178%20-%20Santa%20Leopoldina%2C%20ES%2C%2029640-000!5e0!3m2!1sen!2sbr!4v1719503456789!5m2!1sen!2sbr"
+                        className="w-full h-96 rounded-2xl shadow-lg border border-brand-green-300/50"
+                        style={{ border: 0 }}
+                        allowFullScreen={true}
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                        title="Mapa da localização da Pizzaria Santa Sensação"
+                    ></iframe>
+                </div>
+
             </div>
         </section>
     );
