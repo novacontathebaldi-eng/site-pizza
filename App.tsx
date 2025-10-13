@@ -11,7 +11,7 @@ import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
 import { PixPaymentModal } from './components/PixPaymentModal';
 import { PaymentFailureModal } from './components/PaymentFailureModal';
-import { OrderTrackingModal } from './components/OrderTrackingModal';
+import { Chatbot } from './components/Chatbot';
 import { db } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
@@ -132,8 +132,6 @@ const App: React.FC = () => {
     const [showPaymentFailureModal, setShowPaymentFailureModal] = useState<boolean>(false);
     const [pixRetryKey, setPixRetryKey] = useState<number>(0);
     const [isCreatingPixPayment, setIsCreatingPixPayment] = useState<boolean>(false);
-    const [refundingOrderId, setRefundingOrderId] = useState<string | null>(null);
-    const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
     
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
@@ -618,36 +616,23 @@ const App: React.FC = () => {
     }, [addToast]);
     
     const handleRefundOrder = useCallback(async (orderId: string) => {
-        if (window.confirm("Tem certeza que deseja estornar o valor total deste pagamento? Esta ação não pode ser desfeita.")) {
-            const orderToRefund = orders.find(o => o.id === orderId);
-            const paymentId = orderToRefund?.mercadoPagoDetails?.paymentId;
-
-            if (!paymentId) {
-                addToast("ID do pagamento não encontrado. Não é possível estornar.", 'error');
-                return;
-            }
-
-            setRefundingOrderId(orderId);
-            addToast("Processando estorno...", 'success');
-
+         if (window.confirm("Tem certeza que deseja estornar o valor total deste pagamento? Esta ação não pode ser desfeita.")) {
             try {
                 await firebaseService.refundPayment(orderId);
-                addToast(`Estorno solicitado com sucesso! O pedido ${paymentId} foi cancelado`, 'success');
+                addToast("Estorno solicitado com sucesso!", 'success');
             } catch (error: any) {
                 console.error("Failed to refund order:", error);
                 addToast(error.message || "Erro ao solicitar estorno.", 'error');
-            } finally {
-                setRefundingOrderId(null);
             }
         }
-    }, [addToast, orders]);
+    }, [addToast]);
 
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
 
     return (
         <div className="flex flex-col min-h-screen">
-            <Header cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} activeSection={activeSection} settings={siteSettings} onTrackOrderClick={() => setIsTrackingModalOpen(true)} />
+            <Header cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} activeSection={activeSection} settings={siteSettings} />
             
             <div id="status-banner" className={`bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
                 <i className="fas fa-times-circle mr-2"></i>
@@ -681,7 +666,6 @@ const App: React.FC = () => {
                         setActiveCategoryId={setActiveMenuCategory}
                         cartItemCount={cartTotalItems}
                         onCartClick={() => setIsCartOpen(true)}
-                        cartItems={cart}
                     />
                 )}
                 <div id="sobre">
@@ -717,11 +701,10 @@ const App: React.FC = () => {
                     onDeleteOrder={handleDeleteOrder}
                     onPermanentDeleteOrder={handlePermanentDeleteOrder}
                     onRefundOrder={handleRefundOrder}
-                    refundingOrderId={refundingOrderId}
                 />
             </main>
 
-            <Footer settings={siteSettings} onTrackOrderClick={() => setIsTrackingModalOpen(true)} />
+            <Footer settings={siteSettings} />
 
             {cart.length > 0 && (
                 <div className="fixed bottom-5 right-5 z-40">
@@ -780,12 +763,6 @@ const App: React.FC = () => {
                 onPayLater={handlePayLaterFromFailure}
             />
             
-            <OrderTrackingModal
-                isOpen={isTrackingModalOpen}
-                onClose={() => setIsTrackingModalOpen(false)}
-                orders={orders}
-            />
-
             {isCreatingPixPayment && (
                 <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8">
@@ -821,6 +798,8 @@ const App: React.FC = () => {
                     ))}
                 </div>
             </div>
+            
+            <Chatbot />
 
         </div>
     );

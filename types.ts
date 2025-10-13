@@ -118,3 +118,9 @@ export interface SiteSettings {
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
 }
+
+export interface ChatMessage {
+    role: 'user' | 'model';
+    parts: string;
+    isFunctionCall?: boolean;
+}
