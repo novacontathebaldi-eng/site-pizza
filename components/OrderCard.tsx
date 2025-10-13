@@ -141,7 +141,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
         </div>
     );
     
-    const paymentStatusChanger = !isArchived && !isRefunded && (
+    const paymentStatusChanger = !isArchived && !isRefunded && order.paymentStatus !== 'paid_online' && (
         <div className="flex items-center gap-2">
             <label htmlFor={`payment-status-select-${order.id}`} className="text-sm font-semibold text-gray-700 whitespace-nowrap">Pgto:</label>
             <select
@@ -154,9 +154,6 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
             >
                 <option value="pending">Pendente</option>
                 <option value="paid">Pago</option>
-                {order.paymentStatus === 'paid_online' && (
-                    <option value="paid_online" disabled>Pago pelo Site</option>
-                )}
             </select>
         </div>
     );
