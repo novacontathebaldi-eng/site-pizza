@@ -1,5 +1,4 @@
 
-
 import React, { useMemo } from 'react';
 import { CartItem, Category, Product } from '../types';
 
@@ -87,14 +86,20 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ isOpen, onClose, cartI
             onClose();
             setActiveCategoryId(suggestion.targetCategoryId);
             
-            // Scroll to menu section after cart animation
+            // Scroll to the specific category section after cart animation
             setTimeout(() => {
-                const menuElement = document.getElementById('cardapio');
-                if (menuElement) {
-                    const headerOffset = 80; // Main header height
-                    const elementPosition = menuElement.getBoundingClientRect().top;
+                const element = document.getElementById(`category-section-${suggestion.targetCategoryId}`);
+                const stickyHeader = document.getElementById('sticky-menu-header');
+                
+                if (element) {
+                    let headerOffset = 80; // Main header height
+                    if (stickyHeader) {
+                         headerOffset += stickyHeader.offsetHeight;
+                    }
+
+                    const elementPosition = element.getBoundingClientRect().top;
                     const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-                    
+        
                     window.scrollTo({
                         top: offsetPosition,
                         behavior: 'smooth'
