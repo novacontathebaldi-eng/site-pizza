@@ -10,6 +10,7 @@ interface OrderCardProps {
     onDelete: (orderId: string) => void;
     onPermanentDelete: (orderId: string) => void;
     onRefund: (orderId: string) => void;
+    isRefunding?: boolean;
 }
 
 // This is now a function to provide dynamic text based on the order type
@@ -56,7 +57,7 @@ const getPaymentStatusInfo = (order: Order): { text: string; isPaid: boolean; is
 };
 
 
-export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete, onRefund }) => {
+export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete, onRefund, isRefunding }) => {
     const { id, orderNumber, customer, items, total, paymentMethod, changeNeeded, changeAmount, notes, status, paymentStatus, createdAt, pickupTimeEstimate, mercadoPagoDetails } = order;
     const config = getStatusConfig(order);
     const { text: paymentStatusText, isPaid, isRefunded } = getPaymentStatusInfo(order);
@@ -282,7 +283,13 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                              <div className="flex flex-wrap items-center justify-end gap-3 w-full">
                                 {paymentStatusChanger}
                                 {canRefund && (
-                                     <button onClick={() => onRefund(id)} className="bg-yellow-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-yellow-600"><i className="fas fa-undo-alt mr-2"></i>Estornar</button>
+                                     <button 
+                                        onClick={() => onRefund(id)} 
+                                        disabled={isRefunding}
+                                        className="bg-yellow-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-yellow-600 disabled:bg-yellow-300 disabled:cursor-not-allowed flex items-center justify-center min-w-[110px]"
+                                     >
+                                        {isRefunding ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-undo-alt mr-2"></i>Estornar</>}
+                                     </button>
                                 )}
                                 <div className="flex-grow"></div>
                                 
