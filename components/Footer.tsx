@@ -1,7 +1,7 @@
 import React from 'react';
 import { SiteSettings } from '../types';
 
-export const Footer: React.FC<{ settings: SiteSettings }> = ({ settings }) => {
+export const Footer: React.FC<{ settings: SiteSettings; onTrackOrderClick: () => void; }> = ({ settings, onTrackOrderClick }) => {
     
     const visibleLinks = settings.footerLinks?.filter(link => link.isVisible !== false) ?? [];
     const socialLinks = visibleLinks.filter(link => link.icon.startsWith('fab'));
@@ -51,6 +51,12 @@ export const Footer: React.FC<{ settings: SiteSettings }> = ({ settings }) => {
                      <div>
                         <h4 className="font-bold text-lg mb-4">Acesso</h4>
                          <ul className="space-y-2 text-brand-green-300">
+                             <li>
+                                <a href="#rastrear" onClick={(e) => { e.preventDefault(); onTrackOrderClick(); }} className="inline-flex items-center gap-2 hover:text-white transition-colors">
+                                    <i className="fas fa-truck-loading mr-1 text-accent"></i>
+                                    <span>Rastrear Pedido</span>
+                                </a>
+                            </li>
                             {otherLinks.map(link => (
                                 <li key={link.id}>
                                     <a href={link.url} className="inline-flex items-center gap-2 hover:text-white transition-colors">

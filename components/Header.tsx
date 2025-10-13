@@ -7,9 +7,10 @@ interface HeaderProps {
     onCartClick: () => void;
     activeSection: string;
     settings: SiteSettings;
+    onTrackOrderClick: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, activeSection, settings }) => {
+export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, activeSection, settings, onTrackOrderClick }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
 
@@ -57,6 +58,7 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, acti
                         <a href="#cardapio" onClick={(e) => { e.preventDefault(); scrollToSection('cardapio');}} className="font-medium hover:text-brand-gold-600 transition-colors">Cardápio</a>
                         <a href="#sobre" onClick={(e) => { e.preventDefault(); scrollToSection('sobre');}} className="font-medium hover:text-brand-gold-600 transition-colors">Sobre Nós</a>
                         <a href="#contato" onClick={(e) => { e.preventDefault(); scrollToSection('contato');}} className="font-medium hover:text-brand-gold-600 transition-colors">Contato</a>
+                        <a href="#rastrear" onClick={(e) => { e.preventDefault(); onTrackOrderClick();}} className="font-medium hover:text-brand-gold-600 transition-colors">Rastrear Pedido</a>
                     </nav>
 
                     <div className="flex items-center gap-3">
@@ -86,6 +88,7 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, acti
                     <a href="#cardapio" onClick={(e) => { e.preventDefault(); scrollToSection('cardapio'); handleLinkClick();}} className="font-bold hover:text-brand-gold-600 transition-colors">Cardápio</a>
                     <a href="#sobre" onClick={(e) => { e.preventDefault(); scrollToSection('sobre'); handleLinkClick();}} className="font-bold hover:text-brand-gold-600 transition-colors">Sobre Nós</a>
                     <a href="#contato" onClick={(e) => { e.preventDefault(); scrollToSection('contato'); handleLinkClick();}} className="font-bold hover:text-brand-gold-600 transition-colors">Contato</a>
+                    <a href="#rastrear" onClick={(e) => { e.preventDefault(); handleLinkClick(); onTrackOrderClick();}} className="font-bold hover:text-brand-gold-600 transition-colors">Rastrear Pedido</a>
                 </nav>
             </div>
         </header>
