@@ -21,28 +21,12 @@ const getSuggestedTimes = () => {
     return suggestions;
 };
 
-const bairrosAtendidos = [
-  "Centro",
-  "Olaria",
-  "Vila Nova",
-  "Moxafongo",
-  "Cocal",
-  "Funil"
-];
-
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, onInitiatePixPayment }) => {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [cpf, setCpf] = useState('');
     const [orderType, setOrderType] = useState<'delivery' | 'pickup' | 'local' | ''>('');
-    
-    // States for detailed address
-    const [bairro, setBairro] = useState('');
-    const [street, setStreet] = useState('');
-    const [complement, setComplement] = useState('');
-    const [reference, setReference] = useState('');
-    const [outroWarningAcknowledged, setOutroWarningAcknowledged] = useState(false);
-
+    const [address, setAddress] = useState('');
     const [paymentMethod, setPaymentMethod] = useState<'credit' | 'debit' | 'pix' | 'cash' | ''>('');
     const [changeNeeded, setChangeNeeded] = useState(false);
     const [changeAmount, setChangeAmount] = useState('');
@@ -50,50 +34,27 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const [reservationTime, setReservationTime] = useState('');
     const [pixPaymentOption, setPixPaymentOption] = useState<'payNow' | 'payLater' | null>(null);
 
+
     const suggestedTimes = getSuggestedTimes();
 
-    // Reset state when modal closes
     useEffect(() => {
         if (!isOpen) {
-            setName(''); setPhone(''); setCpf(''); setOrderType(''); 
-            setStreet(''); setBairro(''); setComplement(''); setReference('');
+            setName(''); setPhone(''); setCpf(''); setOrderType(''); setAddress('');
             setPaymentMethod(''); setChangeNeeded(false); setChangeAmount('');
             setNotes(''); setReservationTime(''); setPixPaymentOption(null);
-            setOutroWarningAcknowledged(false);
         }
     }, [isOpen]);
-
-    // Handle logic when "Outro" bairro is selected
-    useEffect(() => {
-        setOutroWarningAcknowledged(false); // Reset acknowledgement when bairro changes
-        if (bairro === 'outro' && pixPaymentOption === 'payNow') {
-            setPixPaymentOption(null); // Disallow "Pay Now" for "Outro"
-        }
-    }, [bairro]);
-
 
     if (!isOpen) return null;
 
     const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-    const getOrderDetails = (): OrderDetails => {
-        let fullAddress = '';
-        if (orderType === 'delivery') {
-            const parts = [street];
-            if(bairro) parts.push(bairro);
-            if(complement) parts.push(complement);
-            if(reference) parts.push(`Ponto de Ref: ${reference}`);
-            parts.push('Santa Leopoldina - ES, 29640-000');
-            fullAddress = parts.join(', ');
-        }
-
-        return {
-            name, phone, cpf, orderType: orderType as 'delivery' | 'pickup' | 'local',
-            address: fullAddress, paymentMethod: paymentMethod as 'credit' | 'debit' | 'pix' | 'cash',
-            changeNeeded: paymentMethod === 'cash' && changeNeeded,
-            changeAmount, notes, reservationTime
-        };
-    };
+    const getOrderDetails = (): OrderDetails => ({
+        name, phone, cpf, orderType: orderType as 'delivery' | 'pickup' | 'local',
+        address, paymentMethod: paymentMethod as 'credit' | 'debit' | 'pix' | 'cash',
+        changeNeeded: paymentMethod === 'cash' && changeNeeded,
+        changeAmount, notes, reservationTime
+    });
 
     const handlePaymentMethodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const newMethod = e.target.value as any;
@@ -108,9 +69,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
         const details = getOrderDetails();
 
         if (paymentMethod === 'pix') {
-            if (pixPaymentOption === 'payNow' && bairro !== 'outro') {
+            if (pixPaymentOption === 'payNow') {
                 onInitiatePixPayment(details, 'payNow');
-            } else if (pixPaymentOption === 'payLater' || bairro === 'outro') {
+            } else if (pixPaymentOption === 'payLater') {
                 onConfirmCheckout(details);
             } else {
                 alert("Por favor, escolha se deseja pagar agora ou depois.");
@@ -120,22 +81,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
         }
     };
     
-    const isOutroFlow = orderType === 'delivery' && bairro === 'outro';
+    const isSubmitDisabled = (paymentMethod === 'pix' && !pixPaymentOption) || (paymentMethod === 'pix' && pixPaymentOption === 'payNow' && !cpf);
     
-    const isSubmitDisabled = 
-        (paymentMethod === 'pix' && !pixPaymentOption) || 
-        (paymentMethod === 'pix' && pixPaymentOption === 'payNow' && !cpf && !isOutroFlow) ||
-        (isOutroFlow && !outroWarningAcknowledged);
-    
-    const submitButtonText = isOutroFlow
-        ? 'Continuar pelo WhatsApp'
-        : (paymentMethod === 'pix' && pixPaymentOption === 'payNow')
+    const submitButtonText = (paymentMethod === 'pix' && pixPaymentOption === 'payNow')
         ? 'Pagar e Finalizar Pedido'
         : 'Enviar Pedido';
         
-    const submitButtonIconClass = isOutroFlow
-        ? 'fab fa-whatsapp'
-        : (paymentMethod === 'pix' && pixPaymentOption === 'payNow')
+    const submitButtonIconClass = (paymentMethod === 'pix' && pixPaymentOption === 'payNow')
         ? 'fab fa-pix'
         : 'fab fa-whatsapp';
 
@@ -169,53 +121,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                             </select>
                         </div>
                         {orderType === 'delivery' && (
-                            <div className="animate-fade-in-up space-y-4 p-4 bg-gray-50 rounded-md border">
-                                <h4 className="font-semibold text-md text-gray-800">Endereço de Entrega</h4>
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-semibold mb-1">CEP</label>
-                                        <input type="text" value="29640-000" className="w-full px-3 py-2 border rounded-md bg-gray-200 cursor-not-allowed" disabled />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <label className="block text-sm font-semibold mb-1">Cidade / Estado</label>
-                                        <input type="text" value="Santa Leopoldina, ES" className="w-full px-3 py-2 border rounded-md bg-gray-200 cursor-not-allowed" disabled />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-semibold mb-1">Área / Bairro *</label>
-                                    <select value={bairro} onChange={e => setBairro(e.target.value)} className="w-full px-3 py-2 border rounded-md bg-white" required>
-                                        <option value="" disabled>Selecione sua região...</option>
-                                        {bairrosAtendidos.map(b => <option key={b} value={b}>{b}</option>)}
-                                        <option value="outro">Outra localidade</option>
-                                    </select>
-                                </div>
-                                 {isOutroFlow && !outroWarningAcknowledged && (
-                                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-center animate-fade-in-up">
-                                        <p className="text-sm text-yellow-800 mb-3">
-                                            <i className="fas fa-info-circle mr-2"></i>
-                                            Não conseguimos confirmar a entrega para esta área automaticamente. Continue o pedido para que nossa equipe verifique a possibilidade de entrega no seu endereço.
-                                        </p>
-                                        <button type="button" onClick={() => setOutroWarningAcknowledged(true)} className="bg-accent text-white font-semibold py-1 px-4 rounded-md text-sm">Ok, entendi</button>
-                                    </div>
-                                )}
-
-                                <div>
-                                    <label className="block text-sm font-semibold mb-1">Rua e Número *</label>
-                                    <input type="text" value={street} onChange={e => setStreet(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Ex: Rua Principal, 123" required />
-                                </div>
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-semibold mb-1">Complemento (opcional)</label>
-                                        <input type="text" value={complement} onChange={e => setComplement(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Ex: Apto 101, casa" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-semibold mb-1">Ponto de referência (opcional)</label>
-                                        <input type="text" value={reference} onChange={e => setReference(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Ex: Próximo à praça" />
-                                    </div>
-                                </div>
+                            <div className="animate-fade-in-up">
+                                <label className="block text-sm font-semibold mb-1">Endereço de Entrega *</label>
+                                <textarea value={address} onChange={e => setAddress(e.target.value)} className="w-full px-3 py-2 border rounded-md" rows={2} required />
                             </div>
                         )}
                         {orderType === 'local' && (
@@ -250,10 +158,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                                     <div className="flex justify-center gap-4">
                                         <button 
                                             type="button" 
-                                            onClick={() => setPixPaymentOption('payNow')}
-                                            disabled={isOutroFlow}
-                                            title={isOutroFlow ? "Pagamento antecipado não disponível para esta localidade." : ""}
-                                            className={`font-bold py-2 px-6 rounded-lg transition-all border-2 ${pixPaymentOption === 'payNow' ? 'bg-accent text-white border-accent' : 'bg-white text-accent border-accent hover:bg-accent/10'} disabled:bg-gray-200 disabled:text-gray-400 disabled:border-gray-300 disabled:cursor-not-allowed`}>
+                                            onClick={() => setPixPaymentOption('payNow')} 
+                                            className={`font-bold py-2 px-6 rounded-lg transition-all border-2 ${pixPaymentOption === 'payNow' ? 'bg-accent text-white border-accent' : 'bg-white text-accent border-accent hover:bg-accent/10'}`}>
                                             <i className="fas fa-qrcode mr-2"></i>Pagar Agora
                                         </button>
                                         <button 
@@ -264,10 +170,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                                         </button>
                                     </div>
                                 </div>
-                                {pixPaymentOption === 'payNow' && !isOutroFlow && (
+                                {pixPaymentOption === 'payNow' && (
                                      <div className="animate-fade-in-up">
                                         <label className="block text-sm font-semibold mb-1" htmlFor="cpf">CPF (para o PIX) *</label>
-                                        <input id="cpf" type="text" value={cpf} onChange={e => setCpf(e.target.value.replace(/\D/g, ''))} className="w-full px-3 py-2 border rounded-md" placeholder="Apenas números" required />
+                                        <input id="cpf" type="text" value={cpf} onChange={e => setCpf(e.target.value.replace(/\D/g, ''))} className="w-full px-3 py-2 border rounded-md" placeholder="000.000.000-00" required />
                                         <p className="text-xs text-gray-500 mt-1">Necessário para gerar a cobrança PIX.</p>
                                     </div>
                                 )}

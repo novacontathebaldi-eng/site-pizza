@@ -11,7 +11,6 @@ import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
 import { PixPaymentModal } from './components/PixPaymentModal';
 import { PaymentFailureModal } from './components/PaymentFailureModal';
-import { Chatbot } from './components/Chatbot';
 import { db } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
@@ -132,6 +131,7 @@ const App: React.FC = () => {
     const [showPaymentFailureModal, setShowPaymentFailureModal] = useState<boolean>(false);
     const [pixRetryKey, setPixRetryKey] = useState<number>(0);
     const [isCreatingPixPayment, setIsCreatingPixPayment] = useState<boolean>(false);
+    const [refundingOrderId, setRefundingOrderId] = useState<string | null>(null);
     
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
@@ -616,16 +616,29 @@ const App: React.FC = () => {
     }, [addToast]);
     
     const handleRefundOrder = useCallback(async (orderId: string) => {
-         if (window.confirm("Tem certeza que deseja estornar o valor total deste pagamento? Esta ação não pode ser desfeita.")) {
+        if (window.confirm("Tem certeza que deseja estornar o valor total deste pagamento? Esta ação não pode ser desfeita.")) {
+            const orderToRefund = orders.find(o => o.id === orderId);
+            const paymentId = orderToRefund?.mercadoPagoDetails?.paymentId;
+
+            if (!paymentId) {
+                addToast("ID do pagamento não encontrado. Não é possível estornar.", 'error');
+                return;
+            }
+
+            setRefundingOrderId(orderId);
+            addToast("Processando estorno...", 'success');
+
             try {
                 await firebaseService.refundPayment(orderId);
-                addToast("Estorno solicitado com sucesso!", 'success');
+                addToast(`Estorno solicitado com sucesso! O pedido ${paymentId} foi cancelado`, 'success');
             } catch (error: any) {
                 console.error("Failed to refund order:", error);
                 addToast(error.message || "Erro ao solicitar estorno.", 'error');
+            } finally {
+                setRefundingOrderId(null);
             }
         }
-    }, [addToast]);
+    }, [addToast, orders]);
 
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
@@ -666,6 +679,7 @@ const App: React.FC = () => {
                         setActiveCategoryId={setActiveMenuCategory}
                         cartItemCount={cartTotalItems}
                         onCartClick={() => setIsCartOpen(true)}
+                        cartItems={cart}
                     />
                 )}
                 <div id="sobre">
@@ -701,6 +715,7 @@ const App: React.FC = () => {
                     onDeleteOrder={handleDeleteOrder}
                     onPermanentDeleteOrder={handlePermanentDeleteOrder}
                     onRefundOrder={handleRefundOrder}
+                    refundingOrderId={refundingOrderId}
                 />
             </main>
 
@@ -798,8 +813,6 @@ const App: React.FC = () => {
                     ))}
                 </div>
             </div>
-            
-            <Chatbot />
 
         </div>
     );

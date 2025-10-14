@@ -23,6 +23,7 @@ exports.createOrder = onCall({secrets}, async (request) => {
   const client = new MercadoPagoConfig({accessToken});
 
   const {details, cart, total, pixOption} = request.data;
+  const userId = request.auth?.uid; // Get user ID from auth context
 
   // 1. Validate input
   if (!details || !cart || !total) {
@@ -55,6 +56,7 @@ exports.createOrder = onCall({secrets}, async (request) => {
 
   const orderData = {
     orderNumber,
+    userId: userId || null, // Add the user ID to the order
     customer: {
       name: details.name,
       phone: details.phone,
