@@ -91,14 +91,14 @@ export const Chatbot: React.FC = () => {
             {/* Floating Action Button */}
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-5 right-5 z-40 bg-accent text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110"
+                className="fixed bottom-5 left-5 z-40 bg-accent text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110"
                 aria-label="Abrir chat de ajuda"
             >
                 <i className="fas fa-question text-xl"></i>
             </button>
 
             {/* Chat Modal */}
-            <div className={`fixed bottom-20 right-5 z-50 w-[calc(100%-40px)] max-w-sm h-[60vh] max-h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col transition-all duration-300 ease-in-out ${isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+            <div className={`fixed bottom-20 left-5 z-50 w-[calc(100%-40px)] max-w-sm h-[60vh] max-h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col transition-all duration-300 ease-in-out ${isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
                 {/* Header */}
                 <div className="flex justify-between items-center p-4 border-b bg-brand-ivory-50 rounded-t-2xl">
                     <h3 className="font-bold text-lg text-text-on-light flex items-center gap-2">
