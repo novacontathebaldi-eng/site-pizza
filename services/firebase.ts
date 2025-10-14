@@ -7,16 +7,16 @@ import 'firebase/compat/storage';
 import 'firebase/compat/auth'; // Import for authentication
 import 'firebase/compat/functions'; // Import for Firebase Functions
 
-// AÇÃO NECESSÁRIA: Credenciais corrigidas.
-// O problema era um erro de digitação na apiKey. Esta versão está 100% correta,
-// baseada na captura de tela da seção "Credenciais" (Browser key).
+// AÇÃO NECESSÁRIA: Credenciais corrigidas e seguras.
+// A chave de API foi movida para uma variável de ambiente para evitar exposição.
+// O Vite irá substituir 'process.env.API_KEY' pelo valor correto durante o build.
 const firebaseConfig = {
-  apiKey: "AIzaSyCTMHlUCGOpU7VRIdbP2VADzUF9n1lI88A",
+  apiKey: process.env.API_KEY,
   authDomain: "site-pizza-a2930.firebaseapp.com",
   projectId: "site-pizza-a2930",
   // FIX: Reverted storage bucket URL to the one from the user's working old version.
   // This is the primary fix for the file upload issue.
-  storageBucket: "site-pizza-a2930.firebasestorage.app",
+  storageBucket: "site-pizza-a2930.appspot.com",
   messagingSenderId: "914255031241",
   appId: "1:914255031241:web:84ae273b22cb7d04499618"
 };
