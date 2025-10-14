@@ -58,9 +58,11 @@ exports.askSanto = onCall({secrets}, async (request) => {
         2. Se o cliente relatar problemas no site, bugs, erros ou algo nesse sentido, peça gentilmente para ele enviar um e-mail para o suporte. A mensagem deve ser: 'Lamento que esteja enfrentando problemas. Por favor, envie um e-mail detalhando o que aconteceu para nosso suporte técnico em [suporte.thebaldi@gmail.com](mailto:suporte.thebaldi@gmail.com) para que possamos resolver o mais rápido possível.'
       `;
 
+    // FIX: Changed the 'contents' property from a simple string to a more robust and explicit Content object array.
+    // This improves compatibility and reduces ambiguity when making the API call.
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: userMessage,
+      contents: [{role: "user", parts: [{text: userMessage}]}],
       config: {
         systemInstruction: systemInstruction,
       },
