@@ -1,15 +1,77 @@
 /* eslint-disable max-len */
-const {onCall, onRequest} = require("firebase-functions/v2/https");
+const {onCall, onRequest, onInit} = require("firebase-functions/v2/core");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago");
 const crypto = require("crypto");
+const {GoogleGenAI} = require("@google/genai");
 
 admin.initializeApp();
 const db = admin.firestore();
 
 // Define os secrets que as funções irão usar.
-const secrets = ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET"];
+const secrets = ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET", "GEMINI_API_KEY"];
+
+// --- Chatbot Santo ---
+let ai; // Initialize ai in the global scope
+
+onInit(() => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    logger.error("GEMINI_API_KEY not set. Cannot initialize Gemini AI.");
+    return;
+  }
+  ai = new GoogleGenAI({apiKey});
+  logger.info("Gemini AI client initialized successfully for Santo.");
+});
+
+/**
+ * Chatbot Cloud Function to interact with Gemini API.
+ */
+exports.askSanto = onCall({secrets}, async (request) => {
+  if (!ai) {
+    logger.error("Gemini AI client is not initialized. Check GEMINI_API_KEY secret.");
+    throw new Error("Internal server error: Assistant is not configured.");
+  }
+
+  const userMessage = request.data.message;
+  if (!userMessage) {
+    throw new Error("No message provided.");
+  }
+
+  try {
+    const systemInstruction = `
+        Você é um atendente virtual amigável e prestativo da pizzaria 'Santa Sensação'. Seu nome é Santo.
+        Sua principal função é ajudar os clientes com dúvidas sobre o cardápio, sabores de pizza, horário de funcionamento, endereço e como fazer um pedido.
+        Seja sempre cordial. Se o cliente perguntar se você é um robô, diga que é o assistente virtual da casa.
+
+        INFORMAÇÕES IMPORTANTES:
+        - Horário de Funcionamento: Quarta a Domingo, das 19h às 22h.
+        - Endereço: Rua Porfilio Furtado, 178, Centro - Santa Leopoldina, ES. Ao fornecer o endereço, adicione uma mensagem amigável como "Estamos no coração de Santa Leopoldina, prontos para te receber com a melhor pizza do estado!".
+        - Como Pedir: Os pedidos são feitos diretamente pelo site.
+        - Pizzaiolos: Chef Pizzaiolo Carlos Entringer e o renomado mestre pizzaiolo Luca Lonardi. Luca Lonardi foi o grande vencedor do concurso Panshow 2025.
+        - Tipos de Atendimento: Atendemos entrega (delivery), retirada no local e consumo em nossa pizzaria.
+
+        REGRAS DE ESCALONAMENTO:
+        1. Se em algum momento o cliente pedir para falar com um humano, um representante, um atendente, ou expressar frustração, você DEVE oferecer o contato via WhatsApp. A mensagem deve ser EXATAMENTE: 'Entendo. Para falar com um de nossos atendentes, por favor, clique no link a seguir: [Falar no WhatsApp](https://api.whatsapp.com/send/?phone=5527996500341&text=Ol%C3%A1+eu+vim+da+se%C3%A7%C3%A3o+de+AJUDA+do+site%2C+o+assistente+Santo+me+encaminhou+o+contato.&type=phone_number&app_absent=0)'. Não forneça o link para outros fins.
+        2. Se o cliente relatar problemas no site, bugs, erros ou algo nesse sentido, peça gentilmente para ele enviar um e-mail para o suporte. A mensagem deve ser: 'Lamento que esteja enfrentando problemas. Por favor, envie um e-mail detalhando o que aconteceu para nosso suporte técnico em [suporte.thebaldi@gmail.com](mailto:suporte.thebaldi@gmail.com) para que possamos resolver o mais rápido possível.'
+      `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: userMessage,
+      config: {
+        systemInstruction: systemInstruction,
+      },
+    });
+
+    return {reply: response.text};
+  } catch (error) {
+    logger.error("Error calling Gemini API:", error);
+    throw new Error("Failed to get a response from the assistant.");
+  }
+});
+
 
 /**
  * Creates an order in Firestore and optionally initiates a PIX payment.
@@ -85,9 +147,9 @@ exports.createOrder = onCall({secrets}, async (request) => {
     if (!details.cpf) {
       throw new Error("CPF é obrigatório para pagamento com PIX.");
     }
-    
+
     // FIX: Use process.env.FUNCTION_REGION which is a standard populated env var for v2 functions.
-    const region = process.env.FUNCTION_REGION || 'us-central1';
+    const region = process.env.FUNCTION_REGION || "us-central1";
     const notificationUrl = `https://${region}-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/mercadoPagoWebhook`;
     logger.info(`Usando a URL de notificação: ${notificationUrl}`);
 
@@ -185,10 +247,10 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
     }
 
     const [ts, hash] = signature.split(",").map((part) => part.split("=")[1]);
-    
+
     // The manifest MUST be built from query params as per Mercado Pago docs.
     const manifest = `id:${paymentIdFromQuery};request-id:${requestId};ts:${ts};`;
-    
+
     const hmac = crypto.createHmac("sha256", webhookSecret);
     hmac.update(manifest);
     const expectedHash = hmac.digest("hex");
