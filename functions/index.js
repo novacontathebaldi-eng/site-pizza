@@ -1,6 +1,5 @@
 /* eslint-disable max-len */
 const {onCall, onRequest} = require("firebase-functions/v2/https");
-const {onInit} = require("firebase-functions/v2/core");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago");
@@ -14,25 +13,22 @@ const db = admin.firestore();
 const secrets = ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET", "GEMINI_API_KEY"];
 
 // --- Chatbot Santo ---
-let ai; // Initialize ai in the global scope
-
-onInit(() => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    logger.error("GEMINI_API_KEY not set. Cannot initialize Gemini AI.");
-    return;
-  }
-  ai = new GoogleGenAI({apiKey});
-  logger.info("Gemini AI client initialized successfully for Santo.");
-});
+let ai; // Mantém a instância da IA no escopo global para ser reutilizada após a primeira chamada.
 
 /**
  * Chatbot Cloud Function to interact with Gemini API.
  */
 exports.askSanto = onCall({secrets}, async (request) => {
+  // "Lazy Initialization": Inicializa a IA somente na primeira vez que a função é chamada.
+  // Isso evita timeouts durante o deploy.
   if (!ai) {
-    logger.error("Gemini AI client is not initialized. Check GEMINI_API_KEY secret.");
-    throw new Error("Internal server error: Assistant is not configured.");
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      logger.error("GEMINI_API_KEY not set. Cannot initialize Gemini AI.");
+      throw new Error("Internal server error: Assistant is not configured.");
+    }
+    ai = new GoogleGenAI({apiKey});
+    logger.info("Gemini AI client initialized on first call.");
   }
 
   const userMessage = request.data.message;
@@ -58,8 +54,6 @@ exports.askSanto = onCall({secrets}, async (request) => {
         2. Se o cliente relatar problemas no site, bugs, erros ou algo nesse sentido, peça gentilmente para ele enviar um e-mail para o suporte. A mensagem deve ser: 'Lamento que esteja enfrentando problemas. Por favor, envie um e-mail detalhando o que aconteceu para nosso suporte técnico em [suporte.thebaldi@gmail.com](mailto:suporte.thebaldi@gmail.com) para que possamos resolver o mais rápido possível.'
       `;
 
-    // FIX: Changed the 'contents' property from a simple string to a more robust and explicit Content object array.
-    // This improves compatibility and reduces ambiguity when making the API call.
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: [{role: "user", parts: [{text: userMessage}]}],
