@@ -5,11 +5,12 @@ import { SiteSettings } from '../types';
 interface HeaderProps {
     cartItemCount: number;
     onCartClick: () => void;
+    onChatbotClick: () => void;
     activeSection: string;
     settings: SiteSettings;
 }
 
-export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, activeSection, settings }) => {
+export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onChatbotClick, activeSection, settings }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
 
@@ -64,7 +65,10 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, acti
                             <i className="fas fa-utensils"></i>
                             <span className="hidden md:inline">Ver Cardápio</span>
                         </button>
-                        <button onClick={onCartClick} className="relative w-12 h-12 flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors">
+                        <button onClick={onChatbotClick} className="w-12 h-12 flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors" aria-label="Abrir assistente virtual">
+                            <i className="fas fa-headset text-lg"></i>
+                        </button>
+                        <button onClick={onCartClick} className="relative w-12 h-12 flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors" aria-label="Abrir carrinho de compras">
                             <i className="fas fa-shopping-cart text-lg"></i>
                             {cartItemCount > 0 && (
                                 <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
