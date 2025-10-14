@@ -11,6 +11,7 @@ import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
 import { PixPaymentModal } from './components/PixPaymentModal';
 import { PaymentFailureModal } from './components/PaymentFailureModal';
+import { Chatbot } from './components/Chatbot';
 import { db } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
@@ -720,6 +721,8 @@ const App: React.FC = () => {
             </main>
 
             <Footer settings={siteSettings} />
+
+            <Chatbot />
 
             {cart.length > 0 && (
                 <div className="fixed bottom-5 right-5 z-40">
