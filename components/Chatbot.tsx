@@ -20,7 +20,7 @@ const parseMessage = (content: string) => {
             parts.push(content.substring(lastIndex, match.index));
         }
         const [fullMatch, text, url] = match;
-        parts.push(<a key={url+text} href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline">{text}</a>);
+        parts.push(<a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline">{text}</a>);
         lastIndex = match.index + fullMatch.length;
     }
 

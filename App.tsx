@@ -11,7 +11,6 @@ import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
 import { PixPaymentModal } from './components/PixPaymentModal';
 import { PaymentFailureModal } from './components/PaymentFailureModal';
-import { Chatbot } from '@/components/Chatbot';
 import { db } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
@@ -24,11 +23,6 @@ interface Toast {
     id: number;
     message: string;
     type: 'success' | 'error';
-}
-
-export interface ChatMessage {
-    role: 'user' | 'bot';
-    content: string;
 }
 
 const defaultSiteSettings: SiteSettings = {
@@ -138,11 +132,6 @@ const App: React.FC = () => {
     const [pixRetryKey, setPixRetryKey] = useState<number>(0);
     const [isCreatingPixPayment, setIsCreatingPixPayment] = useState<boolean>(false);
     const [refundingOrderId, setRefundingOrderId] = useState<string | null>(null);
-    const [isChatbotOpen, setIsChatbotOpen] = useState<boolean>(false);
-    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-        { role: 'bot', content: 'Olá! Eu sou o Santo, seu assistente virtual. Como posso ajudar?' }
-    ]);
-    const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
     
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
@@ -262,25 +251,6 @@ const App: React.FC = () => {
     useEffect(() => {
         localStorage.setItem('santaSensacaoCart', JSON.stringify(cart));
     }, [cart]);
-
-    const handleSendMessageToBot = async (message: string) => {
-        if (!message.trim() || isBotReplying) return;
-
-        const newUserMessage: ChatMessage = { role: 'user', content: message };
-        setChatMessages(prev => [...prev, newUserMessage]);
-        setIsBotReplying(true);
-
-        try {
-            const botReply = await firebaseService.askChatbot(message);
-            const newBotMessage: ChatMessage = { role: 'bot', content: botReply };
-            setChatMessages(prev => [...prev, newBotMessage]);
-        } catch (error) {
-            const errorMessage: ChatMessage = { role: 'bot', content: 'Desculpe, não consegui processar sua mensagem. Tente novamente.' };
-            setChatMessages(prev => [...prev, errorMessage]);
-        } finally {
-            setIsBotReplying(false);
-        }
-    };
 
     const handleAddToCart = useCallback((product: Product, size: string, price: number) => {
         setCart(prevCart => {
@@ -675,13 +645,7 @@ const App: React.FC = () => {
 
     return (
         <div className="flex flex-col min-h-screen">
-            <Header 
-                cartItemCount={cartTotalItems} 
-                onCartClick={() => setIsCartOpen(true)} 
-                onChatbotClick={() => setIsChatbotOpen(prev => !prev)}
-                activeSection={activeSection} 
-                settings={siteSettings} 
-            />
+            <Header cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} activeSection={activeSection} settings={siteSettings} />
             
             <div id="status-banner" className={`bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
                 <i className="fas fa-times-circle mr-2"></i>
@@ -814,14 +778,6 @@ const App: React.FC = () => {
                 onPayLater={handlePayLaterFromFailure}
             />
             
-            <Chatbot
-                isOpen={isChatbotOpen}
-                onClose={() => setIsChatbotOpen(false)}
-                messages={chatMessages}
-                onSendMessage={handleSendMessageToBot}
-                isSending={isBotReplying}
-            />
-
             {isCreatingPixPayment && (
                 <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8">

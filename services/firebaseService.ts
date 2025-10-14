@@ -130,22 +130,6 @@ export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promi
     await settingsRef.set(settings, { merge: true });
 };
 
-// --- Chatbot Function ---
-export const askChatbot = async (message: string): Promise<string> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    const askSantoFunction = functions.httpsCallable('askSanto');
-    try {
-        const result = await askSantoFunction({ message });
-        return result.data.reply;
-    } catch (error) {
-        console.error("Error calling askSanto function:", error);
-        return "Desculpe, estou com um problema para me conectar. Tente novamente mais tarde.";
-    }
-};
-
-
 // --- Order Management Functions (Calling Cloud Functions) ---
 
 /**
