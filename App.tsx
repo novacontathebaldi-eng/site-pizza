@@ -687,7 +687,7 @@ const App: React.FC = () => {
             </div>
 
             <main className="flex-grow">
-                <HeroSection settings={siteSettings} />
+                <HeroSection settings={siteSettings} isLoading={isLoading} />
                 
                 {error && (
                     <div className="container mx-auto px-4 py-8">

@@ -3,9 +3,10 @@ import { SiteSettings } from '../types';
 
 interface HeroSectionProps {
     settings: SiteSettings;
+    isLoading: boolean;
 }
 
-export const HeroSection: React.FC<HeroSectionProps> = ({ settings }) => {
+export const HeroSection: React.FC<HeroSectionProps> = ({ settings, isLoading }) => {
     const [scrollOpacity, setScrollOpacity] = useState(1);
 
     useEffect(() => {
@@ -84,8 +85,22 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ settings }) => {
                     {heroSubtitle}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <button onClick={scrollToCardapio} className="bg-brand-gold-600 text-text-on-dark font-bold py-3 px-8 rounded-xl text-lg hover:bg-opacity-90 transition-all transform hover:scale-105">
-                        <i className="fas fa-pizza-slice mr-2"></i> Ver Cardápio e Pedir
+                    <button 
+                        onClick={scrollToCardapio} 
+                        disabled={isLoading}
+                        className="bg-brand-gold-600 text-text-on-dark font-bold py-3 px-8 rounded-xl text-lg hover:bg-opacity-90 transition-all transform hover:scale-105 disabled:bg-opacity-70 disabled:cursor-not-allowed flex items-center justify-center min-w-[280px]"
+                    >
+                        {isLoading ? (
+                            <>
+                                <i className="fas fa-spinner fa-spin mr-2"></i>
+                                <span>Carregando cardápio...</span>
+                            </>
+                        ) : (
+                            <>
+                                <i className="fas fa-pizza-slice mr-2"></i>
+                                <span>Ver Cardápio e Pedir</span>
+                            </>
+                        )}
                     </button>
                 </div>
             </div>
