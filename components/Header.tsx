@@ -5,12 +5,12 @@ import { SiteSettings } from '../types';
 interface HeaderProps {
     cartItemCount: number;
     onCartClick: () => void;
-    onChatbotClick: () => void;
+    onOpenChatbot: () => void;
     activeSection: string;
     settings: SiteSettings;
 }
 
-export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onChatbotClick, activeSection, settings }) => {
+export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOpenChatbot, activeSection, settings }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
 
@@ -58,15 +58,13 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onCh
                         <a href="#cardapio" onClick={(e) => { e.preventDefault(); scrollToSection('cardapio');}} className="font-medium hover:text-brand-gold-600 transition-colors">Cardápio</a>
                         <a href="#sobre" onClick={(e) => { e.preventDefault(); scrollToSection('sobre');}} className="font-medium hover:text-brand-gold-600 transition-colors">Sobre Nós</a>
                         <a href="#contato" onClick={(e) => { e.preventDefault(); scrollToSection('contato');}} className="font-medium hover:text-brand-gold-600 transition-colors">Contato</a>
+                        <a href="#" onClick={(e) => { e.preventDefault(); onOpenChatbot();}} className="font-medium hover:text-brand-gold-600 transition-colors">Ajuda</a>
                     </nav>
 
                     <div className="flex items-center gap-3">
                         <button onClick={() => scrollToSection('cardapio')} className="hidden sm:flex items-center gap-2 bg-brand-gold-600 text-text-on-dark px-4 py-2 rounded-lg font-semibold hover:bg-opacity-90 transition-all">
                             <i className="fas fa-utensils"></i>
                             <span className="hidden md:inline">Ver Cardápio</span>
-                        </button>
-                        <button onClick={onChatbotClick} className="w-12 h-12 flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors" aria-label="Abrir assistente virtual">
-                            <i className="fas fa-headset text-lg"></i>
                         </button>
                         <button onClick={onCartClick} className="relative w-12 h-12 flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors" aria-label="Abrir carrinho de compras">
                             <i className="fas fa-shopping-cart text-lg"></i>
@@ -90,6 +88,7 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onCh
                     <a href="#cardapio" onClick={(e) => { e.preventDefault(); scrollToSection('cardapio'); handleLinkClick();}} className="font-bold hover:text-brand-gold-600 transition-colors">Cardápio</a>
                     <a href="#sobre" onClick={(e) => { e.preventDefault(); scrollToSection('sobre'); handleLinkClick();}} className="font-bold hover:text-brand-gold-600 transition-colors">Sobre Nós</a>
                     <a href="#contato" onClick={(e) => { e.preventDefault(); scrollToSection('contato'); handleLinkClick();}} className="font-bold hover:text-brand-gold-600 transition-colors">Contato</a>
+                    <a href="#" onClick={(e) => { e.preventDefault(); onOpenChatbot(); handleLinkClick();}} className="font-bold hover:text-brand-gold-600 transition-colors">Ajuda</a>
                 </nav>
             </div>
         </header>

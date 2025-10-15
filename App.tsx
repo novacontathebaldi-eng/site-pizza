@@ -11,7 +11,7 @@ import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
 import { PixPaymentModal } from './components/PixPaymentModal';
 import { PaymentFailureModal } from './components/PaymentFailureModal';
-import { Chatbot } from './components/Chatbot';
+import { Chatbot } from '@/components/Chatbot';
 import { db } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
@@ -678,7 +678,7 @@ const App: React.FC = () => {
             <Header 
                 cartItemCount={cartTotalItems} 
                 onCartClick={() => setIsCartOpen(true)} 
-                onChatbotClick={() => setIsChatbotOpen(prev => !prev)}
+                onOpenChatbot={() => setIsChatbotOpen(true)}
                 activeSection={activeSection} 
                 settings={siteSettings} 
             />
@@ -755,7 +755,7 @@ const App: React.FC = () => {
                 />
             </main>
 
-            <Footer settings={siteSettings} />
+            <Footer settings={siteSettings} onOpenChatbot={() => setIsChatbotOpen(true)} />
 
             {cart.length > 0 && (
                 <div className="fixed bottom-5 right-5 z-40">
@@ -770,6 +770,15 @@ const App: React.FC = () => {
                     </button>
                 </div>
             )}
+
+            {/* Floating Chatbot Button */}
+            <button
+                onClick={() => setIsChatbotOpen(true)}
+                className="fixed bottom-5 left-5 z-40 w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110"
+                aria-label="Abrir assistente virtual"
+            >
+                <i className="fas fa-headset text-2xl"></i>
+            </button>
 
             <CartSidebar 
                 isOpen={isCartOpen}

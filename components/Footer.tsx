@@ -1,7 +1,12 @@
 import React from 'react';
 import { SiteSettings } from '../types';
 
-export const Footer: React.FC<{ settings: SiteSettings }> = ({ settings }) => {
+interface FooterProps {
+    settings: SiteSettings;
+    onOpenChatbot: () => void;
+}
+
+export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot }) => {
     
     const visibleLinks = settings.footerLinks?.filter(link => link.isVisible !== false) ?? [];
     const socialLinks = visibleLinks.filter(link => link.icon.startsWith('fab'));
@@ -59,6 +64,12 @@ export const Footer: React.FC<{ settings: SiteSettings }> = ({ settings }) => {
                                     </a>
                                 </li>
                             ))}
+                            <li>
+                                <button onClick={onOpenChatbot} className="inline-flex items-center gap-2 hover:text-white transition-colors">
+                                    <i className="fas fa-headset mr-1 text-accent"></i>
+                                    <span>Ajuda e Suporte</span>
+                                </button>
+                            </li>
                         </ul>
                     </div>
                 </div>
