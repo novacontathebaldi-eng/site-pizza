@@ -10,20 +10,33 @@ interface ChatbotProps {
 }
 
 const parseMessage = (content: string) => {
-    const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    // Regex para encontrar links markdown [texto](url) ou texto em negrito **texto**
+    const combinedRegex = /\[([^\]]+)\]\(([^)]+)\)|\*\*(.+?)\*\*/g;
     const parts = [];
     let lastIndex = 0;
     let match;
 
-    while ((match = linkRegex.exec(content)) !== null) {
+    while ((match = combinedRegex.exec(content)) !== null) {
+        // Adiciona o texto simples antes da correspondência atual
         if (match.index > lastIndex) {
             parts.push(content.substring(lastIndex, match.index));
         }
-        const [fullMatch, text, url] = match;
-        parts.push(<a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline">{text}</a>);
+
+        const [fullMatch, linkText, linkUrl, boldText] = match;
+
+        // Verifica se a correspondência é um link
+        if (linkText && linkUrl) {
+            parts.push(<a key={`${linkUrl}-${lastIndex}`} href={linkUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline">{linkText}</a>);
+        } 
+        // Verifica se a correspondência é um texto em negrito
+        else if (boldText) {
+            parts.push(<strong key={`bold-${lastIndex}`}>{boldText}</strong>);
+        }
+        
         lastIndex = match.index + fullMatch.length;
     }
 
+    // Adiciona o texto restante após a última correspondência
     if (lastIndex < content.length) {
         parts.push(content.substring(lastIndex));
     }
