@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChatMessage } from '../App';
+// FIX: Corrected the import path for the `ChatMessage` type. It is defined in `../types` not `../App`.
+import { ChatMessage } from '../types';
 
 interface ChatbotProps {
     isOpen: boolean;

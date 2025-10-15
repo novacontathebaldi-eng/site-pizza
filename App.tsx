@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus } from './types';
+import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, ChatMessage } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
@@ -24,11 +24,6 @@ interface Toast {
     id: number;
     message: string;
     type: 'success' | 'error';
-}
-
-export interface ChatMessage {
-    role: 'user' | 'bot';
-    content: string;
 }
 
 const defaultSiteSettings: SiteSettings = {
@@ -267,11 +262,14 @@ const App: React.FC = () => {
         if (!message.trim() || isBotReplying) return;
 
         const newUserMessage: ChatMessage = { role: 'user', content: message };
-        setChatMessages(prev => [...prev, newUserMessage]);
+        // Criamos uma nova lista de mensagens para enviar ao backend
+        const updatedMessages = [...chatMessages, newUserMessage];
+        setChatMessages(updatedMessages);
         setIsBotReplying(true);
 
         try {
-            const botReply = await firebaseService.askChatbot(message);
+            // Agora enviamos o histórico completo
+            const botReply = await firebaseService.askChatbot(updatedMessages);
             const newBotMessage: ChatMessage = { role: 'bot', content: botReply };
             setChatMessages(prev => [...prev, newBotMessage]);
         } catch (error) {
@@ -874,3 +872,4 @@ const App: React.FC = () => {
 // FIX: Added a default export for the App component. The index.tsx file was trying
 // to import it as a default, but it was not exported, causing an error.
 export default App;
+"

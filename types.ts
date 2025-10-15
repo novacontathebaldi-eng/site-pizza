@@ -118,3 +118,8 @@ export interface SiteSettings {
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
 }
+
+export interface ChatMessage {
+    role: 'user' | 'bot';
+    content: string;
+}

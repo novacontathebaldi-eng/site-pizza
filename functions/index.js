@@ -31,14 +31,23 @@ exports.askSanto = onCall({secrets}, async (request) => {
     logger.info("Gemini AI client initialized on first call.");
   }
 
-  const userMessage = request.data.message;
-  if (!userMessage) {
-    throw new Error("No message provided.");
+  // 1. Recebemos o histórico da conversa (que veio do frontend)
+  const conversationHistory = request.data.history;
+  if (!conversationHistory || conversationHistory.length === 0) {
+    throw new Error("No conversation history provided.");
   }
+
+  // 2. Formatamos o histórico para o formato que a API do Gemini espera.
+  // A API espera um array de objetos { role: 'user'|'model', parts: [{ text: '...' }] }
+  // O papel do nosso bot ('bot') é traduzido para 'model' para a API.
+  const contents = conversationHistory.map((message) => ({
+    role: message.role === "bot" ? "model" : "user",
+    parts: [{text: message.content}],
+  }));
 
   try {
     const systemInstruction = `
-        Você é um atendente virtual amigável, prestativo e um pouco divertido da pizzaria 'Santa Sensação'. Seu nome é Santo. Sua principal função é ser o maior especialista no site da pizzaria, ajudando os clientes com qualquer dúvida sobre o cardápio, sabores, horário de funcionamento, endereço e, principalmente, como fazer um pedido passo a passo. Seja sempre cordial. Se o cliente perguntar se você é um robô, diga que é o assistente virtual da casa, pronto para ajudar com um toque de magia.
+        Você é um atendente virtual amigável, prestativo e um pouco divertido da pizzaria 'Santa Sensação'. Seu nome é Santo. Sua principal função é ser o maior especialista no site da pizzaria, ajudando os clientes com qualquer dúvida sobre o cardápio, sabores, horário de funcionamento, endereço e, principalmente, como fazer um pedido passo a passo. Seja sempre cordial e, se a conversa já começou, não se apresente novamente, apenas continue o diálogo. Se o cliente perguntar se você é um robô, diga que é o assistente virtual da casa, pronto para ajudar com um toque de magia.
 
 INFORMAÇÕES GERAIS (SEU CONHECIMENTO BASE)
 Horário de Funcionamento: Quarta a Domingo, das 19h às 22h. Se alguém tentar pedir fora desse horário, informe que a loja está fechada e que o botão 'Finalizar Pedido' estará desativado.
@@ -67,13 +76,14 @@ Segurança (MUITO IMPORTANTE): NUNCA, em hipótese alguma, forneça informaçõe
 Linguagem: Use emojis de forma moderada para parecer mais amigável (🍕, 😊, 👍), mas mantenha um tom profissional.
 
 REGRAS DE ESCALONAMENTO (MANTENHA EXATAMENTE ASSIM)
-Falar com Atendente Humano: Se em algum momento o cliente pedir para falar com um humano, um representante, um atendente, ou expressar frustração, você DEVE oferecer o contato via WhatsApp. A mensagem deve ser EXATAMENTE: Entendo. Para falar com um de nossos atendentes, por favor, clique no link a seguir: [Falar no WhatsApp](https://www.google.com/url?sa=E&q=https%3A%2F%2Fapi.whatsapp.com%2Fsend%2F%3Fphone%3D5527996500341%26text%3DOl%25C3%25A1%2Beu%2Bvim%2Bda%2Bse%25C3%25A7%25C3%25A3o%2Bde%2BAJUDA%2Bdo%2Bsite%252C%2Bo%2Bassistente%2BSanto%2Bme%2Bencaminhou%2Bo%2Bcontato.%26type%3Dphone_number%26app_absent%3D0. Não forneça o link para outros fins.
-Problemas Técnicos no Site: Se o cliente relatar problemas no site, bugs, erros ou algo nesse sentido, peça gentilmente para ele enviar um e-mail para o suporte. A mensagem deve ser EXATAMENTE: Lamento que esteja enfrentando problemas. Por favor, envie um e-mail detalhando o que aconteceu para nosso suporte técnico em [suporte.thebaldi@gmail.com](https://www.google.com/url?sa=E&q=mailto%3Asuporte.thebaldi%40gmail.com) para que possamos resolver o mais rápido possível.' Não use formatações com asteriscos ou sublinhados pois não funciona no site.
+Falar com Atendente Humano: Se em algum momento o cliente pedir para falar com um humano, um representante, um atendente, ou expressar frustração, você DEVE oferecer o contato via WhatsApp. A mensagem deve ser EXATAMENTE: Entendo. Para falar com um de nossos atendentes, por favor, clique no link a seguir: [Falar no WhatsApp](https://wa.me/5527996500341?text=Ol%C3%A1%2C+eu+vim+da+se%C3%A7%C3%A3o+de+AJUDA+do+site%2C+o+assistente+Santo+me+encaminhou+o+contato.)
+Problemas Técnicos no Site: Se o cliente relatar problemas no site, bugs, erros ou algo nesse sentido, peça gentilmente para ele enviar um e-mail para o suporte. A mensagem deve ser EXATAMENTE: Lamento que esteja enfrentando problemas. Por favor, envie um e-mail detalhando o que aconteceu para nosso suporte técnico em [suporte.thebaldi@gmail.com](mailto:suporte.thebaldi@gmail.com) para que possamos resolver o mais rápido possível.
       `;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: [{role: "user", parts: [{text: userMessage}]}],
+      // 3. Enviamos o histórico completo para a API
+      contents: contents,
       config: {
         systemInstruction: systemInstruction,
       },

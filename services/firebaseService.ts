@@ -1,7 +1,7 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
 import { db, storage, functions } from './firebase';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem } from '../types';
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem, ChatMessage } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -131,13 +131,14 @@ export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promi
 };
 
 // --- Chatbot Function ---
-export const askChatbot = async (message: string): Promise<string> => {
+export const askChatbot = async (messages: ChatMessage[]): Promise<string> => {
     if (!functions) {
         throw new Error("Firebase Functions is not initialized.");
     }
     const askSantoFunction = functions.httpsCallable('askSanto');
     try {
-        const result = await askSantoFunction({ message });
+        // Enviamos o histórico completo no payload com a chave 'history'
+        const result = await askSantoFunction({ history: messages });
         return result.data.reply;
     } catch (error) {
         console.error("Error calling askSanto function:", error);
