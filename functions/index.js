@@ -80,13 +80,8 @@ exports.askSanto = onCall({secrets}, async (request) => {
     - **Pagamento com PIX:** Explique as duas opções: "Pagar Agora" (gera um QR Code na hora, precisa de CPF, tem 5 minutos para pagar) e "Pagar Depois" (paga na entrega ou retirada).
     - **Troco para Dinheiro:** Mencione a opção "Precisa de troco?" e a importância de informar o valor para o qual precisa de troco.
 
-    **FERRAMENTAS DISPONÍVEIS:**
-    Você tem uma ferramenta especial para encaminhar clientes para o atendimento humano.
-    - **\`encaminharParaWhatsApp(resumoDaConversa)\`**: Use esta ferramenta SEMPRE que um cliente pedir para falar com um atendente, um humano, ou se mostrar frustrado. Você deve criar um resumo inteligente e conciso da conversa até o momento e passar como argumento para a ferramenta.
-
-    **EXEMPLO DE USO DA FERRAMENTA:**
-    - **Cliente:** "Não estou conseguindo, quero falar com uma pessoa."
-    - **Sua Ação Interna:** Chamar \`encaminharParaWhatsApp\` com o argumento \`resumoDaConversa: "Cliente com dificuldade em finalizar o pedido, precisa de ajuda humana para concluir a compra."\`.
+    **ENCAMINHAMENTO PARA ATENDENTE HUMANO:**
+    Se um cliente pedir para falar com um "atendente", "humano", "pessoa", ou se mostrar frustrado com suas respostas, você DEVE usar a ferramenta \`encaminharParaWhatsApp\`. Ao usar a ferramenta, crie um resumo inteligente e conciso da conversa para que o atendente humano entenda o problema.
 `;
 
     const response = await ai.models.generateContent({
