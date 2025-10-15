@@ -872,4 +872,3 @@ const App: React.FC = () => {
 // FIX: Added a default export for the App component. The index.tsx file was trying
 // to import it as a default, but it was not exported, causing an error.
 export default App;
-"
