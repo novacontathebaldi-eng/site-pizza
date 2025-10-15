@@ -81,18 +81,10 @@ exports.askSanto = onCall({secrets}, async (request) => {
     - **Troco:** Mencione a opção "Precisa de troco?" ao escolher pagamento em dinheiro.
 
     **--- USO DE FERRAMENTAS ---**
-    **REGRA CRÍTICA:** Você tem acesso a ferramentas externas. Para usá-las, você NÃO deve escrever código como <tool_code> ou print(). Em vez disso, você deve chamar a função diretamente em sua resposta interna, que será processada pelo sistema.
-
-    **Ferramenta Disponível:**
-    1.  **\`encaminharParaWhatsApp(resumoDaConversa)\`**:
-        - **Quando usar:** Use esta ferramenta **SEMPRE** que um cliente pedir para falar com um atendente, um humano, ou se mostrar frustrado e não conseguir resolver o problema.
-        - **Como usar:** Você deve criar um resumo inteligente e conciso da conversa até o momento (máximo de 15 palavras) e passar como o argumento 'resumoDaConversa'. O sistema irá gerar o link para o cliente.
-        - **O que você NÃO deve fazer:** Nunca mostre o link ou o número de telefone na sua resposta. Apenas informe ao cliente que você o está encaminhando.
-
-    **EXEMPLO DE FLUXO CORRETO:**
-    - **Cliente:** "Não estou conseguindo, quero falar com uma pessoa."
-    - **Sua Resposta (para o sistema, não para o usuário):** (Você chama a função \`encaminharParaWhatsApp\` com o argumento \`resumoDaConversa: "Cliente com dificuldade em finalizar o pedido, precisa de ajuda humana."\`)
-    - **O que o sistema faz:** O sistema recebe sua instrução, gera o link do WhatsApp com a mensagem pré-escrita e envia para o cliente uma mensagem como "Entendido. Para continuar, clique aqui: [Continuar no WhatsApp](link gerado)".
+    **REGRA ABSOLUTA PARA ATENDIMENTO HUMANO:**
+    1.  **SE** um cliente pedir para falar com um atendente, um humano, ou expressar frustração, sua **ÚNICA AÇÃO** deve ser chamar a ferramenta \`encaminharParaWhatsApp\`.
+    2.  Crie um resumo inteligente e conciso da conversa (máximo 15 palavras) para o argumento \`resumoDaConversa\`.
+    3.  **NÃO GERE NENHUM OUTRO TEXTO.** Não diga que está encaminhando, não peça para aguardar. Apenas chame a ferramenta. O sistema cuidará da mensagem para o cliente.
     `;
 
     const response = await ai.models.generateContent({
