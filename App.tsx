@@ -135,7 +135,7 @@ const App: React.FC = () => {
     const [refundingOrderId, setRefundingOrderId] = useState<string | null>(null);
     const [isChatbotOpen, setIsChatbotOpen] = useState<boolean>(false);
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-        { role: 'bot', content: 'Olá! Eu sou o Santo, seu assistente virtual. Como posso ajudar?' }
+        { role: 'bot', content: 'Olá! Eu sou o Sensação, seu assistente virtual. Como posso ajudar?' }
     ]);
     const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
     
