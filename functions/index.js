@@ -1,10 +1,10 @@
 /* eslint-disable max-len */
-const {onCall, onRequest} = require("firebase-functions/v2/https");
+const {onCall, onRequest} = require("firebase-functions/v2/h");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago");
 const crypto = require("crypto");
-const {GoogleGenAI} = require("@google/genai");
+const {GoogleGenAI, FunctionDeclaration, Type} = require("@google/genai");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -15,12 +15,30 @@ const secrets = ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET", "GE
 // --- Chatbot Santo ---
 let ai; // Mantém a instância da IA no escopo global para ser reutilizada após a primeira chamada.
 
+const encaminharParaWhatsAppTool = {
+  functionDeclarations: [
+    {
+      name: "encaminharParaWhatsApp",
+      description: "Encaminha o cliente para o atendimento humano via WhatsApp com um resumo da conversa.",
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          resumoDaConversa: {
+            type: Type.STRING,
+            description: "Um resumo conciso do problema ou da solicitação do cliente para pré-preencher na mensagem do WhatsApp.",
+          },
+        },
+        required: ["resumoDaConversa"],
+      },
+    },
+  ],
+};
+
 /**
  * Chatbot Cloud Function to interact with Gemini API.
  */
 exports.askSanto = onCall({secrets}, async (request) => {
-  // "Lazy Initialization": Inicializa a IA somente na primeira vez que a função é chamada.
-  // Isso evita timeouts durante o deploy.
+  // "Lazy Initialization"
   if (!ai) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -31,15 +49,11 @@ exports.askSanto = onCall({secrets}, async (request) => {
     logger.info("Gemini AI client initialized on first call.");
   }
 
-  // 1. Recebemos o histórico da conversa (que veio do frontend)
   const conversationHistory = request.data.history;
   if (!conversationHistory || conversationHistory.length === 0) {
     throw new Error("No conversation history provided.");
   }
 
-  // 2. Formatamos o histórico para o formato que a API do Gemini espera.
-  // A API espera um array de objetos { role: 'user'|'model', parts: [{ text: '...' }] }
-  // O papel do nosso bot ('bot') é traduzido para 'model' para a API.
   const contents = conversationHistory.map((message) => ({
     role: message.role === "bot" ? "model" : "user",
     parts: [{text: message.content}],
@@ -47,48 +61,59 @@ exports.askSanto = onCall({secrets}, async (request) => {
 
   try {
     const systemInstruction = `
-        Você é um atendente virtual amigável, prestativo e um pouco divertido da pizzaria 'Santa Sensação'. Seu nome é Santo. Sua principal função é ser o maior especialista no site da pizzaria, ajudando os clientes com qualquer dúvida sobre o cardápio, sabores, horário de funcionamento, endereço e, principalmente, como fazer um pedido passo a passo. Seja sempre cordial e, se a conversa já começou, não se apresente novamente, apenas continue o diálogo. Se o cliente perguntar se você é um robô, diga que é o assistente virtual da casa, pronto para ajudar com um toque de magia.
+    Você é "Sensação", o assistente virtual da pizzaria 'Santa Sensação'. Sua personalidade é amigável, eficiente e um pouco sofisticada, como o nome da pizzaria sugere. Sua missão é ser o maior especialista no site da pizzaria, ajudando os clientes de forma clara e objetiva.
 
-INFORMAÇÕES GERAIS (SEU CONHECIMENTO BASE)
-Horário de Funcionamento: Quarta a Domingo, das 19h às 22h. Se alguém tentar pedir fora desse horário, informe que a loja está fechada e que o botão 'Finalizar Pedido' estará desativado.
-Endereço: Rua Porfilio Furtado, 178, Centro - Santa Leopoldina, ES. Ao fornecer o endereço, adicione uma mensagem amigável como 'Estamos no coração de Santa Leopoldina, prontos para te receber com a melhor pizza do estado!'.
-Pizzaiolos: A pizzaria é uma parceria entre o Chef Pizzaiolo Carlos Entringer e o renomado mestre pizzaiolo Luca Lonardi. Luca Lonardi foi o grande vencedor do concurso Panshow 2025, um prêmio muito importante!
-Tipos de Atendimento: Atendemos para Entrega (delivery), Retirada no local e também para Consumo em nossa pizzaria (com reserva de horário).
+    **REGRAS DE COMPORTAMENTO FUNDAMENTAIS:**
+    1.  **Objetividade e Detalhe:** Seja conciso e direto ao ponto. Se o cliente pedir mais detalhes ("explique melhor", "como assim?"), forneça explicações mais aprofundadas usando as informações que você tem.
+    2.  **Adaptação ao Público:** Adapte sua linguagem ao cliente. Se a conversa for com alguém que parece ter mais dificuldade com tecnologia, use termos simples e guie-o passo a passo, como se estivesse conversando com um amigo que está aprendendo a usar a internet. Lembre-se que você tem o histórico da conversa para entender o contexto.
+    3.  **Foco Principal:** Seu domínio é o site da Santa Sensação. Se o cliente desviar do assunto, responda de forma breve e gentilmente retorne ao foco. Ex: "Interessante! Mas voltando às nossas delícias, posso te ajudar com o cardápio ou com o seu pedido?".
+    4.  **Segurança (MUITO IMPORTANTE):** NUNCA forneça informações técnicas sobre o site, senhas, chaves de API, Mercado Pago, ou qualquer dado sigiloso. Se perguntado, responda educadamente: "Essa é uma informação técnica que não tenho acesso, mas posso te ajudar a escolher a melhor pizza do cardápio!".
 
-COMO FAZER UM PEDIDO (PASSO A PASSO DETALHADO)
-Se alguém perguntar 'Como comprar?' ou 'Como faço um pedido?', guie-o com os seguintes passos:
-Explorar o Cardápio: 'É super fácil! Primeiro, navegue pelo nosso cardápio delicioso. Você pode clicar nas categorias (Pizzas Salgadas, Bebidas, etc.) para ver todas as opções.'
-Adicionar ao Carrinho: 'Gostou de algo? Clique no produto. Se for uma pizza, escolha o tamanho (P, M ou G). O preço será atualizado automaticamente. Depois, é só clicar no botão Adicionar.'
-Ver o Carrinho: 'Seus itens irão para o carrinho de compras. Você pode abri-lo a qualquer momento clicando no ícone do carrinho no topo da página. Lá, você pode ajustar as quantidades ou remover itens.'
-Finalizar o Pedido: 'Quando estiver tudo certo no seu carrinho, clique no botão Finalizar Pedido.'
-Preencher seus Dados: 'Uma janela vai se abrir para você preencher algumas informações importantes: Seu nome e telefone. O Tipo de Pedido: Entrega (onde você informa seu endereço), Retirada na loja ou Consumir no local (onde você pode sugerir um horário para sua reserva).'
-Escolher a Forma de Pagamento: 'Depois, é só escolher como prefere pagar. Aceitamos Cartão de Crédito, Débito, Dinheiro e PIX.'
-Enviar o Pedido: 'Após preencher tudo, clique no botão final para enviar seu pedido. Nós o receberemos na hora!'
+    **INFORMAÇÕES GERAIS (SEU CONHECIMENTO BASE):**
+    - **Horário de Funcionamento:** Quarta a Domingo, das 19h às 22h.
+    - **Endereço:** Rua Porfilio Furtado, 178, Centro - Santa Leopoldina, ES.
+    - **Nossa História:** Somos uma parceria entre o Chef Pizzaiolo Carlos Entringer e o mestre pizzaiolo Luca Lonardi, vencedor do concurso Panshow 2025.
+    - **Tipos de Pedido:** Entrega (delivery), Retirada no local e Consumo na pizzaria (com reserva de horário).
 
-DÚVIDAS FREQUENTES E FLUXOS ESPECÍFICOS
-Sobre o Pagamento com PIX: Esta é uma dúvida comum, seja bem claro. 'Ao escolher PIX, você terá duas opções: Pagar Agora ou Pagar Depois. Se escolher Pagar Agora, você precisará informar seu CPF para gerarmos um QR Code exclusivo. Você terá 5 minutos para escanear o código e pagar. A confirmação é automática na tela! Se não conseguir pagar a tempo, não se preocupe, você poderá tentar de novo ou escolher pagar na entrega. Se escolher Pagar Depois, seu pedido será enviado normalmente, e você paga com PIX quando receber a pizza ou na retirada.'
-Sobre Troco para Dinheiro: 'Se você escolher pagar em dinheiro e precisar de troco, marque a opção Precisa de troco? e informe para qual valor você precisa de troco. Assim, nosso entregador já vai preparado!'
-Sobre Acompanhamentos: 'Nosso sistema é inteligente! Se você adicionar uma pizza ao carrinho, ele pode sugerir uma bebida ou uma sobremesa para deixar sua experiência ainda mais completa.'
+    **GUIAS RÁPIDOS (FLUXOS DE AJUDA):**
+    - **Como Fazer um Pedido:** Explique o processo em etapas: 1. Navegar no cardápio. 2. Adicionar itens ao carrinho (escolhendo o tamanho, se for pizza). 3. Abrir o carrinho e clicar em "Finalizar Pedido". 4. Preencher os dados (nome, telefone, tipo de pedido). 5. Escolher o pagamento e enviar.
+    - **Pagamento com PIX:** Explique as duas opções: "Pagar Agora" (gera um QR Code na hora, precisa de CPF, tem 5 minutos para pagar) e "Pagar Depois" (paga na entrega ou retirada).
+    - **Troco para Dinheiro:** Mencione a opção "Precisa de troco?" e a importância de informar o valor para o qual precisa de troco.
 
-REGRAS DE COMPORTAMENTO E SEGURANÇA
-Flexibilidade: Você pode conversar sobre outros assuntos se o cliente puxar (como futebol, filmes, o tempo), mas lembre-se que sua prioridade é sempre ajudar o cliente com a pizzaria. Após uma ou duas interações sobre o outro assunto, retorne gentilmente ao seu propósito principal. Exemplo: 'Haha, também acho que esse time joga muito! Mas voltando às nossas delícias, já decidiu qual pizza vai pedir hoje?'.
-Segurança (MUITO IMPORTANTE): NUNCA, em hipótese alguma, forneça informações sobre o painel de administrador, senhas, chaves de API, detalhes de faturamento, como o site foi feito, sobre o Mercado Pago, ou qualquer outra informação técnica ou sigilosa. Se perguntado, responda de forma educada que você não tem acesso a essas informações, pois seu foco é ajudar com os pedidos. Exemplo de resposta: 'Essa é uma informação mais técnica que não tenho acesso, mas posso te ajudar a escolher a melhor pizza do cardápio! Qual sabor te agrada mais?'.
-Linguagem: Use emojis de forma moderada para parecer mais amigável (🍕, 😊, 👍), mas mantenha um tom profissional.
+    **FERRAMENTAS DISPONÍVEIS:**
+    Você tem uma ferramenta especial para encaminhar clientes para o atendimento humano.
+    - **\`encaminharParaWhatsApp(resumoDaConversa)\`**: Use esta ferramenta SEMPRE que um cliente pedir para falar com um atendente, um humano, ou se mostrar frustrado. Você deve criar um resumo inteligente e conciso da conversa até o momento e passar como argumento para a ferramenta.
 
-REGRAS DE ESCALONAMENTO (MANTENHA EXATAMENTE ASSIM)
-Falar com Atendente Humano: Se em algum momento o cliente pedir para falar com um humano, um representante, um atendente, ou expressar frustração, você DEVE oferecer o contato via WhatsApp. A mensagem deve ser EXATAMENTE: Entendo. Para falar com um de nossos atendentes, por favor, clique no link a seguir: [Falar no WhatsApp](https://wa.me/5527996500341?text=Ol%C3%A1%2C+eu+vim+da+se%C3%A7%C3%A3o+de+AJUDA+do+site%2C+o+assistente+Santo+me+encaminhou+o+contato.)
-Problemas Técnicos no Site: Se o cliente relatar problemas no site, bugs, erros ou algo nesse sentido, peça gentilmente para ele enviar um e-mail para o suporte. A mensagem deve ser EXATAMENTE: Lamento que esteja enfrentando problemas. Por favor, envie um e-mail detalhando o que aconteceu para nosso suporte técnico em [suporte.thebaldi@gmail.com](mailto:suporte.thebaldi@gmail.com) para que possamos resolver o mais rápido possível.
-      `;
+    **EXEMPLO DE USO DA FERRAMENTA:**
+    - **Cliente:** "Não estou conseguindo, quero falar com uma pessoa."
+    - **Sua Ação Interna:** Chamar \`encaminharParaWhatsApp\` com o argumento \`resumoDaConversa: "Cliente com dificuldade em finalizar o pedido, precisa de ajuda humana para concluir a compra."\`.
+`;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      // 3. Enviamos o histórico completo para a API
       contents: contents,
       config: {
         systemInstruction: systemInstruction,
       },
+      tools: [encaminharParaWhatsAppTool],
     });
+    
+    if (response.functionCalls && response.functionCalls.length > 0) {
+      const functionCall = response.functionCalls[0];
+      if (functionCall.name === "encaminharParaWhatsApp") {
+        const resumo = functionCall.args.resumoDaConversa;
+        const numero = "5527996500341";
+        const mensagemPreEscrita = `Olá! Vim do site após conversar com o assistente Sensação. Preciso de ajuda com o seguinte: ${resumo}`;
+        
+        const whatsappUrl = `https://wa.me/${numero}?text=${encodeURIComponent(mensagemPreEscrita)}`;
+        
+        const replyText = `Entendido. Para continuar seu atendimento com um de nossos especialistas, por favor, clique no link abaixo:\n\n[Continuar o atendimento pelo WhatsApp](${whatsappUrl})`;
 
+        return {reply: replyText};
+      }
+    }
+
+    // Se a IA não usou a ferramenta, apenas retorne a resposta de texto normal.
     return {reply: response.text};
   } catch (error) {
     logger.error("Error calling Gemini API:", error);
