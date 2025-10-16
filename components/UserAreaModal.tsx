@@ -432,7 +432,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
     );
 
     return (
-        <div className="fixed inset-0 bg-brand-ivory-50 z-50 animate-fade-in-up">
+        <div className="fixed inset-0 bg-[url('/assets/fundocliente.png')] bg-cover bg-center z-50 animate-fade-in-up">
             <div className="w-full h-full flex flex-col">
                 <header className="sticky top-0 bg-brand-green-700 z-10 flex-shrink-0 shadow-md">
                     <div className="max-w-4xl mx-auto flex justify-between items-center p-4">
