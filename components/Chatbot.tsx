@@ -49,6 +49,7 @@ const parseMessage = (content: string) => {
 export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onSendMessage, isSending }) => {
     const [input, setInput] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -57,6 +58,13 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
     useEffect(() => {
         scrollToBottom();
     }, [messages, isSending]);
+
+    useEffect(() => {
+        // Foca o input quando o chatbot é aberto ou depois que o bot termina de responder.
+        if (isOpen && !isSending) {
+            inputRef.current?.focus();
+        }
+    }, [isOpen, isSending]);
 
     const handleSend = (e: React.FormEvent) => {
         e.preventDefault();
@@ -103,6 +111,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
             
             <form onSubmit={handleSend} className="p-4 border-t border-gray-200 flex items-center gap-2 flex-shrink-0">
                 <input
+                    ref={inputRef}
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
