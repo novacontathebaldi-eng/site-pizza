@@ -1,5 +1,60 @@
 import React, { useState, useEffect } from 'react';
-import { CartItem, OrderDetails } from '../types';
+import { CartItem, OrderDetails, Order } from '../types';
+
+// NOVO COMPONENTE DE CONFIRMAÇÃO
+interface OrderConfirmationModalProps {
+    order: Order | null;
+    onClose: () => void;
+    onSendWhatsApp: (order: Order) => void;
+}
+
+export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ order, onClose, onSendWhatsApp }) => {
+    if (!order) return null;
+
+    const isPaidOnline = order.paymentStatus === 'paid_online';
+    const title = isPaidOnline ? "Pagamento Aprovado!" : "Pedido Registrado!";
+    const titleIcon = isPaidOnline ? "fa-check-circle text-green-500" : "fa-receipt text-blue-500";
+    const totalLabel = isPaidOnline ? "Total Pago:" : "Total do Pedido:";
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col animate-fade-in-up">
+                <div className="flex justify-between items-center p-5 border-b border-gray-200">
+                    <h2 className="text-2xl font-bold text-text-on-light flex items-center gap-3">
+                        <i className={`fas ${titleIcon}`}></i>
+                        {title}
+                    </h2>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                </div>
+                <div className="p-6 text-center space-y-5">
+                    <p className="text-gray-600 text-base">
+                        Seu pedido já foi registrado em nosso sistema!
+                    </p>
+                    
+                    <div className="text-left bg-gray-50 p-4 rounded-lg border text-gray-800 space-y-2 text-sm">
+                        <p><strong><i className="fas fa-receipt fa-fw mr-2 text-gray-400"></i>Pedido:</strong> #{order.orderNumber}</p>
+                        <p><strong><i className="fas fa-user fa-fw mr-2 text-gray-400"></i>Nome:</strong> {order.customer.name}</p>
+                        {order.total != null && (
+                            <p><strong><i className="fas fa-dollar-sign fa-fw mr-2 text-gray-400"></i>{totalLabel}</strong> {order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                        )}
+                    </div>
+
+                    <p className="text-gray-600 text-sm px-2">
+                        Já estamos preparando tudo! Se precisar, você pode nos contatar pelo WhatsApp sobre este pedido.
+                    </p>
+
+                    <button
+                        onClick={() => onSendWhatsApp(order)}
+                        className="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-green-600 transition-all flex items-center justify-center min-h-[52px]"
+                    >
+                        <i className="fab fa-whatsapp mr-2"></i> Enviar um WhatsApp sobre o pedido
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const DELIVERY_FEE = 3.00;
 const LOCALIDADES = ['Centro', 'Olaria', 'Vila Nova', 'Moxafongo', 'Cocal', 'Funil'];
@@ -101,7 +156,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
         
     const submitButtonIconClass = (paymentMethod === 'pix' && pixPaymentOption === 'payNow')
         ? 'fab fa-pix'
-        : 'fab fa-whatsapp';
+        : 'fas fa-check-circle';
 
 
     return (

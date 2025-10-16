@@ -9,7 +9,7 @@ import { ContactSection } from './components/ContactSection';
 import { AdminSection } from './components/AdminSection';
 import { Footer } from './components/Footer';
 import { CartSidebar } from './components/CartSidebar';
-import { CheckoutModal } from './components/CheckoutModal';
+import { CheckoutModal, OrderConfirmationModal } from './components/CheckoutModal';
 // FIX: Removed ReservationDetails from this import as it's not exported from the component file.
 import { ReservationModal } from './components/ReservationModal';
 import { PixPaymentModal } from './components/PixPaymentModal';
@@ -79,7 +79,7 @@ const defaultSiteSettings: SiteSettings = {
 };
 
 const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, orderNumber: number, isPaid: boolean) => {
-    const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja' };
+    const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumo no Local' };
     const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
 
     let message = `*🍕 NOVO PEDIDO #${orderNumber} - SANTA SENSAÇÃO 🍕*\n\n`;
@@ -151,27 +151,6 @@ const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNu
     return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
 };
 
-const loadingPageHtml = `
-    <html>
-        <head>
-            <title>Aguarde...</title>
-            <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f3f4f6; color: #374151; }
-                .container { text-align: center; }
-                .spinner { border: 4px solid #e5e7eb; border-top: 4px solid #A28438; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
-                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                p { font-size: 1.1rem; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="spinner"></div>
-                <p>Estamos enviando suas informações para o WhatsApp...</p>
-            </div>
-        </body>
-    </html>`;
-
-
 const App: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -198,6 +177,7 @@ const App: React.FC = () => {
         { role: 'bot', content: `🍕 Olá! Bem-vindo(a) à Pizzaria Santa Sensação!\n\nEu sou o Sensação, seu assistente virtual. Estou aqui para te ajudar a fazer pedidos, tirar dúvidas sobre nosso cardápio, acompanhar entregas e muito mais.\n\nComo posso te ajudar hoje?` }
     ]);
     const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
+    const [confirmedOrderData, setConfirmedOrderData] = useState<Order | null>(null);
     
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
@@ -374,34 +354,35 @@ const App: React.FC = () => {
     const handleCheckout = async (details: OrderDetails) => {
         setIsProcessingOrder(true);
         setIsCheckoutModalOpen(false);
-
-        const whatsappTab = window.open('', '_blank');
-        if (whatsappTab) {
-            whatsappTab.document.write(loadingPageHtml);
-        }
-
+    
         const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         const total = subtotal + (details.deliveryFee || 0);
-
+    
         try {
             const { orderId, orderNumber } = await firebaseService.createOrder(details, cart, total, 'payLater');
-            addToast(`Pedido #${orderNumber} criado! Redirecionando...`, 'success');
-            
-            const whatsappUrl = generateWhatsAppMessage(details, cart, total, orderNumber, false);
-
-            if (whatsappTab) {
-                whatsappTab.location.href = whatsappUrl;
-            } else {
-                // Fallback for browsers that might still block it
-                window.location.href = whatsappUrl;
-            }
-            
+            addToast(`Pedido #${orderNumber} criado!`, 'success');
+    
+            const confirmedOrder: Order = {
+                id: orderId,
+                orderNumber,
+                customer: { name: details.name, phone: details.phone, orderType: details.orderType, ...details },
+                items: cart,
+                total,
+                paymentMethod: details.paymentMethod,
+                paymentStatus: 'pending',
+                status: 'pending',
+                createdAt: new Date(),
+                notes: details.notes,
+                allergies: details.allergies,
+                deliveryFee: details.deliveryFee,
+            };
+    
+            setConfirmedOrderData(confirmedOrder);
             setCart([]);
             setIsCartOpen(false);
         } catch (error: any) {
             console.error("Failed to create order:", error);
             addToast(error.message || "Erro ao criar pedido.", 'error');
-            whatsappTab?.close();
         } finally {
             setIsProcessingOrder(false);
         }
@@ -449,7 +430,7 @@ const App: React.FC = () => {
 
         const whatsappTab = window.open('', '_blank');
         if (whatsappTab) {
-            whatsappTab.document.write(loadingPageHtml);
+            whatsappTab.document.body.innerHTML = '<h1>Aguarde...</h1>';
         }
 
         try {
@@ -472,50 +453,48 @@ const App: React.FC = () => {
         }
     };
 
-    const handlePixPaymentSuccess = useCallback(async (paidOrder: Order) => {
+    const handlePixPaymentSuccess = useCallback((paidOrder: Order) => {
        if (!paidOrder || !paidOrder.id) {
            addToast("Erro crítico ao processar pagamento.", 'error');
            return;
        }
-       
-       setIsProcessingOrder(true);
-       try {
-           addToast("Pagamento confirmado! Enviando pedido para a pizzaria...", 'success');
-           
-           const details: OrderDetails = {
-               name: paidOrder.customer.name,
-               phone: paidOrder.customer.phone,
-               orderType: paidOrder.customer.orderType,
-               paymentMethod: 'pix',
-               changeNeeded: false,
-               notes: paidOrder.notes || '',
-               cpf: paidOrder.customer.cpf || '',
-               neighborhood: paidOrder.customer.neighborhood || '',
-               street: paidOrder.customer.street || '',
-               number: paidOrder.customer.number || '',
-               complement: paidOrder.customer.complement || '',
-               allergies: paidOrder.allergies || '',
-               deliveryFee: paidOrder.deliveryFee || 0,
-           };
-           const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items || [], paidOrder.total || 0, paidOrder.orderNumber, true);
-           window.open(whatsappUrl, '_blank');
+       addToast("Pagamento confirmado! Seu pedido foi registrado.", 'success');
+       setPayingOrder(null);
+       setConfirmedOrderData(paidOrder);
+       setCart([]);
+       setIsCartOpen(false);
+    }, [addToast]);
 
-           setCart([]);
-           setPayingOrder(null);
-           setIsCartOpen(false);
-       } catch (error) {
-           console.error("Error finalizing paid order:", error);
-           addToast("Erro ao finalizar o pedido após o pagamento. Contate o suporte.", 'error');
-       } finally {
-           setIsProcessingOrder(false);
-       }
-   }, [addToast]);
+    const handleSendOrderToWhatsApp = (order: Order) => {
+        const isPaid = order.paymentStatus === 'paid_online';
+        
+        const details: OrderDetails = {
+            name: order.customer.name,
+            phone: order.customer.phone,
+            orderType: order.customer.orderType,
+            paymentMethod: order.paymentMethod || 'pix',
+            changeNeeded: order.changeNeeded || false,
+            changeAmount: order.changeAmount || '',
+            notes: order.notes || '',
+            cpf: order.customer.cpf || '',
+            neighborhood: order.customer.neighborhood || '',
+            street: order.customer.street || '',
+            number: order.customer.number || '',
+            complement: order.customer.complement || '',
+            allergies: order.allergies || '',
+            deliveryFee: order.deliveryFee || 0,
+        };
+        
+        const whatsappUrl = generateWhatsAppMessage(details, order.items || cart, order.total || 0, order.orderNumber, isPaid);
+        window.open(whatsappUrl, '_blank');
+        setConfirmedOrderData(null);
+    };
 
     const handleClosePixModal = () => {
         if (payingOrder) {
             setShowPaymentFailureModal(true);
         } else {
-            setPayingOrder(null); // Just close if something went wrong before order was set
+            setPayingOrder(null);
         }
     };
     
@@ -533,43 +512,19 @@ const App: React.FC = () => {
         setPayingOrder(null);
         setIsProcessingOrder(true);
         
-        const whatsappTab = window.open('', '_blank');
-        if (whatsappTab) {
-            whatsappTab.document.write(loadingPageHtml);
-        }
-
         try {
             await firebaseService.updateOrderStatus(orderToUpdateId, 'pending');
             const orderSnapshot = await db.collection('orders').doc(orderToUpdateId).get();
-            const finalOrderData = orderSnapshot.data() as Order;
-            
-            const details: OrderDetails = {
-                name: finalOrderData.customer.name, phone: finalOrderData.customer.phone, orderType: finalOrderData.customer.orderType,
-                paymentMethod: 'pix',
-                changeNeeded: false, changeAmount: '',
-                notes: finalOrderData.notes || '',
-                neighborhood: finalOrderData.customer.neighborhood || '',
-                street: finalOrderData.customer.street || '',
-                number: finalOrderData.customer.number || '',
-                complement: finalOrderData.customer.complement || '',
-                allergies: finalOrderData.allergies || '',
-                deliveryFee: finalOrderData.deliveryFee || 0
-            };
-            const whatsappUrl = generateWhatsAppMessage(details, finalOrderData.items || [], finalOrderData.total || 0, finalOrderData.orderNumber, false);
-            if (whatsappTab) {
-                whatsappTab.location.href = whatsappUrl;
-            } else {
-                window.location.href = whatsappUrl;
-            }
+            const finalOrderData = { id: orderSnapshot.id, ...orderSnapshot.data() } as Order;
             
             addToast("Pedido enviado! O pagamento será feito na entrega/retirada.", 'success');
+            setConfirmedOrderData(finalOrderData);
             setCart([]);
             setIsCartOpen(false);
 
         } catch (error) {
             console.error("Failed to update order to pending:", error);
             addToast("Erro ao processar o pedido. Tente novamente.", 'error');
-            whatsappTab?.close();
         } finally {
             setIsProcessingOrder(false);
         }
@@ -967,6 +922,12 @@ const App: React.FC = () => {
                 }}
                 onTryAgain={handleTryAgainPix}
                 onPayLater={handlePayLaterFromFailure}
+            />
+
+            <OrderConfirmationModal
+                order={confirmedOrderData}
+                onClose={() => setConfirmedOrderData(null)}
+                onSendWhatsApp={handleSendOrderToWhatsApp}
             />
             
             <Chatbot
