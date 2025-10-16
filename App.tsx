@@ -264,7 +264,6 @@ const App: React.FC = () => {
                 setUserProfile(profile);
                 if (profile?.name) setName(profile.name);
                 if (profile?.phone) setPhone(profile.phone);
-
             } else {
                 setUserProfile(null);
                 setName('');
@@ -273,6 +272,24 @@ const App: React.FC = () => {
         });
         return () => unsubscribe();
     }, []);
+
+    useEffect(() => {
+        if (!db) return;
+    
+        const unsubProfile = userProfile?.uid
+            ? db.collection('users').doc(userProfile.uid).onSnapshot(doc => {
+                if (doc.exists) {
+                    const newProfile = { uid: doc.id, ...doc.data() } as UserProfile;
+                    setUserProfile(newProfile);
+                    // Update form state if the profile data changes
+                    if (newProfile.name) setName(newProfile.name);
+                    if (newProfile.phone) setPhone(newProfile.phone);
+                }
+            })
+            : () => {};
+    
+        return () => unsubProfile();
+    }, [userProfile?.uid]);
 
     // Other existing useEffects...
     useEffect(() => {
@@ -600,15 +617,23 @@ const App: React.FC = () => {
                 isProcessing={isProcessingOrder}
                 name={name} setName={setName}
                 phone={phone} setPhone={setPhone}
+                profile={userProfile}
             />
-            <ReservationModal isOpen={isReservationModalOpen} onClose={() => setIsReservationModalOpen(false)} onConfirmReservation={handleConfirmReservation} isProcessing={isProcessingOrder}/>
+            <ReservationModal 
+                isOpen={isReservationModalOpen} 
+                onClose={() => setIsReservationModalOpen(false)} 
+                onConfirmReservation={handleConfirmReservation} 
+                isProcessing={isProcessingOrder}
+                name={name}
+                phone={phone}
+            />
             <PixPaymentModal key={pixRetryKey} order={payingOrder} onClose={handleClosePixModal} onPaymentSuccess={handlePixPaymentSuccess} isProcessing={isProcessingOrder}/>
             <PaymentFailureModal isOpen={showPaymentFailureModal} onClose={() => { setShowPaymentFailureModal(false); setPayingOrder(null); }} onTryAgain={handleTryAgainPix} onPayLater={handlePayLaterFromFailure}/>
             <OrderConfirmationModal order={confirmedOrderData} onClose={() => setConfirmedOrderData(null)} onSendWhatsApp={handleSendOrderToWhatsApp}/>
             <ReservationConfirmationModal reservation={confirmedReservationData} onClose={() => setConfirmedReservationData(null)} onSendWhatsApp={handleSendReservationToWhatsApp}/>
             <Chatbot isOpen={isChatbotOpen} onClose={() => setIsChatbotOpen(false)} messages={chatMessages} onSendMessage={handleSendMessageToBot} isSending={isBotReplying}/>
             
-            <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} onGoogleSignIn={handleGoogleSignIn} />
+            <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} onGoogleSignIn={handleGoogleSignIn} addToast={addToast} />
             <UserAreaModal isOpen={isUserAreaModalOpen} onClose={() => setIsUserAreaModalOpen(false)} user={currentUser} profile={userProfile} onLogout={handleLogout} addToast={addToast} />
 
             {(isProcessingOrder) && <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-6 font-semibold text-lg text-gray-700">Processando seu pedido...</p><p className="mt-2 text-sm text-gray-500">Por favor, aguarde um instante.</p></div></div>}

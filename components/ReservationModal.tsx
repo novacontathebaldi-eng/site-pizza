@@ -6,6 +6,8 @@ interface ReservationModalProps {
     onClose: () => void;
     onConfirmReservation: (details: ReservationDetails) => void;
     isProcessing: boolean;
+    name: string;
+    phone: string;
 }
 
 const getSuggestedTimes = (selectedDate: Date | null) => {
@@ -34,7 +36,7 @@ const getSuggestedTimes = (selectedDate: Date | null) => {
 const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
-export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onClose, onConfirmReservation, isProcessing }) => {
+export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onClose, onConfirmReservation, isProcessing, name: initialName, phone: initialPhone }) => {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [numberOfPeople, setNumberOfPeople] = useState<number | ''>('');
@@ -50,8 +52,8 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
 
     useEffect(() => {
         if (isOpen) {
-            setName('');
-            setPhone('');
+            setName(initialName || '');
+            setPhone(initialPhone || '');
             setNumberOfPeople('');
             setReservationTime('');
             setNotes('');
@@ -59,7 +61,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
             setSelectedDate(null);
             setCurrentDate(new Date());
         }
-    }, [isOpen]);
+    }, [isOpen, initialName, initialPhone]);
 
     // Reset time when date changes
     useEffect(() => {

@@ -1,8 +1,7 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
 import { db, storage, functions } from './firebase';
-// FIX: Added ReservationDetails to the import list to support the new reservation creation function.
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem, ChatMessage, ReservationDetails, UserProfile } from '../types';
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem, ChatMessage, ReservationDetails, UserProfile, Address } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -131,13 +130,6 @@ export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promi
     await settingsRef.set(settings, { merge: true });
 };
 
-// FIX: Added the missing `createReservation` function. This function calls a cloud function
-// to create a reservation record, fixing the error in `App.tsx`.
-/**
- * Creates a reservation by calling a dedicated cloud function.
- * @param details The customer and reservation details from the reservation form.
- * @returns An object containing the new reservation's ID and its number.
- */
 export const createReservation = async (details: ReservationDetails): Promise<{ orderId: string, orderNumber: number }> => {
     if (!functions) {
         throw new Error("Firebase Functions is not initialized.");
@@ -167,6 +159,19 @@ export const verifyGoogleToken = async (idToken: string): Promise<string> => {
     }
 };
 
+export const createUserProfile = async (user: firebase.User, name: string): Promise<void> => {
+    if (!db) throw new Error("Firestore not initialized.");
+    const userRef = db.collection('users').doc(user.uid);
+    const profile: UserProfile = {
+        uid: user.uid,
+        name: name,
+        email: user.email!,
+        photoURL: user.photoURL || '',
+        addresses: []
+    };
+    await userRef.set(profile);
+};
+
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
     if (!db) return null;
     const doc = await db.collection('users').doc(uid).get();
@@ -177,6 +182,40 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
 export const updateUserProfile = async (uid: string, data: Partial<UserProfile>): Promise<void> => {
     if (!db) throw new Error("Firestore not initialized.");
     await db.collection('users').doc(uid).set(data, { merge: true });
+};
+
+// NEW Address management functions
+export const addAddress = async (uid: string, address: Omit<Address, 'id'>): Promise<string> => {
+    if (!db) throw new Error("Firestore not initialized.");
+    const newAddress = { ...address, id: db.collection('users').doc().id };
+    const userRef = db.collection('users').doc(uid);
+    await userRef.update({
+        addresses: firebase.firestore.FieldValue.arrayUnion(newAddress)
+    });
+    return newAddress.id;
+};
+
+export const updateAddress = async (uid: string, updatedAddress: Address): Promise<void> => {
+    if (!db) throw new Error("Firestore not initialized.");
+    const userRef = db.collection('users').doc(uid);
+    const userDoc = await userRef.get();
+    const userData = userDoc.data() as UserProfile;
+    const addresses = userData.addresses || [];
+    const updatedAddresses = addresses.map(addr => addr.id === updatedAddress.id ? updatedAddress : addr);
+    await userRef.update({ addresses: updatedAddresses });
+};
+
+export const deleteAddress = async (uid: string, addressId: string): Promise<void> => {
+    if (!db) throw new Error("Firestore not initialized.");
+    const userRef = db.collection('users').doc(uid);
+    const userDoc = await userRef.get();
+    const userData = userDoc.data() as UserProfile;
+    const addressToDelete = (userData.addresses || []).find(addr => addr.id === addressId);
+    if (addressToDelete) {
+        await userRef.update({
+            addresses: firebase.firestore.FieldValue.arrayRemove(addressToDelete)
+        });
+    }
 };
 
 

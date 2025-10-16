@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import firebase from 'firebase/compat/app';
-import { UserProfile, Order, OrderStatus } from '../types';
+import { UserProfile, Order, OrderStatus, Address } from '../types';
 import { db } from '../services/firebase';
 import * as firebaseService from '../services/firebaseService';
 import defaultProfilePic from '../assets/perfil.png';
@@ -24,17 +24,98 @@ const statusConfig: { [key in OrderStatus]?: { text: string; icon: string; color
     'awaiting-payment': { text: 'Aguardando Pgto', icon: 'fas fa-clock', color: 'text-gray-500' },
 };
 
+const LOCALIDADES = ['Centro', 'Olaria', 'Vila Nova', 'Moxafongo', 'Cocal', 'Funil'];
+
+const AddressForm: React.FC<{
+    address: Partial<Address> | null;
+    onSave: (address: Address) => Promise<void>;
+    onCancel: () => void;
+    isSaving: boolean;
+}> = ({ address, onSave, onCancel, isSaving }) => {
+    const [formData, setFormData] = useState<Partial<Address>>({
+        label: '', localidade: '', street: '', number: '', complement: '',
+        ...address
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const finalAddress: Address = {
+            id: formData.id || '',
+            label: formData.label || 'Endereço',
+            localidade: formData.localidade || '',
+            street: formData.street || '',
+            number: formData.number || '',
+            complement: formData.complement || '',
+            isDeliveryArea: LOCALIDADES.includes(formData.localidade || ''),
+            city: 'Santa Leopoldina',
+            state: 'ES',
+            cep: '29640-000'
+        };
+        onSave(finalAddress);
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-3 p-4 border rounded-lg bg-gray-50 mt-4 animate-fade-in-up">
+            <h5 className="font-bold">{formData.id ? 'Editar Endereço' : 'Novo Endereço'}</h5>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-semibold mb-1">Rótulo (Ex: Casa, Trabalho)</label>
+                    <input type="text" value={formData.label} onChange={e => setFormData({ ...formData, label: e.target.value })} className="w-full px-3 py-2 border rounded-md" required />
+                </div>
+                <div>
+                    <label className="block text-sm font-semibold mb-1">Localidade *</label>
+                    <select value={formData.localidade} onChange={e => setFormData({ ...formData, localidade: e.target.value })} className="w-full px-3 py-2 border rounded-md bg-white" required>
+                        <option value="" disabled>Selecione...</option>
+                        {LOCALIDADES.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                         <option value="Outra">Outra (Fora da área de entrega)</option>
+                    </select>
+                </div>
+            </div>
+             <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4">
+                <div>
+                    <label className="block text-sm font-semibold mb-1">Rua *</label>
+                    <input type="text" value={formData.street} onChange={e => setFormData({ ...formData, street: e.target.value })} className="w-full px-3 py-2 border rounded-md" required />
+                </div>
+                <div>
+                    <label className="block text-sm font-semibold mb-1">Número *</label>
+                    <input type="text" value={formData.number} onChange={e => setFormData({ ...formData, number: e.target.value })} className="w-full px-3 py-2 border rounded-md" required />
+                </div>
+            </div>
+            <div>
+                <label className="block text-sm font-semibold mb-1">Complemento (opcional)</label>
+                <input type="text" value={formData.complement} onChange={e => setFormData({ ...formData, complement: e.target.value })} className="w-full px-3 py-2 border rounded-md" />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={onCancel} className="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Cancelar</button>
+                <button type="submit" disabled={isSaving} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[100px] disabled:bg-opacity-70">
+                    {isSaving ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-2"></i>Salvar</>}
+                </button>
+            </div>
+        </form>
+    );
+};
+
+
 export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, user, profile, onLogout, addToast }) => {
-    const [localidade, setLocalidade] = useState('');
+    const [phone, setPhone] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [myOrders, setMyOrders] = useState<Order[]>([]);
     const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+    const [activeTab, setActiveTab] = useState('orders');
+
+    const [editingAddress, setEditingAddress] = useState<Partial<Address> | null>(null);
+    const [isAddressFormVisible, setIsAddressFormVisible] = useState(false);
 
     useEffect(() => {
         if (profile) {
-            setLocalidade(profile.localidade || '');
+            setPhone(profile.phone || '');
         }
-    }, [profile]);
+        if (!isOpen) {
+            setActiveTab('orders');
+            setIsAddressFormVisible(false);
+            setEditingAddress(null);
+        }
+    }, [profile, isOpen]);
 
     useEffect(() => {
         if (!isOpen || !user || !db) {
@@ -42,53 +123,167 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
             return;
         }
 
-        setIsLoadingOrders(true);
-        const query = db.collection('orders')
-                      .where('userId', '==', user.uid)
-                      .limit(15);
-
-        const unsubscribe = query.onSnapshot(snapshot => {
-            const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-            
-            // Sort client-side by creation date, newest first
-            fetchedOrders.sort((a, b) => {
-                const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
-                const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
-                return dateB - dateA;
+        if (activeTab === 'orders') {
+            setIsLoadingOrders(true);
+            const query = db.collection('orders').where('userId', '==', user.uid).limit(15);
+            const unsubscribe = query.onSnapshot(snapshot => {
+                const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+                fetchedOrders.sort((a, b) => (b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0) - (a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0));
+                setMyOrders(fetchedOrders);
+                setIsLoadingOrders(false);
+            }, error => {
+                console.error("Error fetching user orders:", error);
+                addToast("Erro ao buscar seus pedidos.", 'error');
+                setIsLoadingOrders(false);
             });
-
-            setMyOrders(fetchedOrders);
-            setIsLoadingOrders(false);
-        }, error => {
-            console.error("Error fetching user orders:", error);
-            addToast("Erro ao buscar seus pedidos.", 'error');
-            setIsLoadingOrders(false);
-        });
-
-        return () => unsubscribe();
-    }, [isOpen, user, addToast]);
-
+            return () => unsubscribe();
+        }
+    }, [isOpen, user, addToast, activeTab]);
 
     if (!isOpen || !user || !profile) return null;
 
+    const handleResendVerification = async () => {
+        try {
+            await user.sendEmailVerification();
+            addToast('E-mail de verificação reenviado!', 'success');
+        } catch (error) {
+            addToast('Erro ao reenviar e-mail. Tente mais tarde.', 'error');
+        }
+    };
+    
     const handleProfileUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
         try {
-            await firebaseService.updateUserProfile(user.uid, { localidade });
-            addToast('Sua localidade foi salva!', 'success');
+            await firebaseService.updateUserProfile(user.uid, { phone });
+            addToast('Seu perfil foi salvo!', 'success');
         } catch (error) {
-            addToast('Erro ao salvar sua localidade.', 'error');
+            addToast('Erro ao salvar seu perfil.', 'error');
         } finally {
             setIsSaving(false);
         }
     };
     
+    const handleSaveAddress = async (address: Address) => {
+        setIsSaving(true);
+        try {
+            if (address.id) {
+                await firebaseService.updateAddress(user.uid, address);
+                addToast('Endereço atualizado!', 'success');
+            } else {
+                await firebaseService.addAddress(user.uid, address);
+                addToast('Endereço adicionado!', 'success');
+            }
+            setIsAddressFormVisible(false);
+            setEditingAddress(null);
+        } catch (error) {
+            addToast('Erro ao salvar endereço.', 'error');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+    
+    const handleDeleteAddress = async (addressId: string) => {
+        if (window.confirm('Tem certeza que deseja excluir este endereço?')) {
+            try {
+                await firebaseService.deleteAddress(user.uid, addressId);
+                addToast('Endereço excluído.', 'success');
+            } catch (error) {
+                addToast('Erro ao excluir endereço.', 'error');
+            }
+        }
+    };
+
     const formatTimestamp = (timestamp: any): string => {
         if (!timestamp) return 'N/A';
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
         return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
     };
+
+    const UserProfileTab = () => (
+        <form onSubmit={handleProfileUpdate} className="space-y-4">
+            <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg border">
+                <img src={profile.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-16 h-16 rounded-full" />
+                <div>
+                    <h3 className="font-bold text-xl">{profile.name}</h3>
+                    <p className="text-gray-600 text-sm">{profile.email}</p>
+                </div>
+                <button type="button" onClick={onLogout} className="ml-auto bg-red-100 text-red-600 font-semibold py-2 px-3 rounded-lg text-sm hover:bg-red-200">
+                   <i className="fas fa-sign-out-alt mr-2"></i>Sair
+                </button>
+            </div>
+             {!user.emailVerified && (
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 text-sm" role="alert">
+                    <p className="font-bold">Verifique seu e-mail!</p>
+                    <p>Enviamos um link de confirmação para você. Verifique sua caixa de entrada ou spam.</p>
+                    <button onClick={handleResendVerification} className="font-bold underline mt-2">Reenviar e-mail</button>
+                </div>
+            )}
+             <div>
+                <label className="block text-sm font-semibold mb-1">Telefone/WhatsApp</label>
+                <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded-md" />
+            </div>
+            <div className="text-right pt-2">
+                 <button type="submit" disabled={isSaving} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[120px] disabled:bg-opacity-70">
+                    {isSaving ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-2"></i><span>Salvar Perfil</span></>}
+                </button>
+            </div>
+        </form>
+    );
+
+    const MyOrdersTab = () => (
+        <div>
+            {isLoadingOrders ? (
+                <div className="text-center p-8"><i className="fas fa-spinner fa-spin text-3xl text-accent"></i></div>
+            ) : myOrders.length === 0 ? (
+                <p className="text-center text-gray-500 p-8">Você ainda não fez nenhum pedido.</p>
+            ) : (
+                <div className="space-y-3">
+                    {myOrders.map(order => {
+                        const status = statusConfig[order.status] || { text: 'Desconhecido', icon: 'fas fa-question-circle', color: 'text-gray-500' };
+                        return (
+                        <div key={order.id} className="bg-gray-50 border rounded-lg p-3 flex justify-between items-center">
+                            <div>
+                                <p className="font-bold">Pedido #{order.orderNumber}</p>
+                                <p className="text-sm text-gray-500">{formatTimestamp(order.createdAt)}</p>
+                            </div>
+                            <div className="text-right">
+                                <p className={`font-semibold text-sm flex items-center justify-end gap-2 ${status.color}`}>
+                                    <i className={status.icon}></i>{status.text}
+                                </p>
+                                {order.total != null && <p className="font-bold text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
+                            </div>
+                        </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+    
+    const MyAddressesTab = () => (
+        <div>
+            {(profile.addresses || []).map(addr => (
+                <div key={addr.id} className="bg-gray-50 border rounded-lg p-3 mb-3 flex justify-between items-start">
+                    <div>
+                        <p className="font-bold">{addr.label}</p>
+                        <p className="text-sm text-gray-600">{addr.street}, {addr.number} - {addr.localidade}</p>
+                        {!addr.isDeliveryArea && <p className="text-xs text-red-500 font-semibold mt-1">Fora da área de entrega</p>}
+                    </div>
+                    <div className="flex gap-2">
+                        <button onClick={() => { setEditingAddress(addr); setIsAddressFormVisible(true); }} className="bg-blue-100 text-blue-600 w-8 h-8 rounded-md hover:bg-blue-200"><i className="fas fa-edit"></i></button>
+                        <button onClick={() => handleDeleteAddress(addr.id)} className="bg-red-100 text-red-600 w-8 h-8 rounded-md hover:bg-red-200"><i className="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            ))}
+            {!isAddressFormVisible && (
+                <button onClick={() => { setEditingAddress({}); setIsAddressFormVisible(true); }} className="mt-4 w-full bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
+                    <i className="fas fa-plus mr-2"></i>Adicionar Endereço
+                </button>
+            )}
+            {isAddressFormVisible && <AddressForm address={editingAddress} onSave={handleSaveAddress} onCancel={() => setIsAddressFormVisible(false)} isSaving={isSaving} />}
+        </div>
+    );
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fade-in-up">
@@ -97,63 +292,17 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                     <h2 className="text-2xl font-bold text-text-on-light"><i className="fas fa-user-circle mr-2"></i>Área do Cliente</h2>
                     <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
                 </div>
-                <div className="overflow-y-auto p-6 space-y-6">
-                    <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg border">
-                        <img src={profile.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-16 h-16 rounded-full" />
-                        <div>
-                            <h3 className="font-bold text-xl">{profile.name}</h3>
-                            <p className="text-gray-600 text-sm">{profile.email}</p>
-                        </div>
-                        <button onClick={onLogout} className="ml-auto bg-red-100 text-red-600 font-semibold py-2 px-3 rounded-lg text-sm hover:bg-red-200">
-                           <i className="fas fa-sign-out-alt mr-2"></i>Sair
-                        </button>
+                <div className="overflow-y-auto p-6">
+                    <div className="border-b mb-4">
+                        <nav className="flex -mb-px">
+                            <button onClick={() => setActiveTab('profile')} className={`py-2 px-4 font-semibold text-sm ${activeTab === 'profile' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Perfil</button>
+                            <button onClick={() => setActiveTab('orders')} className={`py-2 px-4 font-semibold text-sm ${activeTab === 'orders' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Meus Pedidos</button>
+                            <button onClick={() => setActiveTab('addresses')} className={`py-2 px-4 font-semibold text-sm ${activeTab === 'addresses' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Meus Endereços</button>
+                        </nav>
                     </div>
-
-                    <form onSubmit={handleProfileUpdate} className="space-y-3">
-                         <h4 className="font-bold text-lg">Meu Endereço</h4>
-                         <p className="text-sm text-gray-500 -mt-2">Salve sua localidade para agilizar pedidos de entrega.</p>
-                         <div>
-                            <label className="block text-sm font-semibold mb-1">Localidade *</label>
-                            <select value={localidade} onChange={e => setLocalidade(e.target.value)} className="w-full px-3 py-2 border rounded-md bg-white" required>
-                                <option value="" disabled>Selecione sua localidade...</option>
-                                {['Centro', 'Olaria', 'Vila Nova', 'Moxafongo', 'Cocal', 'Funil'].map(loc => <option key={loc} value={loc}>{loc}</option>)}
-                            </select>
-                        </div>
-                        <div className="text-right">
-                             <button type="submit" disabled={isSaving} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[120px] disabled:bg-opacity-70">
-                                {isSaving ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-2"></i><span>Salvar</span></>}
-                            </button>
-                        </div>
-                    </form>
-
-                    <div>
-                        <h4 className="font-bold text-lg mb-3">Meus Pedidos Recentes</h4>
-                        {isLoadingOrders ? (
-                            <div className="text-center p-8"><i className="fas fa-spinner fa-spin text-3xl text-accent"></i></div>
-                        ) : myOrders.length === 0 ? (
-                            <p className="text-center text-gray-500 p-8">Você ainda não fez nenhum pedido.</p>
-                        ) : (
-                            <div className="space-y-3">
-                                {myOrders.map(order => {
-                                    const status = statusConfig[order.status] || { text: 'Desconhecido', icon: 'fas fa-question-circle', color: 'text-gray-500' };
-                                    return (
-                                    <div key={order.id} className="bg-gray-50 border rounded-lg p-3 flex justify-between items-center">
-                                        <div>
-                                            <p className="font-bold">Pedido #{order.orderNumber}</p>
-                                            <p className="text-sm text-gray-500">{formatTimestamp(order.createdAt)}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className={`font-semibold text-sm flex items-center gap-2 ${status.color}`}>
-                                                <i className={status.icon}></i>{status.text}
-                                            </p>
-                                            {order.total != null && <p className="font-bold text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
-                                        </div>
-                                    </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
+                    {activeTab === 'profile' && <UserProfileTab />}
+                    {activeTab === 'orders' && <MyOrdersTab />}
+                    {activeTab === 'addresses' && <MyAddressesTab />}
                 </div>
             </div>
         </div>

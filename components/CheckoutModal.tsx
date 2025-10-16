@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CartItem, OrderDetails, Order } from '../types';
+import { CartItem, OrderDetails, Order, UserProfile } from '../types';
 
 // NOVO COMPONENTE DE CONFIRMAÇÃO
 interface OrderConfirmationModalProps {
@@ -128,7 +128,6 @@ export const ReservationConfirmationModal: React.FC<ReservationConfirmationModal
 const DELIVERY_FEE = 3.00;
 const LOCALIDADES = ['Centro', 'Olaria', 'Vila Nova', 'Moxafongo', 'Cocal', 'Funil'];
 
-// FIX: Added missing interface definition for component props.
 interface CheckoutModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -140,13 +139,13 @@ interface CheckoutModalProps {
     setName: (name: string) => void;
     phone: string;
     setPhone: (phone: string) => void;
+    profile: UserProfile | null;
 }
 
-export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, onInitiatePixPayment, isProcessing, name, setName, phone, setPhone }) => {
+export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, onInitiatePixPayment, isProcessing, name, setName, phone, setPhone, profile }) => {
     const [cpf, setCpf] = useState('');
     const [orderType, setOrderType] = useState<'delivery' | 'pickup' | ''>('');
     
-    // Novos estados para endereço detalhado
     const [neighborhood, setNeighborhood] = useState('');
     const [street, setStreet] = useState('');
     const [number, setNumber] = useState('');
@@ -159,27 +158,47 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const [changeAmount, setChangeAmount] = useState('');
     const [notes, setNotes] = useState('');
     const [pixPaymentOption, setPixPaymentOption] = useState<'payNow' | 'payLater' | null>(null);
+    const [selectedAddressId, setSelectedAddressId] = useState<string>('manual');
 
     useEffect(() => {
         if (!isOpen) {
-            // FIX: Name and phone are now controlled by the parent to allow pre-filling.
-            // They are reset on logout in the parent component instead of on modal close.
             setCpf(''); setOrderType('');
             setNeighborhood(''); setStreet(''); setNumber(''); setIsNoNumber(false); setComplement(''); setAllergies('');
             setPaymentMethod(''); setChangeNeeded(false); setChangeAmount('');
             setNotes(''); setPixPaymentOption(null);
+            setSelectedAddressId('manual');
         }
     }, [isOpen]);
     
     useEffect(() => {
-        if (isNoNumber) {
-            setNumber('S/N');
+        if (isNoNumber) setNumber('S/N');
+        else if (number === 'S/N') setNumber('');
+    }, [isNoNumber]);
+    
+    useEffect(() => {
+        if (orderType !== 'delivery') {
+            setSelectedAddressId('manual');
+            setNeighborhood(''); setStreet(''); setNumber(''); setComplement('');
+        }
+    }, [orderType]);
+    
+    useEffect(() => {
+        const deliverableAddresses = profile?.addresses?.filter(a => a.isDeliveryArea) || [];
+        if (selectedAddressId === 'manual' || deliverableAddresses.length === 0) {
+            // Não preenche ou limpa se o usuário quiser digitar manualmente
+            if(orderType === 'delivery') {
+                setNeighborhood(''); setStreet(''); setNumber(''); setComplement('');
+            }
         } else {
-            if (number === 'S/N') {
-                setNumber('');
+            const selectedAddr = deliverableAddresses.find(a => a.id === selectedAddressId);
+            if (selectedAddr) {
+                setNeighborhood(selectedAddr.localidade);
+                setStreet(selectedAddr.street);
+                setNumber(selectedAddr.number);
+                setComplement(selectedAddr.complement || '');
             }
         }
-    }, [isNoNumber]);
+    }, [selectedAddressId, profile, orderType]);
 
 
     if (!isOpen) return null;
@@ -187,6 +206,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const deliveryFee = orderType === 'delivery' ? DELIVERY_FEE : 0;
     const total = subtotal + deliveryFee;
+    const deliverableAddresses = profile?.addresses?.filter(a => a.isDeliveryArea) || [];
+
 
     const getOrderDetails = (): OrderDetails => ({
         name, phone, cpf, orderType: orderType as 'delivery' | 'pickup' | 'local',
@@ -199,9 +220,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const handlePaymentMethodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const newMethod = e.target.value as any;
         setPaymentMethod(newMethod);
-        if (newMethod !== 'pix') {
-            setPixPaymentOption(null);
-        }
+        if (newMethod !== 'pix') setPixPaymentOption(null);
     };
     
     const handleSubmit = (e: React.FormEvent) => {
@@ -209,28 +228,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
         const details = getOrderDetails();
 
         if (paymentMethod === 'pix') {
-            if (pixPaymentOption === 'payNow') {
-                onInitiatePixPayment(details, 'payNow');
-            } else if (pixPaymentOption === 'payLater') {
-                onConfirmCheckout(details);
-            } else {
-                alert("Por favor, escolha se deseja pagar agora ou depois.");
-            }
+            if (pixPaymentOption === 'payNow') onInitiatePixPayment(details, 'payNow');
+            else if (pixPaymentOption === 'payLater') onConfirmCheckout(details);
+            else alert("Por favor, escolha se deseja pagar agora ou depois.");
         } else {
             onConfirmCheckout(details);
         }
     };
     
     const isSubmitDisabled = (paymentMethod === 'pix' && !pixPaymentOption) || (paymentMethod === 'pix' && pixPaymentOption === 'payNow' && !cpf);
-    
-    const submitButtonText = (paymentMethod === 'pix' && pixPaymentOption === 'payNow')
-        ? 'Pagar e Finalizar Pedido'
-        : 'Enviar Pedido';
-        
-    const submitButtonIconClass = (paymentMethod === 'pix' && pixPaymentOption === 'payNow')
-        ? 'fab fa-pix'
-        : 'fas fa-check-circle';
-
+    const submitButtonText = (paymentMethod === 'pix' && pixPaymentOption === 'payNow') ? 'Pagar e Finalizar Pedido' : 'Enviar Pedido';
+    const submitButtonIconClass = (paymentMethod === 'pix' && pixPaymentOption === 'payNow') ? 'fab fa-pix' : 'fas fa-check-circle';
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
@@ -265,6 +273,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                                 <div className="text-center bg-blue-50 border border-blue-200 text-blue-800 text-sm font-semibold p-2 rounded-md">
                                     <i className="fas fa-motorcycle mr-2"></i>Taxa de Entrega: R$ {DELIVERY_FEE.toFixed(2).replace('.', ',')}
                                 </div>
+
+                                {profile && deliverableAddresses.length > 0 && (
+                                     <div>
+                                        <label className="block text-sm font-semibold mb-1">Endereço de Entrega</label>
+                                        <select value={selectedAddressId} onChange={e => setSelectedAddressId(e.target.value)} className="w-full px-3 py-2 border rounded-md bg-white">
+                                            <option value="manual">Digitar endereço manualmente</option>
+                                            {deliverableAddresses.map(addr => (
+                                                <option key={addr.id} value={addr.id}>{addr.label} ({addr.street}, {addr.number})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <p className="text-sm p-2 bg-gray-200 rounded-md"><strong>CEP:</strong> 29640-000</p>
                                     <p className="text-sm p-2 bg-gray-200 rounded-md"><strong>Cidade:</strong> Santa Leopoldina - ES</p>

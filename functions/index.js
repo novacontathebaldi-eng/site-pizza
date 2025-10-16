@@ -294,6 +294,7 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
     const {sub: googleUid, email, name, picture} = payload;
     // We create a unique UID for Firebase Auth based on the Google UID
     const uid = `google:${googleUid}`;
+    let isNewUser = false;
 
     // Update or create user in Firebase Auth
     try {
@@ -304,6 +305,7 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
       });
     } catch (error) {
       if (error.code === "auth/user-not-found") {
+        isNewUser = true;
         await admin.auth().createUser({
           uid: uid,
           email: email,
@@ -317,12 +319,17 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
 
     // Create or update user profile in Firestore 'users' collection
     const userRef = db.collection("users").doc(uid);
-    await userRef.set({
-      name,
-      email,
-      photoURL: picture,
-    }, {merge: true});
+    const userDoc = await userRef.get();
 
+    // Create profile in Firestore only if it doesn't exist
+    if (isNewUser || !userDoc.exists) {
+      await userRef.set({
+        name,
+        email,
+        photoURL: picture,
+        addresses: [], // Initialize with empty addresses
+      }, {merge: true});
+    }
 
     // Create a custom token for the Firebase user
     const customToken = await admin.auth().createCustomToken(uid);

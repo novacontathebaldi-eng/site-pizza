@@ -1,17 +1,26 @@
 import firebase from 'firebase/compat/app';
 
+export interface Address {
+    id: string;
+    label: string; // 'Casa', 'Trabalho', etc.
+    localidade: string;
+    street: string;
+    number: string;
+    complement?: string;
+    isDeliveryArea: boolean;
+    city: string;
+    cep: string;
+    state: string;
+}
+
 export interface UserProfile {
     uid: string;
     name: string;
     email: string;
     photoURL: string;
-    // User-provided address info
+    // User-provided info
     phone?: string;
-    localidade?: string;
-    neighborhood?: string;
-    street?: string;
-    number?: string;
-    complement?: string;
+    addresses?: Address[];
 }
 
 export interface Product {
@@ -47,8 +56,6 @@ export interface CartItem {
 export interface OrderDetails {
     name: string;
     phone: string;
-    // FIX: Added 'local' to the orderType to allow for dine-in orders/reservations
-    // through the checkout and order creation flow, resolving type errors.
     orderType: 'delivery' | 'pickup' | 'local';
     address?: string;
     // Detalhes do endereço para entrega
@@ -67,8 +74,6 @@ export interface OrderDetails {
     reservationTime?: string;
 }
 
-// FIX: Added ReservationDetails interface to provide a standardized type for reservation data
-// across different components and services, such as ReservationModal and firebaseService.
 export interface ReservationDetails {
     name: string;
     phone: string;
