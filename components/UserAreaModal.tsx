@@ -23,6 +23,7 @@ const statusConfig: { [key in OrderStatus]?: { text: string; icon: string; color
     ready: { text: 'Pronto / Em Rota', icon: 'fas fa-shipping-fast', color: 'text-purple-500' },
     completed: { text: 'Finalizado', icon: 'fas fa-check-circle', color: 'text-green-500' },
     cancelled: { text: 'Cancelado', icon: 'fas fa-times-circle', color: 'text-red-500' },
+    deleted: { text: 'Excluído', icon: 'fas fa-trash-alt', color: 'text-gray-500' },
     'awaiting-payment': { text: 'Aguardando Pgto', icon: 'fas fa-clock', color: 'text-gray-500' },
 };
 
@@ -200,7 +201,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
             setIsAddressFormVisible(false);
             setEditingAddress(null);
         }
-    }, [isOpen, initialTab, showAddAddressForm]);
+    }, [isOpen, initialTab, showAddAddressForm, profile]);
 
 
     useEffect(() => {
@@ -211,7 +212,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
 
         if (activeTab === 'orders') {
             setIsLoadingOrders(true);
-            const query = db.collection('orders').where('userId', '==', user.uid).limit(15);
+            const query = db.collection('orders').where('userId', '==', user.uid).limit(25);
             const unsubscribe = query.onSnapshot(snapshot => {
                 const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
                 fetchedOrders.sort((a, b) => (b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0) - (a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0));
@@ -331,35 +332,76 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
         </form>
     );
 
-    const MyOrdersTab = () => (
-        <div>
-            {isLoadingOrders ? (
-                <div className="text-center p-8"><i className="fas fa-spinner fa-spin text-3xl text-accent"></i></div>
-            ) : myOrders.length === 0 ? (
-                <p className="text-center text-gray-500 p-8">Você ainda não fez nenhum pedido.</p>
-            ) : (
-                <div className="space-y-3">
-                    {myOrders.map(order => {
-                        const status = statusConfig[order.status] || { text: 'Desconhecido', icon: 'fas fa-question-circle', color: 'text-gray-500' };
-                        return (
-                        <div key={order.id} className="bg-gray-50 border rounded-lg p-3 flex justify-between items-center">
-                            <div>
-                                <p className="font-bold">Pedido #{order.orderNumber}</p>
-                                <p className="text-sm text-gray-500">{formatTimestamp(order.createdAt)}</p>
-                            </div>
-                            <div className="text-right">
-                                <p className={`font-semibold text-sm flex items-center justify-end gap-2 ${status.color}`}>
-                                    <i className={status.icon}></i>{status.text}
-                                </p>
-                                {order.total != null && <p className="font-bold text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
-                            </div>
-                        </div>
-                        );
-                    })}
+    const MyOrdersTab = () => {
+        const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+    
+        const currentOrders = myOrders.filter(order =>
+            ['pending', 'accepted', 'reserved', 'ready'].includes(order.status)
+        );
+        const archivedOrders = myOrders.filter(order =>
+            ['completed', 'cancelled', 'deleted'].includes(order.status)
+        );
+    
+        const renderOrderCard = (order: Order) => {
+            const config = statusConfig[order.status] || { text: 'Desconhecido', icon: 'fas fa-question-circle', color: 'text-gray-500' };
+            const isDeleted = order.status === 'deleted';
+
+            return (
+                <div key={order.id} className={`bg-white border rounded-lg p-3 flex justify-between items-center shadow-sm transition-opacity ${isDeleted ? 'opacity-60' : ''}`}>
+                    <div>
+                        <p className="font-bold">Pedido #{order.orderNumber}</p>
+                        <p className="text-sm text-gray-500">{formatTimestamp(order.createdAt)}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className={`font-semibold text-sm flex items-center justify-end gap-2 ${config.color}`}>
+                            <i className={config.icon}></i>{config.text}
+                        </p>
+                        {order.total != null && <p className="font-bold text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
+                    </div>
                 </div>
-            )}
-        </div>
-    );
+            );
+        };
+    
+        return (
+            <div>
+                {isLoadingOrders ? (
+                    <div className="text-center p-8"><i className="fas fa-spinner fa-spin text-3xl text-accent"></i></div>
+                ) : (
+                    <>
+                        <h3 className="text-lg font-bold text-text-on-light mb-3">Pedidos em Andamento</h3>
+                        {currentOrders.length === 0 ? (
+                            <p className="text-center text-gray-500 py-8 px-4 bg-gray-50 rounded-lg">Você não tem pedidos em andamento.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {currentOrders.map(renderOrderCard)}
+                            </div>
+                        )}
+    
+                        <div className="mt-8 border-t pt-6">
+                            <button
+                                onClick={() => setIsArchiveOpen(!isArchiveOpen)}
+                                className="w-full flex justify-between items-center text-left p-4 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+                                aria-expanded={isArchiveOpen}
+                            >
+                                <span className="text-lg font-bold text-text-on-light">Histórico de Pedidos</span>
+                                <i className={`fas fa-chevron-down text-gray-600 transition-transform duration-300 ${isArchiveOpen ? 'rotate-180' : ''}`}></i>
+                            </button>
+                            
+                            {isArchiveOpen && (
+                                <div className="mt-4 space-y-3 animate-fade-in-up">
+                                    {archivedOrders.length === 0 ? (
+                                        <p className="text-center text-gray-500 py-8 px-4">Seu histórico de pedidos está vazio.</p>
+                                    ) : (
+                                        archivedOrders.map(renderOrderCard)
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
+        );
+    };
     
     const MyAddressesTab = () => (
         <div>
@@ -390,23 +432,32 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
     );
 
     return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fade-in-up">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-                <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
-                    <h2 className="text-2xl font-bold text-text-on-light"><i className="fas fa-user-circle mr-2"></i>Área do Cliente</h2>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
-                </div>
-                <div className="flex-grow overflow-y-auto p-6">
-                    <div className="border-b mb-4">
-                        <nav className="flex -mb-px">
-                            <button onClick={() => setActiveTab('profile')} className={`py-2 px-4 font-semibold text-sm ${activeTab === 'profile' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Perfil</button>
-                            <button onClick={() => setActiveTab('orders')} className={`py-2 px-4 font-semibold text-sm ${activeTab === 'orders' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Meus Pedidos</button>
-                            <button onClick={() => setActiveTab('addresses')} className={`py-2 px-4 font-semibold text-sm ${activeTab === 'addresses' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Meus Endereços</button>
-                        </nav>
+        <div className="fixed inset-0 bg-brand-ivory-50 z-50 animate-fade-in-up">
+            <div className="w-full h-full flex flex-col">
+                <header className="sticky top-0 bg-brand-ivory-50/90 backdrop-blur-sm z-10 flex justify-between items-center p-4 border-b border-gray-200 flex-shrink-0">
+                    <h2 className="text-xl sm:text-2xl font-bold text-text-on-light flex items-center gap-3">
+                        <i className="fas fa-user-circle"></i>
+                        <span>Área do Cliente</span>
+                    </h2>
+                    <button onClick={onClose} className="text-gray-600 font-semibold py-2 px-3 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-2">
+                        <i className="fas fa-arrow-left"></i>
+                        <span className="hidden sm:inline">Voltar</span>
+                    </button>
+                </header>
+
+                <div className="flex-grow overflow-y-auto">
+                    <div className="max-w-4xl mx-auto p-4 sm:p-6">
+                        <div className="border-b mb-6">
+                            <nav className="flex -mb-px space-x-4">
+                                <button onClick={() => setActiveTab('profile')} className={`py-2 px-3 font-semibold text-sm transition-colors ${activeTab === 'profile' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-800'}`}>Perfil</button>
+                                <button onClick={() => setActiveTab('orders')} className={`py-2 px-3 font-semibold text-sm transition-colors ${activeTab === 'orders' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-800'}`}>Meus Pedidos</button>
+                                <button onClick={() => setActiveTab('addresses')} className={`py-2 px-3 font-semibold text-sm transition-colors ${activeTab === 'addresses' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-800'}`}>Meus Endereços</button>
+                            </nav>
+                        </div>
+                        {activeTab === 'profile' && <UserProfileTab />}
+                        {activeTab === 'orders' && <MyOrdersTab />}
+                        {activeTab === 'addresses' && <MyAddressesTab />}
                     </div>
-                    {activeTab === 'profile' && <UserProfileTab />}
-                    {activeTab === 'orders' && <MyOrdersTab />}
-                    {activeTab === 'addresses' && <MyAddressesTab />}
                 </div>
             </div>
         </div>
