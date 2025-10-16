@@ -297,8 +297,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 <button onClick={() => onPermanentDelete(id)} className="bg-red-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-red-600"><i className="fas fa-trash-alt mr-2"></i>Apagar Perm.</button>
                             </>
                         ) : status === 'pending' ? (
-                            <>
-                                <div className="flex-grow"></div>
+                            <div className="flex items-center gap-2 w-full">
                                 {canRefund && (
                                      <button 
                                         onClick={() => onRefund(id)} 
@@ -308,9 +307,10 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                         {isRefunding ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-undo-alt mr-2"></i>Estornar</>}
                                      </button>
                                 )}
+                                <div className="flex-grow"></div>
                                 <button onClick={handleAccept} className="bg-green-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-green-600"><i className="fas fa-check mr-2"></i>Aceitar</button>
                                 <button onClick={handleRefuse} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Recusar</button>
-                            </>
+                            </div>
                         ) : (
                              <div className="flex flex-wrap items-center justify-end gap-3 w-full">
                                 {paymentStatusChanger}

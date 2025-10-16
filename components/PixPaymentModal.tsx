@@ -113,21 +113,34 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                         </div>
                     )}
                     {isPaid && (
-                        <div className="py-12 text-green-600 animate-fade-in-up space-y-5">
+                        <div className="py-8 text-center animate-fade-in-up space-y-5">
                             <div>
-                                <i className="fas fa-check-circle text-6xl mb-4"></i>
-                                <p className="text-2xl font-bold">Pagamento Aprovado!</p>
-                                <p className="text-gray-700 mt-2">Agora, clique no botão abaixo para finalizar e enviar seu pedido para a pizzaria.</p>
+                                <i className="fas fa-check-circle text-6xl mb-4 text-green-500"></i>
+                                <h3 className="text-2xl font-bold text-green-600">Pagamento Aprovado!</h3>
                             </div>
+                            
+                            <div className="text-left bg-gray-50 p-4 rounded-lg border text-gray-800 space-y-2 text-sm">
+                                <p className="font-bold text-base text-center mb-2">Seu pedido já foi registrado em nosso sitema!</p>
+                                <p><strong><i className="fas fa-receipt fa-fw mr-2 text-gray-400"></i>Pedido:</strong> #{order.orderNumber}</p>
+                                <p><strong><i className="fas fa-user fa-fw mr-2 text-gray-400"></i>Nome:</strong> {order.customer.name}</p>
+                                {order.total != null && (
+                                    <p><strong><i className="fas fa-dollar-sign fa-fw mr-2 text-gray-400"></i>Total Pago:</strong> {order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                )}
+                            </div>
+
+                            <p className="text-gray-600 text-sm px-2">
+                                Já estamos preparando tudo! Se precisar, você pode nos contatar pelo WhatsApp sobre este pedido.
+                            </p>
+
                             <button
                                 onClick={() => onPaymentSuccess(order)}
                                 disabled={isProcessing}
                                 className="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-green-600 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center min-h-[52px]"
                             >
                                 {isProcessing ? (
-                                    <><i className="fas fa-spinner fa-spin mr-2"></i> Enviando...</>
+                                    <><i className="fas fa-spinner fa-spin mr-2"></i> Aguarde...</>
                                 ) : (
-                                    <><i className="fab fa-whatsapp mr-2"></i> Enviar Pedido para Pizzaria</>
+                                    <><i className="fab fa-whatsapp mr-2"></i> Enviar um WhatsApp sobre o pedido</>
                                 )}
                             </button>
                         </div>

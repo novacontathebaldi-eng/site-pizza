@@ -237,6 +237,14 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
 
     const pendingOrdersCount = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
+    
+    // Counter for the main "Pedidos" tab. Sums all active orders.
+    const activeOrdersCount = useMemo(() => {
+        // Active statuses are all those that are not final (completed, cancelled) or meta-states (deleted).
+        const activeStatuses: OrderStatus[] = ['pending', 'accepted', 'reserved', 'ready'];
+        return orders.filter(o => activeStatuses.includes(o.status)).length;
+    }, [orders]);
+
 
     // Effect for sound notification using HTML <audio> element
     useEffect(() => {
@@ -459,7 +467,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                             className={`relative flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === tab ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}
                                         >
                                             <i className={`fas ${icons[tab]} w-5 text-center`}></i> <span>{labels[tab]}</span>
-                                            {tab === 'orders' && pendingOrdersCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">{pendingOrdersCount}</span>}
+                                            {tab === 'orders' && activeOrdersCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">{activeOrdersCount}</span>}
                                         </button>
                                     );
                                 })}
