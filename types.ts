@@ -33,15 +33,36 @@ export interface CartItem {
 export interface OrderDetails {
     name: string;
     phone: string;
+    // FIX: Added 'local' to the orderType to allow for dine-in orders/reservations
+    // through the checkout and order creation flow, resolving type errors.
     orderType: 'delivery' | 'pickup' | 'local';
-    address: string;
+    address?: string;
+    // Detalhes do endereço para entrega
+    neighborhood?: string;
+    street?: string;
+    number?: string;
+    complement?: string;
+    // Fim dos detalhes de endereço
     paymentMethod: 'credit' | 'debit' | 'pix' | 'cash';
     changeNeeded: boolean;
     changeAmount?: string;
     notes: string;
+    allergies?: string;
+    cpf?: string;
+    deliveryFee?: number;
     reservationTime?: string;
-    cpf?: string; // CPF do cliente para pagamentos PIX
 }
+
+// FIX: Added ReservationDetails interface to provide a standardized type for reservation data
+// across different components and services, such as ReservationModal and firebaseService.
+export interface ReservationDetails {
+    name: string;
+    phone: string;
+    numberOfPeople: number;
+    reservationTime: string;
+    notes: string;
+}
+
 
 // New Types for Order Management
 export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted' | 'awaiting-payment';
@@ -54,15 +75,23 @@ export interface OrderCustomerDetails {
     address?: string;
     reservationTime?: string;
     cpf?: string;
+    // Detalhes do endereço
+    neighborhood?: string;
+    street?: string;
+    number?: string;
+    complement?: string;
+    numberOfPeople?: number;
 }
 
 export interface Order {
     id: string;
     orderNumber: number; // Número sequencial do pedido
     customer: OrderCustomerDetails;
-    items: CartItem[];
-    total: number;
-    paymentMethod: 'credit' | 'debit' | 'pix' | 'cash';
+    items?: CartItem[];
+    total?: number;
+    deliveryFee?: number;
+    allergies?: string;
+    paymentMethod?: 'credit' | 'debit' | 'pix' | 'cash';
     changeNeeded?: boolean;
     changeAmount?: string;
     notes?: string;
@@ -70,6 +99,7 @@ export interface Order {
     paymentStatus: PaymentStatus;
     createdAt: firebase.firestore.Timestamp | any; // Firestore Timestamp
     pickupTimeEstimate?: string;
+    numberOfPeople?: number;
     mercadoPagoDetails?: {
         paymentId: string;
         status?: string;

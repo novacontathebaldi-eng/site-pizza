@@ -1,7 +1,8 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
 import { db, storage, functions } from './firebase';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem, ChatMessage } from '../types';
+// FIX: Added ReservationDetails to the import list to support the new reservation creation function.
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem, ChatMessage, ReservationDetails } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -128,6 +129,27 @@ export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promi
     if (!db) throw new Error("Firestore is not initialized.");
     const settingsRef = db.doc('store_config/site_settings');
     await settingsRef.set(settings, { merge: true });
+};
+
+// FIX: Added the missing `createReservation` function. This function calls a cloud function
+// to create a reservation record, fixing the error in `App.tsx`.
+/**
+ * Creates a reservation by calling a dedicated cloud function.
+ * @param details The customer and reservation details from the reservation form.
+ * @returns An object containing the new reservation's ID and its number.
+ */
+export const createReservation = async (details: ReservationDetails): Promise<{ orderId: string, orderNumber: number }> => {
+    if (!functions) {
+        throw new Error("Firebase Functions is not initialized.");
+    }
+    const createReservationFunction = functions.httpsCallable('createReservation');
+    try {
+        const result = await createReservationFunction({ details });
+        return result.data;
+    } catch (error) {
+        console.error("Error calling createReservation function:", error);
+        throw new Error("Não foi possível criar a reserva. Tente novamente.");
+    }
 };
 
 // --- Chatbot Function ---

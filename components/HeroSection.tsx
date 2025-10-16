@@ -4,9 +4,10 @@ import { SiteSettings } from '../types';
 interface HeroSectionProps {
     settings: SiteSettings;
     isLoading: boolean;
+    onReserveClick: () => void; // Nova prop para abrir o modal de reserva
 }
 
-export const HeroSection: React.FC<HeroSectionProps> = ({ settings, isLoading }) => {
+export const HeroSection: React.FC<HeroSectionProps> = ({ settings, isLoading, onReserveClick }) => {
     const [scrollOpacity, setScrollOpacity] = useState(1);
 
     useEffect(() => {
@@ -101,6 +102,13 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ settings, isLoading })
                                 <span>Ver Cardápio e Pedir</span>
                             </>
                         )}
+                    </button>
+                    <button 
+                        onClick={onReserveClick} 
+                        className="bg-transparent border-2 border-brand-gold-600 text-brand-gold-600 font-bold py-3 px-8 rounded-xl text-lg hover:bg-brand-gold-600 hover:text-text-on-dark transition-all transform hover:scale-105 flex items-center justify-center"
+                    >
+                        <i className="fas fa-calendar-alt mr-2"></i>
+                        <span>Fazer uma Reserva</span>
                     </button>
                 </div>
             </div>

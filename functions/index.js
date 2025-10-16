@@ -297,11 +297,16 @@ exports.createOrder = onCall({secrets}, async (request) => {
       phone: details.phone,
       orderType: details.orderType,
       address: details.address || "",
-      reservationTime: details.reservationTime || "",
+      neighborhood: details.neighborhood || "",
+      street: details.street || "",
+      number: details.number || "",
+      complement: details.complement || "",
       cpf: details.cpf || "",
     },
     items: cart,
     total,
+    deliveryFee: details.deliveryFee || 0,
+    allergies: details.allergies || "",
     paymentMethod: details.paymentMethod,
     changeNeeded: details.changeNeeded || false,
     changeAmount: details.changeAmount || "",
@@ -382,6 +387,64 @@ exports.createOrder = onCall({secrets}, async (request) => {
   }
 
   // 6. Return order info for non-PIX or "Pay Later" orders
+  return {orderId, orderNumber};
+});
+
+// FIX: Added the missing `createReservation` Cloud Function.
+// This function handles the creation of reservations, which are stored as a special type of order.
+// It generates an atomic order number and saves the reservation details to Firestore.
+/**
+ * Creates a reservation (as an order) in Firestore.
+ */
+exports.createReservation = onCall({secrets}, async (request) => {
+  const {details} = request.data;
+
+  // 1. Validate input
+  if (!details || !details.name || !details.phone || !details.reservationTime || !details.numberOfPeople) {
+    throw new Error("Dados da reserva incompletos.");
+  }
+
+  // 2. Generate a sequential order number atomically
+  const counterRef = db.doc("_internal/counters");
+  let orderNumber;
+  try {
+    await db.runTransaction(async (transaction) => {
+      const counterDoc = await transaction.get(counterRef);
+      if (!counterDoc.exists) {
+        orderNumber = 1;
+        transaction.set(counterRef, {orderNumber: orderNumber + 1});
+      } else {
+        orderNumber = counterDoc.data().orderNumber;
+        transaction.update(counterRef, {orderNumber: orderNumber + 1});
+      }
+    });
+  } catch (error) {
+    logger.error("Falha ao gerar o número do pedido:", error);
+    throw new Error("Não foi possível gerar o número do pedido.");
+  }
+
+  // 3. Prepare reservation data for Firestore (as an Order)
+  const orderData = {
+    orderNumber,
+    customer: {
+      name: details.name,
+      phone: details.phone,
+      orderType: "local",
+      reservationTime: details.reservationTime,
+    },
+    numberOfPeople: details.numberOfPeople,
+    notes: details.notes || "",
+    status: "reserved",
+    paymentStatus: "pending",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  // 4. Create the order document
+  const orderRef = await db.collection("orders").add(orderData);
+  const orderId = orderRef.id;
+  logger.info(`Reserva #${orderNumber} (ID: ${orderId}) criada no Firestore.`);
+
+  // 5. Return order info
   return {orderId, orderNumber};
 });
 

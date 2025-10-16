@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, ChatMessage } from './types';
+// FIX: Moved ReservationDetails import from ReservationModal to here, where it is defined.
+import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, ChatMessage, ReservationDetails } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
@@ -9,6 +10,8 @@ import { AdminSection } from './components/AdminSection';
 import { Footer } from './components/Footer';
 import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal } from './components/CheckoutModal';
+// FIX: Removed ReservationDetails from this import as it's not exported from the component file.
+import { ReservationModal } from './components/ReservationModal';
 import { PixPaymentModal } from './components/PixPaymentModal';
 import { PaymentFailureModal } from './components/PaymentFailureModal';
 import { Chatbot } from '@/components/Chatbot';
@@ -78,6 +81,7 @@ const defaultSiteSettings: SiteSettings = {
 const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, orderNumber: number, isPaid: boolean) => {
     const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumir no local' };
     const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
+    const DELIVERY_FEE = 3.00;
 
     let message = `*🍕 NOVO PEDIDO #${orderNumber} - SANTA SENSAÇÃO 🍕*\n\n`;
     if (isPaid) {
@@ -90,14 +94,25 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     if (details.orderType === 'delivery') {
         message += `*Endereço:* ${details.address}\n`;
     }
-    if (details.orderType === 'local' && details.reservationTime) {
-        message += `*Horário da Reserva:* ${details.reservationTime}\n`;
+    
+    if (details.allergies) {
+        message += `\n*⚠️ ALERGIAS/RESTRIÇÕES:*\n${details.allergies}\n`;
     }
+
     message += `\n*🛒 ITENS DO PEDIDO:*\n`;
     currentCart.forEach(item => {
         message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2).replace('.', ',')}\n`;
     });
-    message += `\n*💰 TOTAL: R$ ${total.toFixed(2).replace('.', ',')}*\n\n`;
+
+    const subtotal = currentCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+    message += `\n*🧾 RESUMO FINANCEIRO:*\n`;
+    message += `*Subtotal:* R$ ${subtotal.toFixed(2).replace('.', ',')}\n`;
+    if (details.orderType === 'delivery') {
+        message += `*Taxa de Entrega:* R$ ${DELIVERY_FEE.toFixed(2).replace('.', ',')}\n`;
+    }
+    message += `*💰 TOTAL: R$ ${total.toFixed(2).replace('.', ',')}*\n\n`;
+    
     message += `*💳 PAGAMENTO:*\n`;
     message += `*Forma:* ${paymentMethodMap[details.paymentMethod]}\n`;
     if (!isPaid && details.paymentMethod === 'cash') {
@@ -114,6 +129,23 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
 };
 
+const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNumber: number) => {
+    let message = `*📅 NOVA RESERVA #${orderNumber} - SANTA SENSAÇÃO 📅*\n\n`;
+    message += `Uma nova reserva foi feita pelo site.\n\n`;
+    message += `*👤 DADOS DO CLIENTE:*\n`;
+    message += `*Nome:* ${details.name}\n`;
+    message += `*Telefone:* ${details.phone}\n\n`;
+    message += `*📋 DETALHES DA RESERVA:*\n`;
+    message += `*Horário:* ${details.reservationTime}\n`;
+    message += `*Quantidade de Pessoas:* ${details.numberOfPeople}\n`;
+    if (details.notes) {
+        message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
+    }
+    message += `\n_Reserva gerada pelo nosso site._`;
+    return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
+};
+
+
 const App: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -122,6 +154,7 @@ const App: React.FC = () => {
     const [cart, setCart] = useState<CartItem[]>([]);
     const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
     const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState<boolean>(false);
+    const [isReservationModalOpen, setIsReservationModalOpen] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [activeSection, setActiveSection] = useState('Início');
@@ -135,11 +168,7 @@ const App: React.FC = () => {
     const [refundingOrderId, setRefundingOrderId] = useState<string | null>(null);
     const [isChatbotOpen, setIsChatbotOpen] = useState<boolean>(false);
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-        { role: 'bot', content: `🍕 Olá! Bem-vindo(a) à Pizzaria Santa Sensação!
-
-Eu sou o Sensação, seu assistente inteligente. Estou aqui para te ajudar a fazer pedidos, tirar dúvidas sobre nosso cardápio, acompanhar entregas e muito mais.
-
-Como posso te ajudar hoje?` }
+        { role: 'bot', content: `🍕 Olá! Bem-vindo(a) à Pizzaria Santa Sensação!\n\nEu sou o Sensação, seu assistente virtual. Estou aqui para te ajudar a fazer pedidos, tirar dúvidas sobre nosso cardápio, acompanhar entregas e muito mais.\n\nComo posso te ajudar hoje?` }
     ]);
     const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
     
@@ -317,10 +346,12 @@ Como posso te ajudar hoje?` }
     
     const handleCheckout = async (details: OrderDetails) => {
         setIsCheckoutModalOpen(false);
-        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const deliveryFee = details.orderType === 'delivery' ? 3.00 : 0;
+        const total = subtotal + deliveryFee;
 
         try {
-            const { orderId, orderNumber } = await firebaseService.createOrder(details, cart, total, 'payLater');
+            const { orderId, orderNumber } = await firebaseService.createOrder({ ...details, deliveryFee }, cart, total, 'payLater');
             addToast(`Pedido #${orderNumber} criado! Enviando para o WhatsApp...`, 'success');
             
             const whatsappUrl = generateWhatsAppMessage(details, cart, total, orderNumber, false);
@@ -337,10 +368,12 @@ Como posso te ajudar hoje?` }
     const handleInitiatePixPayment = async (details: OrderDetails, pixOption: 'payNow' | 'payLater') => {
         setIsCheckoutModalOpen(false);
         setIsCreatingPixPayment(true);
-        const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const deliveryFee = details.orderType === 'delivery' ? 3.00 : 0;
+        const total = subtotal + deliveryFee;
         
         try {
-            const { orderId, orderNumber, pixData } = await firebaseService.createOrder(details, cart, total, pixOption);
+            const { orderId, orderNumber, pixData } = await firebaseService.createOrder({ ...details, deliveryFee }, cart, total, pixOption);
             
             if (!pixData || !pixData.qrCodeBase64) {
                  throw new Error("A resposta do servidor não incluiu os dados do PIX.");
@@ -351,6 +384,8 @@ Como posso te ajudar hoje?` }
                 orderNumber: orderNumber,
                 customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.address, cpf: details.cpf },
                 items: cart, total, paymentMethod: 'pix', status: 'awaiting-payment', paymentStatus: 'pending',
+                deliveryFee,
+                allergies: details.allergies,
                 createdAt: new Date(),
                 mercadoPagoDetails: { paymentId: '', qrCodeBase64: pixData.qrCodeBase64, qrCode: pixData.copyPaste }
             };
@@ -366,8 +401,23 @@ Como posso te ajudar hoje?` }
         }
     };
 
+    const handleConfirmReservation = async (details: ReservationDetails) => {
+        setIsReservationModalOpen(false);
+        try {
+            const { orderId, orderNumber } = await firebaseService.createReservation(details);
+            addToast(`Reserva #${orderNumber} criada! Enviando confirmação para o WhatsApp...`, 'success');
+
+            const whatsappUrl = generateReservationWhatsAppMessage(details, orderNumber);
+            window.open(whatsappUrl, '_blank');
+
+        } catch (error: any) {
+            console.error("Failed to create reservation:", error);
+            addToast(error.message || "Erro ao criar reserva.", 'error');
+        }
+    };
+
     const handlePixPaymentSuccess = useCallback(async (paidOrder: Order) => {
-        if (!paidOrder || !paidOrder.id) {
+       if (!paidOrder || !paidOrder.id) {
            addToast("Erro crítico ao processar pagamento.", 'error');
            return;
        }
@@ -382,10 +432,13 @@ Como posso te ajudar hoje?` }
                paymentMethod: 'pix',
                changeNeeded: false,
                notes: paidOrder.notes || '',
-               reservationTime: paidOrder.customer.reservationTime || '',
-               cpf: paidOrder.customer.cpf || ''
+               cpf: paidOrder.customer.cpf || '',
+               neighborhood: paidOrder.customer.neighborhood || '',
+               street: paidOrder.customer.street || '',
+               number: paidOrder.customer.number || '',
+               allergies: paidOrder.allergies || '',
            };
-           const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items, paidOrder.total, paidOrder.orderNumber, true);
+           const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items || [], paidOrder.total || 0, paidOrder.orderNumber, true);
            window.open(whatsappUrl, '_blank');
 
            setCart([]);
@@ -428,9 +481,13 @@ Como posso te ajudar hoje?` }
                 name: finalOrderData.customer.name, phone: finalOrderData.customer.phone, orderType: finalOrderData.customer.orderType,
                 address: finalOrderData.customer.address || '', paymentMethod: 'pix',
                 changeNeeded: false, changeAmount: '',
-                notes: finalOrderData.notes || '', reservationTime: finalOrderData.customer.reservationTime || ''
+                notes: finalOrderData.notes || '',
+                neighborhood: finalOrderData.customer.neighborhood || '',
+                street: finalOrderData.customer.street || '',
+                number: finalOrderData.customer.number || '',
+                allergies: finalOrderData.allergies || ''
             };
-            const whatsappUrl = generateWhatsAppMessage(details, finalOrderData.items, finalOrderData.total, finalOrderData.orderNumber, false);
+            const whatsappUrl = generateWhatsAppMessage(details, finalOrderData.items || [], finalOrderData.total || 0, finalOrderData.orderNumber, false);
             window.open(whatsappUrl, '_blank');
             
             addToast("Pedido enviado! O pagamento será feito na entrega/retirada.", 'success');
@@ -691,7 +748,11 @@ Como posso te ajudar hoje?` }
             </div>
 
             <main className="flex-grow">
-                <HeroSection settings={siteSettings} isLoading={isLoading} />
+                <HeroSection 
+                    settings={siteSettings} 
+                    isLoading={isLoading} 
+                    onReserveClick={() => setIsReservationModalOpen(true)}
+                />
                 
                 {error && (
                     <div className="container mx-auto px-4 py-8">
@@ -807,6 +868,11 @@ Como posso te ajudar hoje?` }
                 cartItems={cart}
                 onConfirmCheckout={handleCheckout}
                 onInitiatePixPayment={handleInitiatePixPayment}
+            />
+            <ReservationModal
+                isOpen={isReservationModalOpen}
+                onClose={() => setIsReservationModalOpen(false)}
+                onConfirmReservation={handleConfirmReservation}
             />
              <PixPaymentModal
                 key={pixRetryKey}

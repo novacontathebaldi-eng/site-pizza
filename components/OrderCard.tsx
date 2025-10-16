@@ -58,7 +58,7 @@ const getPaymentStatusInfo = (order: Order): { text: string; isPaid: boolean; is
 
 
 export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete, onRefund, isRefunding }) => {
-    const { id, orderNumber, customer, items, total, paymentMethod, changeNeeded, changeAmount, notes, status, paymentStatus, createdAt, pickupTimeEstimate, mercadoPagoDetails } = order;
+    const { id, orderNumber, customer, items, total, paymentMethod, changeNeeded, changeAmount, notes, status, paymentStatus, createdAt, pickupTimeEstimate, mercadoPagoDetails, numberOfPeople, deliveryFee, allergies } = order;
     const config = getStatusConfig(order);
     const { text: paymentStatusText, isPaid, isRefunded } = getPaymentStatusInfo(order);
 
@@ -159,6 +159,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
         </div>
     );
 
+    const fullAddress = customer.orderType === 'delivery' ? `${customer.street || ''}, ${customer.number || ''} - ${customer.neighborhood || ''}` : customer.address;
+
 
     return (
         <>
@@ -176,8 +178,12 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                         <div className="flex flex-col items-end gap-1">
                             <div className="flex items-start gap-2">
                                 <div className="text-right">
-                                    <p className="font-bold text-2xl text-accent">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                                    <p className="text-sm text-gray-600">{items.reduce((acc, item) => acc + item.quantity, 0)} itens</p>
+                                    {total != null && (
+                                        <p className="font-bold text-2xl text-accent">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                    )}
+                                    {items && items.length > 0 && (
+                                        <p className="text-sm text-gray-600">{items.reduce((acc, item) => acc + item.quantity, 0)} itens</p>
+                                    )}
                                 </div>
                                 <button onClick={() => setIsContactModalOpen(true)} className="w-10 h-10 bg-green-100 text-green-600 rounded-full flex items-center justify-center hover:bg-green-200 transition-colors flex-shrink-0" aria-label="Contato com cliente">
                                     <i className="fab fa-whatsapp text-2xl"></i>
@@ -202,30 +208,34 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                             <p><strong>Nome:</strong> {customer.name}</p>
                             <p><strong>Telefone:</strong> {customer.phone}</p>
                             <p><strong>Pedido:</strong> {orderTypeMap[customer.orderType]}</p>
-                            {customer.orderType === 'delivery' && customer.address && <p><strong>Endereço:</strong> {customer.address}</p>}
-                            {customer.orderType === 'local' && customer.reservationTime && (
-                                <div className="flex items-center gap-2">
-                                    <strong>Reserva:</strong> 
-                                    {isEditingTime ? (
-                                        <input 
-                                            type="text" 
-                                            value={newTime} 
-                                            onChange={(e) => setNewTime(e.target.value)} 
-                                            onBlur={handleTimeSave}
-                                            onKeyDown={(e) => e.key === 'Enter' && handleTimeSave()}
-                                            className="px-2 py-0.5 border rounded-md w-24" 
-                                            autoFocus
-                                        />
-                                    ) : (
-                                        <>
-                                            <span>{customer.reservationTime}</span>
-                                            <button onClick={() => setIsEditingTime(true)} className="text-xs text-blue-600 hover:underline"><i className="fas fa-edit"></i></button>
-                                        </>
-                                    )}
-                                </div>
+                            {customer.orderType === 'delivery' && fullAddress && <p><strong>Endereço:</strong> {fullAddress}</p>}
+                            {customer.orderType === 'local' && (
+                                <>
+                                    <p><strong>Pessoas:</strong> {numberOfPeople}</p>
+                                    <div className="flex items-center gap-2">
+                                        <strong>Reserva:</strong> 
+                                        {isEditingTime ? (
+                                            <input 
+                                                type="text" 
+                                                value={newTime} 
+                                                onChange={(e) => setNewTime(e.target.value)} 
+                                                onBlur={handleTimeSave}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleTimeSave()}
+                                                className="px-2 py-0.5 border rounded-md w-24" 
+                                                autoFocus
+                                            />
+                                        ) : (
+                                            <>
+                                                <span>{customer.reservationTime}</span>
+                                                <button onClick={() => setIsEditingTime(true)} className="text-xs text-blue-600 hover:underline"><i className="fas fa-edit"></i></button>
+                                            </>
+                                        )}
+                                    </div>
+                                </>
                             )}
                             {customer.orderType === 'pickup' && pickupTimeEstimate && <p><strong>Retirada:</strong> <span className="font-bold text-accent">{pickupTimeEstimate}</span></p>}
                         </div>
+                        {paymentMethod && (
                          <div className="bg-gray-50 p-3 rounded-md flex flex-col">
                             <h4 className="font-bold mb-2"><i className="fas fa-credit-card mr-2"></i>Pagamento</h4>
                             <div className="space-y-1 flex-grow">
@@ -238,6 +248,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                     </span>
                                 </p>
                                 {paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {changeNeeded ? `para R$ ${changeAmount}` : 'Não precisa'}</p> )}
+                                {deliveryFee > 0 && (<p><strong>Taxa de Entrega:</strong> {deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>)}
                             </div>
 
                              {mercadoPagoDetails?.paymentId && (
@@ -257,14 +268,18 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 </div>
                             )}
                         </div>
+                        )}
                     </div>
 
-                    <div>
-                        <h4 className="font-bold mb-2"><i className="fas fa-shopping-basket mr-2"></i>Itens do Pedido</h4>
-                        <ul className="space-y-1 text-sm">
-                            {items.map(item => (<li key={item.id} className="flex justify-between p-2 bg-gray-50 rounded"><span>{item.quantity}x {item.name} ({item.size})</span><span>{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>))}
-                        </ul>
-                    </div>
+                    {items && items.length > 0 && (
+                        <div>
+                            <h4 className="font-bold mb-2"><i className="fas fa-shopping-basket mr-2"></i>Itens do Pedido</h4>
+                            <ul className="space-y-1 text-sm">
+                                {items.map(item => (<li key={item.id} className="flex justify-between p-2 bg-gray-50 rounded"><span>{item.quantity}x {item.name} ({item.size})</span><span>{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>))}
+                            </ul>
+                        </div>
+                    )}
+                     {allergies && <p className="text-sm mt-3 p-2 bg-red-50 rounded-md border border-red-200"><strong>Alergias/Restrições:</strong> {allergies}</p>}
                      {notes && <p className="text-sm mt-3 p-2 bg-yellow-50 rounded-md border border-yellow-200"><strong>Obs:</strong> {notes}</p>}
 
                     <div className="flex flex-wrap items-center justify-end gap-2 mt-4 pt-4 border-t">
