@@ -48,15 +48,22 @@ const parseMessage = (content: string) => {
 
 export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onSendMessage, isSending }) => {
     const [input, setInput] = useState('');
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const lastElementRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
-
     useEffect(() => {
-        scrollToBottom();
+        if (lastElementRef.current) {
+            const lastMessage = messages[messages.length - 1];
+            
+            // Quando uma nova mensagem do bot chega (isSending é falso e a última mensagem é do bot),
+            // rola para o topo dessa mensagem.
+            if (lastMessage && lastMessage.role === 'bot' && !isSending) {
+                lastElementRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                // Para mensagens do usuário ou o indicador 'digitando', rola para o final para mantê-los visíveis.
+                lastElementRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }
+        }
     }, [messages, isSending]);
 
     useEffect(() => {
@@ -89,14 +96,19 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
 
             <div className="flex-grow overflow-y-auto p-4 space-y-4">
                 {messages.map((msg, index) => (
-                    <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div 
+                        key={index} 
+                        // Anexa a ref à última mensagem apenas se o bot NÃO estiver digitando.
+                        ref={index === messages.length - 1 && !isSending ? lastElementRef : null}
+                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
                         <div className={`whitespace-pre-wrap max-w-[85%] rounded-2xl px-4 py-2 ${msg.role === 'user' ? 'bg-blue-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-800 rounded-bl-none'}`}>
                             {parseMessage(msg.content)}
                         </div>
                     </div>
                 ))}
                  {isSending && (
-                    <div className="flex justify-start">
+                    <div ref={lastElementRef} className="flex justify-start"> {/* Anexa a ref ao indicador de carregamento */}
                         <div className="bg-gray-200 text-gray-800 rounded-2xl rounded-bl-none px-4 py-2">
                             <div className="flex items-center gap-2">
                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
@@ -106,7 +118,6 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                         </div>
                     </div>
                 )}
-                <div ref={messagesEndRef} />
             </div>
             
             <form onSubmit={handleSend} className="p-4 border-t border-gray-200 flex items-center gap-2 flex-shrink-0">

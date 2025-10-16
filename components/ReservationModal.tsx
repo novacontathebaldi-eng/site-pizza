@@ -27,7 +27,7 @@ const getSuggestedTimes = () => {
 export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onClose, onConfirmReservation, isProcessing }) => {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
-    const [numberOfPeople, setNumberOfPeople] = useState(2);
+    const [numberOfPeople, setNumberOfPeople] = useState<number | ''>('');
     const [reservationTime, setReservationTime] = useState('');
     const [notes, setNotes] = useState('');
     const [error, setError] = useState('');
@@ -38,7 +38,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
         if (isOpen) {
             setName('');
             setPhone('');
-            setNumberOfPeople(2);
+            setNumberOfPeople('');
             setReservationTime('');
             setNotes('');
             setError('');
@@ -56,6 +56,11 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
             return;
         }
 
+        if (!numberOfPeople || numberOfPeople < 1) {
+            setError('Por favor, informe a quantidade de pessoas (mínimo 1).');
+            return;
+        }
+
         const [hour, minute] = reservationTime.split(':').map(Number);
         
         if (isNaN(hour) || isNaN(minute) || hour < 19 || hour > 21 || (hour === 21 && minute > 0)) {
@@ -66,7 +71,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
         onConfirmReservation({
             name,
             phone,
-            numberOfPeople,
+            numberOfPeople: Number(numberOfPeople),
             reservationTime,
             notes
         });
@@ -95,7 +100,14 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-semibold mb-1">Quantidade de Pessoas *</label>
-                                <input type="number" value={numberOfPeople} onChange={e => setNumberOfPeople(parseInt(e.target.value, 10) || 1)} min="1" className="w-full px-3 py-2 border rounded-md" required />
+                                <input 
+                                    type="number" 
+                                    value={numberOfPeople} 
+                                    onChange={e => setNumberOfPeople(e.target.value === '' ? '' : parseInt(e.target.value, 10))} 
+                                    min="1" 
+                                    className="w-full px-3 py-2 border rounded-md" 
+                                    placeholder="Qtd." 
+                                    required />
                             </div>
                              <div className="p-3 bg-gray-50 rounded-md border">
                                  <label className="block text-sm font-semibold mb-2">Horário da Reserva *</label>
