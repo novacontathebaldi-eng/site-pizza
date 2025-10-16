@@ -1,5 +1,19 @@
 import firebase from 'firebase/compat/app';
 
+export interface UserProfile {
+    uid: string;
+    name: string;
+    email: string;
+    photoURL: string;
+    // User-provided address info
+    phone?: string;
+    localidade?: string;
+    neighborhood?: string;
+    street?: string;
+    number?: string;
+    complement?: string;
+}
+
 export interface Product {
     id: string;
     name: string;
@@ -87,6 +101,7 @@ export interface OrderCustomerDetails {
 
 export interface Order {
     id: string;
+    userId?: string;
     orderNumber: number; // Número sequencial do pedido
     customer: OrderCustomerDetails;
     items?: CartItem[];

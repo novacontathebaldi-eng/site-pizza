@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SiteSettings } from '../types';
-// import logo from '../assets/logo.png'; // No longer needed, using dynamic URL
+import firebase from 'firebase/compat/app';
 
 interface HeaderProps {
     cartItemCount: number;
@@ -8,9 +8,11 @@ interface HeaderProps {
     onOpenChatbot: () => void;
     activeSection: string;
     settings: SiteSettings;
+    user: firebase.User | null;
+    onUserIconClick: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOpenChatbot, activeSection, settings }) => {
+export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOpenChatbot, activeSection, settings, user, onUserIconClick }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
 
@@ -65,6 +67,13 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOp
                         <button onClick={() => scrollToSection('cardapio')} className="hidden sm:flex items-center gap-2 bg-brand-gold-600 text-text-on-dark px-4 py-2 rounded-lg font-semibold hover:bg-opacity-90 transition-all">
                             <i className="fas fa-utensils"></i>
                             <span className="hidden md:inline">Ver Cardápio</span>
+                        </button>
+                        <button onClick={onUserIconClick} className="relative w-12 h-12 flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors" aria-label="Minha Conta">
+                            {user ? (
+                                <img src={user.photoURL!} alt="Foto de perfil" className="w-full h-full rounded-lg object-cover" />
+                            ) : (
+                                <i className="fas fa-user-circle text-2xl"></i>
+                            )}
                         </button>
                         <button onClick={onCartClick} className="relative w-12 h-12 flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors" aria-label="Abrir carrinho de compras">
                             <i className="fas fa-shopping-cart text-lg"></i>

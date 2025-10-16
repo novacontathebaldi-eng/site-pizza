@@ -2,7 +2,7 @@
 import firebase from 'firebase/compat/app';
 import { db, storage, functions } from './firebase';
 // FIX: Added ReservationDetails to the import list to support the new reservation creation function.
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem, ChatMessage, ReservationDetails } from '../types';
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem, ChatMessage, ReservationDetails, UserProfile } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -151,6 +151,34 @@ export const createReservation = async (details: ReservationDetails): Promise<{ 
         throw new Error("Não foi possível criar a reserva. Tente novamente.");
     }
 };
+
+// --- User Profile & Auth Functions ---
+export const verifyGoogleToken = async (idToken: string): Promise<string> => {
+    if (!functions) {
+        throw new Error("Firebase Functions is not initialized.");
+    }
+    const verifyFunction = functions.httpsCallable('verifyGoogleToken');
+    try {
+        const result = await verifyFunction({ idToken });
+        return result.data.customToken;
+    } catch (error) {
+        console.error("Error calling verifyGoogleToken function:", error);
+        throw new Error("Falha na autenticação com o Google.");
+    }
+};
+
+export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
+    if (!db) return null;
+    const doc = await db.collection('users').doc(uid).get();
+    if (!doc.exists) return null;
+    return { uid, ...doc.data() } as UserProfile;
+};
+
+export const updateUserProfile = async (uid: string, data: Partial<UserProfile>): Promise<void> => {
+    if (!db) throw new Error("Firestore not initialized.");
+    await db.collection('users').doc(uid).set(data, { merge: true });
+};
+
 
 // --- Chatbot Function ---
 export const askChatbot = async (messages: ChatMessage[]): Promise<string> => {

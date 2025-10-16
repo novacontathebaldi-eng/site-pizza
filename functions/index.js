@@ -5,12 +5,13 @@ const admin = require("firebase-admin");
 const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago");
 const crypto = require("crypto");
 const {GoogleGenAI} = require("@google/genai");
+const {OAuth2Client} = require("google-auth-library");
 
 admin.initializeApp();
 const db = admin.firestore();
 
 // Define os secrets que as funções irão usar.
-const secrets = ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET", "GEMINI_API_KEY"];
+const secrets = ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET", "GEMINI_API_KEY", "GOOGLE_CLIENT_ID"];
 
 // --- Chatbot Santo ---
 let ai; // Mantém a instância da IA no escopo global para ser reutilizada após a primeira chamada.
@@ -60,11 +61,8 @@ exports.askSanto = onCall({secrets}, async (request) => {
     const timeInstruction = `INFORMAÇÃO DE CONTEXTO EM TEMPO REAL: A data e hora atual em Brasília são: ${brasiliaTime}. Use esta informação para responder sobre horários de funcionamento e disponibilidade.`;
 
     const systemInstruction = `${timeInstruction}\n
-        Você é um atendente virtual amigável, prestativo e um pouco divertido da pizzaria 'Santa Sensação'. Seu nome é Santo. Sua principal função é ser o maior especialista no site da pizzaria, ajudando os clientes com qualquer dúvida sobre o cardápio, sabores, horário de funcionamento, endereço e, principalmente, como fazer um pedido, seja objetivo, mas também ofereça detalhes passo a passo se o cliente preferir. Seja sempre cordial e, como o nosso site já envia a primeira mensagem com seu nome automaticamente se a conversa já começou, não se apresente novamente, apenas continue o diálogo. Se o cliente por acaso se apresentar, passe a chama-lo pelo nome. Se o cliente perguntar quem é o dono diga que somos uma família e o dono é ele, o cliente, ele quem manda hahahaha, seja engraçado nesse momento. Se o cliente perguntar se você é um robô, diga que é o assistente virtual da casa, pronto para ajudar com um toque de magia. Para fazer Negrito use dois ** no início da palavra ou frase e dois ** no final da palavra ou frase, como no exemplo: **Exemplo Negrito**. A taxa de entrega é R$ 3,00. Atendemos a Região do Centro de Santa Leopoldina, as comunidades de Olaria, Vila Nova, Centro, Moxafongo, Cocal, Funil. Vou te explicar uma coisa agora para você ficar sabendo e explicar melhor sobre os locais até aonde entregamos: para o lado da Olaria, Entregamos até a Piscina (Canaã Campestre Clube). Subindo pra o funil entregamos até aquelas primeiras casas depois da ponte do Funil. No cocal entregamos até aquelas primeiras casas depois de passar aonde estão construindo a nova Escola Municipal. Mas a princípio diga que entregamos nas comunidades de Olaria, Vila Nova, Centro, Moxafongo, Cocal, Funil. Mas pergunte se o cliente quer enviar uma mensagem para o restaurante pelo WhatsApp confirmar o endereço, se ele responder que quer, usando o mesmo modelo ensinado abaixo crie um link para o cliente 'Continuar as conversa pelo WhatsApp' já faça um resumo e crie o link usando o modelo ensinado abaixo para criar os links clicáveis já com uma mensagem adequada pré escrita.
-        
-Você não deve encaminha o cliente para o WhatsApp depois das 23h, deve informar que a pizzaria está fechada já muito tarde para enviar um WhatsApp e que podemos tentar novamente amanhã, mas se o cliente insistir você pode enviar mas avise-o que está tarde e possivelmente a mensagem só será lida no dia seguinte. aja assim das 23:00 horas até às 5:00 horas.
-De 5:00 horas até 18:00 você pode encaminhar o cliente para o WhatsApp mas deve informar que estamos fora do horário de funcionamento (indique o horário de funcionamento).
-Se o cliente perguntar se estamos abertos, verifique o horário e responda.
+        Você é um atendente virtual amigável, prestativo e um pouco divertido da pizzaria 'Santa Sensação'. Seu nome é Santo. Sua principal função é ser o maior especialista no site da pizzaria, ajudando os clientes com qualquer dúvida sobre o cardápio, sabores, horário de funcionamento, endereço e, principalmente, como fazer um pedido, seja objetivo, mas também ofereça detalhes passo a passo se o cliente preferir. Seja sempre cordial e, como o nosso site já envia a primeira mensagem com seu nome automaticamente se a conversa já começou, não se apresente novamente, apenas continue o diálogo. Se o cliente por acaso se apresentar, passe a chama-lo pelo nome. Se o cliente perguntar quem é o dono diga que somos uma família e o dono é ele, o cliente, ele quem manda hahahaha, seja engraçado nesse momento. Se o cliente perguntar se você é um robô, diga que é o assistente virtual da casa, pronto para ajudar com um toque de magia. Para fazer Negrito use dois ** no início da palavra ou frase e dois ** no final da palavra ou frase, como no exemplo: **Exemplo Negrito**. A taxa de entrega é R$ 3,00. Atendemos a Região do Centro de Santa Leopoldina, as comunidades de Olaria, Vila Nova, Centro, Moxafongo, Cocal, Funil. Vou te explicar uma coisa agora para você ficar sabendo e explicar melhor sobre os locais até aonde entregamos: para o lado da Olaria, Entregamos até a Piscina (Canaã Campreste Clube). Subindo pra o funil entregamos até aquelas primeiras casas depois da ponte do Funil. No cocal entregamos até aquelas primeiras casas depois de passar aonde estão construindo a nova Escola Municipal.Mas a princípio diga que entregamos nas comunidades de Olaria, Vila Nova, Centro, Moxafongo, Cocal, Funil. Mas pergunte se o cliente quer enviar uma mensagem para o restaurante pelo WhatsApp confirmar o endereço, se ele responder que quer, usando o mesmo modelo ensinado abaixo crie um link para o cliente 'Continuar as conversa pelo WhatsApp' já faça um resumo e crie o link usando o modelo ensinado abaixo para criar os links clícáveis já com uma menssagem adequada pré escrita.
+
 INFORMAÇÕES GERAIS (SEU CONHECIMENTO BASE)
 Horário de Funcionamento: Quarta a Domingo, das 19h às 22h. Se alguém tentar pedir fora desse horário, informe que a loja está fechada e que o botão 'Finalizar Pedido' estará desativado.
 Endereço: Rua Porfilio Furtado, 178, Centro - Santa Leopoldina, ES. Ao fornecer o endereço, adicione uma mensagem amigável como 'Estamos no coração de Santa Leopoldina, prontos para te receber com a melhor pizza do estado!'.
@@ -238,7 +236,7 @@ Em JS/TS, prefira sempre encodeURIComponent() para evitar erros manuais.​
 
 Emojis devem ser codificados pelos bytes UTF‑8 quando não usar função nativa (ex.: 🍕 → %F0%9F%8D%95).​
 
-Evite adicionar parâmetros além de text= para o click-to-chat.​
+Evite adicionar parâmetros extras de text= para o click-to-chat.​
 
 Caso precise sem número fixo, use 'https://wa.me/?text=ENCODED_MESSAGE' e permita ao usuário escolher o contato, mas o fluxo principal deve usar o número definido.​
 
@@ -265,6 +263,78 @@ REGRAS DE ESCALONAMENTO SUPORTE TECNICO E BUGS: Quando o cliente relatar problem
 
 
 /**
+ * Verifies a Google ID token, creates or updates a Firebase user,
+ * and returns a custom token for session authentication.
+ */
+exports.verifyGoogleToken = onCall({secrets}, async (request) => {
+  const {idToken} = request.data;
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+
+  if (!idToken) {
+    throw new onCall.HttpsError("invalid-argument", "The function must be called with an idToken.");
+  }
+  if (!clientId) {
+    logger.error("GOOGLE_CLIENT_ID not set.");
+    throw new onCall.HttpsError("internal", "Authentication is not configured correctly.");
+  }
+
+  const client = new OAuth2Client(clientId);
+
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: idToken,
+      audience: clientId,
+    });
+    const payload = ticket.getPayload();
+
+    if (!payload) {
+      throw new onCall.HttpsError("unauthenticated", "Invalid ID token.");
+    }
+
+    const {sub: googleUid, email, name, picture} = payload;
+    // We create a unique UID for Firebase Auth based on the Google UID
+    const uid = `google:${googleUid}`;
+
+    // Update or create user in Firebase Auth
+    try {
+      await admin.auth().updateUser(uid, {
+        email: email,
+        displayName: name,
+        photoURL: picture,
+      });
+    } catch (error) {
+      if (error.code === "auth/user-not-found") {
+        await admin.auth().createUser({
+          uid: uid,
+          email: email,
+          displayName: name,
+          photoURL: picture,
+        });
+      } else {
+        throw error; // Re-throw other errors
+      }
+    }
+
+    // Create or update user profile in Firestore 'users' collection
+    const userRef = db.collection("users").doc(uid);
+    await userRef.set({
+      name,
+      email,
+      photoURL: picture,
+    }, {merge: true});
+
+
+    // Create a custom token for the Firebase user
+    const customToken = await admin.auth().createCustomToken(uid);
+    return {customToken};
+  } catch (error) {
+    logger.error("Error verifying Google token:", error);
+    throw new onCall.HttpsError("unauthenticated", "Token verification failed.", error.message);
+  }
+});
+
+
+/**
  * Creates an order in Firestore and optionally initiates a PIX payment.
  */
 exports.createOrder = onCall({secrets}, async (request) => {
@@ -276,6 +346,7 @@ exports.createOrder = onCall({secrets}, async (request) => {
   const client = new MercadoPagoConfig({accessToken});
 
   const {details, cart, total, pixOption} = request.data;
+  const userId = request.auth?.uid || null;
 
   // 1. Validate input
   if (!details || !cart || !total) {
@@ -307,6 +378,7 @@ exports.createOrder = onCall({secrets}, async (request) => {
   const orderStatus = isPixPayNow ? "awaiting-payment" : "pending";
 
   const orderData = {
+    userId, // Associate order with user if logged in
     orderNumber,
     customer: {
       name: details.name,
@@ -413,6 +485,7 @@ exports.createOrder = onCall({secrets}, async (request) => {
  */
 exports.createReservation = onCall({secrets}, async (request) => {
   const {details} = request.data;
+  const userId = request.auth?.uid || null;
 
   // 1. Validate input
   if (!details || !details.name || !details.phone || !details.reservationDate || !details.reservationTime || !details.numberOfPeople) {
@@ -440,6 +513,7 @@ exports.createReservation = onCall({secrets}, async (request) => {
 
   // 3. Prepare reservation data for Firestore (as an Order)
   const orderData = {
+    userId,
     orderNumber,
     customer: {
       name: details.name,

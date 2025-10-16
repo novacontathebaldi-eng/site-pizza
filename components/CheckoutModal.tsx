@@ -136,11 +136,13 @@ interface CheckoutModalProps {
     onConfirmCheckout: (details: OrderDetails) => void;
     onInitiatePixPayment: (details: OrderDetails, pixOption: 'payNow' | 'payLater') => void;
     isProcessing: boolean;
+    name: string;
+    setName: (name: string) => void;
+    phone: string;
+    setPhone: (phone: string) => void;
 }
 
-export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, onInitiatePixPayment, isProcessing }) => {
-    const [name, setName] = useState('');
-    const [phone, setPhone] = useState('');
+export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, onInitiatePixPayment, isProcessing, name, setName, phone, setPhone }) => {
     const [cpf, setCpf] = useState('');
     const [orderType, setOrderType] = useState<'delivery' | 'pickup' | ''>('');
     
@@ -160,7 +162,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
 
     useEffect(() => {
         if (!isOpen) {
-            setName(''); setPhone(''); setCpf(''); setOrderType('');
+            // FIX: Name and phone are now controlled by the parent to allow pre-filling.
+            // They are reset on logout in the parent component instead of on modal close.
+            setCpf(''); setOrderType('');
             setNeighborhood(''); setStreet(''); setNumber(''); setIsNoNumber(false); setComplement(''); setAllergies('');
             setPaymentMethod(''); setChangeNeeded(false); setChangeAmount('');
             setNotes(''); setPixPaymentOption(null);
