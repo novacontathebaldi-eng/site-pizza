@@ -434,15 +434,17 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
     return (
         <div className="fixed inset-0 bg-brand-ivory-50 z-50 animate-fade-in-up">
             <div className="w-full h-full flex flex-col">
-                <header className="sticky top-0 bg-brand-ivory-50/90 backdrop-blur-sm z-10 flex justify-between items-center p-4 border-b border-gray-200 flex-shrink-0">
-                    <h2 className="text-xl sm:text-2xl font-bold text-text-on-light flex items-center gap-3">
-                        <i className="fas fa-user-circle"></i>
-                        <span>Área do Cliente</span>
-                    </h2>
-                    <button onClick={onClose} className="text-gray-600 font-semibold py-2 px-3 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-2">
-                        <i className="fas fa-arrow-left"></i>
-                        <span className="hidden sm:inline">Voltar</span>
-                    </button>
+                <header className="sticky top-0 bg-brand-green-700 z-10 flex-shrink-0 shadow-md">
+                    <div className="max-w-4xl mx-auto flex justify-between items-center p-4">
+                        <h2 className="text-xl sm:text-2xl font-bold text-text-on-dark flex items-center gap-3">
+                            <i className="fas fa-user-circle"></i>
+                            <span>Área do Cliente</span>
+                        </h2>
+                        <button onClick={onClose} className="text-text-on-dark font-semibold py-2 px-3 rounded-lg hover:bg-brand-olive-600 transition-colors flex items-center gap-2">
+                            <i className="fas fa-arrow-left"></i>
+                            <span className="hidden sm:inline">Voltar</span>
+                        </button>
+                    </div>
                 </header>
 
                 <div className="flex-grow overflow-y-auto">
