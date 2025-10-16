@@ -77,6 +77,13 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
     };
     
     const handleAccept = () => {
+        // Se o pedido for uma reserva, 'Aceitar' muda o status para 'reserved'.
+        if (customer.orderType === 'local' && status === 'pending') {
+            onUpdateStatus(id, 'reserved');
+            return;
+        }
+
+        // Lógica padrão para outros tipos de pedido
         let payload = {};
         if (customer.orderType === 'pickup') {
             const now = new Date();
@@ -100,6 +107,31 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
             onUpdateReservationTime(id, newTime);
         }
         setIsEditingTime(false);
+    };
+
+    const handlePaymentStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newStatus = e.target.value as PaymentStatus;
+        const currentStatus = order.paymentStatus;
+
+        if (newStatus === currentStatus) {
+            return; // Nenhuma alteração
+        }
+
+        let confirmationMessage = '';
+        if (currentStatus === 'pending' && newStatus === 'paid') {
+            confirmationMessage = "Tem certeza que deseja alterar o status do pagamento para 'Pago'?";
+        } else if (currentStatus === 'paid' && newStatus === 'pending') {
+            confirmationMessage = "ATENÇÃO: Tem certeza que deseja reverter o status do pagamento para 'Pendente'?";
+        }
+
+        if (confirmationMessage) {
+            if (window.confirm(confirmationMessage)) {
+                onUpdatePaymentStatus(id, newStatus);
+            }
+            // Se o usuário cancelar, não faz nada. O select voltará ao valor original no re-render.
+        } else {
+            onUpdatePaymentStatus(id, newStatus);
+        }
     };
 
     const isArchived = status === 'completed' || status === 'cancelled';
@@ -150,13 +182,13 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
         </div>
     );
     
-    const paymentStatusChanger = !isArchived && !isRefunded && order.paymentStatus !== 'paid_online' && customer.orderType !== 'local' && (
+    const paymentStatusChanger = !isArchived && !isRefunded && order.paymentStatus !== 'paid_online' && (
         <div className="flex items-center gap-2">
             <label htmlFor={`payment-status-select-${order.id}`} className="text-sm font-semibold text-gray-700 whitespace-nowrap">Pgto:</label>
             <select
                 id={`payment-status-select-${order.id}`}
                 value={order.paymentStatus}
-                onChange={(e) => onUpdatePaymentStatus(id, e.target.value as PaymentStatus)}
+                onChange={handlePaymentStatusChange}
                 className={`px-2 py-1 border rounded-md bg-white text-sm focus:ring-accent focus:border-accent font-semibold ${
                     isPaid ? 'text-green-600' : 'text-yellow-600'
                 }`}
@@ -331,7 +363,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 
                                 {status === 'reserved' && !isRefunded && <button onClick={() => onUpdateStatus(id, 'cancelled')} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Cancelar</button>}
 
-                                {customer.orderType !== 'local' && statusChanger}
+                                {statusChanger}
 
                                 {isArchived && <button onClick={() => onDelete(id)} className="text-red-500 font-semibold py-2 px-3 rounded-lg text-xs hover:bg-red-50"><i className="fas fa-trash mr-2"></i>Mover p/ Lixeira</button>}
                             </div>

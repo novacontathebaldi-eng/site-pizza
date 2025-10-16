@@ -433,7 +433,7 @@ exports.createReservation = onCall({secrets}, async (request) => {
     },
     numberOfPeople: details.numberOfPeople,
     notes: details.notes || "",
-    status: "reserved",
+    status: "pending",
     paymentStatus: "pending",
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   };
