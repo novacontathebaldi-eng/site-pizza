@@ -28,6 +28,7 @@ declare global {
     interface Window {
         gapi: any;
         googleScriptLoaded: boolean;
+        onGoogleScriptLoadCallback: () => void;
     }
 }
 
@@ -219,34 +220,40 @@ const App: React.FC = () => {
 
     // Effect to initialize Google Auth
     useEffect(() => {
-        const handleScriptLoad = () => {
-            if (window.gapi) {
+        const initGoogleAuth = () => {
+            if (window.gapi && !isGapiReady) {
                 window.gapi.load('auth2', () => {
                     try {
                         window.gapi.auth2.init({
-                            // IMPORTANTE: ID de Cliente correto inserido aqui.
                             client_id: '914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com',
                         }).then(() => {
                             setIsGapiReady(true);
+                        }, (error: any) => {
+                            console.error('Error initializing Google Auth2:', error);
+                            addToast('Não foi possível iniciar o Login com Google.', 'error');
                         });
                     } catch (error) {
-                        console.error('Error initializing Google Auth2:', error);
-                        addToast('Não foi possível iniciar o Login com Google.', 'error');
+                        console.error('Error loading Google Auth2:', error);
+                        addToast('Não foi possível carregar a biblioteca de login.', 'error');
                     }
                 });
             }
         };
-        
-        window.addEventListener('google-script-loaded', handleScriptLoad);
-        
-        if (window.googleScriptLoaded && !isGapiReady) {
-            handleScriptLoad();
+
+        // Assign callback for the script in index.html to call
+        window.onGoogleScriptLoadCallback = initGoogleAuth;
+
+        // If script is already loaded and callback was missed (race condition), run init
+        if (window.googleScriptLoaded) {
+            initGoogleAuth();
         }
 
         return () => {
-            window.removeEventListener('google-script-loaded', handleScriptLoad);
-        }
+            // @ts-ignore
+            delete window.onGoogleScriptLoadCallback;
+        };
     }, [isGapiReady, addToast]);
+
 
     // Effect for Firebase Auth state changes
     useEffect(() => {

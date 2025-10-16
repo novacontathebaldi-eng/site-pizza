@@ -3,6 +3,7 @@ import firebase from 'firebase/compat/app';
 import { UserProfile, Order, OrderStatus } from '../types';
 import { db } from '../services/firebase';
 import * as firebaseService from '../services/firebaseService';
+import defaultProfilePic from '../assets/perfil.png';
 
 interface UserAreaModalProps {
     isOpen: boolean;
@@ -44,11 +45,18 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
         setIsLoadingOrders(true);
         const query = db.collection('orders')
                       .where('userId', '==', user.uid)
-                      .orderBy('createdAt', 'desc')
                       .limit(15);
 
         const unsubscribe = query.onSnapshot(snapshot => {
             const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+            
+            // Sort client-side by creation date, newest first
+            fetchedOrders.sort((a, b) => {
+                const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+                const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+                return dateB - dateA;
+            });
+
             setMyOrders(fetchedOrders);
             setIsLoadingOrders(false);
         }, error => {
@@ -91,7 +99,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                 </div>
                 <div className="overflow-y-auto p-6 space-y-6">
                     <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg border">
-                        <img src={profile.photoURL} alt="Foto de perfil" className="w-16 h-16 rounded-full" />
+                        <img src={profile.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-16 h-16 rounded-full" />
                         <div>
                             <h3 className="font-bold text-xl">{profile.name}</h3>
                             <p className="text-gray-600 text-sm">{profile.email}</p>

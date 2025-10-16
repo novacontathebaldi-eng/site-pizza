@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SiteSettings } from '../types';
 import firebase from 'firebase/compat/app';
+import defaultProfilePic from '../assets/perfil.png';
 
 interface HeaderProps {
     cartItemCount: number;
@@ -70,7 +71,7 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOp
                         </button>
                         <button onClick={onUserIconClick} className="relative w-12 h-12 flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors" aria-label="Minha Conta">
                             {user ? (
-                                <img src={user.photoURL!} alt="Foto de perfil" className="w-full h-full rounded-lg object-cover" />
+                                <img src={user.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-full h-full rounded-lg object-cover" />
                             ) : (
                                 <i className="fas fa-user-circle text-2xl"></i>
                             )}
