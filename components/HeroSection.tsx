@@ -105,7 +105,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ settings, isLoading, o
                     </button>
                     <button 
                         onClick={onReserveClick} 
-                        className="bg-transparent border-2 border-brand-gold-600 text-brand-gold-600 font-bold py-3 px-8 rounded-xl text-lg hover:bg-brand-gold-600 hover:text-text-on-dark transition-all transform hover:scale-105 flex items-center justify-center"
+                        className="bg-brand-gold-600 text-text-on-dark font-bold py-3 px-8 rounded-xl text-lg hover:bg-opacity-90 transition-all transform hover:scale-105 flex items-center justify-center min-w-[280px]"
                     >
                         <i className="fas fa-calendar-alt mr-2"></i>
                         <span>Fazer uma Reserva</span>

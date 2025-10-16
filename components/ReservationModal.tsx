@@ -10,22 +10,18 @@ interface ReservationModalProps {
 }
 
 const getSuggestedTimes = () => {
-    const suggestions: string[] = [];
+    const suggestions: string[] = ['19:00', '19:30', '20:00', '20:30'];
     const now = new Date();
     const currentHour = now.getHours();
     const currentMinutes = now.getMinutes();
 
-    // Horários de reserva: 19:00, 19:30, 20:00, 20:30, 21:00
-    for (let hour = 19; hour <= 21; hour++) {
-        for (let minute = 0; minute < 60; minute += 30) {
-            // Não sugere horários que já passaram no dia atual
-            if (hour > currentHour || (hour === currentHour && minute > currentMinutes)) {
-                 suggestions.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
-            }
-        }
-    }
-    return suggestions;
+    // Filtra horários que já passaram no dia atual
+    return suggestions.filter(time => {
+        const [hour, minute] = time.split(':').map(Number);
+        return hour > currentHour || (hour === currentHour && minute > currentMinutes);
+    });
 };
+
 
 export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onClose, onConfirmReservation }) => {
     const [name, setName] = useState('');
