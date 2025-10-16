@@ -396,7 +396,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                     <h2 className="text-2xl font-bold text-text-on-light"><i className="fas fa-user-circle mr-2"></i>Área do Cliente</h2>
                     <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
                 </div>
-                <div className="flex-grow overflow-y-auto p-6">
+                <div className="flex-grow min-h-0 overflow-y-auto p-6">
                     <div className="border-b mb-4">
                         <nav className="flex -mb-px">
                             <button onClick={() => setActiveTab('profile')} className={`py-2 px-4 font-semibold text-sm ${activeTab === 'profile' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Perfil</button>
