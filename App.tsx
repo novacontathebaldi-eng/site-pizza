@@ -337,7 +337,7 @@ const App: React.FC = () => {
     }, [postRegisterAction, currentUser]);
 
 
-    // Other existing useEffects...
+    // Other existing handlers...
     useEffect(() => {
         const savedCart = localStorage.getItem('santaSensacaoCart');
         if (savedCart) setCart(JSON.parse(savedCart));
@@ -618,7 +618,7 @@ const App: React.FC = () => {
     const handleDeleteCategory = useCallback(async (categoryId: string) => { try { await firebaseService.deleteCategory(categoryId, products); addToast("Categoria deletada!", 'success'); } catch (error: any) { console.error("Failed to delete category:", error); addToast(`Erro: ${error.message}`, 'error'); } }, [products, addToast]);
     const handleCategoryStatusChange = useCallback(async (categoryId: string, active: boolean) => { try { await firebaseService.updateCategoryStatus(categoryId, active); addToast(`Categoria ${active ? 'ativada' : 'desativada'}.`, 'success'); } catch (error) { console.error("Failed to update category status:", error); addToast("Erro ao atualizar status.", 'error'); } }, [addToast]);
     const handleReorderProducts = useCallback(async (productsToUpdate: { id: string; orderIndex: number }[]) => { try { await firebaseService.updateProductsOrder(productsToUpdate); addToast("Ordem dos produtos atualizada.", 'success'); } catch (error) { console.error("Failed to reorder products:", error); addToast("Erro ao reordenar produtos.", 'error'); } }, [addToast]);
-    const handleReorderCategories = useCallback(async (categoriesToUpdate: { id: string; order: number }[]) => { try { await firebaseService.updateCategoriesOrder(categoriesToUpdate); addToast("Ordem das categorias atualizada.", 'success'); } catch (error) { console.error("Failed to reorder categories:", error); addToast("Erro ao reordenar categorias.", 'error'); } }, [addToast]);
+    const handleReorderCategories = useCallback(async (categoriesToUpdate: { id: string; order: number }[]): Promise<void> => { try { await firebaseService.updateCategoriesOrder(categoriesToUpdate); addToast("Ordem das categorias atualizada.", 'success'); } catch (error) { console.error("Failed to reorder categories:", error); addToast("Erro ao reordenar categorias.", 'error'); } }, [addToast]);
     const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => { try { const settingsToUpdate = JSON.parse(JSON.stringify(settings)); for (const key in files) { const file = files[key]; if (file) { const url = await firebaseService.uploadSiteAsset(file, key); if (key === 'logo') settingsToUpdate.logoUrl = url; else if (key === 'heroBg') settingsToUpdate.heroBgUrl = url; else { const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key); if (sectionIndex > -1) settingsToUpdate.contentSections[sectionIndex].imageUrl = url; } } } await firebaseService.updateSiteSettings(settingsToUpdate); addToast("Personalização salva!", 'success'); } catch (error) { console.error("Failed to save site settings:", error); addToast("Erro ao salvar configurações.", 'error'); } }, [addToast]);
     const handleUpdateOrderStatus = useCallback(async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => { try { let finalStatus = status; const order = orders.find(o => o.id === orderId); if (status === 'accepted' && order?.customer.orderType === 'local') finalStatus = 'reserved'; await firebaseService.updateOrderStatus(orderId, finalStatus, payload); addToast("Status do pedido atualizado!", 'success'); } catch (error) { console.error("Failed to update order status:", error); addToast("Erro ao atualizar status.", 'error'); } }, [orders, addToast]);
     const handleUpdateOrderPaymentStatus = useCallback(async (orderId: string, paymentStatus: PaymentStatus) => { try { await firebaseService.updateOrderPaymentStatus(orderId, paymentStatus); addToast("Status de pagamento atualizado!", 'success'); } catch (error) { console.error("Failed to update order payment status:", error); addToast("Erro ao atualizar pagamento.", 'error'); } }, [addToast]);
@@ -628,6 +628,32 @@ const App: React.FC = () => {
     const handleRefundOrder = useCallback(async (orderId: string) => { if (window.confirm("Estornar o valor total deste pagamento? Esta ação não pode ser desfeita.")) { const orderToRefund = orders.find(o => o.id === orderId); const paymentId = orderToRefund?.mercadoPagoDetails?.paymentId; if (!paymentId) { addToast("ID do pagamento não encontrado.", 'error'); return; } setRefundingOrderId(orderId); addToast("Processando estorno...", 'success'); try { await firebaseService.refundPayment(orderId); addToast(`Estorno solicitado com sucesso!`, 'success'); } catch (error: any) { console.error("Failed to refund order:", error); addToast(error.message || "Erro ao solicitar estorno.", 'error'); } finally { setRefundingOrderId(null); } } }, [addToast, orders]);
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
+
+    const scrollToCardapio = () => {
+        const cardapioSection = document.getElementById('cardapio');
+        if (cardapioSection) {
+            const header = document.querySelector('header');
+            const statusBanner = document.getElementById('status-banner');
+            
+            let headerOffset = header ? header.offsetHeight : 80;
+            if (statusBanner && !isStoreOnline) {
+                const bannerStyle = window.getComputedStyle(statusBanner);
+                if (bannerStyle.display !== 'none') {
+                     headerOffset += statusBanner.offsetHeight;
+                }
+            }
+
+            const elementPosition = cardapioSection.getBoundingClientRect().top;
+            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+            
+            window.scrollTo({
+              top: offsetPosition,
+              behavior: 'smooth'
+            });
+        }
+    };
+
+    const showMenuFab = ['Cardápio', 'Sobre Nós', 'Contato'].includes(activeSection);
 
     return (
         <div className="flex flex-col min-h-screen">
@@ -661,8 +687,28 @@ const App: React.FC = () => {
             </main>
 
             <Footer settings={siteSettings} onOpenChatbot={() => setIsChatbotOpen(true)} />
+            
+            <div className="fixed bottom-5 right-5 z-40 flex flex-col-reverse items-end gap-3">
+                {cart.length > 0 && (
+                    <button onClick={() => setIsCartOpen(true)} className="bg-accent text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transform transition-transform hover:scale-105 animate-fade-in-up">
+                        <i className="fas fa-shopping-bag text-xl"></i>
+                        <div className="text-left">
+                            <span className="text-sm block leading-tight">{cartTotalItems} {cartTotalItems > 1 ? 'itens' : 'item'}</span>
+                            <span className="font-semibold text-lg block leading-tight">Ver Pedido</span>
+                        </div>
+                    </button>
+                )}
 
-            {cart.length > 0 && <div className="fixed bottom-5 right-5 z-40"><button onClick={() => setIsCartOpen(true)} className="bg-accent text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transform transition-transform hover:scale-105 animate-fade-in-up"><i className="fas fa-shopping-bag text-xl"></i><div className="text-left"><span className="text-sm block leading-tight">{cartTotalItems} {cartTotalItems > 1 ? 'itens' : 'item'}</span><span className="font-semibold text-lg block leading-tight">Ver Pedido</span></div></button></div>}
+                {showMenuFab && (
+                    <button onClick={scrollToCardapio} className="bg-accent text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transform transition-transform hover:scale-105 animate-fade-in-up">
+                        <i className="fas fa-utensils text-xl"></i>
+                        <div className="text-left">
+                            <span className="font-semibold text-lg block leading-tight">Ver Cardápio</span>
+                        </div>
+                    </button>
+                )}
+            </div>
+
             <button onClick={() => setIsChatbotOpen(true)} className="fixed bottom-5 left-5 z-40 w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110" aria-label="Abrir assistente virtual"><i className="fas fa-headset text-2xl"></i></button>
 
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cart} onUpdateQuantity={handleUpdateCartQuantity} onCheckout={() => { if (!isStoreOnline) { addToast("A loja está fechada. Não é possível finalizar o pedido.", 'error'); return; } setIsCartOpen(false); setIsCheckoutModalOpen(true); }} isStoreOnline={isStoreOnline} categories={categories} products={products} setActiveCategoryId={setActiveMenuCategory}/>
