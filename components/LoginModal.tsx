@@ -7,9 +7,10 @@ interface LoginModalProps {
     onClose: () => void;
     onGoogleSignIn: () => void;
     addToast: (message: string, type: 'success' | 'error') => void;
+    onRegisterSuccess: () => void;
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogleSignIn, addToast }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogleSignIn, addToast, onRegisterSuccess }) => {
     const [isRegistering, setIsRegistering] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -45,7 +46,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
                     await firebaseService.createUserProfile(user, name); // Cria o perfil no Firestore
                     await user.sendEmailVerification();
                     addToast('Conta criada! Um e-mail de verificação foi enviado.', 'success');
-                    onClose();
+                    onRegisterSuccess();
                 }
             } else {
                 // Processo de Login

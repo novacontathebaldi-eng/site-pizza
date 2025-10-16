@@ -143,6 +143,9 @@ interface CheckoutModalProps {
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, onInitiatePixPayment, isProcessing, name, setName, phone, setPhone, profile }) => {
+    const deliverableAddresses = profile?.addresses?.filter(a => a.isDeliveryArea) || [];
+    const favoriteAddress = deliverableAddresses.find(a => a.isFavorite);
+
     const [cpf, setCpf] = useState('');
     const [orderType, setOrderType] = useState<'delivery' | 'pickup' | ''>('');
     
@@ -158,17 +161,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const [changeAmount, setChangeAmount] = useState('');
     const [notes, setNotes] = useState('');
     const [pixPaymentOption, setPixPaymentOption] = useState<'payNow' | 'payLater' | null>(null);
-    const [selectedAddressId, setSelectedAddressId] = useState<string>('manual');
+    const [selectedAddressId, setSelectedAddressId] = useState<string>(favoriteAddress ? favoriteAddress.id : 'manual');
 
+    // Reset state when modal opens/closes or profile changes
     useEffect(() => {
-        if (!isOpen) {
+        if (isOpen) {
+            const fav = profile?.addresses?.filter(a => a.isDeliveryArea).find(a => a.isFavorite);
+            setSelectedAddressId(fav ? fav.id : 'manual');
+        } else {
+            // Full reset when closing
             setCpf(''); setOrderType('');
             setNeighborhood(''); setStreet(''); setNumber(''); setIsNoNumber(false); setComplement(''); setAllergies('');
             setPaymentMethod(''); setChangeNeeded(false); setChangeAmount('');
             setNotes(''); setPixPaymentOption(null);
-            setSelectedAddressId('manual');
+            setSelectedAddressId(favoriteAddress ? favoriteAddress.id : 'manual');
         }
-    }, [isOpen]);
+    }, [isOpen, profile]);
     
     useEffect(() => {
         if (isNoNumber) setNumber('S/N');
@@ -183,10 +191,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     }, [orderType]);
     
     useEffect(() => {
-        const deliverableAddresses = profile?.addresses?.filter(a => a.isDeliveryArea) || [];
-        if (selectedAddressId === 'manual' || deliverableAddresses.length === 0) {
-            // Não preenche ou limpa se o usuário quiser digitar manualmente
-            if(orderType === 'delivery') {
+        if (selectedAddressId === 'manual') {
+            if(orderType === 'delivery' && !profile) { // Only clear for non-logged-in users wanting to type manually
                 setNeighborhood(''); setStreet(''); setNumber(''); setComplement('');
             }
         } else {
@@ -206,8 +212,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const deliveryFee = orderType === 'delivery' ? DELIVERY_FEE : 0;
     const total = subtotal + deliveryFee;
-    const deliverableAddresses = profile?.addresses?.filter(a => a.isDeliveryArea) || [];
-
 
     const getOrderDetails = (): OrderDetails => ({
         name, phone, cpf, orderType: orderType as 'delivery' | 'pickup' | 'local',
@@ -240,6 +244,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const submitButtonText = (paymentMethod === 'pix' && pixPaymentOption === 'payNow') ? 'Pagar e Finalizar Pedido' : 'Enviar Pedido';
     const submitButtonIconClass = (paymentMethod === 'pix' && pixPaymentOption === 'payNow') ? 'fab fa-pix' : 'fas fa-check-circle';
 
+    const isAddressLocked = selectedAddressId !== 'manual';
+
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
@@ -252,7 +258,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-semibold mb-1">Nome Completo *</label>
-                                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
+                                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100" required disabled={!!profile} />
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold mb-1">Telefone/WhatsApp *</label>
@@ -292,7 +298,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                                 </div>
                                 <div>
                                     <label className="block text-sm font-semibold mb-1">Localidade *</label>
-                                    <select value={neighborhood} onChange={e => setNeighborhood(e.target.value)} className="w-full px-3 py-2 border rounded-md bg-white" required>
+                                    <select value={neighborhood} onChange={e => setNeighborhood(e.target.value)} className="w-full px-3 py-2 border rounded-md bg-white disabled:bg-gray-100" required disabled={isAddressLocked}>
                                         <option value="" disabled>Selecione sua localidade...</option>
                                         {LOCALIDADES.map(loc => <option key={loc} value={loc}>{loc}</option>)}
                                     </select>
@@ -300,22 +306,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                                 <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4 items-end">
                                     <div>
                                         <label className="block text-sm font-semibold mb-1">Rua *</label>
-                                        <input type="text" value={street} onChange={e => setStreet(e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
+                                        <input type="text" value={street} onChange={e => setStreet(e.target.value)} className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100" required disabled={isAddressLocked} />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-semibold mb-1">Número *</label>
-                                        <input type="text" value={number} onChange={e => setNumber(e.target.value)} className="w-full px-3 py-2 border rounded-md" required disabled={isNoNumber} />
+                                        <input type="text" value={number} onChange={e => setNumber(e.target.value)} className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100" required disabled={isNoNumber || isAddressLocked} />
                                     </div>
                                 </div>
                                 <div className="flex justify-end -mt-2">
                                      <label className="flex items-center gap-2 text-sm">
-                                        <input type="checkbox" checked={isNoNumber} onChange={e => setIsNoNumber(e.target.checked)} />
+                                        <input type="checkbox" checked={isNoNumber} onChange={e => setIsNoNumber(e.target.checked)} disabled={isAddressLocked} />
                                         <span>Sem número</span>
                                     </label>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-semibold mb-1">Complemento (opcional)</label>
-                                    <input type="text" value={complement} onChange={e => setComplement(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Casa, apartamento, ponto de referência..." />
+                                    <input type="text" value={complement} onChange={e => setComplement(e.target.value)} className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100" placeholder="Casa, apartamento, ponto de referência..." disabled={isAddressLocked} />
                                 </div>
                             </div>
                         )}

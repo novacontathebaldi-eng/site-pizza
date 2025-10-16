@@ -167,7 +167,8 @@ export const createUserProfile = async (user: firebase.User, name: string): Prom
         name: name,
         email: user.email!,
         photoURL: user.photoURL || '',
-        addresses: []
+        addresses: [],
+        phone: '',
     };
     await userRef.set(profile);
 };
@@ -179,43 +180,75 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
     return { uid, ...doc.data() } as UserProfile;
 };
 
-export const updateUserProfile = async (uid: string, data: Partial<UserProfile>): Promise<void> => {
+export const updateUserProfile = async (uid: string, data: Partial<Pick<UserProfile, 'name' | 'phone'>>): Promise<void> => {
     if (!db) throw new Error("Firestore not initialized.");
     await db.collection('users').doc(uid).set(data, { merge: true });
 };
 
-// NEW Address management functions
+// Address management functions
 export const addAddress = async (uid: string, address: Omit<Address, 'id'>): Promise<string> => {
     if (!db) throw new Error("Firestore not initialized.");
-    const newAddress = { ...address, id: db.collection('users').doc().id };
     const userRef = db.collection('users').doc(uid);
-    await userRef.update({
-        addresses: firebase.firestore.FieldValue.arrayUnion(newAddress)
+    const newAddressId = db.collection('users').doc().id;
+
+    await db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists) throw "Documento de usuário não existe!";
+        
+        const userData = userDoc.data() as UserProfile;
+        let addresses = userData.addresses || [];
+
+        if (address.isFavorite) {
+            addresses = addresses.map(addr => ({ ...addr, isFavorite: false }));
+        }
+        
+        const newAddress: Address = { ...address, id: newAddressId };
+        addresses.push(newAddress);
+
+        transaction.update(userRef, { addresses });
     });
-    return newAddress.id;
+    return newAddressId;
 };
 
 export const updateAddress = async (uid: string, updatedAddress: Address): Promise<void> => {
     if (!db) throw new Error("Firestore not initialized.");
     const userRef = db.collection('users').doc(uid);
-    const userDoc = await userRef.get();
-    const userData = userDoc.data() as UserProfile;
-    const addresses = userData.addresses || [];
-    const updatedAddresses = addresses.map(addr => addr.id === updatedAddress.id ? updatedAddress : addr);
-    await userRef.update({ addresses: updatedAddresses });
+    
+    await db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists) throw "Documento de usuário não existe!";
+
+        const userData = userDoc.data() as UserProfile;
+        let addresses = userData.addresses || [];
+
+        if (updatedAddress.isFavorite) {
+            addresses = addresses.map(addr => ({ ...addr, isFavorite: false }));
+        }
+
+        const addressIndex = addresses.findIndex(addr => addr.id === updatedAddress.id);
+        if (addressIndex > -1) {
+            addresses[addressIndex] = updatedAddress;
+        } else {
+            addresses.push(updatedAddress);
+        }
+
+        transaction.update(userRef, { addresses });
+    });
 };
 
 export const deleteAddress = async (uid: string, addressId: string): Promise<void> => {
     if (!db) throw new Error("Firestore not initialized.");
     const userRef = db.collection('users').doc(uid);
-    const userDoc = await userRef.get();
-    const userData = userDoc.data() as UserProfile;
-    const addressToDelete = (userData.addresses || []).find(addr => addr.id === addressId);
-    if (addressToDelete) {
-        await userRef.update({
-            addresses: firebase.firestore.FieldValue.arrayRemove(addressToDelete)
-        });
-    }
+    
+    await db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists) throw "Documento de usuário não existe!";
+        
+        const userData = userDoc.data() as UserProfile;
+        const addresses = (userData.addresses || []).filter(addr => addr.id !== addressId);
+        
+        transaction.update(userRef, { addresses });
+    });
 };
 
 
@@ -298,7 +331,7 @@ export const refundPayment = async (orderId: string): Promise<any> => {
     try {
         const result = await refundPaymentFunction({ orderId });
         return result.data;
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error calling refundPayment function:", error);
         // The error from the cloud function is more user-friendly
         throw error;

@@ -12,6 +12,8 @@ interface UserAreaModalProps {
     profile: UserProfile | null;
     onLogout: () => void;
     addToast: (message: string, type: 'success' | 'error') => void;
+    initialTab?: 'orders' | 'profile' | 'addresses';
+    showAddAddressForm?: boolean;
 }
 
 const statusConfig: { [key in OrderStatus]?: { text: string; icon: string; color: string; } } = {
@@ -33,7 +35,7 @@ const AddressForm: React.FC<{
     isSaving: boolean;
 }> = ({ address, onSave, onCancel, isSaving }) => {
     const [formData, setFormData] = useState<Partial<Address>>({
-        label: '', localidade: '', street: '', number: '', complement: '',
+        label: '', localidade: '', street: '', number: '', complement: '', isFavorite: false,
         ...address
     });
 
@@ -49,7 +51,8 @@ const AddressForm: React.FC<{
             isDeliveryArea: LOCALIDADES.includes(formData.localidade || ''),
             city: 'Santa Leopoldina',
             state: 'ES',
-            cep: '29640-000'
+            cep: '29640-000',
+            isFavorite: formData.isFavorite || false,
         };
         onSave(finalAddress);
     };
@@ -85,6 +88,12 @@ const AddressForm: React.FC<{
                 <label className="block text-sm font-semibold mb-1">Complemento (opcional)</label>
                 <input type="text" value={formData.complement} onChange={e => setFormData({ ...formData, complement: e.target.value })} className="w-full px-3 py-2 border rounded-md" />
             </div>
+            <div>
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input type="checkbox" checked={formData.isFavorite} onChange={e => setFormData({ ...formData, isFavorite: e.target.checked })} className="h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent" />
+                    Tornar este o endereço favorito
+                </label>
+            </div>
             <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={onCancel} className="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Cancelar</button>
                 <button type="submit" disabled={isSaving} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[100px] disabled:bg-opacity-70">
@@ -96,26 +105,33 @@ const AddressForm: React.FC<{
 };
 
 
-export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, user, profile, onLogout, addToast }) => {
+export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, user, profile, onLogout, addToast, initialTab = 'orders', showAddAddressForm = false }) => {
+    const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [myOrders, setMyOrders] = useState<Order[]>([]);
     const [isLoadingOrders, setIsLoadingOrders] = useState(true);
-    const [activeTab, setActiveTab] = useState('orders');
+    const [activeTab, setActiveTab] = useState(initialTab);
 
     const [editingAddress, setEditingAddress] = useState<Partial<Address> | null>(null);
-    const [isAddressFormVisible, setIsAddressFormVisible] = useState(false);
+    const [isAddressFormVisible, setIsAddressFormVisible] = useState(showAddAddressForm);
 
     useEffect(() => {
         if (profile) {
+            setName(profile.name || '');
             setPhone(profile.phone || '');
         }
-        if (!isOpen) {
+        if (isOpen) {
+             setActiveTab(initialTab);
+             setIsAddressFormVisible(showAddAddressForm);
+        } else {
+            // Reset to default when modal closes
             setActiveTab('orders');
             setIsAddressFormVisible(false);
             setEditingAddress(null);
         }
-    }, [profile, isOpen]);
+    }, [profile, isOpen, initialTab, showAddAddressForm]);
+
 
     useEffect(() => {
         if (!isOpen || !user || !db) {
@@ -155,7 +171,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
         e.preventDefault();
         setIsSaving(true);
         try {
-            await firebaseService.updateUserProfile(user.uid, { phone });
+            await firebaseService.updateUserProfile(user.uid, { name, phone });
             addToast('Seu perfil foi salvo!', 'success');
         } catch (error) {
             addToast('Erro ao salvar seu perfil.', 'error');
@@ -204,7 +220,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
         <form onSubmit={handleProfileUpdate} className="space-y-4">
             <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg border">
                 <img src={profile.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-16 h-16 rounded-full" />
-                <div>
+                <div className="flex-grow">
                     <h3 className="font-bold text-xl">{profile.name}</h3>
                     <p className="text-gray-600 text-sm">{profile.email}</p>
                 </div>
@@ -219,6 +235,10 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                     <button onClick={handleResendVerification} className="font-bold underline mt-2">Reenviar e-mail</button>
                 </div>
             )}
+            <div>
+                <label className="block text-sm font-semibold mb-1">Nome Completo</label>
+                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 border rounded-md" />
+            </div>
              <div>
                 <label className="block text-sm font-semibold mb-1">Telefone/WhatsApp</label>
                 <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded-md" />
@@ -266,7 +286,10 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
             {(profile.addresses || []).map(addr => (
                 <div key={addr.id} className="bg-gray-50 border rounded-lg p-3 mb-3 flex justify-between items-start">
                     <div>
-                        <p className="font-bold">{addr.label}</p>
+                        <p className="font-bold flex items-center gap-2">
+                            {addr.label}
+                            {addr.isFavorite && <span className="text-yellow-500 text-xs font-semibold flex items-center gap-1"><i className="fas fa-star"></i>Favorito</span>}
+                        </p>
                         <p className="text-sm text-gray-600">{addr.street}, {addr.number} - {addr.localidade}</p>
                         {!addr.isDeliveryArea && <p className="text-xs text-red-500 font-semibold mt-1">Fora da área de entrega</p>}
                     </div>
@@ -277,7 +300,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                 </div>
             ))}
             {!isAddressFormVisible && (
-                <button onClick={() => { setEditingAddress({}); setIsAddressFormVisible(true); }} className="mt-4 w-full bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
+                <button onClick={() => { setEditingAddress({ isFavorite: (profile.addresses || []).length === 0 }); setIsAddressFormVisible(true); }} className="mt-4 w-full bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
                     <i className="fas fa-plus mr-2"></i>Adicionar Endereço
                 </button>
             )}

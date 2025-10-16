@@ -11,6 +11,7 @@ export interface Address {
     city: string;
     cep: string;
     state: string;
+    isFavorite?: boolean;
 }
 
 export interface UserProfile {
