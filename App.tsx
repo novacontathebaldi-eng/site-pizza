@@ -9,7 +9,7 @@ import { ContactSection } from './components/ContactSection';
 import { AdminSection } from './components/AdminSection';
 import { Footer } from './components/Footer';
 import { CartSidebar } from './components/CartSidebar';
-import { CheckoutModal, OrderConfirmationModal } from './components/CheckoutModal';
+import { CheckoutModal, OrderConfirmationModal, ReservationConfirmationModal } from './components/CheckoutModal';
 // FIX: Removed ReservationDetails from this import as it's not exported from the component file.
 import { ReservationModal } from './components/ReservationModal';
 import { PixPaymentModal } from './components/PixPaymentModal';
@@ -178,6 +178,7 @@ const App: React.FC = () => {
     ]);
     const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
     const [confirmedOrderData, setConfirmedOrderData] = useState<Order | null>(null);
+    const [confirmedReservationData, setConfirmedReservationData] = useState<Order | null>(null);
     
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
@@ -427,27 +428,32 @@ const App: React.FC = () => {
     const handleConfirmReservation = async (details: ReservationDetails) => {
         setIsProcessingOrder(true);
         setIsReservationModalOpen(false);
-
-        const whatsappTab = window.open('', '_blank');
-        if (whatsappTab) {
-            whatsappTab.document.body.innerHTML = '<h1>Aguarde...</h1>';
-        }
-
+    
         try {
-            const { orderNumber } = await firebaseService.createReservation(details);
-            addToast(`Reserva #${orderNumber} criada! Redirecionando...`, 'success');
-
-            const whatsappUrl = generateReservationWhatsAppMessage(details, orderNumber);
-
-            if (whatsappTab) {
-                whatsappTab.location.href = whatsappUrl;
-            } else {
-                window.location.href = whatsappUrl;
-            }
+            const { orderId, orderNumber } = await firebaseService.createReservation(details);
+            addToast(`Reserva #${orderNumber} registrada com sucesso!`, 'success');
+    
+            const confirmedReservation: Order = {
+                id: orderId,
+                orderNumber,
+                customer: {
+                    name: details.name,
+                    phone: details.phone,
+                    orderType: 'local',
+                    reservationTime: details.reservationTime,
+                },
+                numberOfPeople: details.numberOfPeople,
+                notes: details.notes,
+                status: 'pending',
+                paymentStatus: 'pending',
+                createdAt: new Date(),
+            };
+            
+            setConfirmedReservationData(confirmedReservation);
+    
         } catch (error: any) {
             console.error("Failed to create reservation:", error);
             addToast(error.message || "Erro ao criar reserva.", 'error');
-            whatsappTab?.close();
         } finally {
             setIsProcessingOrder(false);
         }
@@ -488,6 +494,20 @@ const App: React.FC = () => {
         const whatsappUrl = generateWhatsAppMessage(details, order.items || cart, order.total || 0, order.orderNumber, isPaid);
         window.open(whatsappUrl, '_blank');
         setConfirmedOrderData(null);
+    };
+
+    const handleSendReservationToWhatsApp = (reservation: Order) => {
+        const details: ReservationDetails = {
+            name: reservation.customer.name,
+            phone: reservation.customer.phone,
+            numberOfPeople: reservation.numberOfPeople || 2,
+            reservationTime: reservation.customer.reservationTime || '',
+            notes: reservation.notes || '',
+        };
+    
+        const whatsappUrl = generateReservationWhatsAppMessage(details, reservation.orderNumber);
+        window.open(whatsappUrl, '_blank');
+        setConfirmedReservationData(null);
     };
 
     const handleClosePixModal = () => {
@@ -928,6 +948,12 @@ const App: React.FC = () => {
                 order={confirmedOrderData}
                 onClose={() => setConfirmedOrderData(null)}
                 onSendWhatsApp={handleSendOrderToWhatsApp}
+            />
+
+            <ReservationConfirmationModal
+                reservation={confirmedReservationData}
+                onClose={() => setConfirmedReservationData(null)}
+                onSendWhatsApp={handleSendReservationToWhatsApp}
             />
             
             <Chatbot

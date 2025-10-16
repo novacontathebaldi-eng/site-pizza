@@ -56,6 +56,59 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
 };
 
 
+// NOVA CONFIRMAÇÃO DE RESERVA
+interface ReservationConfirmationModalProps {
+    reservation: Order | null;
+    onClose: () => void;
+    onSendWhatsApp: (reservation: Order) => void;
+}
+
+export const ReservationConfirmationModal: React.FC<ReservationConfirmationModalProps> = ({ reservation, onClose, onSendWhatsApp }) => {
+    if (!reservation) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col animate-fade-in-up">
+                <div className="flex justify-between items-center p-5 border-b border-gray-200">
+                    <h2 className="text-2xl font-bold text-text-on-light flex items-center gap-3">
+                        <i className="fas fa-calendar-check text-blue-500"></i>
+                        Reserva Registrada!
+                    </h2>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                </div>
+                <div className="p-6 text-center space-y-5">
+                    <p className="text-gray-600 text-base">
+                        Sua solicitação de reserva foi enviada! Em breve, nossa equipe entrará em contato pelo WhatsApp informado para confirmar todos os detalhes.
+                    </p>
+                    
+                    <div className="text-left bg-gray-50 p-4 rounded-lg border text-gray-800 space-y-2 text-sm">
+                        <p><strong><i className="fas fa-receipt fa-fw mr-2 text-gray-400"></i>Reserva:</strong> #{reservation.orderNumber}</p>
+                        <p><strong><i className="fas fa-user fa-fw mr-2 text-gray-400"></i>Nome:</strong> {reservation.customer.name}</p>
+                        {reservation.customer.reservationTime && (
+                            <p><strong><i className="fas fa-clock fa-fw mr-2 text-gray-400"></i>Horário:</strong> {reservation.customer.reservationTime}</p>
+                        )}
+                        {reservation.numberOfPeople != null && (
+                            <p><strong><i className="fas fa-users fa-fw mr-2 text-gray-400"></i>Pessoas:</strong> {reservation.numberOfPeople}</p>
+                        )}
+                    </div>
+
+                    <p className="text-gray-600 text-sm px-2">
+                        Agradecemos a sua preferência! Se precisar, você pode nos contatar pelo WhatsApp sobre esta reserva.
+                    </p>
+
+                    <button
+                        onClick={() => onSendWhatsApp(reservation)}
+                        className="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-green-600 transition-all flex items-center justify-center min-h-[52px]"
+                    >
+                        <i className="fab fa-whatsapp mr-2"></i> Enviar um WhatsApp sobre a reserva
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 const DELIVERY_FEE = 3.00;
 const LOCALIDADES = ['Centro', 'Olaria', 'Vila Nova', 'Moxafongo', 'Cocal', 'Funil'];
 
