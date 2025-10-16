@@ -229,12 +229,11 @@ const App: React.FC = () => {
                         }).then(() => {
                             setIsGapiReady(true);
                         }, (error: any) => {
+                            // Don't show toast on initial load failure, only on interaction.
                             console.error('Error initializing Google Auth2:', error);
-                            addToast('Não foi possível iniciar o Login com Google.', 'error');
                         });
                     } catch (error) {
                         console.error('Error loading Google Auth2:', error);
-                        addToast('Não foi possível carregar a biblioteca de login.', 'error');
                     }
                 });
             }
@@ -252,7 +251,7 @@ const App: React.FC = () => {
             // @ts-ignore
             delete window.onGoogleScriptLoadCallback;
         };
-    }, [isGapiReady, addToast]);
+    }, [isGapiReady]);
 
 
     // Effect for Firebase Auth state changes
