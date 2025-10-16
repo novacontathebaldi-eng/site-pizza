@@ -174,6 +174,190 @@ function validarCPF(cpf: string): boolean {
   return true;
 }
 
+const formatTimestamp = (timestamp: any): string => {
+    if (!timestamp) return 'N/A';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+};
+
+// --- Child Components for Tabs ---
+
+interface UserProfileTabProps {
+    profile: UserProfile;
+    user: firebase.User;
+    onLogout: () => void;
+    handleResendVerification: () => Promise<void>;
+    handleProfileUpdate: (e: React.FormEvent) => Promise<void>;
+    name: string;
+    setName: (name: string) => void;
+    phone: string;
+    setPhone: (phone: string) => void;
+    cpf: string;
+    setCpf: (cpf: string) => void;
+    isSaving: boolean;
+}
+
+const UserProfileTab: React.FC<UserProfileTabProps> = ({
+    profile, user, onLogout, handleResendVerification, handleProfileUpdate,
+    name, setName, phone, setPhone, cpf, setCpf, isSaving
+}) => (
+    <form onSubmit={handleProfileUpdate} className="space-y-4">
+        <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg border">
+            <img src={profile.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-16 h-16 rounded-full" />
+            <div className="flex-grow">
+                <h3 className="font-bold text-xl">{profile.name}</h3>
+                <p className="text-gray-600 text-sm">{profile.email}</p>
+            </div>
+            <button type="button" onClick={onLogout} className="ml-auto bg-red-100 text-red-600 font-semibold py-2 px-3 rounded-lg text-sm hover:bg-red-200">
+               <i className="fas fa-sign-out-alt mr-2"></i>Sair
+            </button>
+        </div>
+         {!user.emailVerified && (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 text-sm" role="alert">
+                <p className="font-bold">Verifique seu e-mail!</p>
+                <p>Enviamos um link de confirmação para você. Verifique sua caixa de entrada ou spam.</p>
+                <button onClick={handleResendVerification} className="font-bold underline mt-2">Reenviar e-mail</button>
+            </div>
+        )}
+        <div>
+            <label className="block text-sm font-semibold mb-1">Nome Completo</label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 border rounded-md" />
+        </div>
+         <div>
+            <label className="block text-sm font-semibold mb-1">Telefone/WhatsApp</label>
+            <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded-md" />
+        </div>
+         <div>
+            <label className="block text-sm font-semibold mb-1">CPF (opcional)</label>
+            <input type="text" value={cpf} onChange={e => setCpf(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="000.000.000-00" />
+             <p className="text-xs text-gray-500 mt-1">Seu CPF é usado para agilizar o pagamento com PIX.</p>
+        </div>
+        <div className="text-right pt-2">
+             <button type="submit" disabled={isSaving} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[120px] disabled:bg-opacity-70">
+                {isSaving ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-2"></i><span>Salvar Perfil</span></>}
+            </button>
+        </div>
+    </form>
+);
+
+interface MyOrdersTabProps {
+    myOrders: Order[];
+    isLoadingOrders: boolean;
+}
+
+const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders }) => {
+    const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+
+    const currentOrders = myOrders.filter(order =>
+        ['pending', 'accepted', 'reserved', 'ready'].includes(order.status)
+    );
+    const archivedOrders = myOrders.filter(order =>
+        ['completed', 'cancelled', 'deleted'].includes(order.status)
+    );
+
+    const renderOrderCard = (order: Order) => {
+        const config = statusConfig[order.status] || { text: 'Desconhecido', icon: 'fas fa-question-circle', color: 'text-gray-500' };
+        const isDeleted = order.status === 'deleted';
+
+        return (
+            <div key={order.id} className={`bg-white border rounded-lg p-3 flex justify-between items-center shadow-sm transition-opacity ${isDeleted ? 'opacity-60' : ''}`}>
+                <div>
+                    <p className="font-bold">Pedido #{order.orderNumber}</p>
+                    <p className="text-sm text-gray-500">{formatTimestamp(order.createdAt)}</p>
+                </div>
+                <div className="text-right">
+                    <p className={`font-semibold text-sm flex items-center justify-end gap-2 ${config.color}`}>
+                        <i className={config.icon}></i>{config.text}
+                    </p>
+                    {order.total != null && <p className="font-bold text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <div>
+            {isLoadingOrders ? (
+                <div className="text-center p-8"><i className="fas fa-spinner fa-spin text-3xl text-accent"></i></div>
+            ) : (
+                <>
+                    <h3 className="text-lg font-bold text-text-on-light mb-3">Pedidos em Andamento</h3>
+                    {currentOrders.length === 0 ? (
+                        <p className="text-center text-gray-500 py-8 px-4 bg-gray-50 rounded-lg">Você não tem pedidos em andamento.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {currentOrders.map(renderOrderCard)}
+                        </div>
+                    )}
+
+                    <div className="mt-8 border-t pt-6">
+                        <button
+                            onClick={() => setIsArchiveOpen(!isArchiveOpen)}
+                            className="w-full flex justify-between items-center text-left p-4 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+                            aria-expanded={isArchiveOpen}
+                        >
+                            <span className="text-lg font-bold text-text-on-light">Histórico de Pedidos</span>
+                            <i className={`fas fa-chevron-down text-gray-600 transition-transform duration-300 ${isArchiveOpen ? 'rotate-180' : ''}`}></i>
+                        </button>
+                        
+                        {isArchiveOpen && (
+                            <div className="mt-4 space-y-3 animate-fade-in-up">
+                                {archivedOrders.length === 0 ? (
+                                    <p className="text-center text-gray-500 py-8 px-4">Seu histórico de pedidos está vazio.</p>
+                                ) : (
+                                    archivedOrders.map(renderOrderCard)
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
+
+interface MyAddressesTabProps {
+    profile: UserProfile;
+    isAddressFormVisible: boolean;
+    setIsAddressFormVisible: (visible: boolean) => void;
+    editingAddress: Partial<Address> | null;
+    setEditingAddress: (address: Partial<Address> | null) => void;
+    handleSaveAddress: (address: Address) => Promise<void>;
+    handleDeleteAddress: (addressId: string) => Promise<void>;
+    isSaving: boolean;
+}
+
+const MyAddressesTab: React.FC<MyAddressesTabProps> = ({
+    profile, isAddressFormVisible, setIsAddressFormVisible, editingAddress, setEditingAddress,
+    handleSaveAddress, handleDeleteAddress, isSaving
+}) => (
+    <div>
+        {(profile.addresses || []).map(addr => (
+            <div key={addr.id} className="bg-gray-50 border rounded-lg p-3 mb-3 flex justify-between items-start">
+                <div>
+                    <p className="font-bold flex items-center gap-2">
+                        {addr.label}
+                        {addr.isFavorite && <span className="text-yellow-500 text-xs font-semibold flex items-center gap-1"><i className="fas fa-star"></i>Favorito</span>}
+                    </p>
+                    <p className="text-sm text-gray-600">{addr.street}, {addr.number} - {addr.bairro ? `${addr.bairro}, ` : ''}{addr.localidade}</p>
+                    <p className="text-sm text-gray-600">{addr.city}, {addr.cep}</p>
+                    {!addr.isDeliveryArea && <p className="text-xs text-red-500 font-semibold mt-1">Fora da área de entrega</p>}
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={() => { setEditingAddress(addr); setIsAddressFormVisible(true); }} className="bg-blue-100 text-blue-600 w-8 h-8 rounded-md hover:bg-blue-200"><i className="fas fa-edit"></i></button>
+                    <button onClick={() => handleDeleteAddress(addr.id)} className="bg-red-100 text-red-600 w-8 h-8 rounded-md hover:bg-red-200"><i className="fas fa-trash"></i></button>
+                </div>
+            </div>
+        ))}
+        {!isAddressFormVisible && (
+            <button onClick={() => { setEditingAddress(null); setIsAddressFormVisible(true); }} className="mt-4 w-full bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
+                <i className="fas fa-plus mr-2"></i>Adicionar Endereço
+            </button>
+        )}
+        {isAddressFormVisible && <AddressForm address={editingAddress} onSave={handleSaveAddress} onCancel={() => { setIsAddressFormVisible(false); setEditingAddress(null); }} isSaving={isSaving} totalAddresses={(profile.addresses || []).length} />}
+    </div>
+);
+
 
 export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, user, profile, onLogout, addToast, initialTab = 'orders', showAddAddressForm = false }) => {
     const [name, setName] = useState('');
@@ -287,151 +471,6 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
         }
     };
 
-    const formatTimestamp = (timestamp: any): string => {
-        if (!timestamp) return 'N/A';
-        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
-    };
-
-    const UserProfileTab = () => (
-        <form onSubmit={handleProfileUpdate} className="space-y-4">
-            <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg border">
-                <img src={profile.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-16 h-16 rounded-full" />
-                <div className="flex-grow">
-                    <h3 className="font-bold text-xl">{profile.name}</h3>
-                    <p className="text-gray-600 text-sm">{profile.email}</p>
-                </div>
-                <button type="button" onClick={onLogout} className="ml-auto bg-red-100 text-red-600 font-semibold py-2 px-3 rounded-lg text-sm hover:bg-red-200">
-                   <i className="fas fa-sign-out-alt mr-2"></i>Sair
-                </button>
-            </div>
-             {!user.emailVerified && (
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 text-sm" role="alert">
-                    <p className="font-bold">Verifique seu e-mail!</p>
-                    <p>Enviamos um link de confirmação para você. Verifique sua caixa de entrada ou spam.</p>
-                    <button onClick={handleResendVerification} className="font-bold underline mt-2">Reenviar e-mail</button>
-                </div>
-            )}
-            <div>
-                <label className="block text-sm font-semibold mb-1">Nome Completo</label>
-                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 border rounded-md" />
-            </div>
-             <div>
-                <label className="block text-sm font-semibold mb-1">Telefone/WhatsApp</label>
-                <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded-md" />
-            </div>
-             <div>
-                <label className="block text-sm font-semibold mb-1">CPF (opcional)</label>
-                <input type="text" value={cpf} onChange={e => setCpf(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="000.000.000-00" />
-                 <p className="text-xs text-gray-500 mt-1">Seu CPF é usado para agilizar o pagamento com PIX.</p>
-            </div>
-            <div className="text-right pt-2">
-                 <button type="submit" disabled={isSaving} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[120px] disabled:bg-opacity-70">
-                    {isSaving ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-2"></i><span>Salvar Perfil</span></>}
-                </button>
-            </div>
-        </form>
-    );
-
-    const MyOrdersTab = () => {
-        const [isArchiveOpen, setIsArchiveOpen] = useState(false);
-    
-        const currentOrders = myOrders.filter(order =>
-            ['pending', 'accepted', 'reserved', 'ready'].includes(order.status)
-        );
-        const archivedOrders = myOrders.filter(order =>
-            ['completed', 'cancelled', 'deleted'].includes(order.status)
-        );
-    
-        const renderOrderCard = (order: Order) => {
-            const config = statusConfig[order.status] || { text: 'Desconhecido', icon: 'fas fa-question-circle', color: 'text-gray-500' };
-            const isDeleted = order.status === 'deleted';
-
-            return (
-                <div key={order.id} className={`bg-white border rounded-lg p-3 flex justify-between items-center shadow-sm transition-opacity ${isDeleted ? 'opacity-60' : ''}`}>
-                    <div>
-                        <p className="font-bold">Pedido #{order.orderNumber}</p>
-                        <p className="text-sm text-gray-500">{formatTimestamp(order.createdAt)}</p>
-                    </div>
-                    <div className="text-right">
-                        <p className={`font-semibold text-sm flex items-center justify-end gap-2 ${config.color}`}>
-                            <i className={config.icon}></i>{config.text}
-                        </p>
-                        {order.total != null && <p className="font-bold text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
-                    </div>
-                </div>
-            );
-        };
-    
-        return (
-            <div>
-                {isLoadingOrders ? (
-                    <div className="text-center p-8"><i className="fas fa-spinner fa-spin text-3xl text-accent"></i></div>
-                ) : (
-                    <>
-                        <h3 className="text-lg font-bold text-text-on-light mb-3">Pedidos em Andamento</h3>
-                        {currentOrders.length === 0 ? (
-                            <p className="text-center text-gray-500 py-8 px-4 bg-gray-50 rounded-lg">Você não tem pedidos em andamento.</p>
-                        ) : (
-                            <div className="space-y-3">
-                                {currentOrders.map(renderOrderCard)}
-                            </div>
-                        )}
-    
-                        <div className="mt-8 border-t pt-6">
-                            <button
-                                onClick={() => setIsArchiveOpen(!isArchiveOpen)}
-                                className="w-full flex justify-between items-center text-left p-4 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
-                                aria-expanded={isArchiveOpen}
-                            >
-                                <span className="text-lg font-bold text-text-on-light">Histórico de Pedidos</span>
-                                <i className={`fas fa-chevron-down text-gray-600 transition-transform duration-300 ${isArchiveOpen ? 'rotate-180' : ''}`}></i>
-                            </button>
-                            
-                            {isArchiveOpen && (
-                                <div className="mt-4 space-y-3 animate-fade-in-up">
-                                    {archivedOrders.length === 0 ? (
-                                        <p className="text-center text-gray-500 py-8 px-4">Seu histórico de pedidos está vazio.</p>
-                                    ) : (
-                                        archivedOrders.map(renderOrderCard)
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </>
-                )}
-            </div>
-        );
-    };
-    
-    const MyAddressesTab = () => (
-        <div>
-            {(profile.addresses || []).map(addr => (
-                <div key={addr.id} className="bg-gray-50 border rounded-lg p-3 mb-3 flex justify-between items-start">
-                    <div>
-                        <p className="font-bold flex items-center gap-2">
-                            {addr.label}
-                            {addr.isFavorite && <span className="text-yellow-500 text-xs font-semibold flex items-center gap-1"><i className="fas fa-star"></i>Favorito</span>}
-                        </p>
-                        <p className="text-sm text-gray-600">{addr.street}, {addr.number} - {addr.bairro ? `${addr.bairro}, ` : ''}{addr.localidade}</p>
-                        <p className="text-sm text-gray-600">{addr.city}, {addr.cep}</p>
-                        {!addr.isDeliveryArea && <p className="text-xs text-red-500 font-semibold mt-1">Fora da área de entrega</p>}
-                    </div>
-                    <div className="flex gap-2">
-                        <button onClick={() => { setEditingAddress(addr); setIsAddressFormVisible(true); }} className="bg-blue-100 text-blue-600 w-8 h-8 rounded-md hover:bg-blue-200"><i className="fas fa-edit"></i></button>
-                        <button onClick={() => handleDeleteAddress(addr.id)} className="bg-red-100 text-red-600 w-8 h-8 rounded-md hover:bg-red-200"><i className="fas fa-trash"></i></button>
-                    </div>
-                </div>
-            ))}
-            {!isAddressFormVisible && (
-                <button onClick={() => { setEditingAddress(null); setIsAddressFormVisible(true); }} className="mt-4 w-full bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
-                    <i className="fas fa-plus mr-2"></i>Adicionar Endereço
-                </button>
-            )}
-            {isAddressFormVisible && <AddressForm address={editingAddress} onSave={handleSaveAddress} onCancel={() => { setIsAddressFormVisible(false); setEditingAddress(null); }} isSaving={isSaving} totalAddresses={(profile.addresses || []).length} />}
-        </div>
-    );
-
     return (
         <div
             className="fixed inset-0 bg-cover bg-center z-50 animate-fade-in-up"
@@ -460,9 +499,35 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                                 <button onClick={() => setActiveTab('addresses')} className={`py-2 px-3 font-semibold text-sm transition-colors ${activeTab === 'addresses' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-800'}`}>Meus Endereços</button>
                             </nav>
                         </div>
-                        {activeTab === 'profile' && <UserProfileTab />}
-                        {activeTab === 'orders' && <MyOrdersTab />}
-                        {activeTab === 'addresses' && <MyAddressesTab />}
+                        {activeTab === 'profile' && (
+                            <UserProfileTab
+                                profile={profile}
+                                user={user}
+                                onLogout={onLogout}
+                                handleResendVerification={handleResendVerification}
+                                handleProfileUpdate={handleProfileUpdate}
+                                name={name}
+                                setName={setName}
+                                phone={phone}
+                                setPhone={setPhone}
+                                cpf={cpf}
+                                setCpf={setCpf}
+                                isSaving={isSaving}
+                            />
+                        )}
+                        {activeTab === 'orders' && <MyOrdersTab myOrders={myOrders} isLoadingOrders={isLoadingOrders} />}
+                        {activeTab === 'addresses' && (
+                            <MyAddressesTab
+                                profile={profile}
+                                isAddressFormVisible={isAddressFormVisible}
+                                setIsAddressFormVisible={setIsAddressFormVisible}
+                                editingAddress={editingAddress}
+                                setEditingAddress={setEditingAddress}
+                                handleSaveAddress={handleSaveAddress}
+                                handleDeleteAddress={handleDeleteAddress}
+                                isSaving={isSaving}
+                            />
+                        )}
                     </div>
                 </div>
             </div>
