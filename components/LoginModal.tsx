@@ -15,6 +15,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
+    const [phone, setPhone] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -43,7 +44,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
                 const user = userCredential.user;
                 if (user) {
                     await user.updateProfile({ displayName: name });
-                    await firebaseService.createUserProfile(user, name); // Cria o perfil no Firestore
+                    await firebaseService.createUserProfile(user, name, phone); // Cria o perfil no Firestore
                     await user.sendEmailVerification();
                     addToast('Conta criada! Um e-mail de verificação foi enviado.', 'success');
                     onRegisterSuccess();
@@ -86,9 +87,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
 
                     <form onSubmit={handleEmailPasswordSubmit} className="space-y-4">
                         {isRegistering && (
-                            <div>
-                                <label className="block text-sm font-semibold mb-1" htmlFor="name">Nome Completo *</label>
-                                <input id="name" type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
+                             <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-semibold mb-1" htmlFor="name">Nome Completo *</label>
+                                    <input id="name" type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold mb-1" htmlFor="phone-register">WhatsApp *</label>
+                                    <input id="phone-register" type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Para contato sobre o pedido" required />
+                                </div>
                             </div>
                         )}
                         <div>

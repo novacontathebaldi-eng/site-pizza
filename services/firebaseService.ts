@@ -159,7 +159,7 @@ export const verifyGoogleToken = async (idToken: string): Promise<string> => {
     }
 };
 
-export const createUserProfile = async (user: firebase.User, name: string): Promise<void> => {
+export const createUserProfile = async (user: firebase.User, name: string, phone: string): Promise<void> => {
     if (!db) throw new Error("Firestore not initialized.");
     const userRef = db.collection('users').doc(user.uid);
     const profile: UserProfile = {
@@ -168,7 +168,7 @@ export const createUserProfile = async (user: firebase.User, name: string): Prom
         email: user.email!,
         photoURL: user.photoURL || '',
         addresses: [],
-        phone: '',
+        phone: phone,
     };
     await userRef.set(profile);
 };
@@ -229,6 +229,7 @@ export const updateAddress = async (uid: string, updatedAddress: Address): Promi
         if (addressIndex > -1) {
             addresses[addressIndex] = updatedAddress;
         } else {
+            // This case should ideally not happen for an update, but as a fallback:
             addresses.push(updatedAddress);
         }
 
