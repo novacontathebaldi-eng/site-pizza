@@ -137,7 +137,7 @@ const App: React.FC = () => {
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
         { role: 'bot', content: `🍕 Olá! Bem-vindo(a) à Pizzaria Santa Sensação!
 
-Eu sou o Sensação, seu assistente virtual. Estou aqui para te ajudar a fazer pedidos, tirar dúvidas sobre nosso cardápio, acompanhar entregas e muito mais.
+Eu sou o Sensação, seu assistente inteligente. Pode conversar comigo normalmente, estou aqui para te ajudar a fazer pedidos, tirar dúvidas sobre nosso cardápio, acompanhar entregas e muito mais.
 
 Como posso te ajudar hoje?` }
     ]);
