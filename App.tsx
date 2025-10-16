@@ -164,7 +164,6 @@ const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNu
 
 const App: React.FC = () => {
     // App State
-    // FIX: State for checkout form fields lifted up to pre-fill with user profile data.
     const [name, setName] = useState<string>('');
     const [phone, setPhone] = useState<string>('');
     const [products, setProducts] = useState<Product[]>([]);
@@ -225,7 +224,6 @@ const App: React.FC = () => {
                 window.gapi.load('auth2', () => {
                     try {
                         window.gapi.auth2.init({
-                            // IMPORTANTE: Substitua pelo seu ID de Cliente do Google
                             client_id: '15856214344-cnqogu0885v86b88j07not68n989h8go.apps.googleusercontent.com',
                         }).then(() => {
                             setIsGapiReady(true);
@@ -238,10 +236,8 @@ const App: React.FC = () => {
             }
         };
         
-        // Listen for the custom event dispatched from index.html
         window.addEventListener('google-script-loaded', handleScriptLoad);
         
-        // Fallback if the script is already loaded
         if (window.googleScriptLoaded && !isGapiReady) {
             handleScriptLoad();
         }
@@ -259,14 +255,11 @@ const App: React.FC = () => {
             if (user) {
                 const profile = await firebaseService.getUserProfile(user.uid);
                 setUserProfile(profile);
-                // Pre-fill checkout form if user data is available
-                // FIX: Use the state setters defined in the App component to resolve 'Cannot find name' errors.
                 if (profile?.name) setName(profile.name);
                 if (profile?.phone) setPhone(profile.phone);
 
             } else {
                 setUserProfile(null);
-                // FIX: Clear checkout form fields on logout.
                 setName('');
                 setPhone('');
             }
@@ -376,7 +369,7 @@ const App: React.FC = () => {
             const newBotMessage: ChatMessage = { role: 'bot', content: botReply };
             setChatMessages(prev => [...prev, newBotMessage]);
         } catch (error) {
-            const errorMessage: ChatMessage = { role: 'bot', content: 'Desculpe, não consegui processar sua mensagem. Tente novamente.' };
+            const errorMessage: ChatMessage = { role: 'bot', content: 'Desculpe, estou com um problema para me conectar. Tente novamente mais tarde.' };
             setChatMessages(prev => [...prev, errorMessage]);
         } finally {
             setIsBotReplying(false);
@@ -612,7 +605,7 @@ const App: React.FC = () => {
             <UserAreaModal isOpen={isUserAreaModalOpen} onClose={() => setIsUserAreaModalOpen(false)} user={currentUser} profile={userProfile} onLogout={handleLogout} addToast={addToast} />
 
             {(isProcessingOrder) && <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-6 font-semibold text-lg text-gray-700">Processando seu pedido...</p><p className="mt-2 text-sm text-gray-500">Por favor, aguarde um instante.</p></div></div>}
-            <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]"><div className="w-full flex flex-col items-center space-y-4 sm:items-end">{toasts.map((toast) => <div key={toast.id} className="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden animate-fade-in-up"><div className="p-4"><div className="flex items-start"><div className="flex-shrink-0">{toast.type === 'success' ? <i className="fas fa-check-circle h-6 w-6 text-green-500"></i> : <i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>}</div><div className="ml-3 w-0 flex-1 pt-0.5"><p className="text-sm font-medium text-gray-900">{toast.message}</p></div></div></div></div>))}</div></div>
+            <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]"><div className="w-full flex flex-col items-center space-y-4 sm:items-end">{toasts.map((toast) => (<div key={toast.id} className="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden animate-fade-in-up"><div className="p-4"><div className="flex items-start"><div className="flex-shrink-0">{toast.type === 'success' ? <i className="fas fa-check-circle h-6 w-6 text-green-500"></i> : <i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>}</div><div className="ml-3 w-0 flex-1 pt-0.5"><p className="text-sm font-medium text-gray-900">{toast.message}</p></div></div></div></div>))}</div></div>
         </div>
     );
 };
