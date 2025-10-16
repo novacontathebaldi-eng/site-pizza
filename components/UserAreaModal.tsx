@@ -4,6 +4,7 @@ import { UserProfile, Order, OrderStatus, Address } from '../types';
 import { db } from '../services/firebase';
 import * as firebaseService from '../services/firebaseService';
 import defaultProfilePic from '../assets/perfil.png';
+import userAreaBackground from '../assets/fundocliente.png';
 
 interface UserAreaModalProps {
     isOpen: boolean;
@@ -432,7 +433,10 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
     );
 
     return (
-        <div className="fixed inset-0 bg-brand-ivory-50 z-50 animate-fade-in-up">
+        <div
+            className="fixed inset-0 bg-cover bg-center z-50 animate-fade-in-up"
+            style={{ backgroundImage: `url(${userAreaBackground})` }}
+        >
             <div className="w-full h-full flex flex-col">
                 <header className="sticky top-0 bg-brand-green-700 z-10 flex-shrink-0 shadow-md">
                     <div className="max-w-4xl mx-auto flex justify-between items-center p-4">
@@ -448,7 +452,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                 </header>
 
                 <div className="flex-grow overflow-y-auto">
-                    <div className="max-w-4xl mx-auto p-4 sm:p-6">
+                    <div className="max-w-4xl mx-auto p-4 sm:p-6 my-4 sm:my-6 bg-brand-ivory-50/90 backdrop-blur-sm rounded-xl shadow-lg">
                         <div className="border-b mb-6">
                             <nav className="flex -mb-px space-x-4">
                                 <button onClick={() => setActiveTab('profile')} className={`py-2 px-3 font-semibold text-sm transition-colors ${activeTab === 'profile' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-800'}`}>Perfil</button>
