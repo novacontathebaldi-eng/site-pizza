@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import firebase from 'firebase/compat/app';
 import { UserProfile, Order, OrderStatus, Address } from '../types';
 import { db } from '../services/firebase';
@@ -24,6 +24,7 @@ const statusConfig: { [key in OrderStatus]?: { text: string; icon: string; color
     completed: { text: 'Finalizado', icon: 'fas fa-check-circle', color: 'text-green-500' },
     cancelled: { text: 'Cancelado', icon: 'fas fa-times-circle', color: 'text-red-500' },
     'awaiting-payment': { text: 'Aguardando Pgto', icon: 'fas fa-clock', color: 'text-gray-500' },
+    deleted: { text: 'Excluído', icon: 'fas fa-trash-alt', color: 'text-gray-400' },
 };
 
 const LOCALIDADES = ['Centro', 'Olaria', 'Vila Nova', 'Moxafongo', 'Cocal', 'Funil'];
@@ -172,6 +173,30 @@ function validarCPF(cpf: string): boolean {
   return true;
 }
 
+const formatTimestamp = (timestamp: any): string => {
+    if (!timestamp) return 'N/A';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+};
+
+const OrderRow: React.FC<{ order: Order }> = ({ order }) => {
+    const status = statusConfig[order.status] || { text: 'Desconhecido', icon: 'fas fa-question-circle', color: 'text-gray-500' };
+    return (
+        <div className="bg-gray-50 border rounded-lg p-3 flex justify-between items-center animate-fade-in-up">
+            <div>
+                <p className="font-bold">Pedido #{order.orderNumber}</p>
+                <p className="text-sm text-gray-500">{formatTimestamp(order.createdAt)}</p>
+            </div>
+            <div className="text-right">
+                <p className={`font-semibold text-sm flex items-center justify-end gap-2 ${status.color}`}>
+                    <i className={status.icon}></i>{status.text}
+                </p>
+                {order.total != null && <p className="font-bold text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
+            </div>
+        </div>
+    );
+};
+
 
 export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, user, profile, onLogout, addToast, initialTab = 'orders', showAddAddressForm = false }) => {
     const [name, setName] = useState('');
@@ -184,6 +209,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
 
     const [editingAddress, setEditingAddress] = useState<Partial<Address> | null>(null);
     const [isAddressFormVisible, setIsAddressFormVisible] = useState(showAddAddressForm);
+    const [isHistoryVisible, setIsHistoryVisible] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -211,7 +237,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
 
         if (activeTab === 'orders') {
             setIsLoadingOrders(true);
-            const query = db.collection('orders').where('userId', '==', user.uid).limit(15);
+            const query = db.collection('orders').where('userId', '==', user.uid).limit(25);
             const unsubscribe = query.onSnapshot(snapshot => {
                 const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
                 fetchedOrders.sort((a, b) => (b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0) - (a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0));
@@ -225,6 +251,24 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
             return () => unsubscribe();
         }
     }, [isOpen, user, addToast, activeTab]);
+
+    const { activeOrders, finishedOrders } = useMemo(() => {
+        const active: Order[] = [];
+        const finished: Order[] = [];
+        const activeStatuses: OrderStatus[] = ['pending', 'accepted', 'reserved', 'ready'];
+        const finishedStatuses: OrderStatus[] = ['completed', 'cancelled', 'deleted'];
+
+        myOrders.forEach(order => {
+            if (activeStatuses.includes(order.status)) {
+                active.push(order);
+            } else if (finishedStatuses.includes(order.status)) {
+                finished.push(order);
+            }
+            // Orders with 'awaiting-payment' status are implicitly ignored
+        });
+        return { activeOrders, finishedOrders };
+    }, [myOrders]);
+
 
     if (!isOpen || !user || !profile) return null;
 
@@ -285,12 +329,6 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
         }
     };
 
-    const formatTimestamp = (timestamp: any): string => {
-        if (!timestamp) return 'N/A';
-        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
-    };
-
     const UserProfileTab = () => (
         <form onSubmit={handleProfileUpdate} className="space-y-4">
             <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg border">
@@ -335,28 +373,39 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
         <div>
             {isLoadingOrders ? (
                 <div className="text-center p-8"><i className="fas fa-spinner fa-spin text-3xl text-accent"></i></div>
-            ) : myOrders.length === 0 ? (
-                <p className="text-center text-gray-500 p-8">Você ainda não fez nenhum pedido.</p>
             ) : (
-                <div className="space-y-3">
-                    {myOrders.map(order => {
-                        const status = statusConfig[order.status] || { text: 'Desconhecido', icon: 'fas fa-question-circle', color: 'text-gray-500' };
-                        return (
-                        <div key={order.id} className="bg-gray-50 border rounded-lg p-3 flex justify-between items-center">
-                            <div>
-                                <p className="font-bold">Pedido #{order.orderNumber}</p>
-                                <p className="text-sm text-gray-500">{formatTimestamp(order.createdAt)}</p>
+                <>
+                    <div>
+                        <h4 className="text-lg font-bold mb-3 text-text-on-light">Pedidos Atuais</h4>
+                        {activeOrders.length > 0 ? (
+                            <div className="space-y-3">
+                                {activeOrders.map(order => <OrderRow key={order.id} order={order} />)}
                             </div>
-                            <div className="text-right">
-                                <p className={`font-semibold text-sm flex items-center justify-end gap-2 ${status.color}`}>
-                                    <i className={status.icon}></i>{status.text}
-                                </p>
-                                {order.total != null && <p className="font-bold text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
+                        ) : (
+                            <p className="text-center text-gray-500 p-6 bg-gray-50 rounded-lg">Você não tem pedidos em andamento.</p>
+                        )}
+                    </div>
+
+                    <div className="mt-6 border-t pt-6">
+                        <button
+                            onClick={() => setIsHistoryVisible(!isHistoryVisible)}
+                            className="w-full flex justify-between items-center text-left text-lg font-bold text-text-on-light p-2 rounded-md hover:bg-gray-100 transition-colors"
+                            aria-expanded={isHistoryVisible}
+                        >
+                            <span>Finalizados</span>
+                            <i className={`fas fa-chevron-down transition-transform duration-300 ${isHistoryVisible ? 'rotate-180' : ''}`}></i>
+                        </button>
+                        {isHistoryVisible && (
+                            <div className="mt-3 space-y-3">
+                                {finishedOrders.length > 0 ? (
+                                    finishedOrders.map(order => <OrderRow key={order.id} order={order} />)
+                                ) : (
+                                    <p className="text-center text-gray-500 p-6 bg-gray-50 rounded-lg">Nenhum pedido no seu histórico.</p>
+                                )}
                             </div>
-                        </div>
-                        );
-                    })}
-                </div>
+                        )}
+                    </div>
+                </>
             )}
         </div>
     );
