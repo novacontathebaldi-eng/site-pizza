@@ -5,6 +5,17 @@ import { db } from '../services/firebase';
 import * as firebaseService from '../services/firebaseService';
 import defaultProfilePic from '../assets/perfil.png';
 
+interface UserAreaModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    user: firebase.User | null;
+    profile: UserProfile | null;
+    onLogout: () => void;
+    addToast: (message: string, type: 'success' | 'error') => void;
+    initialTab?: 'orders' | 'profile' | 'addresses';
+    showAddAddressForm?: boolean;
+}
+
 const statusConfig: { [key in OrderStatus]?: { text: string; icon: string; color: string; } } = {
     pending: { text: 'Pendente', icon: 'fas fa-hourglass-start', color: 'text-yellow-500' },
     accepted: { text: 'Em Preparo', icon: 'fas fa-cogs', color: 'text-blue-500' },
@@ -22,112 +33,82 @@ const AddressForm: React.FC<{
     onSave: (address: Address) => Promise<void>;
     onCancel: () => void;
     isSaving: boolean;
-    isOnlyAddress: boolean;
-}> = ({ address, onSave, onCancel, isSaving, isOnlyAddress }) => {
-    
-    const [formData, setFormData] = useState({
-        id: address?.id || undefined,
-        label: address?.label || '',
-        localidade: address?.localidade || '',
-        street: address?.street || '',
-        number: address?.number || '',
-        complement: address?.complement || '',
-        cep: address?.cep || '29640-000',
-        city: address?.city || 'Santa Leopoldina',
-        state: address?.state || 'ES',
-        isFavorite: address?.isFavorite || false,
-        bairro: address?.isDeliveryArea === false ? address.localidade : ''
+    totalAddresses: number;
+}> = ({ address, onSave, onCancel, isSaving, totalAddresses }) => {
+    const [formData, setFormData] = useState<Partial<Address>>({
+        label: '', localidade: 'Centro', street: '', number: '', complement: '', isFavorite: false,
+        bairro: '', cep: '29640-000', city: 'Santa Leopoldina',
+        ...address
     });
     
-    const isOutsideArea = formData.localidade === 'Outra';
-
     useEffect(() => {
-        if (isOutsideArea) {
-            // Se for a primeira vez que seleciona "Outra" e os dados são padrão, limpa.
-            if (formData.cep === '29640-000') {
-                 setFormData(f => ({ ...f, cep: '', city: '', state: '', isFavorite: false }));
-            }
-        } else {
-             setFormData(f => ({ ...f, cep: '29640-000', city: 'Santa Leopoldina', state: 'ES' }));
-        }
-    }, [isOutsideArea]);
+        const isOther = formData.localidade === 'Outra';
+        setFormData(prev => ({
+            ...prev,
+            cep: isOther ? '' : '29640-000',
+            city: isOther ? '' : 'Santa Leopoldina'
+        }));
+    }, [formData.localidade]);
 
-    const handleLocalidadeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const newLocalidade = e.target.value;
-        setFormData({ ...formData, localidade: newLocalidade });
-    };
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setFormData({ ...formData, [name]: value });
-    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        const isOtherLocality = formData.localidade === 'Outra';
         const finalAddress: Address = {
             id: formData.id || '',
             label: formData.label || 'Endereço',
-            localidade: isOutsideArea ? formData.bairro : formData.localidade,
-            street: formData.street,
-            number: formData.number,
-            complement: formData.complement,
-            isDeliveryArea: !isOutsideArea,
-            city: formData.city,
-            state: formData.state,
-            cep: formData.cep,
-            isFavorite: isOutsideArea ? false : formData.isFavorite,
+            localidade: formData.localidade || '',
+            street: formData.street || '',
+            number: formData.number || '',
+            complement: formData.complement || '',
+            bairro: isOtherLocality ? formData.bairro : '',
+            isDeliveryArea: LOCALIDADES.includes(formData.localidade || ''),
+            city: isOtherLocality ? formData.city || '' : 'Santa Leopoldina',
+            cep: isOtherLocality ? formData.cep || '' : '29640-000',
+            state: 'ES',
+            isFavorite: isOtherLocality ? false : formData.isFavorite || false,
         };
         onSave(finalAddress);
     };
+    
+    const isOnlyAddress = totalAddresses === 1 && !!address?.id;
+    const isOtherLocality = formData.localidade === 'Outra';
+    const isFavoriteDisabled = isOtherLocality || isOnlyAddress;
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4 p-4 border rounded-lg bg-gray-50 mt-4 animate-fade-in-up">
+        <form onSubmit={handleSubmit} className="space-y-3 p-4 border rounded-lg bg-gray-50 mt-4 animate-fade-in-up">
             <h5 className="font-bold">{formData.id ? 'Editar Endereço' : 'Novo Endereço'}</h5>
-            
-            <div>
-                <label className="block text-sm font-semibold mb-1">Rótulo (Ex: Casa, Trabalho) *</label>
-                <input type="text" value={formData.label} onChange={e => setFormData({ ...formData, label: e.target.value })} className="w-full px-3 py-2 border rounded-md" required />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-semibold mb-1">Rótulo (Ex: Casa, Trabalho)</label>
+                    <input type="text" value={formData.label} onChange={e => setFormData({ ...formData, label: e.target.value })} className="w-full px-3 py-2 border rounded-md" required />
+                </div>
+                <div>
+                    <label className="block text-sm font-semibold mb-1">Localidade *</label>
+                    <select value={formData.localidade} onChange={e => setFormData({ ...formData, localidade: e.target.value })} className="w-full px-3 py-2 border rounded-md bg-white" required>
+                        <option value="" disabled>Selecione...</option>
+                        {LOCALIDADES.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                         <option value="Outra">Outra (Fora da área de entrega)</option>
+                    </select>
+                </div>
             </div>
-
-            <div>
-                <label className="block text-sm font-semibold mb-1">Localidade *</label>
-                <select value={formData.localidade} onChange={handleLocalidadeChange} className="w-full px-3 py-2 border rounded-md bg-white" required>
-                    <option value="" disabled>Selecione...</option>
-                    {LOCALIDADES.map(loc => <option key={loc} value={loc}>{loc}</option>)}
-                    <option value="Outra">Outra (Fora da área de entrega)</option>
-                </select>
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label className="block text-sm font-semibold mb-1">CEP</label>
+                    <input type="text" value={formData.cep} onChange={e => setFormData({ ...formData, cep: e.target.value })} className="w-full px-3 py-2 border rounded-md disabled:bg-gray-200" required disabled={!isOtherLocality} />
+                </div>
+                <div className="col-span-2">
+                    <label className="block text-sm font-semibold mb-1">Cidade</label>
+                    <input type="text" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} className="w-full px-3 py-2 border rounded-md disabled:bg-gray-200" required disabled={!isOtherLocality} />
+                </div>
             </div>
-            
-            {isOutsideArea ? (
-                <div className='animate-fade-in-up space-y-4 p-3 border rounded-md bg-white'>
-                     <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4">
-                        <div>
-                            <label className="block text-sm font-semibold mb-1">Bairro *</label>
-                            <input name="bairro" value={formData.bairro} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" required />
-                        </div>
-                        <div>
-                             <label className="block text-sm font-semibold mb-1">CEP *</label>
-                            <input name="cep" value={formData.cep} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" required />
-                        </div>
-                     </div>
-                     <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4">
-                        <div>
-                            <label className="block text-sm font-semibold mb-1">Cidade *</label>
-                            <input name="city" value={formData.city} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" required />
-                        </div>
-                         <div>
-                            <label className="block text-sm font-semibold mb-1">Estado *</label>
-                            <input name="state" value={formData.state} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" required />
-                        </div>
+             <div className={`grid grid-cols-1 md:grid-cols-[${isOtherLocality ? '1fr_2fr_1fr' : '2fr_1fr'}] gap-4`}>
+                 {isOtherLocality && (
+                     <div>
+                        <label className="block text-sm font-semibold mb-1">Bairro *</label>
+                        <input type="text" value={formData.bairro} onChange={e => setFormData({ ...formData, bairro: e.target.value })} className="w-full px-3 py-2 border rounded-md" required={isOtherLocality} />
                     </div>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <p className="text-sm p-2 bg-gray-200 rounded-md"><strong>CEP:</strong> 29640-000</p>
-                    <p className="text-sm p-2 bg-gray-200 rounded-md"><strong>Cidade:</strong> Santa Leopoldina - ES</p>
-                </div>
-            )}
-             <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4">
+                 )}
                 <div>
                     <label className="block text-sm font-semibold mb-1">Rua *</label>
                     <input type="text" value={formData.street} onChange={e => setFormData({ ...formData, street: e.target.value })} className="w-full px-3 py-2 border rounded-md" required />
@@ -142,12 +123,11 @@ const AddressForm: React.FC<{
                 <input type="text" value={formData.complement} onChange={e => setFormData({ ...formData, complement: e.target.value })} className="w-full px-3 py-2 border rounded-md" />
             </div>
             <div>
-                <label className={`flex items-center gap-2 cursor-pointer text-sm ${isOutsideArea || isOnlyAddress ? 'cursor-not-allowed opacity-50' : ''}`}>
-                    <input type="checkbox" checked={formData.isFavorite} disabled={isOutsideArea || isOnlyAddress} onChange={e => setFormData({ ...formData, isFavorite: e.target.checked })} className="h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent disabled:bg-gray-200" />
+                <label className={`flex items-center gap-2 text-sm ${isFavoriteDisabled ? 'cursor-not-allowed text-gray-400' : 'cursor-pointer'}`}>
+                    <input type="checkbox" checked={formData.isFavorite || isOnlyAddress} onChange={e => !isFavoriteDisabled && setFormData({ ...formData, isFavorite: e.target.checked })} className="h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent disabled:opacity-50" disabled={isFavoriteDisabled} />
                     Tornar este o endereço favorito
                 </label>
-                {isOnlyAddress && <p className="text-xs text-gray-500 mt-1">Você não pode desmarcar seu único endereço como favorito.</p>}
-                 {isOutsideArea && <p className="text-xs text-red-500 mt-1">Endereços fora da área de entrega não podem ser favoritos.</p>}
+                 {isOtherLocality && <p className="text-xs text-red-500 mt-1">Endereços fora da área de entrega não podem ser favoritos.</p>}
             </div>
             <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={onCancel} className="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Cancelar</button>
@@ -159,21 +139,94 @@ const AddressForm: React.FC<{
     );
 };
 
+function validarCPF(cpf: string): boolean {
+  // Remove pontos, traços e espaços
+  cpf = cpf.replace(/[^\d]+/g, '');
+  
+  // Verifica se tem 11 dígitos
+  if (cpf.length !== 11) return false;
+  
+  // Elimina CPFs inválidos conhecidos (todos dígitos iguais)
+  if (/^(\d)\1+$/.test(cpf)) {
+    return false;
+  }
+  
+  // Valida primeiro dígito verificador
+  let soma = 0;
+  for (let i = 0; i < 9; i++) {
+    soma += parseInt(cpf.charAt(i)) * (10 - i);
+  }
+  let resto = 11 - (soma % 11);
+  if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== parseInt(cpf.charAt(9))) return false;
+  
+  // Valida segundo dígito verificador
+  soma = 0;
+  for (let i = 0; i < 10; i++) {
+    soma += parseInt(cpf.charAt(i)) * (11 - i);
+  }
+  resto = 11 - (soma % 11);
+  if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== parseInt(cpf.charAt(10))) return false;
+  
+  return true;
+}
 
-const UserProfileTab: React.FC<{
-    user: firebase.User;
-    profile: UserProfile;
-    onLogout: () => void;
-    addToast: (message: string, type: 'success' | 'error') => void;
-}> = ({ user, profile, onLogout, addToast }) => {
-    const [name, setName] = useState(profile.name || '');
-    const [phone, setPhone] = useState(profile.phone || '');
+
+export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, user, profile, onLogout, addToast, initialTab = 'orders', showAddAddressForm = false }) => {
+    const [name, setName] = useState('');
+    const [phone, setPhone] = useState('');
+    const [cpf, setCpf] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [myOrders, setMyOrders] = useState<Order[]>([]);
+    const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+    const [activeTab, setActiveTab] = useState(initialTab);
+
+    const [editingAddress, setEditingAddress] = useState<Partial<Address> | null>(null);
+    const [isAddressFormVisible, setIsAddressFormVisible] = useState(showAddAddressForm);
 
     useEffect(() => {
-        setName(profile.name || '');
-        setPhone(profile.phone || '');
-    }, [profile]);
+        if (isOpen) {
+            if (profile) {
+                setName(profile.name || '');
+                setPhone(profile.phone || '');
+                setCpf(profile.cpf || '');
+            }
+             setActiveTab(initialTab);
+             setIsAddressFormVisible(showAddAddressForm);
+        } else {
+            // Reset to default when modal closes
+            setActiveTab('orders');
+            setIsAddressFormVisible(false);
+            setEditingAddress(null);
+        }
+    }, [profile, isOpen, initialTab, showAddAddressForm]);
+
+
+    useEffect(() => {
+        if (!isOpen || !user || !db) {
+            setMyOrders([]);
+            return;
+        }
+
+        if (activeTab === 'orders') {
+            setIsLoadingOrders(true);
+            const query = db.collection('orders').where('userId', '==', user.uid).limit(15);
+            const unsubscribe = query.onSnapshot(snapshot => {
+                const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+                fetchedOrders.sort((a, b) => (b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0) - (a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0));
+                setMyOrders(fetchedOrders);
+                setIsLoadingOrders(false);
+            }, error => {
+                console.error("Error fetching user orders:", error);
+                addToast("Erro ao buscar seus pedidos.", 'error');
+                setIsLoadingOrders(false);
+            });
+            return () => unsubscribe();
+        }
+    }, [isOpen, user, addToast, activeTab]);
+
+    if (!isOpen || !user || !profile) return null;
 
     const handleResendVerification = async () => {
         try {
@@ -183,12 +236,17 @@ const UserProfileTab: React.FC<{
             addToast('Erro ao reenviar e-mail. Tente mais tarde.', 'error');
         }
     };
-
+    
     const handleProfileUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
+        if (cpf.trim() && !validarCPF(cpf)) {
+            addToast('O CPF inserido não é válido.', 'error');
+            setIsSaving(false);
+            return;
+        }
         try {
-            await firebaseService.updateUserProfile(user.uid, { name, phone });
+            await firebaseService.updateUserProfile(user.uid, { name, phone, cpf });
             addToast('Seu perfil foi salvo!', 'success');
         } catch (error) {
             addToast('Erro ao salvar seu perfil.', 'error');
@@ -196,8 +254,44 @@ const UserProfileTab: React.FC<{
             setIsSaving(false);
         }
     };
+    
+    const handleSaveAddress = async (address: Address) => {
+        setIsSaving(true);
+        try {
+            if (address.id) {
+                await firebaseService.updateAddress(user.uid, address);
+                addToast('Endereço atualizado!', 'success');
+            } else {
+                await firebaseService.addAddress(user.uid, address);
+                addToast('Endereço adicionado!', 'success');
+            }
+            setIsAddressFormVisible(false);
+            setEditingAddress(null);
+        } catch (error) {
+            addToast('Erro ao salvar endereço.', 'error');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+    
+    const handleDeleteAddress = async (addressId: string) => {
+        if (window.confirm('Tem certeza que deseja excluir este endereço?')) {
+            try {
+                await firebaseService.deleteAddress(user.uid, addressId);
+                addToast('Endereço excluído.', 'success');
+            } catch (error) {
+                addToast('Erro ao excluir endereço.', 'error');
+            }
+        }
+    };
 
-    return (
+    const formatTimestamp = (timestamp: any): string => {
+        if (!timestamp) return 'N/A';
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+    };
+
+    const UserProfileTab = () => (
         <form onSubmit={handleProfileUpdate} className="space-y-4">
             <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg border">
                 <img src={profile.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-16 h-16 rounded-full" />
@@ -209,7 +303,7 @@ const UserProfileTab: React.FC<{
                    <i className="fas fa-sign-out-alt mr-2"></i>Sair
                 </button>
             </div>
-            {!user.emailVerified && (
+             {!user.emailVerified && (
                 <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 text-sm" role="alert">
                     <p className="font-bold">Verifique seu e-mail!</p>
                     <p>Enviamos um link de confirmação para você. Verifique sua caixa de entrada ou spam.</p>
@@ -224,6 +318,11 @@ const UserProfileTab: React.FC<{
                 <label className="block text-sm font-semibold mb-1">Telefone/WhatsApp</label>
                 <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded-md" />
             </div>
+             <div>
+                <label className="block text-sm font-semibold mb-1">CPF (opcional)</label>
+                <input type="text" value={cpf} onChange={e => setCpf(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="000.000.000-00" />
+                 <p className="text-xs text-gray-500 mt-1">Seu CPF é usado para agilizar o pagamento com PIX.</p>
+            </div>
             <div className="text-right pt-2">
                  <button type="submit" disabled={isSaving} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[120px] disabled:bg-opacity-70">
                     {isSaving ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-2"></i><span>Salvar Perfil</span></>}
@@ -231,27 +330,16 @@ const UserProfileTab: React.FC<{
             </div>
         </form>
     );
-};
 
-const MyOrdersTab: React.FC<{
-    isLoading: boolean;
-    orders: Order[];
-}> = ({ isLoading, orders }) => {
-    const formatTimestamp = (timestamp: any): string => {
-        if (!timestamp) return 'N/A';
-        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
-    };
-
-    return (
+    const MyOrdersTab = () => (
         <div>
-            {isLoading ? (
+            {isLoadingOrders ? (
                 <div className="text-center p-8"><i className="fas fa-spinner fa-spin text-3xl text-accent"></i></div>
-            ) : orders.length === 0 ? (
+            ) : myOrders.length === 0 ? (
                 <p className="text-center text-gray-500 p-8">Você ainda não fez nenhum pedido.</p>
             ) : (
                 <div className="space-y-3">
-                    {orders.map(order => {
+                    {myOrders.map(order => {
                         const status = statusConfig[order.status] || { text: 'Desconhecido', icon: 'fas fa-question-circle', color: 'text-gray-500' };
                         return (
                         <div key={order.id} className="bg-gray-50 border rounded-lg p-3 flex justify-between items-center">
@@ -272,66 +360,18 @@ const MyOrdersTab: React.FC<{
             )}
         </div>
     );
-};
-
-const MyAddressesTab: React.FC<{
-    profile: UserProfile;
-    userUid: string;
-    addToast: (message: string, type: 'success' | 'error') => void;
-    initialShowForm: boolean;
-}> = ({ profile, userUid, addToast, initialShowForm }) => {
-    const [isSaving, setIsSaving] = useState(false);
-    const [editingAddress, setEditingAddress] = useState<Partial<Address> | null>(null);
-    const [isAddressFormVisible, setIsAddressFormVisible] = useState(initialShowForm);
-    const addresses = profile.addresses || [];
-
-    useEffect(() => {
-        setIsAddressFormVisible(initialShowForm);
-        if (initialShowForm) {
-             setEditingAddress({ isFavorite: addresses.length === 0 });
-        }
-    }, [initialShowForm, addresses.length]);
-
-    const handleSaveAddress = async (address: Address) => {
-        setIsSaving(true);
-        try {
-            if (address.id) {
-                await firebaseService.updateAddress(userUid, address);
-                addToast('Endereço atualizado!', 'success');
-            } else {
-                await firebaseService.addAddress(userUid, address);
-                addToast('Endereço adicionado!', 'success');
-            }
-            setIsAddressFormVisible(false);
-            setEditingAddress(null);
-        } catch (error) {
-            addToast('Erro ao salvar endereço.', 'error');
-        } finally {
-            setIsSaving(false);
-        }
-    };
     
-    const handleDeleteAddress = async (addressId: string) => {
-        if (window.confirm('Tem certeza que deseja excluir este endereço?')) {
-            try {
-                await firebaseService.deleteAddress(userUid, addressId);
-                addToast('Endereço excluído.', 'success');
-            } catch (error) {
-                addToast('Erro ao excluir endereço.', 'error');
-            }
-        }
-    };
-
-    return (
+    const MyAddressesTab = () => (
         <div>
-            {addresses.map(addr => (
+            {(profile.addresses || []).map(addr => (
                 <div key={addr.id} className="bg-gray-50 border rounded-lg p-3 mb-3 flex justify-between items-start">
                     <div>
                         <p className="font-bold flex items-center gap-2">
                             {addr.label}
                             {addr.isFavorite && <span className="text-yellow-500 text-xs font-semibold flex items-center gap-1"><i className="fas fa-star"></i>Favorito</span>}
                         </p>
-                        <p className="text-sm text-gray-600">{addr.street}, {addr.number} - {addr.localidade}</p>
+                        <p className="text-sm text-gray-600">{addr.street}, {addr.number} - {addr.bairro ? `${addr.bairro}, ` : ''}{addr.localidade}</p>
+                        <p className="text-sm text-gray-600">{addr.city}, {addr.cep}</p>
                         {!addr.isDeliveryArea && <p className="text-xs text-red-500 font-semibold mt-1">Fora da área de entrega</p>}
                     </div>
                     <div className="flex gap-2">
@@ -341,64 +381,13 @@ const MyAddressesTab: React.FC<{
                 </div>
             ))}
             {!isAddressFormVisible && (
-                <button onClick={() => { setEditingAddress({ isFavorite: addresses.length === 0 }); setIsAddressFormVisible(true); }} className="mt-4 w-full bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
+                <button onClick={() => { setEditingAddress({ isFavorite: (profile.addresses || []).length === 0 }); setIsAddressFormVisible(true); }} className="mt-4 w-full bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
                     <i className="fas fa-plus mr-2"></i>Adicionar Endereço
                 </button>
             )}
-            {isAddressFormVisible && <AddressForm address={editingAddress} onSave={handleSaveAddress} onCancel={() => { setIsAddressFormVisible(false); setEditingAddress(null); }} isSaving={isSaving} isOnlyAddress={addresses.length === 1 && !!addresses.find(a => a.id === editingAddress?.id)} />}
+            {isAddressFormVisible && <AddressForm address={editingAddress} onSave={handleSaveAddress} onCancel={() => setIsAddressFormVisible(false)} isSaving={isSaving} totalAddresses={(profile.addresses || []).length} />}
         </div>
     );
-};
-
-// FIX: Added the missing UserAreaModalProps interface definition.
-interface UserAreaModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    user: firebase.User | null;
-    profile: UserProfile | null;
-    onLogout: () => void;
-    addToast: (message: string, type: 'success' | 'error') => void;
-    initialTab?: 'profile' | 'orders' | 'addresses';
-    showAddAddressForm?: boolean;
-}
-
-export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, user, profile, onLogout, addToast, initialTab = 'orders', showAddAddressForm = false }) => {
-    const [myOrders, setMyOrders] = useState<Order[]>([]);
-    const [isLoadingOrders, setIsLoadingOrders] = useState(true);
-    const [activeTab, setActiveTab] = useState(initialTab);
-
-    useEffect(() => {
-        if (isOpen) {
-             setActiveTab(initialTab);
-        } else {
-            setActiveTab('orders'); // Reset to default when modal closes
-        }
-    }, [isOpen, initialTab]);
-
-
-    useEffect(() => {
-        if (!isOpen || !user || !db) {
-            setMyOrders([]);
-            return;
-        }
-
-        if (activeTab === 'orders') {
-            setIsLoadingOrders(true);
-            const query = db.collection('orders').where('userId', '==', user.uid).orderBy('createdAt', 'desc').limit(15);
-            const unsubscribe = query.onSnapshot(snapshot => {
-                const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-                setMyOrders(fetchedOrders);
-                setIsLoadingOrders(false);
-            }, error => {
-                console.error("Error fetching user orders:", error);
-                addToast("Erro ao buscar seus pedidos.", 'error');
-                setIsLoadingOrders(false);
-            });
-            return () => unsubscribe();
-        }
-    }, [isOpen, user, addToast, activeTab]);
-
-    if (!isOpen || !user || !profile) return null;
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fade-in-up">
@@ -415,9 +404,9 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                             <button onClick={() => setActiveTab('addresses')} className={`py-2 px-4 font-semibold text-sm ${activeTab === 'addresses' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Meus Endereços</button>
                         </nav>
                     </div>
-                    {activeTab === 'profile' && <UserProfileTab user={user} profile={profile} onLogout={onLogout} addToast={addToast} />}
-                    {activeTab === 'orders' && <MyOrdersTab isLoading={isLoadingOrders} orders={myOrders} />}
-                    {activeTab === 'addresses' && <MyAddressesTab profile={profile} userUid={user.uid} addToast={addToast} initialShowForm={showAddAddressForm} />}
+                    {activeTab === 'profile' && <UserProfileTab />}
+                    {activeTab === 'orders' && <MyOrdersTab />}
+                    {activeTab === 'addresses' && <MyAddressesTab />}
                 </div>
             </div>
         </div>

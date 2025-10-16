@@ -12,6 +12,7 @@ export interface Address {
     cep: string;
     state: string;
     isFavorite?: boolean;
+    bairro?: string;
 }
 
 export interface UserProfile {
@@ -21,6 +22,7 @@ export interface UserProfile {
     photoURL: string;
     // User-provided info
     phone?: string;
+    cpf?: string;
     addresses?: Address[];
 }
 

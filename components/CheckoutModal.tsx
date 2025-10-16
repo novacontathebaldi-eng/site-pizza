@@ -168,6 +168,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
         if (isOpen) {
             const fav = profile?.addresses?.filter(a => a.isDeliveryArea).find(a => a.isFavorite);
             setSelectedAddressId(fav ? fav.id : 'manual');
+            if (profile?.cpf) {
+                setCpf(profile.cpf);
+            }
         } else {
             // Full reset when closing
             setCpf(''); setOrderType('');

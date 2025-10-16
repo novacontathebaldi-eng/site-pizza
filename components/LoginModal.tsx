@@ -10,12 +10,46 @@ interface LoginModalProps {
     onRegisterSuccess: () => void;
 }
 
+function validarCPF(cpf: string): boolean {
+  // Remove pontos, traços e espaços
+  cpf = cpf.replace(/[^\d]+/g, '');
+  
+  // Verifica se tem 11 dígitos
+  if (cpf.length !== 11) return false;
+  
+  // Elimina CPFs inválidos conhecidos (todos dígitos iguais)
+  if (/^(\d)\1+$/.test(cpf)) {
+    return false;
+  }
+  
+  // Valida primeiro dígito verificador
+  let soma = 0;
+  for (let i = 0; i < 9; i++) {
+    soma += parseInt(cpf.charAt(i)) * (10 - i);
+  }
+  let resto = 11 - (soma % 11);
+  if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== parseInt(cpf.charAt(9))) return false;
+  
+  // Valida segundo dígito verificador
+  soma = 0;
+  for (let i = 0; i < 10; i++) {
+    soma += parseInt(cpf.charAt(i)) * (11 - i);
+  }
+  resto = 11 - (soma % 11);
+  if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== parseInt(cpf.charAt(10))) return false;
+  
+  return true;
+}
+
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogleSignIn, addToast, onRegisterSuccess }) => {
     const [isRegistering, setIsRegistering] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
+    const [cpf, setCpf] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -40,11 +74,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
                     setIsLoading(false);
                     return;
                 }
+                if (cpf.trim() && !validarCPF(cpf)) {
+                    setError('O CPF inserido não é válido.');
+                    setIsLoading(false);
+                    return;
+                }
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                 const user = userCredential.user;
                 if (user) {
                     await user.updateProfile({ displayName: name });
-                    await firebaseService.createUserProfile(user, name, phone); // Cria o perfil no Firestore
+                    await firebaseService.createUserProfile(user, name, phone, cpf); // Cria o perfil no Firestore
                     await user.sendEmailVerification();
                     addToast('Conta criada! Um e-mail de verificação foi enviado.', 'success');
                     onRegisterSuccess();
@@ -87,16 +126,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
 
                     <form onSubmit={handleEmailPasswordSubmit} className="space-y-4">
                         {isRegistering && (
-                             <div className="space-y-4">
+                           <>
                                 <div>
                                     <label className="block text-sm font-semibold mb-1" htmlFor="name">Nome Completo *</label>
                                     <input id="name" type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-semibold mb-1" htmlFor="phone-register">WhatsApp *</label>
-                                    <input id="phone-register" type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Para contato sobre o pedido" required />
+                                    <label className="block text-sm font-semibold mb-1" htmlFor="phone">WhatsApp *</label>
+                                    <input id="phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="(27) 99999-9999" required />
                                 </div>
-                            </div>
+                           </>
                         )}
                         <div>
                             <label className="block text-sm font-semibold mb-1" htmlFor="email">E-mail *</label>
@@ -106,6 +145,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
                             <label className="block text-sm font-semibold mb-1" htmlFor="password">Senha *</label>
                             <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
                         </div>
+                         {isRegistering && (
+                            <div>
+                                <label className="block text-sm font-semibold mb-1" htmlFor="cpf">CPF (opcional)</label>
+                                <input id="cpf" type="text" value={cpf} onChange={e => setCpf(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="000.000.000-00" />
+                                <p className="text-xs text-gray-500 mt-1">Ajuda a agilizar pagamentos com PIX.</p>
+                            </div>
+                        )}
 
                         {error && <p className="text-red-600 text-sm text-center bg-red-50 p-2 rounded-md">{error}</p>}
 
