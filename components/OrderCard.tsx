@@ -86,6 +86,14 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
         }
         onUpdateStatus(id, 'accepted', payload);
     };
+
+    const handleRefuse = () => {
+        if (paymentStatus === 'paid_online') {
+            alert("Este pedido já foi pago via PIX pelo site. Só é permitido recusar pedidos pagos após efetuar o reembolso.");
+            return;
+        }
+        onUpdateStatus(id, 'cancelled');
+    };
     
     const handleTimeSave = () => {
         if (newTime !== customer.reservationTime) {
@@ -291,8 +299,17 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                         ) : status === 'pending' ? (
                             <>
                                 <div className="flex-grow"></div>
+                                {canRefund && (
+                                     <button 
+                                        onClick={() => onRefund(id)} 
+                                        disabled={isRefunding}
+                                        className="bg-yellow-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-yellow-600 disabled:bg-yellow-300 disabled:cursor-not-allowed flex items-center justify-center min-w-[110px]"
+                                     >
+                                        {isRefunding ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-undo-alt mr-2"></i>Estornar</>}
+                                     </button>
+                                )}
                                 <button onClick={handleAccept} className="bg-green-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-green-600"><i className="fas fa-check mr-2"></i>Aceitar</button>
-                                <button onClick={() => onUpdateStatus(id, 'cancelled')} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Cancelar</button>
+                                <button onClick={handleRefuse} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Recusar</button>
                             </>
                         ) : (
                              <div className="flex flex-wrap items-center justify-end gap-3 w-full">
