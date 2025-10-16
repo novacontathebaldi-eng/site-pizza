@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useRef } from 'react';
-import { Product, Category } from '../types';
+import { Product, Category, CartItem } from '../types';
 import { MenuItemCard } from './MenuItemCard';
 
 interface MenuSectionProps {
@@ -11,6 +11,7 @@ interface MenuSectionProps {
     setActiveCategoryId: (id: string) => void;
     cartItemCount: number;
     onCartClick: () => void;
+    cartItems: CartItem[];
 }
 
 const categoryIcons: { [key: string]: string } = {
@@ -24,7 +25,7 @@ const categoryIcons: { [key: string]: string } = {
 export const MenuSection: React.FC<MenuSectionProps> = ({ 
     categories, products, onAddToCart, isStoreOnline, 
     activeCategoryId, setActiveCategoryId, 
-    cartItemCount, onCartClick
+    cartItemCount, onCartClick, cartItems
 }) => {
     const categoryRefs = useRef<Map<string, HTMLElement | null>>(new Map());
     const tabRefs = useRef<Map<string, HTMLAnchorElement | null>>(new Map());
@@ -36,6 +37,9 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
 
     // Effect for the main scroll-spy functionality (updates active tab based on page scroll)
     useEffect(() => {
+        const bannerHeight = !isStoreOnline ? 40 : 0; // Approximate banner height in pixels (p-2 + text)
+        const topMargin = 120 + bannerHeight; // 120 is approx. for main header (80) + sticky menu (40)
+
         const observer = new IntersectionObserver(
             (entries) => {
                 entries.forEach((entry) => {
@@ -45,7 +49,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                 });
             },
             {
-                rootMargin: '-120px 0px -50% 0px', // Top offset for sticky header, bottom to trigger earlier
+                rootMargin: `-${topMargin}px 0px -50% 0px`, // Use dynamic offset
                 threshold: 0,
             }
         );
@@ -61,7 +65,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
             });
             observer.disconnect();
         };
-    }, [sortedActiveCategories, setActiveCategoryId]);
+    }, [sortedActiveCategories, setActiveCategoryId, isStoreOnline]);
 
     // New Effect: Automatically scrolls the active tab to the center of the tab bar
     useEffect(() => {
@@ -79,9 +83,11 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
         e.preventDefault();
         const element = document.getElementById(`category-section-${categoryId}`);
         const stickyHeader = document.getElementById('sticky-menu-header');
+        const statusBanner = document.getElementById('status-banner');
         
         if (element && stickyHeader) {
-            const headerOffset = stickyHeader.offsetHeight + 80; // Main header + sticky menu header
+            const bannerHeight = statusBanner ? statusBanner.offsetHeight : 0;
+            const headerOffset = stickyHeader.offsetHeight + 80 + bannerHeight; // Main header + sticky menu header + status banner
             const elementPosition = element.getBoundingClientRect().top;
             const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
 
@@ -103,7 +109,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                     <p className="text-lg text-gray-600 mt-2 max-w-2xl mx-auto">Descubra nossa seleção especial de pizzas artesanais, bebidas e sobremesas.</p>
                 </div>
                 
-                <div id="sticky-menu-header" className="sticky top-20 bg-white/95 backdrop-blur-sm z-30 -mx-4 shadow-sm">
+                <div id="sticky-menu-header" className={`sticky ${isStoreOnline ? 'top-20' : 'top-[7.5rem]'} bg-white/95 backdrop-blur-sm z-30 -mx-4 shadow-sm`}>
                     <div className="border-b border-gray-200">
                         <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide px-2 sm:px-4 lg:flex-wrap lg:justify-center lg:overflow-x-visible">
                             {sortedActiveCategories.map(category => (
@@ -148,6 +154,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                                             product={product} 
                                             onAddToCart={onAddToCart}
                                             isStoreOnline={isStoreOnline}
+                                            isInCart={cartItems.some(item => item.productId === product.id)}
                                         />
                                     ))}
                                 </div>

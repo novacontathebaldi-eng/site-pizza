@@ -797,7 +797,7 @@ const App: React.FC = () => {
                 settings={siteSettings} 
             />
             
-            <div id="status-banner" className={`bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
+            <div id="status-banner" className={`sticky top-20 z-40 bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
                 <i className="fas fa-times-circle mr-2"></i>
                 Desculpe, estamos fechados no momento.
             </div>
