@@ -79,9 +79,8 @@ const defaultSiteSettings: SiteSettings = {
 };
 
 const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, orderNumber: number, isPaid: boolean) => {
-    const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumir no local' };
+    const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja' };
     const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
-    const DELIVERY_FEE = 3.00;
 
     let message = `*🍕 NOVO PEDIDO #${orderNumber} - SANTA SENSAÇÃO 🍕*\n\n`;
     if (isPaid) {
@@ -91,8 +90,15 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     message += `*Nome:* ${details.name}\n`;
     message += `*Telefone:* ${details.phone}\n`;
     message += `*Tipo de Pedido:* ${orderTypeMap[details.orderType]}\n`;
+    
     if (details.orderType === 'delivery') {
-        message += `*Endereço:* ${details.address}\n`;
+        message += `\n*📍 ENDEREÇO DE ENTREGA:*\n`;
+        message += `*Localidade:* ${details.neighborhood}\n`;
+        message += `*Rua:* ${details.street}\n`;
+        message += `*Número:* ${details.number}\n`;
+        if (details.complement) {
+            message += `*Complemento:* ${details.complement}\n`;
+        }
     }
     
     if (details.allergies) {
@@ -108,8 +114,8 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
 
     message += `\n*🧾 RESUMO FINANCEIRO:*\n`;
     message += `*Subtotal:* R$ ${subtotal.toFixed(2).replace('.', ',')}\n`;
-    if (details.orderType === 'delivery') {
-        message += `*Taxa de Entrega:* R$ ${DELIVERY_FEE.toFixed(2).replace('.', ',')}\n`;
+    if (details.orderType === 'delivery' && details.deliveryFee) {
+        message += `*Taxa de Entrega:* R$ ${details.deliveryFee.toFixed(2).replace('.', ',')}\n`;
     }
     message += `*💰 TOTAL: R$ ${total.toFixed(2).replace('.', ',')}*\n\n`;
     
@@ -347,11 +353,10 @@ const App: React.FC = () => {
     const handleCheckout = async (details: OrderDetails) => {
         setIsCheckoutModalOpen(false);
         const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        const deliveryFee = details.orderType === 'delivery' ? 3.00 : 0;
-        const total = subtotal + deliveryFee;
+        const total = subtotal + (details.deliveryFee || 0);
 
         try {
-            const { orderId, orderNumber } = await firebaseService.createOrder({ ...details, deliveryFee }, cart, total, 'payLater');
+            const { orderId, orderNumber } = await firebaseService.createOrder(details, cart, total, 'payLater');
             addToast(`Pedido #${orderNumber} criado! Enviando para o WhatsApp...`, 'success');
             
             const whatsappUrl = generateWhatsAppMessage(details, cart, total, orderNumber, false);
@@ -369,11 +374,10 @@ const App: React.FC = () => {
         setIsCheckoutModalOpen(false);
         setIsCreatingPixPayment(true);
         const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        const deliveryFee = details.orderType === 'delivery' ? 3.00 : 0;
-        const total = subtotal + deliveryFee;
+        const total = subtotal + (details.deliveryFee || 0);
         
         try {
-            const { orderId, orderNumber, pixData } = await firebaseService.createOrder({ ...details, deliveryFee }, cart, total, pixOption);
+            const { orderId, orderNumber, pixData } = await firebaseService.createOrder(details, cart, total, pixOption);
             
             if (!pixData || !pixData.qrCodeBase64) {
                  throw new Error("A resposta do servidor não incluiu os dados do PIX.");
@@ -384,7 +388,7 @@ const App: React.FC = () => {
                 orderNumber: orderNumber,
                 customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.address, cpf: details.cpf },
                 items: cart, total, paymentMethod: 'pix', status: 'awaiting-payment', paymentStatus: 'pending',
-                deliveryFee,
+                deliveryFee: details.deliveryFee,
                 allergies: details.allergies,
                 createdAt: new Date(),
                 mercadoPagoDetails: { paymentId: '', qrCodeBase64: pixData.qrCodeBase64, qrCode: pixData.copyPaste }
@@ -428,7 +432,6 @@ const App: React.FC = () => {
                name: paidOrder.customer.name,
                phone: paidOrder.customer.phone,
                orderType: paidOrder.customer.orderType,
-               address: paidOrder.customer.address || '',
                paymentMethod: 'pix',
                changeNeeded: false,
                notes: paidOrder.notes || '',
@@ -436,7 +439,9 @@ const App: React.FC = () => {
                neighborhood: paidOrder.customer.neighborhood || '',
                street: paidOrder.customer.street || '',
                number: paidOrder.customer.number || '',
+               complement: paidOrder.customer.complement || '',
                allergies: paidOrder.allergies || '',
+               deliveryFee: paidOrder.deliveryFee || 0,
            };
            const whatsappUrl = generateWhatsAppMessage(details, paidOrder.items || [], paidOrder.total || 0, paidOrder.orderNumber, true);
            window.open(whatsappUrl, '_blank');
@@ -479,13 +484,15 @@ const App: React.FC = () => {
             
             const details: OrderDetails = {
                 name: finalOrderData.customer.name, phone: finalOrderData.customer.phone, orderType: finalOrderData.customer.orderType,
-                address: finalOrderData.customer.address || '', paymentMethod: 'pix',
+                paymentMethod: 'pix',
                 changeNeeded: false, changeAmount: '',
                 notes: finalOrderData.notes || '',
                 neighborhood: finalOrderData.customer.neighborhood || '',
                 street: finalOrderData.customer.street || '',
                 number: finalOrderData.customer.number || '',
-                allergies: finalOrderData.allergies || ''
+                complement: finalOrderData.customer.complement || '',
+                allergies: finalOrderData.allergies || '',
+                deliveryFee: finalOrderData.deliveryFee || 0
             };
             const whatsappUrl = generateWhatsAppMessage(details, finalOrderData.items || [], finalOrderData.total || 0, finalOrderData.orderNumber, false);
             window.open(whatsappUrl, '_blank');

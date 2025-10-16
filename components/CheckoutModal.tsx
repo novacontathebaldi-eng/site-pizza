@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { CartItem, OrderDetails } from '../types';
 
+const DELIVERY_FEE = 3.00;
+const LOCALIDADES = ['Centro', 'Olaria', 'Vila Nova', 'Moxafongo', 'Cocal', 'Funil'];
+
+// FIX: Added missing interface definition for component props.
 interface CheckoutModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -9,51 +13,58 @@ interface CheckoutModalProps {
     onInitiatePixPayment: (details: OrderDetails, pixOption: 'payNow' | 'payLater') => void;
 }
 
-const getSuggestedTimes = () => {
-    const now = new Date();
-    const suggestions = [];
-    for (let i = 1; i <= 4; i++) {
-        const suggestionTime = new Date(now.getTime() + i * 15 * 60000);
-        const hours = suggestionTime.getHours().toString().padStart(2, '0');
-        const minutes = suggestionTime.getMinutes().toString().padStart(2, '0');
-        suggestions.push(`${hours}:${minutes}`);
-    }
-    return suggestions;
-};
-
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, onInitiatePixPayment }) => {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [cpf, setCpf] = useState('');
-    const [orderType, setOrderType] = useState<'delivery' | 'pickup' | 'local' | ''>('');
-    const [address, setAddress] = useState('');
+    const [orderType, setOrderType] = useState<'delivery' | 'pickup' | ''>('');
+    
+    // Novos estados para endereço detalhado
+    const [neighborhood, setNeighborhood] = useState('');
+    const [street, setStreet] = useState('');
+    const [number, setNumber] = useState('');
+    const [isNoNumber, setIsNoNumber] = useState(false);
+    const [complement, setComplement] = useState('');
+    const [allergies, setAllergies] = useState('');
+
     const [paymentMethod, setPaymentMethod] = useState<'credit' | 'debit' | 'pix' | 'cash' | ''>('');
     const [changeNeeded, setChangeNeeded] = useState(false);
     const [changeAmount, setChangeAmount] = useState('');
     const [notes, setNotes] = useState('');
-    const [reservationTime, setReservationTime] = useState('');
     const [pixPaymentOption, setPixPaymentOption] = useState<'payNow' | 'payLater' | null>(null);
-
-
-    const suggestedTimes = getSuggestedTimes();
 
     useEffect(() => {
         if (!isOpen) {
-            setName(''); setPhone(''); setCpf(''); setOrderType(''); setAddress('');
+            setName(''); setPhone(''); setCpf(''); setOrderType('');
+            setNeighborhood(''); setStreet(''); setNumber(''); setIsNoNumber(false); setComplement(''); setAllergies('');
             setPaymentMethod(''); setChangeNeeded(false); setChangeAmount('');
-            setNotes(''); setReservationTime(''); setPixPaymentOption(null);
+            setNotes(''); setPixPaymentOption(null);
         }
     }, [isOpen]);
+    
+    useEffect(() => {
+        if (isNoNumber) {
+            setNumber('S/N');
+        } else {
+            if (number === 'S/N') {
+                setNumber('');
+            }
+        }
+    }, [isNoNumber]);
+
 
     if (!isOpen) return null;
 
-    const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const deliveryFee = orderType === 'delivery' ? DELIVERY_FEE : 0;
+    const total = subtotal + deliveryFee;
 
     const getOrderDetails = (): OrderDetails => ({
         name, phone, cpf, orderType: orderType as 'delivery' | 'pickup' | 'local',
-        address, paymentMethod: paymentMethod as 'credit' | 'debit' | 'pix' | 'cash',
+        neighborhood, street, number, complement,
+        paymentMethod: paymentMethod as 'credit' | 'debit' | 'pix' | 'cash',
         changeNeeded: paymentMethod === 'cash' && changeNeeded,
-        changeAmount, notes, reservationTime
+        changeAmount, allergies, notes, deliveryFee
     });
 
     const handlePaymentMethodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -117,29 +128,53 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                                 <option value="" disabled>Selecione...</option>
                                 <option value="delivery">Entrega</option>
                                 <option value="pickup">Retirada na loja</option>
-                                <option value="local">Consumir no local</option>
                             </select>
                         </div>
+
                         {orderType === 'delivery' && (
-                            <div className="animate-fade-in-up">
-                                <label className="block text-sm font-semibold mb-1">Endereço de Entrega *</label>
-                                <textarea value={address} onChange={e => setAddress(e.target.value)} className="w-full px-3 py-2 border rounded-md" rows={2} required />
+                            <div className="p-4 bg-gray-50 rounded-md border animate-fade-in-up space-y-4">
+                                <div className="text-center bg-blue-50 border border-blue-200 text-blue-800 text-sm font-semibold p-2 rounded-md">
+                                    <i className="fas fa-motorcycle mr-2"></i>Taxa de Entrega: R$ {DELIVERY_FEE.toFixed(2).replace('.', ',')}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <p className="text-sm p-2 bg-gray-200 rounded-md"><strong>CEP:</strong> 29640-000</p>
+                                    <p className="text-sm p-2 bg-gray-200 rounded-md"><strong>Cidade:</strong> Santa Leopoldina - ES</p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold mb-1">Localidade *</label>
+                                    <select value={neighborhood} onChange={e => setNeighborhood(e.target.value)} className="w-full px-3 py-2 border rounded-md bg-white" required>
+                                        <option value="" disabled>Selecione sua localidade...</option>
+                                        {LOCALIDADES.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                                    </select>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4 items-end">
+                                    <div>
+                                        <label className="block text-sm font-semibold mb-1">Rua *</label>
+                                        <input type="text" value={street} onChange={e => setStreet(e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold mb-1">Número *</label>
+                                        <input type="text" value={number} onChange={e => setNumber(e.target.value)} className="w-full px-3 py-2 border rounded-md" required disabled={isNoNumber} />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end -mt-2">
+                                     <label className="flex items-center gap-2 text-sm">
+                                        <input type="checkbox" checked={isNoNumber} onChange={e => setIsNoNumber(e.target.checked)} />
+                                        <span>Sem número</span>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold mb-1">Complemento (opcional)</label>
+                                    <input type="text" value={complement} onChange={e => setComplement(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Casa, apartamento, ponto de referência..." />
+                                </div>
                             </div>
                         )}
-                        {orderType === 'local' && (
-                             <div className="p-3 bg-gray-50 rounded-md border animate-fade-in-up">
-                                 <label className="block text-sm font-semibold mb-2">Horário da Reserva *</label>
-                                 <div className="flex flex-wrap items-center gap-2 mb-2">
-                                    <p className="text-xs text-gray-600">Sugestões:</p>
-                                    {suggestedTimes.map(time => (
-                                        <button type="button" key={time} onClick={() => setReservationTime(time)} className="px-2 py-1 text-xs font-semibold rounded-md bg-accent/20 text-accent hover:bg-accent/30">
-                                            {time}
-                                        </button>
-                                    ))}
-                                 </div>
-                                <input type="text" value={reservationTime} onChange={e => setReservationTime(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Ou digite o horário (ex: 20:30)" required />
-                            </div>
-                        )}
+                        
+                        <div>
+                             <label className="block text-sm font-semibold mb-1">Possui alguma alergia ou restrição alimentar? (opcional)</label>
+                            <textarea value={allergies} onChange={e => setAllergies(e.target.value)} className="w-full px-3 py-2 border rounded-md" rows={2} placeholder="Ex: alergia a camarão, intolerância à lactose..."/>
+                        </div>
+
                         <div>
                             <label className="block text-sm font-semibold mb-1">Método de Pagamento *</label>
                             <select value={paymentMethod} onChange={handlePaymentMethodChange} className="w-full px-3 py-2 border rounded-md bg-white" required>
@@ -201,12 +236,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                         </div>
                         <div className="p-4 bg-brand-ivory-50 rounded-lg my-4">
                             <h3 className="font-bold mb-2">Resumo do Pedido</h3>
-                            {cartItems.map(item => (
-                                <div key={item.id} className="flex justify-between text-sm">
-                                    <span>{item.quantity}x {item.name} ({item.size})</span>
-                                    <span>{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                            <div className="space-y-1">
+                                {cartItems.map(item => (
+                                    <div key={item.id} className="flex justify-between text-sm">
+                                        <span>
+                                            {item.quantity}x {item.name} ({item.size})
+                                            {item.quantity > 1 && <span className="text-gray-500 ml-2">({(item.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/un)</span>}
+                                        </span>
+                                        <span className="font-semibold">{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            {deliveryFee > 0 && (
+                                <div className="flex justify-between text-sm mt-2 pt-2 border-t">
+                                    <span>Taxa de Entrega:</span>
+                                    <span className="font-semibold">{deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                                 </div>
-                            ))}
+                            )}
                             <div className="flex justify-between font-bold text-lg mt-2 pt-2 border-t">
                                 <span>Total:</span>
                                 <span>{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>

@@ -296,7 +296,6 @@ exports.createOrder = onCall({secrets}, async (request) => {
       name: details.name,
       phone: details.phone,
       orderType: details.orderType,
-      address: details.address || "",
       neighborhood: details.neighborhood || "",
       street: details.street || "",
       number: details.number || "",
