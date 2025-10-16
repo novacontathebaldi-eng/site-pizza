@@ -224,7 +224,8 @@ const App: React.FC = () => {
                 window.gapi.load('auth2', () => {
                     try {
                         window.gapi.auth2.init({
-                            client_id: '15856214344-cnqogu0885v86b88j07not68n989h8go.apps.googleusercontent.com',
+                            // IMPORTANTE: ID de Cliente correto inserido aqui.
+                            client_id: '914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com',
                         }).then(() => {
                             setIsGapiReady(true);
                         });
