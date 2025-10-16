@@ -299,7 +299,7 @@ const App: React.FC = () => {
     }, [postRegisterAction, currentUser]);
 
 
-    // Other existing useEffects...
+    // Other existing handlers...
     useEffect(() => {
         const savedCart = localStorage.getItem('santaSensacaoCart');
         if (savedCart) setCart(JSON.parse(savedCart));
