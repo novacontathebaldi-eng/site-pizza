@@ -68,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOp
 
                     <div className="flex items-center gap-2 sm:gap-3">
                         {showMenuButton && (
-                            <button onClick={() => scrollToSection('cardapio')} className="flex items-center gap-2 bg-brand-gold-600 text-text-on-dark px-3 sm:px-4 py-2 rounded-lg font-semibold hover:bg-opacity-90 transition-all">
+                            <button onClick={() => scrollToSection('cardapio')} className="hidden lg:flex items-center gap-2 bg-brand-gold-600 text-text-on-dark px-3 sm:px-4 py-2 rounded-lg font-semibold hover:bg-opacity-90 transition-all">
                                 <i className="fas fa-utensils"></i>
                                 <span className="hidden sm:inline">Ver Cardápio</span>
                             </button>
