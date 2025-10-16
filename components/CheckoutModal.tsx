@@ -11,9 +11,10 @@ interface CheckoutModalProps {
     cartItems: CartItem[];
     onConfirmCheckout: (details: OrderDetails) => void;
     onInitiatePixPayment: (details: OrderDetails, pixOption: 'payNow' | 'payLater') => void;
+    isProcessing: boolean;
 }
 
-export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, onInitiatePixPayment }) => {
+export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, onInitiatePixPayment, isProcessing }) => {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [cpf, setCpf] = useState('');
@@ -261,11 +262,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
 
                          <button 
                             type="submit" 
-                            disabled={isSubmitDisabled}
-                            className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
+                            disabled={isSubmitDisabled || isProcessing}
+                            className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center min-h-[52px]"
                         >
-                            <i className={`${submitButtonIconClass} mr-2`}></i>
-                            {submitButtonText}
+                            {isProcessing ? (
+                                <><i className="fas fa-spinner fa-spin mr-2"></i> Enviando...</>
+                            ) : (
+                                <><i className={`${submitButtonIconClass} mr-2`}></i> {submitButtonText}</>
+                            )}
                         </button>
                     </form>
                 </div>

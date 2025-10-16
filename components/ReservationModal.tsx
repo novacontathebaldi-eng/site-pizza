@@ -7,6 +7,7 @@ interface ReservationModalProps {
     isOpen: boolean;
     onClose: () => void;
     onConfirmReservation: (details: ReservationDetails) => void;
+    isProcessing: boolean;
 }
 
 const getSuggestedTimes = () => {
@@ -23,7 +24,7 @@ const getSuggestedTimes = () => {
 };
 
 
-export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onClose, onConfirmReservation }) => {
+export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onClose, onConfirmReservation, isProcessing }) => {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [numberOfPeople, setNumberOfPeople] = useState(2);
@@ -117,10 +118,14 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({ isOpen, onCl
 
                          <button 
                             type="submit" 
-                            className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
+                            disabled={isProcessing}
+                            className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center min-h-[52px]"
                         >
-                            <i className="fab fa-whatsapp mr-2"></i>
-                            Confirmar Reserva
+                            {isProcessing ? (
+                                <><i className="fas fa-spinner fa-spin mr-2"></i> Confirmando...</>
+                            ) : (
+                                <><i className="fab fa-whatsapp mr-2"></i> Confirmar Reserva</>
+                            )}
                         </button>
                     </form>
                 </div>

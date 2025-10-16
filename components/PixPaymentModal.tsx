@@ -6,11 +6,12 @@ interface PixPaymentModalProps {
     order: Order | null;
     onClose: () => void;
     onPaymentSuccess: (paidOrder: Order) => void;
+    isProcessing: boolean;
 }
 
 const PIX_EXPIRATION_SECONDS = 300; // 5 minutes
 
-export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose, onPaymentSuccess }) => {
+export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose, onPaymentSuccess, isProcessing }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [pixData, setPixData] = useState<{ qrCodeBase64: string; copyPaste: string } | null>(null);
@@ -69,14 +70,12 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                 if (updatedOrder && updatedOrder.paymentStatus === 'paid_online') {
                     setIsPaid(true);
                     if (timerRef.current) clearInterval(timerRef.current);
-                    setTimeout(() => {
-                        onPaymentSuccess({ ...updatedOrder, id: doc.id });
-                    }, 2500); // Wait a bit to show success message
+                    // Não chama mais onPaymentSuccess automaticamente.
                 }
             });
 
         return () => unsubscribe();
-    }, [order, onPaymentSuccess]);
+    }, [order]);
     
     const handleCopyToClipboard = () => {
         if (pixData?.copyPaste) {
@@ -114,10 +113,23 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                         </div>
                     )}
                     {isPaid && (
-                        <div className="py-12 text-green-600 animate-fade-in-up">
-                            <i className="fas fa-check-circle text-6xl mb-4"></i>
-                            <p className="text-2xl font-bold">Pagamento Aprovado!</p>
-                            <p className="text-gray-700">Seu pedido será finalizado em instantes...</p>
+                        <div className="py-12 text-green-600 animate-fade-in-up space-y-5">
+                            <div>
+                                <i className="fas fa-check-circle text-6xl mb-4"></i>
+                                <p className="text-2xl font-bold">Pagamento Aprovado!</p>
+                                <p className="text-gray-700 mt-2">Agora, clique no botão abaixo para finalizar e enviar seu pedido para a pizzaria.</p>
+                            </div>
+                            <button
+                                onClick={() => onPaymentSuccess(order)}
+                                disabled={isProcessing}
+                                className="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-green-600 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center min-h-[52px]"
+                            >
+                                {isProcessing ? (
+                                    <><i className="fas fa-spinner fa-spin mr-2"></i> Enviando...</>
+                                ) : (
+                                    <><i className="fab fa-whatsapp mr-2"></i> Enviar Pedido para Pizzaria</>
+                                )}
+                            </button>
                         </div>
                     )}
                     {!isLoading && !error && !isPaid && pixData && (

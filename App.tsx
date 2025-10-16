@@ -151,6 +151,26 @@ const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNu
     return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
 };
 
+const loadingPageHtml = `
+    <html>
+        <head>
+            <title>Aguarde...</title>
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f3f4f6; color: #374151; }
+                .container { text-align: center; }
+                .spinner { border: 4px solid #e5e7eb; border-top: 4px solid #A28438; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                p { font-size: 1.1rem; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="spinner"></div>
+                <p>Estamos enviando suas informações para o WhatsApp...</p>
+            </div>
+        </body>
+    </html>`;
+
 
 const App: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
@@ -171,6 +191,7 @@ const App: React.FC = () => {
     const [showPaymentFailureModal, setShowPaymentFailureModal] = useState<boolean>(false);
     const [pixRetryKey, setPixRetryKey] = useState<number>(0);
     const [isCreatingPixPayment, setIsCreatingPixPayment] = useState<boolean>(false);
+    const [isProcessingOrder, setIsProcessingOrder] = useState<boolean>(false);
     const [refundingOrderId, setRefundingOrderId] = useState<string | null>(null);
     const [isChatbotOpen, setIsChatbotOpen] = useState<boolean>(false);
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -351,28 +372,45 @@ const App: React.FC = () => {
     }, []);
     
     const handleCheckout = async (details: OrderDetails) => {
+        setIsProcessingOrder(true);
         setIsCheckoutModalOpen(false);
+
+        const whatsappTab = window.open('', '_blank');
+        if (whatsappTab) {
+            whatsappTab.document.write(loadingPageHtml);
+        }
+
         const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         const total = subtotal + (details.deliveryFee || 0);
 
         try {
             const { orderId, orderNumber } = await firebaseService.createOrder(details, cart, total, 'payLater');
-            addToast(`Pedido #${orderNumber} criado! Enviando para o WhatsApp...`, 'success');
+            addToast(`Pedido #${orderNumber} criado! Redirecionando...`, 'success');
             
             const whatsappUrl = generateWhatsAppMessage(details, cart, total, orderNumber, false);
-            window.open(whatsappUrl, '_blank');
+
+            if (whatsappTab) {
+                whatsappTab.location.href = whatsappUrl;
+            } else {
+                // Fallback for browsers that might still block it
+                window.location.href = whatsappUrl;
+            }
             
             setCart([]);
             setIsCartOpen(false);
         } catch (error: any) {
             console.error("Failed to create order:", error);
             addToast(error.message || "Erro ao criar pedido.", 'error');
+            whatsappTab?.close();
+        } finally {
+            setIsProcessingOrder(false);
         }
     };
 
     const handleInitiatePixPayment = async (details: OrderDetails, pixOption: 'payNow' | 'payLater') => {
+        setIsProcessingOrder(true); // Reuse the same loading state
         setIsCheckoutModalOpen(false);
-        setIsCreatingPixPayment(true);
+
         const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         const total = subtotal + (details.deliveryFee || 0);
         
@@ -401,22 +439,36 @@ const App: React.FC = () => {
             addToast(error.message || "Erro ao iniciar pagamento PIX.", 'error');
             setPayingOrder(null);
         } finally {
-            setIsCreatingPixPayment(false);
+            setIsProcessingOrder(false);
         }
     };
 
     const handleConfirmReservation = async (details: ReservationDetails) => {
+        setIsProcessingOrder(true);
         setIsReservationModalOpen(false);
+
+        const whatsappTab = window.open('', '_blank');
+        if (whatsappTab) {
+            whatsappTab.document.write(loadingPageHtml);
+        }
+
         try {
-            const { orderId, orderNumber } = await firebaseService.createReservation(details);
-            addToast(`Reserva #${orderNumber} criada! Enviando confirmação para o WhatsApp...`, 'success');
+            const { orderNumber } = await firebaseService.createReservation(details);
+            addToast(`Reserva #${orderNumber} criada! Redirecionando...`, 'success');
 
             const whatsappUrl = generateReservationWhatsAppMessage(details, orderNumber);
-            window.open(whatsappUrl, '_blank');
 
+            if (whatsappTab) {
+                whatsappTab.location.href = whatsappUrl;
+            } else {
+                window.location.href = whatsappUrl;
+            }
         } catch (error: any) {
             console.error("Failed to create reservation:", error);
             addToast(error.message || "Erro ao criar reserva.", 'error');
+            whatsappTab?.close();
+        } finally {
+            setIsProcessingOrder(false);
         }
     };
 
@@ -425,6 +477,8 @@ const App: React.FC = () => {
            addToast("Erro crítico ao processar pagamento.", 'error');
            return;
        }
+       
+       setIsProcessingOrder(true);
        try {
            addToast("Pagamento confirmado! Enviando pedido para a pizzaria...", 'success');
            
@@ -452,6 +506,8 @@ const App: React.FC = () => {
        } catch (error) {
            console.error("Error finalizing paid order:", error);
            addToast("Erro ao finalizar o pedido após o pagamento. Contate o suporte.", 'error');
+       } finally {
+           setIsProcessingOrder(false);
        }
    }, [addToast]);
 
@@ -475,9 +531,14 @@ const App: React.FC = () => {
         const orderToUpdateId = payingOrder.id;
         setShowPaymentFailureModal(false);
         setPayingOrder(null);
+        setIsProcessingOrder(true);
+        
+        const whatsappTab = window.open('', '_blank');
+        if (whatsappTab) {
+            whatsappTab.document.write(loadingPageHtml);
+        }
 
         try {
-            // Update status in Firestore and send to WhatsApp
             await firebaseService.updateOrderStatus(orderToUpdateId, 'pending');
             const orderSnapshot = await db.collection('orders').doc(orderToUpdateId).get();
             const finalOrderData = orderSnapshot.data() as Order;
@@ -495,7 +556,11 @@ const App: React.FC = () => {
                 deliveryFee: finalOrderData.deliveryFee || 0
             };
             const whatsappUrl = generateWhatsAppMessage(details, finalOrderData.items || [], finalOrderData.total || 0, finalOrderData.orderNumber, false);
-            window.open(whatsappUrl, '_blank');
+            if (whatsappTab) {
+                whatsappTab.location.href = whatsappUrl;
+            } else {
+                window.location.href = whatsappUrl;
+            }
             
             addToast("Pedido enviado! O pagamento será feito na entrega/retirada.", 'success');
             setCart([]);
@@ -504,6 +569,9 @@ const App: React.FC = () => {
         } catch (error) {
             console.error("Failed to update order to pending:", error);
             addToast("Erro ao processar o pedido. Tente novamente.", 'error');
+            whatsappTab?.close();
+        } finally {
+            setIsProcessingOrder(false);
         }
     };
 
@@ -875,17 +943,20 @@ const App: React.FC = () => {
                 cartItems={cart}
                 onConfirmCheckout={handleCheckout}
                 onInitiatePixPayment={handleInitiatePixPayment}
+                isProcessing={isProcessingOrder}
             />
             <ReservationModal
                 isOpen={isReservationModalOpen}
                 onClose={() => setIsReservationModalOpen(false)}
                 onConfirmReservation={handleConfirmReservation}
+                isProcessing={isProcessingOrder}
             />
              <PixPaymentModal
                 key={pixRetryKey}
                 order={payingOrder}
                 onClose={handleClosePixModal}
                 onPaymentSuccess={handlePixPaymentSuccess}
+                isProcessing={isProcessingOrder}
             />
 
             <PaymentFailureModal
@@ -906,12 +977,12 @@ const App: React.FC = () => {
                 isSending={isBotReplying}
             />
 
-            {isCreatingPixPayment && (
+            {(isProcessingOrder || isCreatingPixPayment) && (
                 <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8">
                         <i className="fas fa-spinner fa-spin text-5xl text-accent"></i>
-                        <p className="mt-6 font-semibold text-lg text-gray-700">Conectando com o Mercado Pago...</p>
-                        <p className="mt-2 text-sm text-gray-500">Estamos gerando seu PIX seguro. Por favor, aguarde um instante.</p>
+                        <p className="mt-6 font-semibold text-lg text-gray-700">{isCreatingPixPayment ? 'Conectando com o Mercado Pago...' : 'Processando seu pedido...'}</p>
+                        <p className="mt-2 text-sm text-gray-500">{isCreatingPixPayment ? 'Estamos gerando seu PIX seguro.' : 'Por favor, aguarde um instante.'}</p>
                     </div>
                 </div>
             )}
