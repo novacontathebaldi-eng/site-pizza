@@ -211,6 +211,44 @@ const App: React.FC = () => {
     ]);
     const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
     
+    // Logic to determine if any modal is visible
+    const isModalVisible = useMemo(() => {
+        return isCartOpen || 
+               isCheckoutModalOpen || 
+               isReservationModalOpen || 
+               isChatbotOpen || 
+               isLoginModalOpen || 
+               isUserAreaModalOpen || 
+               !!payingOrder || 
+               showPaymentFailureModal || 
+               !!confirmedOrderData || 
+               !!confirmedReservationData;
+    }, [
+        isCartOpen, 
+        isCheckoutModalOpen, 
+        isReservationModalOpen, 
+        isChatbotOpen, 
+        isLoginModalOpen, 
+        isUserAreaModalOpen, 
+        payingOrder, 
+        showPaymentFailureModal, 
+        confirmedOrderData, 
+        confirmedReservationData
+    ]);
+
+    // Effect to lock body scroll when a modal is open
+    useEffect(() => {
+        if (isModalVisible) {
+            document.body.classList.add('modal-open');
+        } else {
+            document.body.classList.remove('modal-open');
+        }
+
+        // Cleanup function to ensure scroll is restored if component unmounts
+        return () => {
+            document.body.classList.remove('modal-open');
+        };
+    }, [isModalVisible]);
 
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
