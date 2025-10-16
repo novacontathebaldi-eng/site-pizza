@@ -399,7 +399,7 @@ exports.createReservation = onCall({secrets}, async (request) => {
   const {details} = request.data;
 
   // 1. Validate input
-  if (!details || !details.name || !details.phone || !details.reservationTime || !details.numberOfPeople) {
+  if (!details || !details.name || !details.phone || !details.reservationDate || !details.reservationTime || !details.numberOfPeople) {
     throw new Error("Dados da reserva incompletos.");
   }
 
@@ -429,6 +429,7 @@ exports.createReservation = onCall({secrets}, async (request) => {
       name: details.name,
       phone: details.phone,
       orderType: "local",
+      reservationDate: details.reservationDate,
       reservationTime: details.reservationTime,
     },
     numberOfPeople: details.numberOfPeople,

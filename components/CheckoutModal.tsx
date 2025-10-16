@@ -63,6 +63,19 @@ interface ReservationConfirmationModalProps {
     onSendWhatsApp: (reservation: Order) => void;
 }
 
+const formatDateForDisplay = (dateString?: string): string => {
+    if (!dateString) return '';
+    const [year, month, day] = dateString.split('-');
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    return new Intl.DateTimeFormat('pt-BR', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: 'UTC'
+    }).format(date);
+};
+
 export const ReservationConfirmationModal: React.FC<ReservationConfirmationModalProps> = ({ reservation, onClose, onSendWhatsApp }) => {
     if (!reservation) return null;
 
@@ -84,6 +97,9 @@ export const ReservationConfirmationModal: React.FC<ReservationConfirmationModal
                     <div className="text-left bg-gray-50 p-4 rounded-lg border text-gray-800 space-y-2 text-sm">
                         <p><strong><i className="fas fa-receipt fa-fw mr-2 text-gray-400"></i>Reserva:</strong> #{reservation.orderNumber}</p>
                         <p><strong><i className="fas fa-user fa-fw mr-2 text-gray-400"></i>Nome:</strong> {reservation.customer.name}</p>
+                        {reservation.customer.reservationDate && (
+                            <p className="capitalize"><strong><i className="fas fa-calendar-alt fa-fw mr-2 text-gray-400"></i>Data:</strong> {formatDateForDisplay(reservation.customer.reservationDate)}</p>
+                        )}
                         {reservation.customer.reservationTime && (
                             <p><strong><i className="fas fa-clock fa-fw mr-2 text-gray-400"></i>Horário:</strong> {reservation.customer.reservationTime}</p>
                         )}

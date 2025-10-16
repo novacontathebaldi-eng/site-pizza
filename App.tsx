@@ -142,6 +142,9 @@ const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNu
     message += `*Nome:* ${details.name}\n`;
     message += `*Telefone:* ${details.phone}\n\n`;
     message += `*📋 DETALHES DA RESERVA:*\n`;
+    const [year, month, day] = details.reservationDate.split('-');
+    const formattedDate = `${day}/${month}/${year}`;
+    message += `*Data:* ${formattedDate}\n`;
     message += `*Horário:* ${details.reservationTime}\n`;
     message += `*Quantidade de Pessoas:* ${details.numberOfPeople}\n`;
     if (details.notes) {
@@ -440,6 +443,7 @@ const App: React.FC = () => {
                     name: details.name,
                     phone: details.phone,
                     orderType: 'local',
+                    reservationDate: details.reservationDate,
                     reservationTime: details.reservationTime,
                 },
                 numberOfPeople: details.numberOfPeople,
@@ -501,6 +505,7 @@ const App: React.FC = () => {
             name: reservation.customer.name,
             phone: reservation.customer.phone,
             numberOfPeople: reservation.numberOfPeople || 2,
+            reservationDate: reservation.customer.reservationDate || '',
             reservationTime: reservation.customer.reservationTime || '',
             notes: reservation.notes || '',
         };

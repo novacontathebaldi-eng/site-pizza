@@ -59,6 +59,7 @@ export interface ReservationDetails {
     name: string;
     phone: string;
     numberOfPeople: number;
+    reservationDate: string;
     reservationTime: string;
     notes: string;
 }
@@ -73,6 +74,7 @@ export interface OrderCustomerDetails {
     phone: string;
     orderType: 'delivery' | 'pickup' | 'local';
     address?: string;
+    reservationDate?: string;
     reservationTime?: string;
     cpf?: string;
     // Detalhes do endereço
