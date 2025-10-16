@@ -74,7 +74,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
             <header className="flex justify-between items-center p-4 bg-brand-green-700 text-text-on-dark rounded-t-2xl flex-shrink-0">
                 <h2 className="text-lg font-bold flex items-center gap-2">
                     <i className="fas fa-robot"></i>
-                    Sensação - O Assistente Inteligente
+                    Sensação - Assistente Virtual
                 </h2>
                 <button onClick={onClose} className="text-text-on-dark/70 hover:text-white text-2xl" aria-label="Fechar chat">&times;</button>
             </header>
