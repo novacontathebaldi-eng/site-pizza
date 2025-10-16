@@ -45,14 +45,14 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOp
 
     return (
         <header className={`bg-brand-green-700 text-text-on-dark sticky top-0 z-50 transition-shadow duration-300 ${isScrolled ? 'shadow-lg' : ''}`}>
-            <div className="container mx-auto px-4">
+            <div className="container mx-auto px-2 sm:px-4">
                 <div className="flex justify-between items-center h-20 relative">
                     <a href="#inicio" onClick={(e) => { e.preventDefault(); scrollToSection('inicio');}} className="flex items-center gap-3 text-xl font-bold">
                         <img src={settings.logoUrl} alt="Santa Sensação Logo" className="h-14" />
                         <span className="hidden sm:inline">Santa Sensação</span>
                     </a>
                     
-                    <div className="lg:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-bold">
+                    <div className="lg:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-bold transition-opacity duration-300">
                         {activeSection}
                     </div>
                     
@@ -64,10 +64,10 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOp
                         <a href="#" onClick={(e) => { e.preventDefault(); onOpenChatbot();}} className="font-medium hover:text-brand-gold-600 transition-colors">Ajuda</a>
                     </nav>
 
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => scrollToSection('cardapio')} className="hidden sm:flex items-center gap-2 bg-brand-gold-600 text-text-on-dark px-4 py-2 rounded-lg font-semibold hover:bg-opacity-90 transition-all">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <button onClick={() => scrollToSection('cardapio')} className="flex items-center gap-2 bg-brand-gold-600 text-text-on-dark px-3 sm:px-4 py-2 rounded-lg font-semibold hover:bg-opacity-90 transition-all">
                             <i className="fas fa-utensils"></i>
-                            <span className="hidden md:inline">Ver Cardápio</span>
+                            <span className="hidden sm:inline">Ver Cardápio</span>
                         </button>
                         <button onClick={onUserIconClick} className="relative w-12 h-12 flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors" aria-label="Minha Conta">
                             {user ? (
@@ -76,7 +76,7 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOp
                                 <i className="fas fa-user-circle text-2xl"></i>
                             )}
                         </button>
-                        <button onClick={onCartClick} className="relative w-12 h-12 flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors" aria-label="Abrir carrinho de compras">
+                        <button onClick={onCartClick} className="relative w-12 h-12 hidden sm:flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors" aria-label="Abrir carrinho de compras">
                             <i className="fas fa-shopping-cart text-lg"></i>
                             {cartItemCount > 0 && (
                                 <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
