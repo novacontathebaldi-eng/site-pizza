@@ -198,12 +198,16 @@ export const addAddress = async (uid: string, address: Omit<Address, 'id'>): Pro
         
         const userData = userDoc.data() as UserProfile;
         let addresses = userData.addresses || [];
+        const newAddress: Address = { ...address, id: newAddressId };
 
-        if (address.isFavorite) {
+        // If this is the very first address, make it the favorite
+        if (addresses.length === 0) {
+            newAddress.isFavorite = true;
+        } else if (newAddress.isFavorite) {
+            // If this new address is marked as favorite, unfavorite all others
             addresses = addresses.map(addr => ({ ...addr, isFavorite: false }));
         }
         
-        const newAddress: Address = { ...address, id: newAddressId };
         addresses.push(newAddress);
 
         transaction.update(userRef, { addresses });

@@ -200,7 +200,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
             setIsAddressFormVisible(false);
             setEditingAddress(null);
         }
-    }, [profile, isOpen, initialTab, showAddAddressForm]);
+    }, [isOpen, initialTab, showAddAddressForm]);
 
 
     useEffect(() => {
@@ -381,22 +381,22 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                 </div>
             ))}
             {!isAddressFormVisible && (
-                <button onClick={() => { setEditingAddress({ isFavorite: (profile.addresses || []).length === 0 }); setIsAddressFormVisible(true); }} className="mt-4 w-full bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
+                <button onClick={() => { setEditingAddress(null); setIsAddressFormVisible(true); }} className="mt-4 w-full bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
                     <i className="fas fa-plus mr-2"></i>Adicionar Endereço
                 </button>
             )}
-            {isAddressFormVisible && <AddressForm address={editingAddress} onSave={handleSaveAddress} onCancel={() => setIsAddressFormVisible(false)} isSaving={isSaving} totalAddresses={(profile.addresses || []).length} />}
+            {isAddressFormVisible && <AddressForm address={editingAddress} onSave={handleSaveAddress} onCancel={() => { setIsAddressFormVisible(false); setEditingAddress(null); }} isSaving={isSaving} totalAddresses={(profile.addresses || []).length} />}
         </div>
     );
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fade-in-up">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-                <div className="flex justify-between items-center p-5 border-b border-gray-200">
+                <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
                     <h2 className="text-2xl font-bold text-text-on-light"><i className="fas fa-user-circle mr-2"></i>Área do Cliente</h2>
                     <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
                 </div>
-                <div className="overflow-y-auto p-6">
+                <div className="flex-grow overflow-y-auto p-6">
                     <div className="border-b mb-4">
                         <nav className="flex -mb-px">
                             <button onClick={() => setActiveTab('profile')} className={`py-2 px-4 font-semibold text-sm ${activeTab === 'profile' ? 'border-b-2 border-accent text-accent' : 'text-gray-500'}`}>Perfil</button>
