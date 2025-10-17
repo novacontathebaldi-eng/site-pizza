@@ -92,45 +92,51 @@ const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
       currentStatusIndex = 3;
     }
 
+    const progressPercent = currentStatusIndex < 0 ? 0 : (currentStatusIndex / (steps.length - 1)) * 100;
+
     return (
-        <div className="w-full pt-4 pb-2">
-            <div className="flex items-start relative px-4 sm:px-0">
-                <div className="absolute top-5 left-0 w-full h-1 bg-gray-200" style={{ transform: 'translateY(-50%)' }} />
-                
-                <div className="absolute top-5 left-0 h-1 bg-green-500 transition-all duration-500 ease-in-out"
-                    style={{
-                        width: `calc(${(currentStatusIndex / (steps.length - 1)) * 100}% - 2rem)`,
-                        marginLeft: '1rem',
-                        marginRight: '1rem',
-                    }}
-                />
+        <div className="w-full py-4">
+            <div className="relative h-20">
+                {/* Lines Container */}
+                <div className="absolute top-5 left-5 right-5 h-1">
+                    {/* Gray Line */}
+                    <div className="w-full h-full bg-gray-200 rounded-full" />
+                    {/* Green Line */}
+                    <div
+                        className="absolute top-0 left-0 h-full bg-green-500 rounded-full transition-all duration-500 ease-in-out"
+                        style={{ width: `${progressPercent}%` }}
+                    />
+                </div>
 
-                {steps.map((step, index) => {
-                    const isCompleted = currentStatusIndex >= index;
-                    const isActive = currentStatusIndex === index;
+                {/* Icons & Labels Container */}
+                <div className="absolute top-0 left-0 w-full h-full flex justify-between items-start">
+                    {steps.map((step, index) => {
+                        const isCompleted = currentStatusIndex >= index;
+                        const isActive = currentStatusIndex === index;
 
-                    let circleClass = 'bg-gray-200 text-gray-400';
-                    let textClass = 'text-gray-500';
+                        let circleClass = 'bg-white border-2 border-gray-300 text-gray-400';
+                        let textClass = 'text-gray-500';
 
-                    if (isActive) {
-                        circleClass = 'bg-green-500 text-white scale-110 shadow-lg';
-                        textClass = 'font-bold text-green-600';
-                    } else if (isCompleted) {
-                        circleClass = 'bg-green-500 text-white';
-                        textClass = 'text-green-600';
-                    }
-                    
-                    return (
-                        <div key={step.id} className="flex-1 flex flex-col items-center text-center z-10 px-1">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all duration-300 ${circleClass}`}>
-                                <i className={step.icon}></i>
+                        if (isActive) {
+                            circleClass = 'bg-green-500 text-white scale-110 shadow-lg border-2 border-green-600';
+                            textClass = 'font-bold text-green-600';
+                        } else if (isCompleted) {
+                            circleClass = 'bg-green-500 text-white border-2 border-green-600';
+                            textClass = 'text-green-600';
+                        }
+
+                        return (
+                            <div key={step.id} className="z-10 flex flex-col items-center text-center">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all duration-300 ${circleClass}`}>
+                                    <i className={step.icon}></i>
+                                </div>
+                                <p className={`mt-2 text-xs font-semibold leading-tight w-20 ${textClass} transition-colors duration-300`}>
+                                    {steps[index].label}
+                                </p>
                             </div>
-                            <p className={`mt-2 text-xs leading-tight min-h-[2.5em] ${textClass} transition-colors duration-300`}>
-                                {steps[index].label}
-                            </p>
-                        </div>
-                    );
-                })}
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );
