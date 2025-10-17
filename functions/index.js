@@ -7,7 +7,6 @@ const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago");
 const crypto = require("crypto");
 const {GoogleGenAI} = require("@google/genai");
 const {OAuth2Client} = require("google-auth-library");
-const axios = require("axios");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -171,7 +170,7 @@ Diacríticos do português: á → %C3%A1, à → %C3%A0, â → %C3%A2, ã → 
 
 Não adicione parâmetros extras; use apenas ?text= e coloque toda a mensagem codificada após text=.​
 
-Nunca faça double-encoding; se já estiver codificada, não reencode.​
+Nunca faça double-encoding; se já estiver codificado, não reencode.​
 
 Algoritmo determinístico.​
 
@@ -795,33 +794,41 @@ const sendWhatsappMessage = async (phoneNumber, message) => {
   }
 
   const endpoint = `${apiUrl}/message/sendText/${instanceName}`;
+  const body = {
+    number: formattedNumber,
+    options: {
+      delay: 1200,
+      presence: "composing",
+      linkPreview: false,
+    },
+    textMessage: {
+      text: message,
+    },
+  };
+
+  const options = {
+    method: "POST",
+    headers: {
+      "apikey": apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  };
 
   try {
     logger.info(`Sending WhatsApp to ${formattedNumber} with message: "${message}"`);
-    await axios.post(
-        endpoint,
-        {
-          "number": formattedNumber,
-          "options": {
-            "delay": 1200,
-            "presence": "composing",
-          },
-          "textMessage": {
-            "text": message,
-          },
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": apiKey,
-          },
-        },
-    );
-    logger.info(`Successfully sent WhatsApp message to ${formattedNumber}.`);
+    const response = await fetch(endpoint, options);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({error: "Failed to parse error response"}));
+      throw new Error(`API request failed with status ${response.status}: ${JSON.stringify(errorData)}`);
+    }
+
+    const data = await response.json();
+    logger.info(`Successfully sent WhatsApp message to ${formattedNumber}. Response:`, data);
   } catch (error) {
     logger.error(`Failed to send WhatsApp message to ${formattedNumber}.`, {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      error: error.response ? error.response.data : error.message,
+      error: error.message,
       endpoint,
     });
   }
