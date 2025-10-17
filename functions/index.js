@@ -740,7 +740,10 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
         public: true,
       });
 
-      const photoURL = file.publicUrl();
+      const publicUrl = file.publicUrl();
+      // Appending a timestamp as a query parameter to act as a cache buster.
+      // This ensures the browser always fetches the latest version of the profile picture.
+      const photoURL = `${publicUrl}?t=${new Date().getTime()}`;
 
       // Update Firebase Auth and Firestore user records
       await admin.auth().updateUser(uid, {photoURL});
