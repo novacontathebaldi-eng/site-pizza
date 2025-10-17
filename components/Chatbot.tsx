@@ -83,7 +83,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
 
     const handleSend = (e: React.FormEvent) => {
         e.preventDefault();
-        if (input.trim()) {
+        if (input.trim() && !isSending) {
             onSendMessage(input);
             setInput('');
         }
@@ -134,9 +134,9 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Digite sua pergunta..."
+                    placeholder={isSending ? "Sensação está digitando..." : "Digite sua pergunta..."}
                     className="w-full px-4 py-2 border rounded-full focus:ring-2 focus:ring-accent"
-                    disabled={isSending}
+                    readOnly={isSending}
                 />
                 <button 
                     type="submit" 
