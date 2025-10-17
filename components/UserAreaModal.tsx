@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import firebase from 'firebase/compat/app';
 import { UserProfile, Order, OrderStatus, Address } from '../types';
 import { db } from '../services/firebase';
@@ -394,7 +394,7 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
 interface MyOrdersTabProps {
     myOrders: Order[];
     isLoadingOrders: boolean;
-    onViewDetails: (order: Order) => void;
+    onViewDetails: (orderId: string) => void;
 }
 
 const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, onViewDetails }) => {
@@ -407,7 +407,7 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
         ['completed', 'cancelled', 'deleted'].includes(order.status)
     );
 
-    const renderOrderSummaryCard = (order: Order) => {
+    const renderOrderSummaryCard = (order: Order, isOngoing: boolean) => {
         const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo no Local' };
         const paymentStatusInfo = {
             'pending': { text: 'Pendente', color: 'text-yellow-600' },
@@ -430,7 +430,10 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
                      <p><strong>Tipo:</strong> {orderTypeMap[order.customer.orderType]}</p>
                      <p><strong>Pagamento:</strong> <span className={`font-semibold ${paymentStatusInfo.color}`}>{paymentStatusInfo.text}</span></p>
                 </div>
-                 <button onClick={() => onViewDetails(order)} className="mt-auto w-full bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
+                
+                {isOngoing && <OrderStatusTracker order={order} />}
+
+                 <button onClick={() => onViewDetails(order.id)} className="mt-auto w-full bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
                     <i className="fas fa-receipt mr-2"></i>Ver Detalhes do Pedido
                 </button>
             </div>
@@ -448,7 +451,7 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
                         <p className="text-center text-gray-500 py-8 px-4 bg-gray-50 rounded-lg">Você não tem pedidos em andamento.</p>
                     ) : (
                         <div className="space-y-3">
-                            {currentOrders.map(renderOrderSummaryCard)}
+                            {currentOrders.map(order => renderOrderSummaryCard(order, true))}
                         </div>
                     )}
 
@@ -467,7 +470,7 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
                                 {archivedOrders.length === 0 ? (
                                     <p className="text-center text-gray-500 py-8 px-4">Seu histórico de pedidos está vazio.</p>
                                 ) : (
-                                     archivedOrders.map(renderOrderSummaryCard)
+                                     archivedOrders.map(order => renderOrderSummaryCard(order, false))
                                 )}
                             </div>
                         )}
@@ -532,7 +535,9 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
 
     const [editingAddress, setEditingAddress] = useState<Partial<Address> | null>(null);
     const [isAddressFormVisible, setIsAddressFormVisible] = useState(showAddAddressForm);
-    const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
+    
+    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+    const selectedOrderDetails = useMemo(() => myOrders.find(o => o.id === selectedOrderId) || null, [myOrders, selectedOrderId]);
 
     useEffect(() => {
         if (isOpen) {
@@ -547,7 +552,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
             setActiveTab('orders');
             setIsAddressFormVisible(false);
             setEditingAddress(null);
-            setSelectedOrderDetails(null);
+            setSelectedOrderId(null);
         }
     }, [isOpen, initialTab, showAddAddressForm, profile]);
 
@@ -560,9 +565,16 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
 
         if (activeTab === 'orders') {
             setIsLoadingOrders(true);
-            const query = db.collection('orders').where('userId', '==', user.uid).orderBy('createdAt', 'desc').limit(25);
+            const query = db.collection('orders').where('userId', '==', user.uid).limit(25);
             const unsubscribe = query.onSnapshot(snapshot => {
                 const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+                
+                fetchedOrders.sort((a, b) => {
+                    const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+                    const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+                    return dateB - dateA;
+                });
+
                 setMyOrders(fetchedOrders);
                 setIsLoadingOrders(false);
             }, error => {
@@ -571,6 +583,8 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                 setIsLoadingOrders(false);
             });
             return () => unsubscribe();
+        } else {
+            setIsLoadingOrders(false);
         }
     }, [isOpen, user, addToast, activeTab]);
 
@@ -678,7 +692,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                                     isSaving={isSaving}
                                 />
                             )}
-                            {activeTab === 'orders' && <MyOrdersTab myOrders={myOrders} isLoadingOrders={isLoadingOrders} onViewDetails={setSelectedOrderDetails} />}
+                            {activeTab === 'orders' && <MyOrdersTab myOrders={myOrders} isLoadingOrders={isLoadingOrders} onViewDetails={setSelectedOrderId} />}
                             {activeTab === 'addresses' && (
                                 <MyAddressesTab
                                     profile={profile}
@@ -695,7 +709,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                     </div>
                 </div>
             </div>
-            <OrderDetailsModal order={selectedOrderDetails} onClose={() => setSelectedOrderDetails(null)} />
+            <OrderDetailsModal order={selectedOrderDetails} onClose={() => setSelectedOrderId(null)} />
         </>
     );
 };
