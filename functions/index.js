@@ -9,6 +9,7 @@ const {OAuth2Client} = require("google-auth-library");
 
 admin.initializeApp();
 const db = admin.firestore();
+const storage = admin.storage();
 
 // Define os secrets que as funções irão usar.
 const secrets = ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET", "GEMINI_API_KEY", "GOOGLE_CLIENT_ID"];
@@ -692,4 +693,66 @@ exports.refundPayment = onCall({secrets}, async (request) => {
     const errorMessage = error.cause?.error?.message || error.cause?.message || "Erro ao processar o estorno.";
     throw new Error(errorMessage);
   }
+});
+
+/**
+ * Manages user profile picture upload and removal securely.
+ */
+exports.manageProfilePicture = onCall({secrets}, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) {
+    throw new onCall.HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
+  }
+
+  const {imageBase64} = request.data;
+  const bucket = storage.bucket();
+  const filePath = `user-profiles/${uid}/profile.jpg`;
+  const file = bucket.file(filePath);
+
+  // Case 1: Remove photo (imageBase64 is null)
+  if (imageBase64 === null) {
+    try {
+      await file.delete({ignoreNotFound: true});
+      await admin.auth().updateUser(uid, {photoURL: null});
+      await db.collection("users").doc(uid).update({photoURL: null});
+      logger.info(`Foto de perfil removida para o usuário: ${uid}`);
+      return {success: true, photoURL: null};
+    } catch (error) {
+      logger.error(`Falha ao remover a foto de perfil para ${uid}:`, error);
+      throw new onCall.HttpsError("internal", "Não foi possível remover a foto de perfil.");
+    }
+  }
+
+  // Case 2: Upload/update photo (imageBase64 is a string)
+  if (typeof imageBase64 === "string") {
+    try {
+      const matches = imageBase64.match(/^data:(image\/[a-z]+);base64,(.+)$/);
+      if (!matches || matches.length !== 3) {
+        throw new onCall.HttpsError("invalid-argument", "Formato de imagem base64 inválido.");
+      }
+      const mimeType = matches[1];
+      const base64Data = matches[2];
+      const buffer = Buffer.from(base64Data, "base64");
+
+      // Upload the file and make it public
+      await file.save(buffer, {
+        metadata: {contentType: mimeType},
+        public: true,
+      });
+
+      const photoURL = file.publicUrl();
+
+      // Update Firebase Auth and Firestore user records
+      await admin.auth().updateUser(uid, {photoURL});
+      await db.collection("users").doc(uid).update({photoURL});
+
+      logger.info(`Foto de perfil atualizada para o usuário: ${uid}`);
+      return {success: true, photoURL};
+    } catch (error) {
+      logger.error(`Falha ao atualizar a foto de perfil para ${uid}:`, error);
+      throw new onCall.HttpsError("internal", "Não foi possível salvar a nova foto de perfil.");
+    }
+  }
+
+  throw new onCall.HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
 });

@@ -145,6 +145,21 @@ export const createReservation = async (details: ReservationDetails): Promise<{ 
 };
 
 // --- User Profile & Auth Functions ---
+
+export const manageProfilePicture = async (imageBase64: string | null): Promise<{success: boolean, photoURL: string | null}> => {
+    if (!functions) {
+        throw new Error("Firebase Functions is not initialized.");
+    }
+    const manageFunction = functions.httpsCallable('manageProfilePicture');
+    try {
+        const result = await manageFunction({ imageBase64 });
+        return result.data as {success: boolean, photoURL: string | null};
+    } catch (error) {
+        console.error("Error calling manageProfilePicture function:", error);
+        throw new Error("Falha ao gerenciar a foto do perfil.");
+    }
+};
+
 export const verifyGoogleToken = async (idToken: string): Promise<string> => {
     if (!functions) {
         throw new Error("Firebase Functions is not initialized.");

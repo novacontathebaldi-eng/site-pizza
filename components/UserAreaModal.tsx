@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import firebase from 'firebase/compat/app';
 import { UserProfile, Order, OrderStatus, Address } from '../types';
 import { db } from '../services/firebase';
@@ -352,20 +352,129 @@ interface UserProfileTabProps {
     cpf: string;
     setCpf: (cpf: string) => void;
     isSaving: boolean;
+    addToast: (message: string, type: 'success' | 'error') => void;
 }
 
 const UserProfileTab: React.FC<UserProfileTabProps> = ({
     profile, user, onLogout, handleResendVerification, handleProfileUpdate,
-    name, setName, phone, setPhone, cpf, setCpf, isSaving
-}) => (
+    name, setName, phone, setPhone, cpf, setCpf, isSaving, addToast,
+}) => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+
+    const handleUploadClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const resizeImage = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target?.result as string;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 256;
+                    const MAX_HEIGHT = 256;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        return reject(new Error('Não foi possível obter o contexto do canvas.'));
+                    }
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.9));
+                };
+                img.onerror = error => reject(error);
+            };
+            reader.onerror = error => reject(error);
+        });
+    };
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) {
+            return;
+        }
+        const file = e.target.files[0];
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+            addToast('A imagem é muito grande. Use uma imagem com menos de 5MB.', 'error');
+            return;
+        }
+
+        setIsPhotoUploading(true);
+        try {
+            const resizedImageBase64 = await resizeImage(file);
+            await firebaseService.manageProfilePicture(resizedImageBase64);
+            addToast('Foto de perfil atualizada!', 'success');
+        } catch (error) {
+            console.error(error);
+            addToast('Erro ao atualizar a foto.', 'error');
+        } finally {
+            setIsPhotoUploading(false);
+            if(fileInputRef.current) {
+                fileInputRef.current.value = "";
+            }
+        }
+    };
+
+    const handleRemovePhoto = async () => {
+        if (!window.confirm('Tem certeza que deseja remover sua foto de perfil?')) {
+            return;
+        }
+        setIsPhotoUploading(true);
+        try {
+            await firebaseService.manageProfilePicture(null);
+            addToast('Foto de perfil removida.', 'success');
+        } catch (error) {
+            console.error(error);
+            addToast('Erro ao remover a foto.', 'error');
+        } finally {
+            setIsPhotoUploading(false);
+        }
+    };
+    
+    return (
     <form onSubmit={handleProfileUpdate} className="space-y-4">
-        <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg border">
-            <img src={profile.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-16 h-16 rounded-full" />
-            <div className="flex-grow">
+         <div className="flex flex-col sm:flex-row items-center gap-4 bg-gray-50 p-4 rounded-lg border">
+            <div className="relative w-24 h-24 flex-shrink-0">
+                <img src={profile.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-24 h-24 rounded-full object-cover" />
+                {isPhotoUploading && (
+                    <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                        <i className="fas fa-spinner fa-spin text-white text-2xl"></i>
+                    </div>
+                )}
+            </div>
+            <div className="flex-grow text-center sm:text-left">
                 <h3 className="font-bold text-xl">{profile.name}</h3>
                 <p className="text-gray-600 text-sm">{profile.email}</p>
+                <div className="flex gap-2 mt-2 justify-center sm:justify-start">
+                    <button type="button" onClick={handleUploadClick} disabled={isPhotoUploading} className="bg-blue-100 text-blue-600 font-semibold py-1 px-3 rounded-lg text-xs hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i className="fas fa-upload mr-1"></i>Alterar Foto
+                    </button>
+                    {profile.photoURL && (
+                        <button type="button" onClick={handleRemovePhoto} disabled={isPhotoUploading} className="bg-gray-200 text-gray-700 font-semibold py-1 px-3 rounded-lg text-xs hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i className="fas fa-trash mr-1"></i>Remover
+                        </button>
+                    )}
+                </div>
+                <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/jpeg, image/png, image/webp" />
             </div>
-            <button type="button" onClick={onLogout} className="ml-auto bg-red-100 text-red-600 font-semibold py-2 px-3 rounded-lg text-sm hover:bg-red-200">
+            <button type="button" onClick={onLogout} className="ml-auto bg-red-100 text-red-600 font-semibold py-2 px-3 rounded-lg text-sm hover:bg-red-200 flex-shrink-0">
                <i className="fas fa-sign-out-alt mr-2"></i>Sair
             </button>
         </div>
@@ -390,12 +499,12 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
              <p className="text-xs text-gray-500 mt-1">Seu CPF é usado para agilizar o pagamento com PIX.</p>
         </div>
         <div className="text-right pt-2">
-             <button type="submit" disabled={isSaving} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[120px] disabled:bg-opacity-70">
+             <button type="submit" disabled={isSaving || isPhotoUploading} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[120px] disabled:bg-opacity-70">
                 {isSaving ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-2"></i><span>Salvar Perfil</span></>}
             </button>
         </div>
     </form>
-);
+)};
 
 interface MyOrdersTabProps {
     myOrders: Order[];
@@ -687,6 +796,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                                     profile={profile}
                                     user={user}
                                     onLogout={onLogout}
+                                    addToast={addToast}
                                     handleResendVerification={handleResendVerification}
                                     handleProfileUpdate={handleProfileUpdate}
                                     name={name}
