@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { auth } from '../services/firebase';
 import * as firebaseService from '../services/firebaseService';
+import firebase from 'firebase/compat/app';
 
 interface LoginModalProps {
     isOpen: boolean;
@@ -67,6 +68,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
         }
 
         try {
+            // Garante que a sessão do usuário persista após o navegador ser fechado.
+            await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
             if (isRegistering) {
                 // Processo de Registro
                 if (name.trim().length < 2) {

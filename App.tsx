@@ -411,6 +411,9 @@ const App: React.FC = () => {
             const googleUser = await googleAuth.signIn();
             const idToken = googleUser.getAuthResponse().id_token;
 
+            // Garante que a sessão do usuário persista após o navegador ser fechado.
+            await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
             const customToken = await firebaseService.verifyGoogleToken(idToken);
             await auth.signInWithCustomToken(customToken);
 
