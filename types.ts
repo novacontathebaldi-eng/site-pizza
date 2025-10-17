@@ -75,6 +75,7 @@ export interface OrderDetails {
     cpf?: string;
     deliveryFee?: number;
     reservationTime?: string;
+    whatsappUpdates?: boolean;
 }
 
 export interface ReservationDetails {
@@ -125,6 +126,7 @@ export interface Order {
     createdAt: firebase.firestore.Timestamp | any; // Firestore Timestamp
     pickupTimeEstimate?: string;
     numberOfPeople?: number;
+    whatsappUpdates?: boolean;
     mercadoPagoDetails?: {
         paymentId: string;
         status?: string;

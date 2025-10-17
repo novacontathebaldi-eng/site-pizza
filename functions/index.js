@@ -1,18 +1,28 @@
 /* eslint-disable max-len */
 const {onCall, onRequest} = require("firebase-functions/v2/https");
+const functions = require("firebase-functions");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago");
 const crypto = require("crypto");
 const {GoogleGenAI} = require("@google/genai");
 const {OAuth2Client} = require("google-auth-library");
+const axios = require("axios");
 
 admin.initializeApp();
 const db = admin.firestore();
 const storage = admin.storage();
 
 // Define os secrets que as funções irão usar.
-const secrets = ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET", "GEMINI_API_KEY", "GOOGLE_CLIENT_ID"];
+const secrets = [
+    "MERCADO_PAGO_ACCESS_TOKEN",
+    "MERCADO_PAGO_WEBHOOK_SECRET",
+    "GEMINI_API_KEY",
+    "GOOGLE_CLIENT_ID",
+    "EVOLUTION_API_KEY",
+    "EVOLUTION_API_URL",
+    "EVOLUTION_INSTANCE_NAME",
+];
 
 // --- Chatbot Santo ---
 let ai; // Mantém a instância da IA no escopo global para ser reutilizada após a primeira chamada.
@@ -408,6 +418,7 @@ exports.createOrder = onCall({secrets}, async (request) => {
     notes: details.notes || "",
     status: orderStatus,
     paymentStatus: "pending",
+    whatsappUpdates: !!details.whatsappUpdates,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     mercadoPagoDetails: {}, // Initialize the object
   };
@@ -756,3 +767,117 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
 
   throw new onCall.HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
 });
+
+// --- WHATSAPP NOTIFICATION FUNCTIONS ---
+
+/**
+ * Sends a WhatsApp message using the Evolution API.
+ * @param {string} phoneNumber The recipient's phone number.
+ * @param {string} message The text message to send.
+ */
+const sendWhatsappMessage = async (phoneNumber, message) => {
+  const apiKey = process.env.EVOLUTION_API_KEY;
+  const apiUrl = process.env.EVOLUTION_API_URL;
+  const instanceName = process.env.EVOLUTION_INSTANCE_NAME;
+
+  if (!apiKey || !apiUrl || !instanceName) {
+    logger.error("Evolution API secrets are not configured.", {apiKey: !!apiKey, apiUrl: !!apiUrl, instanceName: !!instanceName});
+    return;
+  }
+
+  let formattedNumber = phoneNumber.replace(/\D/g, "");
+  if (formattedNumber.length === 11) { // DDD + Number, e.g., 27999999999
+    formattedNumber = "55" + formattedNumber;
+  } else if (formattedNumber.length === 10) { // DDD + Number (missing 9), e.g., 2788888888
+    const areaCode = formattedNumber.substring(0, 2);
+    const number = formattedNumber.substring(2);
+    formattedNumber = `55${areaCode}9${number}`;
+  }
+
+  const endpoint = `${apiUrl}/message/sendText/${instanceName}`;
+
+  try {
+    logger.info(`Sending WhatsApp to ${formattedNumber} with message: "${message}"`);
+    await axios.post(
+        endpoint,
+        {
+          "number": formattedNumber,
+          "options": {
+            "delay": 1200,
+            "presence": "composing",
+          },
+          "textMessage": {
+            "text": message,
+          },
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": apiKey,
+          },
+        },
+    );
+    logger.info(`Successfully sent WhatsApp message to ${formattedNumber}.`);
+  } catch (error) {
+    logger.error(`Failed to send WhatsApp message to ${formattedNumber}.`, {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      error: error.response ? error.response.data : error.message,
+      endpoint,
+    });
+  }
+};
+
+/**
+ * Triggered on order document updates to send WhatsApp notifications.
+ */
+exports.onOrderStatusUpdate = functions.runWith({secrets})
+    .firestore.document("orders/{orderId}")
+    .onUpdate(async (change) => {
+      const beforeData = change.before.data();
+      const afterData = change.after.data();
+
+      if (!afterData.whatsappUpdates) {
+        return null;
+      }
+
+      const statusChanged = beforeData.status !== afterData.status;
+      const paymentChanged = beforeData.paymentStatus !== afterData.paymentStatus;
+
+      if (!statusChanged && !paymentChanged) {
+        return null;
+      }
+
+      let message = "";
+
+      if (paymentChanged && afterData.paymentStatus === "paid_online" && beforeData.paymentStatus !== "paid_online") {
+        message = `Pagamento aprovado! ✅ Seu pedido #${afterData.orderNumber} foi confirmado e logo começaremos a prepará-lo. Agradecemos a sua compra!`;
+      } else if (statusChanged) {
+        switch (afterData.status) {
+          case "accepted":
+            message = `Seu pedido #${afterData.orderNumber} foi aceito e já está em preparo! 🍕`;
+            break;
+          case "reserved":
+            message = `Sua reserva #${afterData.orderNumber} foi confirmada! Aguardamos você. 🎉`;
+            break;
+          case "ready":
+            if (afterData.customer.orderType === "delivery") {
+              message = `Boas notícias! Seu pedido #${afterData.orderNumber} saiu para entrega! 🛵`;
+            } else if (afterData.customer.orderType === "pickup") {
+              message = `Seu pedido #${afterData.orderNumber} está pronto para retirada! Pode vir buscar. 😊`;
+            }
+            break;
+          case "completed":
+            message = `Seu pedido #${afterData.orderNumber} foi finalizado! Agradecemos a preferência e esperamos que tenha gostado. ❤️`;
+            break;
+          case "cancelled":
+            message = `Atenção: seu pedido #${afterData.orderNumber} foi cancelado.`;
+            break;
+        }
+      }
+
+      if (message) {
+        await sendWhatsappMessage(afterData.customer.phone, message);
+      }
+
+      return null;
+    });
