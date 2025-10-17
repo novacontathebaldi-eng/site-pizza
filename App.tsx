@@ -183,6 +183,7 @@ const App: React.FC = () => {
     const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState<boolean>(false);
     const [isReservationModalOpen, setIsReservationModalOpen] = useState<boolean>(false);
     const [isChatbotOpen, setIsChatbotOpen] = useState<boolean>(false);
+    const [isFooterVisible, setIsFooterVisible] = useState(false);
     
     // Auth State
     const [currentUser, setCurrentUser] = useState<firebase.User | null>(null);
@@ -210,6 +211,10 @@ const App: React.FC = () => {
         { role: 'bot', content: `🍕 Olá! Bem-vindo(a) à Pizzaria Santa Sensação!\n\nEu sou o Sensação, seu assistente virtual. Estou aqui para te ajudar a fazer pedidos, tirar dúvidas sobre nosso cardápio, acompanhar entregas e muito mais.\n\nComo posso te ajudar hoje?` }
     ]);
     const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
+
+    const scrollToTop = () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
     
     // Logic to determine if any modal is visible
     const isModalVisible = useMemo(() => {
@@ -360,6 +365,27 @@ const App: React.FC = () => {
         sectionElements.forEach(el => { if (el) observer.observe(el); });
         return () => { sectionElements.forEach(el => { if (el) observer.unobserve(el); }); };
     }, []);
+    
+    useEffect(() => {
+        const footerElement = document.getElementById('footer-section');
+        if (!footerElement) return;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                setIsFooterVisible(entry.isIntersecting);
+            },
+            { threshold: 0.1 } // When 10% of footer is visible
+        );
+
+        observer.observe(footerElement);
+
+        return () => {
+            if (footerElement) {
+                observer.unobserve(footerElement);
+            }
+        };
+    }, []);
+
 
     useEffect(() => {
         if (!db) { setError("Falha na conexão com o banco de dados."); setIsLoading(false); return; }
@@ -652,6 +678,9 @@ const App: React.FC = () => {
             });
         }
     };
+    
+    const showFloatingButton = !['Início', 'Cardápio'].includes(activeSection);
+
 
     return (
         <div className="flex flex-col min-h-screen">
@@ -683,25 +712,33 @@ const App: React.FC = () => {
                 <ContactSection />
                 <AdminSection allProducts={products} allCategories={categories} isStoreOnline={isStoreOnline} siteSettings={siteSettings} orders={orders} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onProductStatusChange={handleProductStatusChange} onProductStockStatusChange={handleProductStockStatusChange} onStoreStatusChange={handleStoreStatusChange} onSaveCategory={handleSaveCategory} onDeleteCategory={handleDeleteCategory} onCategoryStatusChange={handleCategoryStatusChange} onReorderProducts={handleReorderProducts} onReorderCategories={handleReorderCategories} onSeedDatabase={seedDatabase} onSaveSiteSettings={handleSaveSiteSettings} onUpdateOrderStatus={handleUpdateOrderStatus} onUpdateOrderPaymentStatus={handleUpdateOrderPaymentStatus} onUpdateOrderReservationTime={handleUpdateOrderReservationTime} onDeleteOrder={handleDeleteOrder} onPermanentDeleteOrder={handlePermanentDeleteOrder} onRefundOrder={handleRefundOrder} refundingOrderId={refundingOrderId}/>
             </main>
-
-            <Footer settings={siteSettings} onOpenChatbot={() => setIsChatbotOpen(true)} />
+            
+            <div id="footer-section">
+                <Footer settings={siteSettings} onOpenChatbot={() => setIsChatbotOpen(true)} />
+            </div>
             
             <div className="fixed bottom-5 right-5 z-40 flex flex-col-reverse items-end gap-3">
-                {cart.length > 0 ? (
-                    <button onClick={() => setIsCartOpen(true)} className="bg-accent text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transform transition-transform hover:scale-105 animate-fade-in-up">
-                        <i className="fas fa-shopping-bag text-xl"></i>
-                        <div className="text-left">
-                            <span className="text-sm block leading-tight">{cartTotalItems} {cartTotalItems > 1 ? 'itens' : 'item'}</span>
-                            <span className="font-semibold text-lg block leading-tight">Ver Pedido</span>
-                        </div>
+                 {isFooterVisible ? (
+                    <button onClick={scrollToTop} className="w-14 h-14 bg-accent text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110 animate-fade-in-up" aria-label="Voltar ao topo">
+                        <i className="fas fa-arrow-up text-xl"></i>
                     </button>
-                ) : activeSection !== 'Cardápio' ? (
-                    <button onClick={scrollToCardapio} className="bg-accent text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transform transition-transform hover:scale-105 animate-fade-in-up">
-                        <i className="fas fa-utensils text-xl"></i>
-                        <div className="text-left">
-                            <span className="font-semibold text-lg block leading-tight">Ver Cardápio</span>
-                        </div>
-                    </button>
+                ) : showFloatingButton ? (
+                    cart.length > 0 ? (
+                        <button onClick={() => setIsCartOpen(true)} className="bg-accent text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transform transition-transform hover:scale-105 animate-fade-in-up">
+                            <i className="fas fa-shopping-bag text-xl"></i>
+                            <div className="text-left">
+                                <span className="text-sm block leading-tight">{cartTotalItems} {cartTotalItems > 1 ? 'itens' : 'item'}</span>
+                                <span className="font-semibold text-lg block leading-tight">Ver Pedido</span>
+                            </div>
+                        </button>
+                    ) : (
+                        <button onClick={scrollToCardapio} className="bg-accent text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transform transition-transform hover:scale-105 animate-fade-in-up">
+                            <i className="fas fa-utensils text-xl"></i>
+                            <div className="text-left">
+                                <span className="font-semibold text-lg block leading-tight">Ver Cardápio</span>
+                            </div>
+                        </button>
+                    )
                 ) : null}
             </div>
 
