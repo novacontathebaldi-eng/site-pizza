@@ -43,8 +43,6 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOp
       }
     };
 
-    const showMenuButton = activeSection === 'Sobre Nós' || activeSection === 'Contato';
-
     return (
         <header className={`bg-brand-green-700 text-text-on-dark sticky top-0 z-50 transition-shadow duration-300 ${isScrolled ? 'shadow-lg' : ''}`}>
             <div className="container mx-auto px-2 sm:px-4">
@@ -67,12 +65,6 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOp
                     </nav>
 
                     <div className="flex items-center gap-2 sm:gap-3">
-                        {showMenuButton && (
-                            <button onClick={() => scrollToSection('cardapio')} className="hidden lg:flex items-center gap-2 bg-brand-gold-600 text-text-on-dark px-3 sm:px-4 py-2 rounded-lg font-semibold hover:bg-opacity-90 transition-all">
-                                <i className="fas fa-utensils"></i>
-                                <span className="hidden sm:inline">Ver Cardápio</span>
-                            </button>
-                        )}
                         <button onClick={onUserIconClick} className="relative w-12 h-12 flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors" aria-label="Minha Conta">
                             {user ? (
                                 <img src={user.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-full h-full rounded-lg object-cover" />
