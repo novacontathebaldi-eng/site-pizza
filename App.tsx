@@ -111,7 +111,7 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     }
     
     if (details.allergies) {
-        message += `\n*⚠️ ALERGIAS/RESTRIÇÕES:*\n${details.allergies}\n`;
+        message += `\n⚠️ ALERGIAS/RESTRIÇÕES:*\n${details.allergies}\n`;
     }
 
     message += `\n*🛒 ITENS DO PEDIDO:*\n`;
@@ -714,27 +714,22 @@ const App: React.FC = () => {
             </div>
             
             <div className="fixed bottom-5 right-5 z-40 flex flex-col-reverse items-end gap-3">
-                 {isFooterVisible ? (
+                {isFooterVisible ? (
                     <button onClick={scrollToTop} className="w-14 h-14 bg-accent text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110 animate-fade-in-up" aria-label="Voltar ao topo">
                         <i className="fas fa-arrow-up text-xl"></i>
                     </button>
+                ) : cart.length > 0 ? (
+                    <button onClick={() => setIsCartOpen(true)} className="bg-accent text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transform transition-transform hover:scale-105 animate-fade-in-up">
+                        <i className="fas fa-shopping-bag text-xl"></i>
+                        <div className="text-left">
+                            <span className="text-sm block leading-tight">{cartTotalItems} {cartTotalItems > 1 ? 'itens' : 'item'}</span>
+                            <span className="font-semibold text-lg block leading-tight">Ver Pedido</span>
+                        </div>
+                    </button>
                 ) : showFloatingButton ? (
-                    cart.length > 0 ? (
-                        <button onClick={() => setIsCartOpen(true)} className="bg-accent text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transform transition-transform hover:scale-105 animate-fade-in-up">
-                            <i className="fas fa-shopping-bag text-xl"></i>
-                            <div className="text-left">
-                                <span className="text-sm block leading-tight">{cartTotalItems} {cartTotalItems > 1 ? 'itens' : 'item'}</span>
-                                <span className="font-semibold text-lg block leading-tight">Ver Pedido</span>
-                            </div>
-                        </button>
-                    ) : (
-                        <button onClick={scrollToCardapio} className="bg-accent text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transform transition-transform hover:scale-105 animate-fade-in-up">
-                            <i className="fas fa-utensils text-xl"></i>
-                            <div className="text-left">
-                                <span className="font-semibold text-lg block leading-tight">Ver Cardápio</span>
-                            </div>
-                        </button>
-                    )
+                    <button onClick={scrollToCardapio} className="w-14 h-14 bg-accent text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110 animate-fade-in-up" aria-label="Ver Cardápio">
+                        <i className="fas fa-utensils text-xl"></i>
+                    </button>
                 ) : null}
             </div>
 
