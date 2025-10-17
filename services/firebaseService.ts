@@ -1,7 +1,7 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
 import { db, storage, functions } from './firebase';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem, ChatMessage, ReservationDetails, UserProfile, Address } from '../types';
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem, ChatMessage, ReservationDetails, UserProfile, Address, FaqItem } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -122,6 +122,43 @@ export const updateCategoriesOrder = async (categoriesToUpdate: { id: string; or
     });
     await batch.commit();
 };
+
+// --- FAQ Functions ---
+export const addFaqItem = async (faqData: Omit<FaqItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+    await db.collection('chatbot_faqs').add({
+        ...faqData,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+    });
+};
+
+export const updateFaqItem = async (faqId: string, faqData: Partial<Omit<FaqItem, 'id' | 'createdAt'>>): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+    await db.collection('chatbot_faqs').doc(faqId).update({
+        ...faqData,
+        updatedAt: timestamp,
+    });
+};
+
+export const deleteFaqItem = async (faqId: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    await db.collection('chatbot_faqs').doc(faqId).delete();
+};
+
+export const updateFaqsOrder = async (faqsToUpdate: { id: string; order: number }[]): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const batch = db.batch();
+    const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+    faqsToUpdate.forEach(faqUpdate => {
+        const faqRef = db.collection('chatbot_faqs').doc(faqUpdate.id);
+        batch.update(faqRef, { order: faqUpdate.order, updatedAt: timestamp });
+    });
+    await batch.commit();
+};
+
 
 // Site Settings Function
 export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promise<void> => {
