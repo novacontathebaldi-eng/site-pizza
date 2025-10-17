@@ -6,56 +6,87 @@ interface FooterProps {
     onOpenChatbot: () => void;
 }
 
+// Helper function to process operating hours into structured groups
+function formatOperatingHoursGroups(operatingHours?: DaySchedule[]): { days: string, time: string }[] {
+    if (!operatingHours?.length) return [];
+    
+    const openSchedules = operatingHours.filter(h => h.isOpen);
+    if (openSchedules.length === 0) return [];
+    
+    const schedulesByTime = openSchedules.reduce((acc, schedule) => {
+        const timeKey = `${schedule.openTime}-${schedule.closeTime}`;
+        if (!acc[timeKey]) acc[timeKey] = [];
+        acc[timeKey].push(schedule);
+        return acc;
+    }, {} as Record<string, DaySchedule[]>);
+
+    const result: { days: string, time: string }[] = [];
+
+    for (const timeKey in schedulesByTime) {
+        const schedules = schedulesByTime[timeKey].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+        if (schedules.length === 0) continue;
+
+        let dayString;
+        if (schedules.length === 7) {
+            dayString = 'Todos os dias';
+        } else {
+            const sequences: DaySchedule[][] = [];
+            if (schedules.length > 0) {
+                let currentSequence: DaySchedule[] = [schedules[0]];
+                for (let i = 1; i < schedules.length; i++) {
+                    if (schedules[i].dayOfWeek === schedules[i - 1].dayOfWeek + 1) {
+                        currentSequence.push(schedules[i]);
+                    } else {
+                        sequences.push(currentSequence);
+                        currentSequence = [schedules[i]];
+                    }
+                }
+                sequences.push(currentSequence);
+            }
+            
+            // Handle Sunday-Saturday wrap-around (e.g., Fri, Sat, Sun)
+            if (sequences.length > 1 && sequences[0][0].dayOfWeek === 0 && schedules[schedules.length - 1].dayOfWeek === 6) {
+               const firstSeq = sequences.shift()!;
+               sequences[sequences.length - 1].push(...firstSeq);
+            }
+
+            const formattedSequences = sequences.map(seq => {
+                if (seq.length === 1) return seq[0].dayName;
+                if (seq.length === 2) return `${seq[0].dayName} e ${seq[1].dayName}`;
+                return `De ${seq[0].dayName} a ${seq[seq.length - 1].dayName}`;
+            });
+            dayString = formattedSequences.join(' e ');
+        }
+
+        const [openTime, closeTime] = timeKey.split('-');
+        result.push({
+            days: dayString,
+            time: `das ${openTime}h às ${closeTime}h`
+        });
+    }
+    return result;
+}
+
+
 const formatOperatingHours = (operatingHours?: DaySchedule[]): string[] => {
     if (!operatingHours?.length) {
         return ['Funcionamento não informado.'];
     }
-
-    const openSchedules = operatingHours
-        .map((h, index) => ({...h, originalIndex: index})) // Preserve original order for sorting
-        .filter(h => h.isOpen)
-        .sort((a, b) => a.originalIndex - b.originalIndex);
-        
+    const openSchedules = operatingHours.filter(h => h.isOpen);
     if (openSchedules.length === 0) {
         return ['Fechado todos os dias.'];
     }
 
-    const scheduleByTime = openSchedules.reduce((acc, schedule) => {
-        const timeKey = `${schedule.openTime}h às ${schedule.closeTime}h`;
-        if (!acc[timeKey]) {
-            acc[timeKey] = [];
-        }
-        acc[timeKey].push(schedule.dayName);
-        return acc;
-    }, {} as Record<string, string[]>);
-    
-    // Attempt to group consecutive days
-    const dayOrder = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-    const finalStrings: string[] = [];
-
-    Object.entries(scheduleByTime).forEach(([time, days]) => {
-        if (days.length > 2) {
-            let isConsecutive = true;
-            for (let i = 0; i < days.length - 1; i++) {
-                if (dayOrder.indexOf(days[i+1]) - dayOrder.indexOf(days[i]) !== 1) {
-                    isConsecutive = false;
-                    break;
-                }
-            }
-            if (isConsecutive) {
-                finalStrings.push(`${days[0]} a ${days[days.length-1]}`);
-                finalStrings.push(`das ${time}`);
-                return;
-            }
-        }
-        // Fallback for non-consecutive or short lists
-        finalStrings.push(days.join(' e '));
-        finalStrings.push(`das ${time}`);
-    });
-
-    if (finalStrings.length === 2 && finalStrings[0] === 'Quarta a Domingo') {
-        return ['Quarta a Domingo', finalStrings[1]]
+    const groups = formatOperatingHoursGroups(operatingHours);
+    if (groups.length === 0) {
+        return ['Fechado todos os dias.'];
     }
+
+    const finalStrings: string[] = [];
+    groups.forEach(group => {
+        finalStrings.push(group.days);
+        finalStrings.push(group.time);
+    });
 
     return finalStrings;
 };
@@ -105,7 +136,7 @@ export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot }) => {
                         <h4 className="font-bold text-lg mb-4">Funcionamento</h4>
                          <ul className="space-y-2 text-brand-green-300">
                             {operatingHoursParts.map((part, index) => (
-                                <li key={index}><i className={`fas ${index === 0 ? 'fa-clock' : 'fa-none'} mr-2 text-accent`}></i>{part}</li>
+                                <li key={index}><i className={`fas ${index % 2 === 0 ? 'fa-clock' : 'fa-none'} mr-2 text-accent`}></i>{part}</li>
                             ))}
                             <li><i className="fas fa-truck mr-2 text-accent"></i>Delivery disponível</li>
                         </ul>

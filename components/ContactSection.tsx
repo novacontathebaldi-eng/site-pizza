@@ -5,6 +5,68 @@ interface ContactSectionProps {
     settings: SiteSettings;
 }
 
+// Helper function to process operating hours into structured groups
+function formatOperatingHoursGroups(operatingHours?: DaySchedule[]): { days: string, time: string }[] {
+    if (!operatingHours?.length) return [];
+    
+    const openSchedules = operatingHours.filter(h => h.isOpen);
+    if (openSchedules.length === 0) return [];
+    
+    const schedulesByTime = openSchedules.reduce((acc, schedule) => {
+        const timeKey = `${schedule.openTime}-${schedule.closeTime}`;
+        if (!acc[timeKey]) acc[timeKey] = [];
+        acc[timeKey].push(schedule);
+        return acc;
+    }, {} as Record<string, DaySchedule[]>);
+
+    const result: { days: string, time: string }[] = [];
+
+    for (const timeKey in schedulesByTime) {
+        const schedules = schedulesByTime[timeKey].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+        if (schedules.length === 0) continue;
+
+        let dayString;
+        if (schedules.length === 7) {
+            dayString = 'Todos os dias';
+        } else {
+            const sequences: DaySchedule[][] = [];
+            if (schedules.length > 0) {
+                let currentSequence: DaySchedule[] = [schedules[0]];
+                for (let i = 1; i < schedules.length; i++) {
+                    if (schedules[i].dayOfWeek === schedules[i - 1].dayOfWeek + 1) {
+                        currentSequence.push(schedules[i]);
+                    } else {
+                        sequences.push(currentSequence);
+                        currentSequence = [schedules[i]];
+                    }
+                }
+                sequences.push(currentSequence);
+            }
+            
+            // Handle Sunday-Saturday wrap-around (e.g., Fri, Sat, Sun)
+            if (sequences.length > 1 && sequences[0][0].dayOfWeek === 0 && schedules[schedules.length - 1].dayOfWeek === 6) {
+               const firstSeq = sequences.shift()!;
+               sequences[sequences.length - 1].push(...firstSeq);
+            }
+
+            const formattedSequences = sequences.map(seq => {
+                if (seq.length === 1) return seq[0].dayName;
+                if (seq.length === 2) return `${seq[0].dayName} e ${seq[1].dayName}`;
+                return `De ${seq[0].dayName} a ${seq[seq.length - 1].dayName}`;
+            });
+            dayString = formattedSequences.join(' e ');
+        }
+
+        const [openTime, closeTime] = timeKey.split('-');
+        result.push({
+            days: dayString,
+            time: `das ${openTime}h às ${closeTime}h`
+        });
+    }
+    return result;
+}
+
+
 const formatOperatingHours = (operatingHours?: DaySchedule[]): string => {
     if (!operatingHours?.length) {
         return 'Funcionamento não informado.';
@@ -15,19 +77,12 @@ const formatOperatingHours = (operatingHours?: DaySchedule[]): string => {
         return 'Fechado todos os dias.';
     }
 
-    const scheduleByTime = openSchedules.reduce((acc, schedule) => {
-        const timeKey = `${schedule.openTime}h às ${schedule.closeTime}h`;
-        if (!acc[timeKey]) {
-            acc[timeKey] = [];
-        }
-        // Adiciona apenas os 3 primeiros caracteres do dia para abreviar
-        acc[timeKey].push(schedule.dayName.slice(0, 3));
-        return acc;
-    }, {} as Record<string, string[]>);
+    const groups = formatOperatingHoursGroups(operatingHours);
+    if (groups.length === 0) {
+        return 'Fechado todos os dias.';
+    }
 
-    return Object.entries(scheduleByTime).map(([time, days]) => {
-        return `${days.join(' / ')}, das ${time}`;
-    }).join(' | ');
+    return groups.map(group => `${group.days}, ${group.time}`).join(' | ');
 };
 
 

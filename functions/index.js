@@ -38,9 +38,13 @@ exports.updateStoreStatusBySchedule = onSchedule({
       return;
     }
 
-    const now = new Date();
-    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ...
-    const currentTime = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+    // FIX: Get current date/time in the correct timezone.
+    // The function runtime is UTC, but the schedule is in 'America/Sao_Paulo'.
+    // We must convert the current time to that timezone for accurate checks.
+    const nowInSaoPaulo = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
+
+    const dayOfWeek = nowInSaoPaulo.getDay(); // 0 = Sunday, 1 = Monday, ...
+    const currentTime = `${nowInSaoPaulo.getHours().toString().padStart(2, "0")}:${nowInSaoPaulo.getMinutes().toString().padStart(2, "0")}`;
 
     const todaySchedule = settings.operatingHours.find((d) => d.dayOfWeek === dayOfWeek);
 
@@ -58,7 +62,7 @@ exports.updateStoreStatusBySchedule = onSchedule({
       await statusRef.set({isOpen: shouldBeOpen});
       logger.info(`Status da loja atualizado para: ${shouldBeOpen ? "ABERTA" : "FECHADA"}`);
     } else {
-      logger.info("Status da loja já está correto. Nenhuma atualização necessária.");
+      logger.info(`Status da loja já está correto. Nenhuma atualização necessária. Atualmente: ${currentStatus ? "ABERTA" : "FECHADA"}`);
     }
   } catch (error) {
     logger.error("Erro ao atualizar status da loja por agendamento:", error);
