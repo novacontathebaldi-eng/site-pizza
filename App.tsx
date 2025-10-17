@@ -272,6 +272,36 @@ const App: React.FC = () => {
         });
         return () => unsubscribe();
     }, []);
+    
+    // Effect to handle the result of a redirect sign-in flow
+    // FIX: Replaced the Firebase v9 modular `getRedirectResult` function with the v8 compatibility equivalent `auth.getRedirectResult()`.
+    // This resolves type mismatches for `UserCredential` and `User` objects, fixing errors where the `additionalUserInfo` property
+    // was not found and where the `user` object was not assignable to the expected type in `firebaseService.createUserProfile`.
+    useEffect(() => {
+        if (!auth) return;
+        setIsProcessingOrder(true);
+        auth.getRedirectResult()
+            .then(async (result) => {
+                if (result && result.user) {
+                    // This means the user has just signed in via redirect.
+                    const user = result.user;
+                     if (result.additionalUserInfo?.isNewUser) {
+                        await firebaseService.createUserProfile(user, user.displayName || 'Novo Usuário', user.phoneNumber || '', '');
+                    }
+                    addToast(`Bem-vindo(a), ${user.displayName}!`, 'success');
+                }
+            })
+            .catch((error) => {
+                console.error("Google Redirect Sign-In Error:", error);
+                 if (error.code !== 'auth/popup-closed-by-user') {
+                     addToast('Falha no login com Google. Tente novamente.', 'error');
+                }
+            })
+            .finally(() => {
+                setIsProcessingOrder(false);
+            });
+    }, [auth, addToast]);
+
 
     // Effect to listen for profile updates in real-time
     useEffect(() => {
@@ -363,16 +393,7 @@ const App: React.FC = () => {
         try {
             const provider = new firebase.auth.GoogleAuthProvider();
             await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-            const result = await auth.signInWithPopup(provider);
-            const user = result.user;
-
-            // Se for um novo usuário, cria um perfil básico para ele no Firestore
-            if (user && result.additionalUserInfo?.isNewUser) {
-                await firebaseService.createUserProfile(user, user.displayName || 'Novo Usuário', user.phoneNumber || '', '');
-            }
-
-            setIsLoginModalOpen(false);
-            addToast(`Bem-vindo(a), ${user?.displayName}!`, 'success');
+            await auth.signInWithRedirect(provider);
         } catch (error: any) {
             console.error("Google Sign-In Error:", error);
             if (error.code !== 'auth/popup-closed-by-user') {
