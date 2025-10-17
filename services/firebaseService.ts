@@ -337,6 +337,29 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
     await orderRef.delete();
 };
 
+export const permanentDeleteMultipleOrders = async (orderIds: string[]): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    if (orderIds.length === 0) {
+        return;
+    }
+
+    // Firestore allows a maximum of 500 writes in a single batch.
+    // Chunking the array to handle more than 500 deletions at once.
+    const chunks = [];
+    for (let i = 0; i < orderIds.length; i += 500) {
+        chunks.push(orderIds.slice(i, i + 500));
+    }
+
+    for (const chunk of chunks) {
+        const batch = db.batch();
+        chunk.forEach(orderId => {
+            const orderRef = db.collection('orders').doc(orderId);
+            batch.delete(orderRef);
+        });
+        await batch.commit();
+    }
+};
+
 
 /**
  * Calls a cloud function to process a full refund for a given order via Mercado Pago.

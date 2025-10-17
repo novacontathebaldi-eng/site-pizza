@@ -35,6 +35,7 @@ interface AdminSectionProps {
     onUpdateOrderReservationTime: (orderId: string, reservationTime: string) => Promise<void>;
     onDeleteOrder: (orderId: string) => Promise<void>;
     onPermanentDeleteOrder: (orderId: string) => Promise<void>;
+    onPermanentDeleteMultipleOrders: (orderIds: string[]) => Promise<void>;
     onRefundOrder: (orderId: string) => Promise<void>;
     refundingOrderId: string | null;
 }
@@ -150,7 +151,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
         onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
-        onDeleteOrder, onPermanentDeleteOrder, onRefundOrder, refundingOrderId
+        onDeleteOrder, onPermanentDeleteOrder, onPermanentDeleteMultipleOrders, onRefundOrder, refundingOrderId
     } = props;
     
     const [user, setUser] = useState<firebase.User | null>(null);
@@ -178,6 +179,8 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const [showFilters, setShowFilters] = useState(false);
     const [activeOrdersTab, setActiveOrdersTab] = useState<OrderTabKey>('accepted');
     const [isTrashVisible, setIsTrashVisible] = useState(false);
+    const [selectedOrderIds, setSelectedOrderIds] = useState(new Set<string>());
+
 
     // State for sound notification
     const [isSoundEnabled, setIsSoundEnabled] = useState(() => {
@@ -206,6 +209,13 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         window.addEventListener('hashchange', handleHashChange, false);
         return () => window.removeEventListener('hashchange', handleHashChange, false);
     }, []);
+    
+    // Clear selection when leaving trash view
+    useEffect(() => {
+        if (!isTrashVisible) {
+            setSelectedOrderIds(new Set());
+        }
+    }, [isTrashVisible]);
 
     // Scroll main admin tabs into view
     useEffect(() => {
@@ -390,6 +400,33 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         }
     }, [filteredOrders, activeOrdersTab]);
     
+     // --- Handlers for Bulk Selection in Trash ---
+    const handleSelectOrder = (orderId: string) => {
+        setSelectedOrderIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(orderId)) {
+                newSet.delete(orderId);
+            } else {
+                newSet.add(orderId);
+            }
+            return newSet;
+        });
+    };
+
+    const handleSelectAll = () => {
+        if (selectedOrderIds.size === deletedOrders.length) {
+            setSelectedOrderIds(new Set());
+        } else {
+            setSelectedOrderIds(new Set(deletedOrders.map(o => o.id)));
+        }
+    };
+
+    const handleDeleteSelected = async () => {
+        if (selectedOrderIds.size === 0) return;
+        await onPermanentDeleteMultipleOrders(Array.from(selectedOrderIds));
+        setSelectedOrderIds(new Set());
+    };
+
     const scrollToContent = (elementId: string) => {
         const element = document.getElementById(elementId);
         if (!element) return;
@@ -544,7 +581,44 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
                                     <div id="order-list-container" className="mt-4 space-y-4">
                                         {isTrashVisible ? (
-                                            deletedOrders.length > 0 ? deletedOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} onRefund={onRefundOrder} isRefunding={refundingOrderId === order.id} />) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>
+                                            <>
+                                                {deletedOrders.length > 0 && (
+                                                    <div className="bg-gray-100 p-2 rounded-lg mb-4 flex items-center gap-4 border sticky top-[12.5rem] z-20">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="h-5 w-5 rounded border-gray-400 text-accent focus:ring-accent cursor-pointer"
+                                                            checked={selectedOrderIds.size > 0 && selectedOrderIds.size === deletedOrders.length}
+                                                            onChange={handleSelectAll}
+                                                            aria-label="Selecionar todos os pedidos na lixeira"
+                                                        />
+                                                        <span className="font-semibold text-sm text-gray-700">{selectedOrderIds.size} selecionado(s)</span>
+                                                        <button
+                                                            onClick={handleDeleteSelected}
+                                                            disabled={selectedOrderIds.size === 0}
+                                                            className="ml-auto bg-red-500 text-white font-semibold py-1 px-3 rounded-md text-sm hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                                        >
+                                                            <i className="fas fa-trash-alt mr-2"></i>
+                                                            Apagar Selecionados
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                {deletedOrders.length > 0 ? deletedOrders.map(order => 
+                                                    <OrderCard 
+                                                        key={order.id} 
+                                                        order={order} 
+                                                        onUpdateStatus={onUpdateOrderStatus} 
+                                                        onUpdatePaymentStatus={onUpdateOrderPaymentStatus} 
+                                                        onUpdateReservationTime={onUpdateOrderReservationTime} 
+                                                        onDelete={onDeleteOrder} 
+                                                        onPermanentDelete={onPermanentDeleteOrder} 
+                                                        onRefund={onRefundOrder} 
+                                                        isRefunding={refundingOrderId === order.id}
+                                                        isSelectable={true}
+                                                        isSelected={selectedOrderIds.has(order.id)}
+                                                        onSelect={handleSelectOrder}
+                                                    />
+                                                ) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>}
+                                            </>
                                         ) : (
                                             tabOrders.length > 0 ? tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} onRefund={onRefundOrder} isRefunding={refundingOrderId === order.id} />) : <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>
                                         )}
