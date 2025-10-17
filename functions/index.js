@@ -38,13 +38,31 @@ exports.updateStoreStatusBySchedule = onSchedule({
       return;
     }
 
-    // FIX: Get current date/time in the correct timezone.
-    // The function runtime is UTC, but the schedule is in 'America/Sao_Paulo'.
-    // We must convert the current time to that timezone for accurate checks.
-    const nowInSaoPaulo = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
+    // FIX: The previous method for getting São Paulo time was unreliable.
+    // This new method uses Intl.DateTimeFormat to correctly extract date/time parts
+    // for the "America/Sao_Paulo" timezone, avoiding parsing issues with `new Date()`.
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Sao_Paulo",
+      weekday: "long", // e.g., "Sunday"
+      hour: "2-digit",   // e.g., "00"-"23" or "24"
+      minute: "2-digit", // e.g., "05"
+      hour12: false,
+    });
 
-    const dayOfWeek = nowInSaoPaulo.getDay(); // 0 = Sunday, 1 = Monday, ...
-    const currentTime = `${nowInSaoPaulo.getHours().toString().padStart(2, "0")}:${nowInSaoPaulo.getMinutes().toString().padStart(2, "0")}`;
+    const parts = formatter.formatToParts(now);
+    const getPart = (type) => parts.find((p) => p.type === type)?.value;
+
+    let hour = getPart("hour");
+    // Some environments might return "24" for midnight. Convert it to "00" for correct string comparison.
+    if (hour === "24") {
+      hour = "00";
+    }
+    const currentTime = `${hour}:${getPart("minute")}`;
+
+    const dayName = getPart("weekday");
+    const dayOfWeekMap = {Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6};
+    const dayOfWeek = dayOfWeekMap[dayName];
 
     const todaySchedule = settings.operatingHours.find((d) => d.dayOfWeek === dayOfWeek);
 
