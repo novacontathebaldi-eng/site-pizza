@@ -714,31 +714,28 @@ const App: React.FC = () => {
             </div>
             
             <div className="fixed bottom-5 right-5 z-40 flex flex-col-reverse items-end gap-3">
-                {isFooterVisible ? (
-                    // Botão para voltar ao topo, visível apenas no rodapé
+                 {isFooterVisible ? (
                     <button onClick={scrollToTop} className="w-14 h-14 bg-accent text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110 animate-fade-in-up" aria-label="Voltar ao topo">
                         <i className="fas fa-arrow-up text-xl"></i>
                     </button>
-                ) : (
-                    // Botões flutuantes principais, visíveis quando o rodapé não está na tela
-                    <>
-                        {cart.length > 0 ? (
-                            // Botão "Ver Pedido", visível sempre que há itens no carrinho
-                            <button onClick={() => setIsCartOpen(true)} className="bg-accent text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transform transition-transform hover:scale-105 animate-fade-in-up">
-                                <i className="fas fa-shopping-bag text-xl"></i>
-                                <div className="text-left">
-                                    <span className="text-sm block leading-tight">{cartTotalItems} {cartTotalItems > 1 ? 'itens' : 'item'}</span>
-                                    <span className="font-semibold text-lg block leading-tight">Ver Pedido</span>
-                                </div>
-                            </button>
-                        ) : showFloatingButton && (
-                            // Botão "Ver Cardápio", visível apenas se o carrinho estiver vazio E o usuário já passou do cardápio
-                            <button onClick={scrollToCardapio} className="w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110 animate-fade-in-up" aria-label="Ver cardápio">
-                                <i className="fas fa-utensils text-xl"></i>
-                            </button>
-                        )}
-                    </>
-                )}
+                ) : showFloatingButton ? (
+                    cart.length > 0 ? (
+                        <button onClick={() => setIsCartOpen(true)} className="bg-accent text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transform transition-transform hover:scale-105 animate-fade-in-up">
+                            <i className="fas fa-shopping-bag text-xl"></i>
+                            <div className="text-left">
+                                <span className="text-sm block leading-tight">{cartTotalItems} {cartTotalItems > 1 ? 'itens' : 'item'}</span>
+                                <span className="font-semibold text-lg block leading-tight">Ver Pedido</span>
+                            </div>
+                        </button>
+                    ) : (
+                        <button onClick={scrollToCardapio} className="bg-accent text-white font-bold py-3 px-5 rounded-full shadow-lg flex items-center gap-3 transform transition-transform hover:scale-105 animate-fade-in-up">
+                            <i className="fas fa-utensils text-xl"></i>
+                            <div className="text-left">
+                                <span className="font-semibold text-lg block leading-tight">Ver Cardápio</span>
+                            </div>
+                        </button>
+                    )
+                ) : null}
             </div>
 
             <button onClick={() => setIsChatbotOpen(true)} className="fixed bottom-5 left-5 z-40 w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110" aria-label="Abrir assistente virtual"><i className="fas fa-headset text-2xl"></i></button>
