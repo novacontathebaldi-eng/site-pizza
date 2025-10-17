@@ -162,7 +162,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const [notes, setNotes] = useState('');
     const [pixPaymentOption, setPixPaymentOption] = useState<'payNow' | 'payLater' | null>(null);
     const [selectedAddressId, setSelectedAddressId] = useState<string>(favoriteAddress ? favoriteAddress.id : 'manual');
-    const [whatsappUpdates, setWhatsappUpdates] = useState(true);
 
     // Reset state when modal opens/closes or profile changes
     useEffect(() => {
@@ -178,7 +177,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
             setNeighborhood(''); setStreet(''); setNumber(''); setIsNoNumber(false); setComplement(''); setAllergies('');
             setPaymentMethod(''); setChangeNeeded(false); setChangeAmount('');
             setNotes(''); setPixPaymentOption(null);
-            setWhatsappUpdates(true);
             setSelectedAddressId(favoriteAddress ? favoriteAddress.id : 'manual');
         }
     }, [isOpen, profile]);
@@ -223,8 +221,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
         neighborhood, street, number, complement,
         paymentMethod: paymentMethod as 'credit' | 'debit' | 'pix' | 'cash',
         changeNeeded: paymentMethod === 'cash' && changeNeeded,
-        changeAmount, allergies, notes, deliveryFee,
-        whatsappUpdates,
+        changeAmount, allergies, notes, deliveryFee
     });
 
     const handlePaymentMethodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -396,19 +393,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                             <label className="block text-sm font-semibold mb-1">Observações (opcional)</label>
                             <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full px-3 py-2 border rounded-md" rows={2} />
                         </div>
-
-                        <div>
-                            <label className="flex items-center gap-3 text-sm font-medium text-gray-700 p-3 bg-gray-50 rounded-md border cursor-pointer">
-                                <input 
-                                    type="checkbox" 
-                                    checked={whatsappUpdates} 
-                                    onChange={e => setWhatsappUpdates(e.target.checked)}
-                                    className="h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                                />
-                                <span>Quero receber atualizações do pedido pelo WhatsApp <i className="fab fa-whatsapp text-green-500"></i></span>
-                            </label>
-                        </div>
-                        
                         <div className="p-4 bg-brand-ivory-50 rounded-lg my-4">
                             <h3 className="font-bold mb-2">Resumo do Pedido</h3>
                             <div className="space-y-1">
