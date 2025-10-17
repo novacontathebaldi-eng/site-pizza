@@ -193,6 +193,7 @@ const App: React.FC = () => {
     const [isUserAreaModalOpen, setIsUserAreaModalOpen] = useState<boolean>(false);
     const [isGapiReady, setIsGapiReady] = useState(false);
     const [postRegisterAction, setPostRegisterAction] = useState<string | null>(null);
+    const prevUser = useRef<firebase.User | null>(null);
 
 
     // Order/Payment Flow State
@@ -318,6 +319,32 @@ const App: React.FC = () => {
         });
         return () => unsubscribe();
     }, []);
+    
+    // Effect to sync guest orders on login
+    useEffect(() => {
+        const syncGuestOrders = async (user: firebase.User) => {
+            const guestOrderIds: string[] = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
+            if (guestOrderIds.length > 0) {
+                try {
+                    await firebaseService.syncGuestOrders(user.uid, guestOrderIds);
+                    localStorage.removeItem('santaSensacaoGuestOrders');
+                    addToast('Seus pedidos anteriores foram associados à sua conta!', 'success');
+                } catch (error) {
+                    console.error('Failed to sync guest orders:', error);
+                    addToast('Não foi possível associar seus pedidos anteriores.', 'error');
+                }
+            }
+        };
+
+        // Check if user has just logged in (was null, is now not null)
+        if (currentUser && !prevUser.current) {
+            syncGuestOrders(currentUser);
+        }
+
+        // Update the ref for the next render
+        prevUser.current = currentUser;
+    }, [currentUser, addToast]);
+
 
     // Effect to listen for profile updates in real-time
     useEffect(() => {
@@ -513,6 +540,13 @@ const App: React.FC = () => {
         const total = subtotal + (details.deliveryFee || 0);
         try {
             const { orderId, orderNumber } = await firebaseService.createOrder(details, cart, total, 'payLater');
+            
+            if (!currentUser) {
+                const guestOrders = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
+                guestOrders.push(orderId);
+                localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
+            }
+
             addToast(`Pedido #${orderNumber} criado!`, 'success');
             const confirmedOrder: Order = {
                 id: orderId, orderNumber,
@@ -538,6 +572,13 @@ const App: React.FC = () => {
         const total = subtotal + (details.deliveryFee || 0);
         try {
             const { orderId, orderNumber, pixData } = await firebaseService.createOrder(details, cart, total, pixOption);
+
+            if (!currentUser) {
+                const guestOrders = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
+                guestOrders.push(orderId);
+                localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
+            }
+
             if (!pixData || !pixData.qrCodeBase64) throw new Error("A resposta do servidor não incluiu os dados do PIX.");
             const newOrder: Order = {
                 id: orderId, orderNumber: orderNumber,

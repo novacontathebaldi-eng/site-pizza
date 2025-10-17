@@ -289,6 +289,24 @@ export const askChatbot = async (messages: ChatMessage[]): Promise<string> => {
     }
 };
 
+/**
+ * Associates guest orders stored in localStorage with a user ID upon login.
+ * @param userId The UID of the user who has just logged in.
+ * @param orderIds An array of order document IDs to update.
+ */
+export const syncGuestOrders = async (userId: string, orderIds: string[]): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    if (!userId || orderIds.length === 0) return;
+
+    const batch = db.batch();
+    orderIds.forEach(orderId => {
+        const orderRef = db.collection('orders').doc(orderId);
+        batch.update(orderRef, { userId: userId });
+    });
+
+    await batch.commit();
+};
+
 
 // --- Order Management Functions (Calling Cloud Functions) ---
 
