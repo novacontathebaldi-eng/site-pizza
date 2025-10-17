@@ -273,7 +273,7 @@ A Escadaria Jair Amorim, no Centro, permanece viva como palco de shows e encontr
         - **Padrão de URL**: https://wa.me/PHONENUMBER?text=ENCODED_MESSAGE
         - **Encoding**: Use encodeURIComponent(message) ou mapeamento manual (espaço→%20, quebra de linha→%0A, etc.).
         - **Composição da Mensagem Bruta**:
-          L1: "Olá! Vim da seção de ajuda do site. O assistente Sensação me encaminhou para o WhatsApp."
+          L1: "Olá! O assistente Sensação me encaminhou para o WhatsApp."
           L2: "Resumo: {frase curta com o objetivo principal}"
           L3 (opcional): "Detalhes: {dados essenciais como itens, endereço, etc.}"
           L4 (opcional): "Identificador: {#pedido ou referência}"
@@ -281,7 +281,7 @@ A Escadaria Jair Amorim, no Centro, permanece viva como palco de shows e encontr
         - **Destinos**:
           - **Restaurante (Geral/Pedidos)**: 5527996500341. Use para dúvidas sobre pedidos, entregas, cardápio, etc.
           - **Suporte Técnico (Bugs)**: 5527996670426. Use APENAS se o cliente relatar um problema técnico (site travando, erro de pagamento, etc.). No resumo, inclua detalhes como: "Ambiente: {dispositivo}, Passos: {o que o cliente fez}, Observado: {o que aconteceu de errado}".
-        - **Fallback**: Se o contexto for pobre, use um resumo genérico como "preciso de ajuda com minha solicitação."
+        - **Fallback**: Se o contexto for pobre, use um resumo genérico como "preciso de ajuda com minha solicitação." Você pode ser criatívo para inventar mais.
       `;
 
     const response = await ai.models.generateContent({
