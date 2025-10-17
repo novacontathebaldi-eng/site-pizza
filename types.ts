@@ -1,5 +1,8 @@
 import firebase from 'firebase/compat/app';
 
+// FIX: The type `Partial` is a built-in TypeScript utility type and does not need to be imported or exported.
+// The incorrect export from 'react' has been removed.
+
 export interface Address {
     id: string;
     label: string; // 'Casa', 'Trabalho', etc.

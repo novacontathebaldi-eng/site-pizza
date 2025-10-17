@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+// FIX: The 'Partial' type is a built-in TypeScript utility and does not need to be imported.
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, DaySchedule } from '../types';
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
@@ -30,6 +31,7 @@ interface AdminSectionProps {
     onReorderCategories: (categoriesToUpdate: { id: string; order: number }[]) => Promise<void>;
     onSeedDatabase: () => Promise<void>;
     onSaveSiteSettings: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
+    onUpdateSiteSettingsField: (updates: Partial<SiteSettings>) => Promise<void>;
     onUpdateOrderStatus: (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => Promise<void>;
     onUpdateOrderPaymentStatus: (orderId: string, paymentStatus: PaymentStatus) => Promise<void>;
     onUpdateOrderReservationTime: (orderId: string, reservationTime: string) => Promise<void>;
@@ -150,7 +152,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         allProducts, allCategories, isStoreOnline, siteSettings, orders,
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
-        onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
+        onSeedDatabase, onSaveSiteSettings, onUpdateSiteSettingsField, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
         onDeleteOrder, onPermanentDeleteOrder, onPermanentDeleteMultipleOrders, onRefundOrder, refundingOrderId
     } = props;
     
@@ -185,6 +187,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const [localSettings, setLocalSettings] = useState<SiteSettings>(siteSettings);
     const [hasSettingsChanged, setHasSettingsChanged] = useState(false);
     const [isSavingStatus, setIsSavingStatus] = useState(false);
+    const [isSavingAutoSchedule, setIsSavingAutoSchedule] = useState(false);
 
 
     // State for sound notification
@@ -197,11 +200,17 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
     // Sync Status tab settings with props, but don't overwrite local changes
     useEffect(() => {
-        if (JSON.stringify(localSettings) === JSON.stringify(siteSettings)) {
-            setLocalSettings(siteSettings);
-            setHasSettingsChanged(false);
-        }
-    }, [siteSettings, localSettings]);
+        // This effect runs when siteSettings prop changes from Firestore listener
+        // We want to update our local state with the new values, but without
+        // destroying unsaved changes in operatingHours.
+        setLocalSettings(currentLocalSettings => ({
+            ...currentLocalSettings, // Keep current local values (like dirty operatingHours)
+            ...siteSettings, // Overwrite with fresh data from Firestore
+            operatingHours: hasSettingsChanged // If operatingHours are dirty...
+                ? currentLocalSettings.operatingHours // ...keep the dirty version
+                : siteSettings.operatingHours, // ...otherwise, take the fresh version.
+        }));
+    }, [siteSettings]);
 
 
     useEffect(() => setLocalProducts(allProducts), [allProducts]);
@@ -479,12 +488,16 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     };
 
     // --- Handlers for Status Tab ---
-    const handleAutomaticSchedulingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setLocalSettings(prev => ({
-            ...prev,
-            automaticSchedulingEnabled: e.target.checked
-        }));
-        setHasSettingsChanged(true);
+    const handleAutomaticSchedulingChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const isEnabled = e.target.checked;
+        setIsSavingAutoSchedule(true);
+        try {
+            await onUpdateSiteSettingsField({ automaticSchedulingEnabled: isEnabled });
+        } catch (error) {
+            // Error toast is shown by the parent App component.
+        } finally {
+            setIsSavingAutoSchedule(false);
+        }
     };
 
     const handleOperatingHoursChange = (dayOfWeek: number, field: keyof DaySchedule, value: any) => {
@@ -507,7 +520,13 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const handleSaveStatusSettings = async () => {
         setIsSavingStatus(true);
         try {
-            await onSaveSiteSettings(localSettings, {});
+            // Merge the latest siteSettings (which has the correct auto-schedule value)
+            // with the local changes (which has the correct operating hours).
+            const settingsToSave = {
+                ...siteSettings, // Start with the most up-to-date settings from props
+                operatingHours: localSettings.operatingHours, // Overwrite with only the locally managed field
+            };
+            await onSaveSiteSettings(settingsToSave, {});
             setHasSettingsChanged(false);
         } catch (e) {
             console.error("Failed to save status settings", e);
@@ -574,15 +593,15 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                 className="sr-only peer"
                                                 checked={isStoreOnline}
                                                 onChange={e => onStoreStatusChange(e.target.checked)}
-                                                disabled={localSettings.automaticSchedulingEnabled}
+                                                disabled={siteSettings.automaticSchedulingEnabled}
                                             />
                                             <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600 peer-disabled:bg-gray-300 peer-disabled:cursor-not-allowed"></div>
                                         </label>
                                         <div>
-                                            <span className={`font-semibold text-lg ${localSettings.automaticSchedulingEnabled ? 'text-gray-500' : (isStoreOnline ? 'text-green-600' : 'text-red-600')}`}>
+                                            <span className={`font-semibold text-lg ${siteSettings.automaticSchedulingEnabled ? 'text-gray-500' : (isStoreOnline ? 'text-green-600' : 'text-red-600')}`}>
                                                 {isStoreOnline ? 'Aberta' : 'Fechada'}
                                             </span>
-                                            {localSettings.automaticSchedulingEnabled && <span className="text-sm text-gray-500 ml-2">(Gerenciado automaticamente)</span>}
+                                            {siteSettings.automaticSchedulingEnabled && <span className="text-sm text-gray-500 ml-2">(Gerenciado automaticamente)</span>}
                                         </div>
                                     </div>
 
@@ -593,12 +612,14 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                     type="checkbox"
                                                     id="automatic-scheduling-toggle"
                                                     className="sr-only peer"
-                                                    checked={localSettings.automaticSchedulingEnabled ?? false}
+                                                    checked={siteSettings.automaticSchedulingEnabled ?? false}
                                                     onChange={handleAutomaticSchedulingChange}
+                                                    disabled={isSavingAutoSchedule}
                                                 />
-                                                <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600"></div>
+                                                <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600 peer-disabled:opacity-50 peer-disabled:cursor-wait"></div>
                                             </label>
                                             <span className="font-semibold text-gray-800">Gerir horário automaticamente.</span>
+                                            {isSavingAutoSchedule && <i className="fas fa-spinner fa-spin text-accent ml-2"></i>}
                                         </div>
                                         <p className="text-sm text-gray-500 mt-2 pl-14">Quando ativado, o status da loja mudará para "Aberta" ou "Fechada" conforme o horário de funcionamento definido abaixo, mesmo com o painel fechado.</p>
                                     </div>
