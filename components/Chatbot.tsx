@@ -50,6 +50,12 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
     const [input, setInput] = useState('');
     const lastElementRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const prevIsSending = useRef(isSending);
+
+    useEffect(() => {
+        // Guarda o valor anterior de `isSending` para detectar quando o bot termina de responder.
+        prevIsSending.current = isSending;
+    });
 
     useEffect(() => {
         if (lastElementRef.current) {
@@ -67,8 +73,10 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
     }, [messages, isSending]);
 
     useEffect(() => {
-        // Foca o input quando o chatbot é aberto ou depois que o bot termina de responder.
-        if (isOpen && !isSending) {
+        // Foca o input apenas depois que o bot termina de responder, não na abertura inicial.
+        // Isso evita que o teclado do celular apareça inesperadamente.
+        const justFinishedReplying = prevIsSending.current && !isSending;
+        if (isOpen && justFinishedReplying) {
             inputRef.current?.focus();
         }
     }, [isOpen, isSending]);

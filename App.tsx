@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, ChatMessage, ReservationDetails, UserProfile } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
@@ -184,6 +184,7 @@ const App: React.FC = () => {
     const [isReservationModalOpen, setIsReservationModalOpen] = useState<boolean>(false);
     const [isChatbotOpen, setIsChatbotOpen] = useState<boolean>(false);
     const [isFooterVisible, setIsFooterVisible] = useState(false);
+    const [showFloatingButton, setShowFloatingButton] = useState(false);
     
     // Auth State
     const [currentUser, setCurrentUser] = useState<firebase.User | null>(null);
@@ -351,40 +352,37 @@ const App: React.FC = () => {
     useEffect(() => {
         const sectionIds = ['inicio', 'cardapio', 'sobre', 'contato'];
         const sectionElements = sectionIds.map(id => document.getElementById(id));
-        
+        const idToTitle: { [key: string]: string } = { 'inicio': 'Início', 'cardapio': 'Cardápio', 'sobre': 'Sobre Nós', 'contato': 'Contato' };
+
         const observerOptions = { root: null, rootMargin: '-80px 0px -60% 0px', threshold: 0 };
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
-                    const idToTitle: { [key: string]: string } = { 'inicio': 'Início', 'cardapio': 'Cardápio', 'sobre': 'Sobre Nós', 'contato': 'Contato' };
                     setActiveSection(idToTitle[entry.target.id] || 'Início');
                 }
             });
         }, observerOptions);
 
         sectionElements.forEach(el => { if (el) observer.observe(el); });
-        return () => { sectionElements.forEach(el => { if (el) observer.unobserve(el); }); };
-    }, []);
-    
-    useEffect(() => {
+        
         const footerElement = document.getElementById('footer-section');
-        if (!footerElement) return;
+        const footerObserver = new IntersectionObserver(([entry]) => setIsFooterVisible(entry.isIntersecting), { threshold: 0.1 });
+        if (footerElement) footerObserver.observe(footerElement);
 
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                setIsFooterVisible(entry.isIntersecting);
-            },
-            { threshold: 0.1 } // When 10% of footer is visible
-        );
-
-        observer.observe(footerElement);
+        const cardapioEl = document.getElementById('cardapio');
+        const buttonObserver = new IntersectionObserver(([entry]) => {
+            // Mostra o botão se o final da seção do cardápio estiver acima do topo da viewport (ou seja, já foi rolado para cima)
+            setShowFloatingButton(!entry.isIntersecting && entry.boundingClientRect.bottom < 0);
+        }, { threshold: 0 });
+        if (cardapioEl) buttonObserver.observe(cardapioEl);
 
         return () => {
-            if (footerElement) {
-                observer.unobserve(footerElement);
-            }
+            sectionElements.forEach(el => { if (el) observer.unobserve(el); });
+            if (footerElement) footerObserver.unobserve(footerElement);
+            if (cardapioEl) buttonObserver.unobserve(cardapioEl);
         };
     }, []);
+    
 
 
     useEffect(() => {
@@ -679,8 +677,6 @@ const App: React.FC = () => {
         }
     };
     
-    const showFloatingButton = !['Início', 'Cardápio'].includes(activeSection);
-
 
     return (
         <div className="flex flex-col min-h-screen">
