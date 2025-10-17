@@ -30,10 +30,19 @@ const statusConfig: { [key in OrderStatus]?: { text: string; icon: string; color
 
 const LOCALIDADES = ['Centro', 'Olaria', 'Vila Nova', 'Moxafongo', 'Cocal', 'Funil'];
 
-const formatTimestamp = (timestamp: any): string => {
+const formatTimestamp = (timestamp: any, includeTime: boolean = false): string => {
     if (!timestamp) return 'N/A';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+    const options: Intl.DateTimeFormatOptions = {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    };
+    if (includeTime) {
+        options.hour = '2-digit';
+        options.minute = '2-digit';
+    }
+    return new Intl.DateTimeFormat('pt-BR', options).format(date);
 };
 
 const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
@@ -46,7 +55,7 @@ const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
                     <div className="py-1"><i className={`text-xl mr-3 ${config.icon}`}></i></div>
                     <div>
                         <p className="font-bold">{config.text}</p>
-                        <p className="text-xs">Sua reserva para {order.numberOfPeople} pessoa(s) em {formatTimestamp(order.createdAt)}.</p>
+                        <p className="text-xs">Sua reserva para {order.numberOfPeople} pessoa(s) em {formatTimestamp(order.createdAt, true)}.</p>
                     </div>
                 </div>
             </div>
@@ -54,49 +63,58 @@ const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
     }
 
     const steps = [
-        { id: 'received', label: 'Pedido Recebido', icon: 'fas fa-receipt' },
-        { id: 'preparing', label: 'Em Preparo', icon: 'fas fa-utensils' },
-        { id: 'on_the_way', label: order.customer.orderType === 'delivery' ? 'Saiu p/ Entrega' : 'Pronto p/ Retirada', icon: order.customer.orderType === 'delivery' ? 'fas fa-motorcycle' : 'fas fa-box-open' },
+        { id: 'pending', label: 'Pedido Recebido', icon: 'fas fa-receipt' },
+        { id: 'accepted', label: 'Em Preparo', icon: 'fas fa-utensils' },
+        { id: 'ready', label: order.customer.orderType === 'delivery' ? 'Saiu p/ Entrega' : 'Pronto p/ Retirada', icon: order.customer.orderType === 'delivery' ? 'fas fa-motorcycle' : 'fas fa-box-open' },
         { id: 'completed', label: 'Finalizado', icon: 'fas fa-check' }
     ];
 
     const statusOrder: OrderStatus[] = ['pending', 'accepted', 'ready', 'completed'];
-    let currentStatusIndex = statusOrder.indexOf(order.status as any);
-
-    // If status is not in the normal flow (e.g., 'awaiting-payment'), treat it as the first step.
-    if (currentStatusIndex < 0) {
+    let currentStatusIndex = statusOrder.indexOf(order.status);
+    
+    if (order.status === 'awaiting-payment') {
         currentStatusIndex = 0;
+    }
+    
+    if (order.status === 'cancelled') {
+        return (
+            <div className="bg-red-50 border-l-4 border-red-400 text-red-800 p-3 my-4 rounded-r-lg">
+                <p className="font-bold text-sm"><i className="fas fa-times-circle mr-2"></i>Pedido Cancelado</p>
+            </div>
+        );
+   }
+
+    if (currentStatusIndex < 0 && order.status !== 'completed') {
+        return null; 
+    }
+
+    if(order.status === 'completed') {
+      currentStatusIndex = 3;
     }
 
     return (
         <div className="w-full pt-4 pb-2">
-            <div className="flex items-start relative">
-                 {/* Background line */}
+            <div className="flex items-start relative px-4 sm:px-0">
                 <div className="absolute top-5 left-0 w-full h-1 bg-gray-200" style={{ transform: 'translateY(-50%)' }} />
                 
-                {/* Progress line */}
                 <div className="absolute top-5 left-0 h-1 bg-green-500 transition-all duration-500 ease-in-out"
                     style={{
-                        width: `${(currentStatusIndex / (steps.length - 1)) * 100}%`,
-                        transform: 'translateY(-50%)'
+                        width: `calc(${(currentStatusIndex / (steps.length - 1)) * 100}% - 2rem)`,
+                        marginLeft: '1rem',
+                        marginRight: '1rem',
                     }}
                 />
 
                 {steps.map((step, index) => {
-                    const isCompleted = currentStatusIndex > index;
+                    const isCompleted = currentStatusIndex >= index;
                     const isActive = currentStatusIndex === index;
 
                     let circleClass = 'bg-gray-200 text-gray-400';
                     let textClass = 'text-gray-500';
 
                     if (isActive) {
-                        if (step.id === 'preparing' && order.status === 'accepted') {
-                            circleClass = 'bg-brand-gold-600 text-white scale-110';
-                            textClass = 'font-bold text-brand-gold-600';
-                        } else {
-                            circleClass = 'bg-green-500 text-white scale-110';
-                            textClass = 'font-bold text-green-600';
-                        }
+                        circleClass = 'bg-green-500 text-white scale-110 shadow-lg';
+                        textClass = 'font-bold text-green-600';
                     } else if (isCompleted) {
                         circleClass = 'bg-green-500 text-white';
                         textClass = 'text-green-600';
@@ -107,12 +125,79 @@ const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all duration-300 ${circleClass}`}>
                                 <i className={step.icon}></i>
                             </div>
-                            <p className={`mt-2 text-xs leading-tight ${textClass} transition-colors duration-300`}>
-                                {step.label}
+                            <p className={`mt-2 text-xs leading-tight min-h-[2.5em] ${textClass} transition-colors duration-300`}>
+                                {steps[index].label}
                             </p>
                         </div>
                     );
                 })}
+            </div>
+        </div>
+    );
+};
+
+const OrderDetailsModal: React.FC<{ order: Order | null; onClose: () => void; }> = ({ order, onClose }) => {
+    if (!order) return null;
+
+    const isOngoing = ['pending', 'accepted', 'ready', 'awaiting-payment'].includes(order.status);
+    const paymentMethodMap = { credit: 'Crédito', debit: 'Débito', pix: 'PIX', cash: 'Dinheiro' };
+    const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo no Local' };
+    
+     const paymentStatusInfo = {
+        'pending': { text: 'Pendente', color: 'text-yellow-600' },
+        'paid': { text: 'Pago', color: 'text-green-600' },
+        'paid_online': { text: 'Pago Pelo Site', color: 'text-green-600 font-bold' },
+        'refunded': { text: 'Estornado', color: 'text-orange-500' }
+    }[order.paymentStatus] || { text: 'Pendente', color: 'text-yellow-600' };
+
+    const fullAddress = order.customer.orderType === 'delivery' ? `${order.customer.street || ''}, ${order.customer.number || ''} - ${order.customer.neighborhood || ''}` : null;
+
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-fade-in-up">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+                 <div className="flex justify-between items-center p-4 border-b border-gray-200">
+                    <h3 className="text-xl font-bold text-text-on-light">Detalhes do Pedido #{order.orderNumber}</h3>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                </div>
+                 <div className="overflow-y-auto p-4 sm:p-6 space-y-4">
+                    {isOngoing && <OrderStatusTracker order={order} />}
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div className="bg-gray-50 p-3 rounded-md border">
+                            <h4 className="font-bold mb-2 text-base"><i className="fas fa-user mr-2 text-gray-400"></i>Cliente</h4>
+                            <p><strong>Nome:</strong> {order.customer.name}</p>
+                            <p><strong>Telefone:</strong> {order.customer.phone}</p>
+                            <p><strong>Pedido:</strong> {orderTypeMap[order.customer.orderType]}</p>
+                            {fullAddress && <p><strong>Endereço:</strong> {fullAddress}</p>}
+                            {order.customer.orderType === 'local' && (
+                                <>
+                                    <p><strong>Pessoas:</strong> {order.numberOfPeople}</p>
+                                    <p><strong>Reserva:</strong> {order.customer.reservationTime}</p>
+                                </>
+                            )}
+                        </div>
+                        <div className="bg-gray-50 p-3 rounded-md border">
+                            <h4 className="font-bold mb-2 text-base"><i className="fas fa-credit-card mr-2 text-gray-400"></i>Pagamento</h4>
+                             <p><strong>Método:</strong> {order.paymentMethod ? paymentMethodMap[order.paymentMethod] : 'N/A'}</p>
+                            <p><strong>Status:</strong> <span className={`font-semibold ${paymentStatusInfo.color}`}>{paymentStatusInfo.text}</span></p>
+                            {order.paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {order.changeNeeded ? `para R$ ${order.changeAmount}` : 'Não precisa'}</p> )}
+                            {order.deliveryFee > 0 && (<p><strong>Taxa de Entrega:</strong> {order.deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>)}
+                            <p className="mt-2 pt-2 border-t font-bold"><strong>Total:</strong> {order.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                        </div>
+                    </div>
+
+                    {order.items && order.items.length > 0 && (
+                        <div>
+                            <h4 className="font-bold mb-2 text-base"><i className="fas fa-shopping-basket mr-2 text-gray-400"></i>Itens do Pedido</h4>
+                            <ul className="space-y-1 text-sm">
+                                {order.items.map(item => (<li key={item.id} className="flex justify-between p-2 bg-gray-50 rounded"><span>{item.quantity}x {item.name} ({item.size})</span><span className="font-semibold">{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>))}
+                            </ul>
+                        </div>
+                    )}
+                     {order.allergies && <p className="text-sm mt-3 p-2 bg-red-50 rounded-md border border-red-200"><strong>Alergias/Restrições:</strong> {order.allergies}</p>}
+                     {order.notes && <p className="text-sm mt-3 p-2 bg-yellow-50 rounded-md border border-yellow-200"><strong>Obs:</strong> {order.notes}</p>}
+                 </div>
             </div>
         </div>
     );
@@ -231,40 +316,22 @@ const AddressForm: React.FC<{
 };
 
 function validarCPF(cpf: string): boolean {
-  // Remove pontos, traços e espaços
   cpf = cpf.replace(/[^\d]+/g, '');
-  
-  // Verifica se tem 11 dígitos
   if (cpf.length !== 11) return false;
-  
-  // Elimina CPFs inválidos conhecidos (todos dígitos iguais)
-  if (/^(\d)\1+$/.test(cpf)) {
-    return false;
-  }
-  
-  // Valida primeiro dígito verificador
+  if (/^(\d)\1+$/.test(cpf)) return false;
   let soma = 0;
-  for (let i = 0; i < 9; i++) {
-    soma += parseInt(cpf.charAt(i)) * (10 - i);
-  }
+  for (let i = 0; i < 9; i++) soma += parseInt(cpf.charAt(i)) * (10 - i);
   let resto = 11 - (soma % 11);
   if (resto === 10 || resto === 11) resto = 0;
   if (resto !== parseInt(cpf.charAt(9))) return false;
-  
-  // Valida segundo dígito verificador
   soma = 0;
-  for (let i = 0; i < 10; i++) {
-    soma += parseInt(cpf.charAt(i)) * (11 - i);
-  }
+  for (let i = 0; i < 10; i++) soma += parseInt(cpf.charAt(i)) * (11 - i);
   resto = 11 - (soma % 11);
   if (resto === 10 || resto === 11) resto = 0;
   if (resto !== parseInt(cpf.charAt(10))) return false;
-  
   return true;
 }
 
-
-// --- Child Components for Tabs ---
 
 interface UserProfileTabProps {
     profile: UserProfile;
@@ -327,12 +394,11 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
 interface MyOrdersTabProps {
     myOrders: Order[];
     isLoadingOrders: boolean;
+    onViewDetails: (order: Order) => void;
 }
 
-const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders }) => {
+const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, onViewDetails }) => {
     const [isArchiveOpen, setIsArchiveOpen] = useState(false);
-    const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
-
 
     const currentOrders = myOrders.filter(order =>
         ['pending', 'accepted', 'reserved', 'ready', 'awaiting-payment'].includes(order.status)
@@ -341,58 +407,32 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders }) 
         ['completed', 'cancelled', 'deleted'].includes(order.status)
     );
 
-    const renderOrderCard = (order: Order, isCurrent: boolean) => {
-        const config = statusConfig[order.status] || { text: 'Desconhecido', icon: 'fas fa-question-circle', color: 'text-gray-500' };
-        const isDeleted = order.status === 'deleted';
-        const isExpanded = expandedOrderId === order.id;
+    const renderOrderSummaryCard = (order: Order) => {
+        const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo no Local' };
+        const paymentStatusInfo = {
+            'pending': { text: 'Pendente', color: 'text-yellow-600' },
+            'paid': { text: 'Pago', color: 'text-green-600' },
+            'paid_online': { text: 'Pago Pelo Site', color: 'text-green-600' },
+            'refunded': { text: 'Estornado', color: 'text-orange-500' }
+        }[order.paymentStatus] || { text: 'Pendente', color: 'text-yellow-600' };
 
         return (
-            <div key={order.id} className={`bg-white border rounded-lg p-4 flex flex-col shadow-sm transition-opacity ${isDeleted ? 'opacity-60' : ''}`}>
-                <div className="flex justify-between items-start">
+             <div key={order.id} className="bg-white border rounded-lg p-4 flex flex-col shadow-sm">
+                <div className="flex justify-between items-start mb-3">
                     <div>
-                        <p className="font-bold">Pedido #{order.orderNumber}</p>
-                        <p className="text-sm text-gray-500">{formatTimestamp(order.createdAt)}</p>
+                        <p className="font-bold text-lg text-text-on-light">Pedido #{order.orderNumber}</p>
+                        <p className="text-xs text-gray-500">{formatTimestamp(order.createdAt, true)}</p>
                     </div>
-                    <div className="text-right">
-                        {order.total != null && <p className="font-bold text-lg text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
-                    </div>
+                    {order.total != null && <p className="font-bold text-xl text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
                 </div>
-
-                {isCurrent ? (
-                    <OrderStatusTracker order={order} />
-                ) : (
-                    <div className="mt-2 pt-2 border-t">
-                        <p className={`font-semibold text-sm flex items-center gap-2 ${config.color}`}>
-                            <i className={config.icon}></i>{config.text}
-                        </p>
-                    </div>
-                )}
-                
-                {(order.items && order.items.length > 0) && (
-                    <div className="w-full text-center mt-1">
-                        <button 
-                            onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} 
-                            className="text-xs font-semibold text-blue-600 hover:underline p-1"
-                            aria-expanded={isExpanded}
-                        >
-                            {isExpanded ? 'Ocultar Itens' : 'Ver Itens'}
-                            <i className={`fas fa-chevron-down ml-1 transition-transform text-xs ${isExpanded ? 'rotate-180' : ''}`}></i>
-                        </button>
-                    </div>
-                )}
-                
-                {isExpanded && (
-                    <div className="mt-2 pt-2 border-t animate-fade-in-up">
-                        <ul className="space-y-1 text-sm text-gray-700">
-                            {(order.items || []).map(item => (
-                                <li key={item.id} className="flex justify-between">
-                                    <span>{item.quantity}x {item.name} ({item.size})</span>
-                                    <span className="font-medium">{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
+                <div className="text-sm space-y-1 mb-4">
+                     <p><strong>Cliente:</strong> {order.customer.name}</p>
+                     <p><strong>Tipo:</strong> {orderTypeMap[order.customer.orderType]}</p>
+                     <p><strong>Pagamento:</strong> <span className={`font-semibold ${paymentStatusInfo.color}`}>{paymentStatusInfo.text}</span></p>
+                </div>
+                 <button onClick={() => onViewDetails(order)} className="mt-auto w-full bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
+                    <i className="fas fa-receipt mr-2"></i>Ver Detalhes do Pedido
+                </button>
             </div>
         );
     };
@@ -408,7 +448,7 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders }) 
                         <p className="text-center text-gray-500 py-8 px-4 bg-gray-50 rounded-lg">Você não tem pedidos em andamento.</p>
                     ) : (
                         <div className="space-y-3">
-                            {currentOrders.map(order => renderOrderCard(order, true))}
+                            {currentOrders.map(renderOrderSummaryCard)}
                         </div>
                     )}
 
@@ -427,7 +467,7 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders }) 
                                 {archivedOrders.length === 0 ? (
                                     <p className="text-center text-gray-500 py-8 px-4">Seu histórico de pedidos está vazio.</p>
                                 ) : (
-                                     archivedOrders.map(order => renderOrderCard(order, false))
+                                     archivedOrders.map(renderOrderSummaryCard)
                                 )}
                             </div>
                         )}
@@ -492,6 +532,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
 
     const [editingAddress, setEditingAddress] = useState<Partial<Address> | null>(null);
     const [isAddressFormVisible, setIsAddressFormVisible] = useState(showAddAddressForm);
+    const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -503,10 +544,10 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
              setActiveTab(initialTab);
              setIsAddressFormVisible(showAddAddressForm);
         } else {
-            // Reset to default when modal closes
             setActiveTab('orders');
             setIsAddressFormVisible(false);
             setEditingAddress(null);
+            setSelectedOrderDetails(null);
         }
     }, [isOpen, initialTab, showAddAddressForm, profile]);
 
@@ -519,10 +560,9 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
 
         if (activeTab === 'orders') {
             setIsLoadingOrders(true);
-            const query = db.collection('orders').where('userId', '==', user.uid).limit(25);
+            const query = db.collection('orders').where('userId', '==', user.uid).orderBy('createdAt', 'desc').limit(25);
             const unsubscribe = query.onSnapshot(snapshot => {
                 const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-                fetchedOrders.sort((a, b) => (b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0) - (a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0));
                 setMyOrders(fetchedOrders);
                 setIsLoadingOrders(false);
             }, error => {
@@ -594,65 +634,68 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
     };
 
     return (
-        <div
-            className="fixed inset-0 bg-cover bg-center z-50 animate-fade-in-up"
-            style={{ backgroundImage: `url(${userAreaBackground})` }}
-        >
-            <div className="w-full h-full flex flex-col">
-                <header className="sticky top-0 bg-brand-green-700 z-10 flex-shrink-0 shadow-md">
-                    <div className="max-w-4xl mx-auto flex justify-between items-center p-4">
-                        <h2 className="text-xl sm:text-2xl font-bold text-text-on-dark flex items-center gap-3">
-                            <i className="fas fa-user-circle"></i>
-                            <span>Área do Cliente</span>
-                        </h2>
-                        <button onClick={onClose} className="text-text-on-dark font-semibold py-2 px-3 rounded-lg hover:bg-brand-olive-600 transition-colors flex items-center gap-2">
-                            <i className="fas fa-arrow-left"></i>
-                            <span className="hidden sm:inline">Voltar</span>
-                        </button>
-                    </div>
-                </header>
-
-                <div className="flex-grow overflow-y-auto">
-                    <div className="max-w-4xl mx-auto p-4 sm:p-6 my-4 sm:my-6 bg-brand-ivory-50/90 backdrop-blur-sm rounded-xl shadow-lg">
-                        <div className="border-b mb-6">
-                            <nav className="flex -mb-px space-x-4">
-                                <button onClick={() => setActiveTab('profile')} className={`py-2 px-3 font-semibold text-sm transition-colors ${activeTab === 'profile' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-800'}`}>Perfil</button>
-                                <button onClick={() => setActiveTab('orders')} className={`py-2 px-3 font-semibold text-sm transition-colors ${activeTab === 'orders' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-800'}`}>Meus Pedidos</button>
-                                <button onClick={() => setActiveTab('addresses')} className={`py-2 px-3 font-semibold text-sm transition-colors ${activeTab === 'addresses' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-800'}`}>Meus Endereços</button>
-                            </nav>
+        <>
+            <div
+                className="fixed inset-0 bg-cover bg-center z-50 animate-fade-in-up"
+                style={{ backgroundImage: `url(${userAreaBackground})` }}
+            >
+                <div className="w-full h-full flex flex-col">
+                    <header className="sticky top-0 bg-brand-green-700 z-10 flex-shrink-0 shadow-md">
+                        <div className="max-w-4xl mx-auto flex justify-between items-center p-4">
+                            <h2 className="text-xl sm:text-2xl font-bold text-text-on-dark flex items-center gap-3">
+                                <i className="fas fa-user-circle"></i>
+                                <span>Área do Cliente</span>
+                            </h2>
+                            <button onClick={onClose} className="text-text-on-dark font-semibold py-2 px-3 rounded-lg hover:bg-brand-olive-600 transition-colors flex items-center gap-2">
+                                <i className="fas fa-arrow-left"></i>
+                                <span className="hidden sm:inline">Voltar</span>
+                            </button>
                         </div>
-                        {activeTab === 'profile' && (
-                            <UserProfileTab
-                                profile={profile}
-                                user={user}
-                                onLogout={onLogout}
-                                handleResendVerification={handleResendVerification}
-                                handleProfileUpdate={handleProfileUpdate}
-                                name={name}
-                                setName={setName}
-                                phone={phone}
-                                setPhone={setPhone}
-                                cpf={cpf}
-                                setCpf={setCpf}
-                                isSaving={isSaving}
-                            />
-                        )}
-                        {activeTab === 'orders' && <MyOrdersTab myOrders={myOrders} isLoadingOrders={isLoadingOrders} />}
-                        {activeTab === 'addresses' && (
-                            <MyAddressesTab
-                                profile={profile}
-                                isAddressFormVisible={isAddressFormVisible}
-                                setIsAddressFormVisible={setIsAddressFormVisible}
-                                editingAddress={editingAddress}
-                                setEditingAddress={setEditingAddress}
-                                handleSaveAddress={handleSaveAddress}
-                                handleDeleteAddress={handleDeleteAddress}
-                                isSaving={isSaving}
-                            />
-                        )}
+                    </header>
+
+                    <div className="flex-grow overflow-y-auto">
+                        <div className="max-w-4xl mx-auto p-4 sm:p-6 my-4 sm:my-6 bg-brand-ivory-50/90 backdrop-blur-sm rounded-xl shadow-lg">
+                            <div className="border-b mb-6">
+                                <nav className="flex -mb-px space-x-4">
+                                    <button onClick={() => setActiveTab('profile')} className={`py-2 px-3 font-semibold text-sm transition-colors ${activeTab === 'profile' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-800'}`}>Perfil</button>
+                                    <button onClick={() => setActiveTab('orders')} className={`py-2 px-3 font-semibold text-sm transition-colors ${activeTab === 'orders' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-800'}`}>Meus Pedidos</button>
+                                    <button onClick={() => setActiveTab('addresses')} className={`py-2 px-3 font-semibold text-sm transition-colors ${activeTab === 'addresses' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-800'}`}>Meus Endereços</button>
+                                </nav>
+                            </div>
+                            {activeTab === 'profile' && (
+                                <UserProfileTab
+                                    profile={profile}
+                                    user={user}
+                                    onLogout={onLogout}
+                                    handleResendVerification={handleResendVerification}
+                                    handleProfileUpdate={handleProfileUpdate}
+                                    name={name}
+                                    setName={setName}
+                                    phone={phone}
+                                    setPhone={setPhone}
+                                    cpf={cpf}
+                                    setCpf={setCpf}
+                                    isSaving={isSaving}
+                                />
+                            )}
+                            {activeTab === 'orders' && <MyOrdersTab myOrders={myOrders} isLoadingOrders={isLoadingOrders} onViewDetails={setSelectedOrderDetails} />}
+                            {activeTab === 'addresses' && (
+                                <MyAddressesTab
+                                    profile={profile}
+                                    isAddressFormVisible={isAddressFormVisible}
+                                    setIsAddressFormVisible={setIsAddressFormVisible}
+                                    editingAddress={editingAddress}
+                                    setEditingAddress={setEditingAddress}
+                                    handleSaveAddress={handleSaveAddress}
+                                    handleDeleteAddress={handleDeleteAddress}
+                                    isSaving={isSaving}
+                                />
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+            <OrderDetailsModal order={selectedOrderDetails} onClose={() => setSelectedOrderDetails(null)} />
+        </>
     );
 };
