@@ -1,10 +1,43 @@
 import React from 'react';
+import { SiteSettings, DaySchedule } from '../types';
 
-export const ContactSection: React.FC = () => {
+interface ContactSectionProps {
+    settings: SiteSettings;
+}
+
+const formatOperatingHours = (operatingHours?: DaySchedule[]): string => {
+    if (!operatingHours?.length) {
+        return 'Funcionamento não informado.';
+    }
+
+    const openSchedules = operatingHours.filter(h => h.isOpen);
+    if (openSchedules.length === 0) {
+        return 'Fechado todos os dias.';
+    }
+
+    const scheduleByTime = openSchedules.reduce((acc, schedule) => {
+        const timeKey = `${schedule.openTime}h às ${schedule.closeTime}h`;
+        if (!acc[timeKey]) {
+            acc[timeKey] = [];
+        }
+        // Adiciona apenas os 3 primeiros caracteres do dia para abreviar
+        acc[timeKey].push(schedule.dayName.slice(0, 3));
+        return acc;
+    }, {} as Record<string, string[]>);
+
+    return Object.entries(scheduleByTime).map(([time, days]) => {
+        return `${days.join(' / ')}, das ${time}`;
+    }).join(' | ');
+};
+
+
+export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
     const address = "Rua Porfilio Furtado, 178, Centro - Santa Leopoldina, ES";
     const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
     // Vou colocar um botão no personalizar para carlinhos mudar isso fácil heheheh
     const facadeImageUrl = "https://firebasestorage.googleapis.com/v0/b/site-pizza-a2930.firebasestorage.app/o/fachada%2FFACHADA.png?alt=media&token=8010021e-a157-475e-8734-4ba56a3e967f";
+    const operatingHoursText = formatOperatingHours(settings.operatingHours);
+
 
     return (
         <section id="contato" className="py-20 bg-white">
@@ -39,7 +72,7 @@ export const ContactSection: React.FC = () => {
                                 <i className="fas fa-clock text-accent text-xl mt-1 w-6 text-center flex-shrink-0"></i>
                                 <div>
                                     <h3 className="text-lg font-bold text-text-on-light">Funcionamento</h3>
-                                    <p className="text-gray-700">Quarta a Domingo, das 19h às 22h</p>
+                                    <p className="text-gray-700">{operatingHoursText}</p>
                                 </div>
                             </div>
                         </div>

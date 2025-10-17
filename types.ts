@@ -137,6 +137,13 @@ export interface Order {
     };
 }
 
+export interface DaySchedule {
+    dayOfWeek: number; // 0 = Sunday, 6 = Saturday
+    dayName: string;
+    isOpen: boolean;
+    openTime: string; // HH:mm
+    closeTime: string; // HH:mm
+}
 
 export interface ContentSectionListItem {
     id: string;
@@ -173,6 +180,8 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
+    automaticSchedulingEnabled?: boolean;
+    operatingHours?: DaySchedule[];
 }
 
 export interface ChatMessage {
