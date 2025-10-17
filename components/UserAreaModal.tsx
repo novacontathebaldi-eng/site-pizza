@@ -30,6 +30,95 @@ const statusConfig: { [key in OrderStatus]?: { text: string; icon: string; color
 
 const LOCALIDADES = ['Centro', 'Olaria', 'Vila Nova', 'Moxafongo', 'Cocal', 'Funil'];
 
+const formatTimestamp = (timestamp: any): string => {
+    if (!timestamp) return 'N/A';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+};
+
+const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
+    if (order.customer.orderType === 'local') {
+        const config = statusConfig[order.status === 'pending' ? 'pending' : 'reserved'] || statusConfig[order.status];
+        if (!config) return null;
+        return (
+             <div className="bg-blue-50 border-l-4 border-blue-400 text-blue-800 p-3 my-2 rounded-r-lg text-sm">
+                <div className="flex">
+                    <div className="py-1"><i className={`text-xl mr-3 ${config.icon}`}></i></div>
+                    <div>
+                        <p className="font-bold">{config.text}</p>
+                        <p className="text-xs">Sua reserva para {order.numberOfPeople} pessoa(s) em {formatTimestamp(order.createdAt)}.</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    const steps = [
+        { id: 'received', label: 'Pedido Recebido', icon: 'fas fa-receipt' },
+        { id: 'preparing', label: 'Em Preparo', icon: 'fas fa-utensils' },
+        { id: 'on_the_way', label: order.customer.orderType === 'delivery' ? 'Saiu p/ Entrega' : 'Pronto p/ Retirada', icon: order.customer.orderType === 'delivery' ? 'fas fa-motorcycle' : 'fas fa-box-open' },
+        { id: 'completed', label: 'Finalizado', icon: 'fas fa-check' }
+    ];
+
+    const statusOrder: OrderStatus[] = ['pending', 'accepted', 'ready', 'completed'];
+    let currentStatusIndex = statusOrder.indexOf(order.status as any);
+
+    // If status is not in the normal flow (e.g., 'awaiting-payment'), treat it as the first step.
+    if (currentStatusIndex < 0) {
+        currentStatusIndex = 0;
+    }
+
+    return (
+        <div className="w-full pt-4 pb-2">
+            <div className="flex items-start relative">
+                 {/* Background line */}
+                <div className="absolute top-5 left-0 w-full h-1 bg-gray-200" style={{ transform: 'translateY(-50%)' }} />
+                
+                {/* Progress line */}
+                <div className="absolute top-5 left-0 h-1 bg-green-500 transition-all duration-500 ease-in-out"
+                    style={{
+                        width: `${(currentStatusIndex / (steps.length - 1)) * 100}%`,
+                        transform: 'translateY(-50%)'
+                    }}
+                />
+
+                {steps.map((step, index) => {
+                    const isCompleted = currentStatusIndex > index;
+                    const isActive = currentStatusIndex === index;
+
+                    let circleClass = 'bg-gray-200 text-gray-400';
+                    let textClass = 'text-gray-500';
+
+                    if (isActive) {
+                        if (step.id === 'preparing' && order.status === 'accepted') {
+                            circleClass = 'bg-brand-gold-600 text-white scale-110';
+                            textClass = 'font-bold text-brand-gold-600';
+                        } else {
+                            circleClass = 'bg-green-500 text-white scale-110';
+                            textClass = 'font-bold text-green-600';
+                        }
+                    } else if (isCompleted) {
+                        circleClass = 'bg-green-500 text-white';
+                        textClass = 'text-green-600';
+                    }
+                    
+                    return (
+                        <div key={step.id} className="flex-1 flex flex-col items-center text-center z-10 px-1">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all duration-300 ${circleClass}`}>
+                                <i className={step.icon}></i>
+                            </div>
+                            <p className={`mt-2 text-xs leading-tight ${textClass} transition-colors duration-300`}>
+                                {step.label}
+                            </p>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+
 const AddressForm: React.FC<{
     address: Partial<Address> | null;
     onSave: (address: Address) => Promise<void>;
@@ -174,11 +263,6 @@ function validarCPF(cpf: string): boolean {
   return true;
 }
 
-const formatTimestamp = (timestamp: any): string => {
-    if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
-};
 
 // --- Child Components for Tabs ---
 
@@ -247,30 +331,68 @@ interface MyOrdersTabProps {
 
 const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders }) => {
     const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+    const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+
 
     const currentOrders = myOrders.filter(order =>
-        ['pending', 'accepted', 'reserved', 'ready'].includes(order.status)
+        ['pending', 'accepted', 'reserved', 'ready', 'awaiting-payment'].includes(order.status)
     );
     const archivedOrders = myOrders.filter(order =>
         ['completed', 'cancelled', 'deleted'].includes(order.status)
     );
 
-    const renderOrderCard = (order: Order) => {
+    const renderOrderCard = (order: Order, isCurrent: boolean) => {
         const config = statusConfig[order.status] || { text: 'Desconhecido', icon: 'fas fa-question-circle', color: 'text-gray-500' };
         const isDeleted = order.status === 'deleted';
+        const isExpanded = expandedOrderId === order.id;
 
         return (
-            <div key={order.id} className={`bg-white border rounded-lg p-3 flex justify-between items-center shadow-sm transition-opacity ${isDeleted ? 'opacity-60' : ''}`}>
-                <div>
-                    <p className="font-bold">Pedido #{order.orderNumber}</p>
-                    <p className="text-sm text-gray-500">{formatTimestamp(order.createdAt)}</p>
+            <div key={order.id} className={`bg-white border rounded-lg p-4 flex flex-col shadow-sm transition-opacity ${isDeleted ? 'opacity-60' : ''}`}>
+                <div className="flex justify-between items-start">
+                    <div>
+                        <p className="font-bold">Pedido #{order.orderNumber}</p>
+                        <p className="text-sm text-gray-500">{formatTimestamp(order.createdAt)}</p>
+                    </div>
+                    <div className="text-right">
+                        {order.total != null && <p className="font-bold text-lg text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
+                    </div>
                 </div>
-                <div className="text-right">
-                    <p className={`font-semibold text-sm flex items-center justify-end gap-2 ${config.color}`}>
-                        <i className={config.icon}></i>{config.text}
-                    </p>
-                    {order.total != null && <p className="font-bold text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
-                </div>
+
+                {isCurrent ? (
+                    <OrderStatusTracker order={order} />
+                ) : (
+                    <div className="mt-2 pt-2 border-t">
+                        <p className={`font-semibold text-sm flex items-center gap-2 ${config.color}`}>
+                            <i className={config.icon}></i>{config.text}
+                        </p>
+                    </div>
+                )}
+                
+                {(order.items && order.items.length > 0) && (
+                    <div className="w-full text-center mt-1">
+                        <button 
+                            onClick={() => setExpandedOrderId(isExpanded ? null : order.id)} 
+                            className="text-xs font-semibold text-blue-600 hover:underline p-1"
+                            aria-expanded={isExpanded}
+                        >
+                            {isExpanded ? 'Ocultar Itens' : 'Ver Itens'}
+                            <i className={`fas fa-chevron-down ml-1 transition-transform text-xs ${isExpanded ? 'rotate-180' : ''}`}></i>
+                        </button>
+                    </div>
+                )}
+                
+                {isExpanded && (
+                    <div className="mt-2 pt-2 border-t animate-fade-in-up">
+                        <ul className="space-y-1 text-sm text-gray-700">
+                            {(order.items || []).map(item => (
+                                <li key={item.id} className="flex justify-between">
+                                    <span>{item.quantity}x {item.name} ({item.size})</span>
+                                    <span className="font-medium">{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
             </div>
         );
     };
@@ -286,7 +408,7 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders }) 
                         <p className="text-center text-gray-500 py-8 px-4 bg-gray-50 rounded-lg">Você não tem pedidos em andamento.</p>
                     ) : (
                         <div className="space-y-3">
-                            {currentOrders.map(renderOrderCard)}
+                            {currentOrders.map(order => renderOrderCard(order, true))}
                         </div>
                     )}
 
@@ -305,7 +427,7 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders }) 
                                 {archivedOrders.length === 0 ? (
                                     <p className="text-center text-gray-500 py-8 px-4">Seu histórico de pedidos está vazio.</p>
                                 ) : (
-                                    archivedOrders.map(renderOrderCard)
+                                     archivedOrders.map(order => renderOrderCard(order, false))
                                 )}
                             </div>
                         )}
