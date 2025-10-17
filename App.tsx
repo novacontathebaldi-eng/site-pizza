@@ -22,6 +22,7 @@ import defaultLogo from './assets/logo.png';
 import defaultHeroBg from './assets/ambiente-pizzaria.webp';
 import defaultAboutImg from './assets/sobre-imagem.webp';
 import firebase from 'firebase/compat/app';
+import { OrderDetailsModal } from './components/OrderDetailsModal';
 
 // Type declarations for Google GAPI library to avoid TypeScript errors
 declare global {
@@ -204,6 +205,8 @@ const App: React.FC = () => {
     const [isProcessingOrder, setIsProcessingOrder] = useState<boolean>(false);
     const [confirmedOrderData, setConfirmedOrderData] = useState<Order | null>(null);
     const [confirmedReservationData, setConfirmedReservationData] = useState<Order | null>(null);
+    const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
+    const [isOrderTrackerExpanded, setIsOrderTrackerExpanded] = useState<boolean>(false);
 
     // Admin State
     const [refundingOrderId, setRefundingOrderId] = useState<string | null>(null);
@@ -229,7 +232,8 @@ const App: React.FC = () => {
                !!payingOrder || 
                showPaymentFailureModal || 
                !!confirmedOrderData || 
-               !!confirmedReservationData;
+               !!confirmedReservationData ||
+               !!trackingOrder;
     }, [
         isCartOpen, 
         isCheckoutModalOpen, 
@@ -240,7 +244,8 @@ const App: React.FC = () => {
         payingOrder, 
         showPaymentFailureModal, 
         confirmedOrderData, 
-        confirmedReservationData
+        confirmedReservationData,
+        trackingOrder
     ]);
 
     // Effect to lock body scroll when a modal is open
@@ -736,6 +741,40 @@ const App: React.FC = () => {
         }
     };
     
+    const activeOrders = useMemo(() => {
+        const activeStatuses: OrderStatus[] = ['pending', 'accepted', 'reserved', 'ready', 'awaiting-payment'];
+    
+        if (currentUser) {
+            // User is logged in, filter by their UID
+            return orders.filter(order =>
+                order.userId === currentUser.uid && activeStatuses.includes(order.status)
+            );
+        } else {
+            // User is a guest, filter by IDs in localStorage
+            const guestOrderIds: string[] = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
+            if (guestOrderIds.length === 0) {
+                return [];
+            }
+            const guestOrdersSet = new Set(guestOrderIds);
+            return orders.filter(order =>
+                guestOrdersSet.has(order.id) && activeStatuses.includes(order.status)
+            );
+        }
+    }, [orders, currentUser]);
+
+    const statusIconMap: { [key in OrderStatus]?: string } = {
+        pending: 'fas fa-hourglass-start',
+        accepted: 'fas fa-cogs',
+        reserved: 'fas fa-chair',
+        'awaiting-payment': 'fas fa-clock',
+    };
+
+    const getStatusIcon = (order: Order): string => {
+        if (order.status === 'ready') {
+            return order.customer.orderType === 'delivery' ? 'fas fa-motorcycle' : 'fas fa-box-open';
+        }
+        return statusIconMap[order.status] || 'fas fa-receipt';
+    };
 
     return (
         <div className="flex flex-col min-h-screen">
@@ -792,6 +831,42 @@ const App: React.FC = () => {
                 ) : null}
             </div>
 
+            <div className="fixed bottom-[5.5rem] left-5 z-40 flex flex-col-reverse items-center gap-3">
+                {activeOrders.length > 1 && isOrderTrackerExpanded && (
+                    <div className="flex flex-col-reverse gap-3 animate-fade-in-up">
+                        {activeOrders.map(order => (
+                            <button
+                                key={order.id}
+                                onClick={() => { setTrackingOrder(order); setIsOrderTrackerExpanded(false); }}
+                                className="w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110"
+                                aria-label={`Acompanhar pedido #${order.orderNumber}`}
+                            >
+                                <i className={`${getStatusIcon(order)} text-2xl`}></i>
+                            </button>
+                        ))}
+                    </div>
+                )}
+                {activeOrders.length > 0 && (
+                    <button
+                        onClick={() => {
+                            if (activeOrders.length === 1) {
+                                setTrackingOrder(activeOrders[0]);
+                            } else {
+                                setIsOrderTrackerExpanded(prev => !prev);
+                            }
+                        }}
+                        className="w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110"
+                        aria-label={activeOrders.length === 1 ? `Acompanhar pedido #${activeOrders[0].orderNumber}` : `${activeOrders.length} pedidos ativos`}
+                    >
+                        {activeOrders.length === 1 ? (
+                            <i className={`${getStatusIcon(activeOrders[0])} text-2xl`}></i>
+                        ) : (
+                            <span className="text-2xl font-bold">{activeOrders.length}</span>
+                        )}
+                    </button>
+                )}
+            </div>
+
             <button onClick={() => setIsChatbotOpen(true)} className="fixed bottom-5 left-5 z-40 w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110" aria-label="Abrir assistente virtual"><i className="fas fa-headset text-2xl"></i></button>
 
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cart} onUpdateQuantity={handleUpdateCartQuantity} onCheckout={() => { if (!isStoreOnline) { addToast("A loja está fechada. Não é possível finalizar o pedido.", 'error'); return; } setIsCartOpen(false); setIsCheckoutModalOpen(true); }} isStoreOnline={isStoreOnline} categories={categories} products={products} setActiveCategoryId={setActiveMenuCategory}/>
@@ -819,6 +894,7 @@ const App: React.FC = () => {
             <OrderConfirmationModal order={confirmedOrderData} onClose={() => setConfirmedOrderData(null)} onSendWhatsApp={handleSendOrderToWhatsApp}/>
             <ReservationConfirmationModal reservation={confirmedReservationData} onClose={() => setConfirmedReservationData(null)} onSendWhatsApp={handleSendReservationToWhatsApp}/>
             <Chatbot isOpen={isChatbotOpen} onClose={() => setIsChatbotOpen(false)} messages={chatMessages} onSendMessage={handleSendMessageToBot} isSending={isBotReplying}/>
+            <OrderDetailsModal order={trackingOrder} onClose={() => setTrackingOrder(null)} title="Acompanhar Pedido" />
             
             <LoginModal 
                 isOpen={isLoginModalOpen} 

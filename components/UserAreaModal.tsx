@@ -5,28 +5,8 @@ import { db } from '../services/firebase';
 import * as firebaseService from '../services/firebaseService';
 import defaultProfilePic from '../assets/perfil.png';
 import userAreaBackground from '../assets/fundocliente.png';
-
-interface UserAreaModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    user: firebase.User | null;
-    profile: UserProfile | null;
-    onLogout: () => void;
-    addToast: (message: string, type: 'success' | 'error') => void;
-    initialTab?: 'orders' | 'profile' | 'addresses';
-    showAddAddressForm?: boolean;
-}
-
-const statusConfig: { [key in OrderStatus]?: { text: string; icon: string; color: string; } } = {
-    pending: { text: 'Pendente', icon: 'fas fa-hourglass-start', color: 'text-yellow-500' },
-    accepted: { text: 'Em Preparo', icon: 'fas fa-cogs', color: 'text-blue-500' },
-    reserved: { text: 'Reserva Confirmada', icon: 'fas fa-chair', color: 'text-teal-500' },
-    ready: { text: 'Pronto / Em Rota', icon: 'fas fa-shipping-fast', color: 'text-purple-500' },
-    completed: { text: 'Finalizado', icon: 'fas fa-check-circle', color: 'text-green-500' },
-    cancelled: { text: 'Cancelado', icon: 'fas fa-times-circle', color: 'text-red-500' },
-    deleted: { text: 'Excluído', icon: 'fas fa-trash-alt', color: 'text-gray-500' },
-    'awaiting-payment': { text: 'Aguardando Pgto', icon: 'fas fa-clock', color: 'text-gray-500' },
-};
+import { OrderStatusTracker } from './OrderStatusTracker';
+import { OrderDetailsModal } from './OrderDetailsModal';
 
 const LOCALIDADES = ['Centro', 'Olaria', 'Vila Nova', 'Moxafongo', 'Cocal', 'Funil'];
 
@@ -44,171 +24,6 @@ const formatTimestamp = (timestamp: any, includeTime: boolean = false): string =
     }
     return new Intl.DateTimeFormat('pt-BR', options).format(date);
 };
-
-const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
-    if (order.customer.orderType === 'local') {
-        const config = statusConfig[order.status === 'pending' ? 'pending' : 'reserved'] || statusConfig[order.status];
-        if (!config) return null;
-        return (
-             <div className="bg-blue-50 border-l-4 border-blue-400 text-blue-800 p-3 my-2 rounded-r-lg text-sm">
-                <div className="flex">
-                    <div className="py-1"><i className={`text-xl mr-3 ${config.icon}`}></i></div>
-                    <div>
-                        <p className="font-bold">{config.text}</p>
-                        <p className="text-xs">Sua reserva para {order.numberOfPeople} pessoa(s) em {formatTimestamp(order.createdAt, true)}.</p>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    const steps = [
-        { id: 'pending', label: 'Pedido Recebido', icon: 'fas fa-receipt' },
-        { id: 'accepted', label: 'Em Preparo', icon: 'fas fa-utensils' },
-        { id: 'ready', label: order.customer.orderType === 'delivery' ? 'Saiu p/ Entrega' : 'Pronto p/ Retirada', icon: order.customer.orderType === 'delivery' ? 'fas fa-motorcycle' : 'fas fa-box-open' },
-        { id: 'completed', label: 'Finalizado', icon: 'fas fa-check' }
-    ];
-
-    const statusOrder: OrderStatus[] = ['pending', 'accepted', 'ready', 'completed'];
-    let currentStatusIndex = statusOrder.indexOf(order.status);
-    
-    if (order.status === 'awaiting-payment') {
-        currentStatusIndex = 0;
-    }
-    
-    if (order.status === 'cancelled') {
-        return (
-            <div className="bg-red-50 border-l-4 border-red-400 text-red-800 p-3 my-4 rounded-r-lg">
-                <p className="font-bold text-sm"><i className="fas fa-times-circle mr-2"></i>Pedido Cancelado</p>
-            </div>
-        );
-   }
-
-    if (currentStatusIndex < 0 && order.status !== 'completed') {
-        return null; 
-    }
-
-    if(order.status === 'completed') {
-      currentStatusIndex = 3;
-    }
-
-    const progressPercent = currentStatusIndex < 0 ? 0 : (currentStatusIndex / (steps.length - 1)) * 100;
-
-    return (
-        <div className="w-full py-4">
-            <div className="relative h-20">
-                {/* Lines Container */}
-                <div className="absolute top-5 left-5 right-5 h-1">
-                    {/* Gray Line */}
-                    <div className="w-full h-full bg-gray-200 rounded-full" />
-                    {/* Green Line */}
-                    <div
-                        className="absolute top-0 left-0 h-full bg-green-500 rounded-full transition-all duration-500 ease-in-out"
-                        style={{ width: `${progressPercent}%` }}
-                    />
-                </div>
-
-                {/* Icons & Labels Container */}
-                <div className="absolute top-0 left-0 w-full h-full flex justify-between items-start">
-                    {steps.map((step, index) => {
-                        const isCompleted = currentStatusIndex >= index;
-                        const isActive = currentStatusIndex === index;
-
-                        let circleClass = 'bg-white border-2 border-gray-300 text-gray-400';
-                        let textClass = 'text-gray-500';
-
-                        if (isActive) {
-                            circleClass = 'bg-green-500 text-white scale-110 shadow-lg border-2 border-green-600';
-                            textClass = 'font-bold text-green-600';
-                        } else if (isCompleted) {
-                            circleClass = 'bg-green-500 text-white border-2 border-green-600';
-                            textClass = 'text-green-600';
-                        }
-
-                        return (
-                            <div key={step.id} className="z-10 flex flex-col items-center text-center">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all duration-300 ${circleClass}`}>
-                                    <i className={step.icon}></i>
-                                </div>
-                                <p className={`mt-2 text-xs font-semibold leading-tight w-20 ${textClass} transition-colors duration-300`}>
-                                    {steps[index].label}
-                                </p>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const OrderDetailsModal: React.FC<{ order: Order | null; onClose: () => void; }> = ({ order, onClose }) => {
-    if (!order) return null;
-
-    const isOngoing = ['pending', 'accepted', 'ready', 'awaiting-payment'].includes(order.status);
-    const paymentMethodMap = { credit: 'Crédito', debit: 'Débito', pix: 'PIX', cash: 'Dinheiro' };
-    const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo no Local' };
-    
-     const paymentStatusInfo = {
-        'pending': { text: 'Pendente', color: 'text-yellow-600' },
-        'paid': { text: 'Pago', color: 'text-green-600' },
-        'paid_online': { text: 'Pago Pelo Site', color: 'text-green-600 font-bold' },
-        'refunded': { text: 'Estornado', color: 'text-orange-500' }
-    }[order.paymentStatus] || { text: 'Pendente', color: 'text-yellow-600' };
-
-    const fullAddress = order.customer.orderType === 'delivery' ? `${order.customer.street || ''}, ${order.customer.number || ''} - ${order.customer.neighborhood || ''}` : null;
-
-
-    return (
-        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-fade-in-up">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-                 <div className="flex justify-between items-center p-4 border-b border-gray-200">
-                    <h3 className="text-xl font-bold text-text-on-light">Detalhes do Pedido #{order.orderNumber}</h3>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
-                </div>
-                 <div className="overflow-y-auto p-4 sm:p-6 space-y-4">
-                    {isOngoing && <OrderStatusTracker order={order} />}
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div className="bg-gray-50 p-3 rounded-md border">
-                            <h4 className="font-bold mb-2 text-base"><i className="fas fa-user mr-2 text-gray-400"></i>Cliente</h4>
-                            <p><strong>Nome:</strong> {order.customer.name}</p>
-                            <p><strong>Telefone:</strong> {order.customer.phone}</p>
-                            <p><strong>Pedido:</strong> {orderTypeMap[order.customer.orderType]}</p>
-                            {fullAddress && <p><strong>Endereço:</strong> {fullAddress}</p>}
-                            {order.customer.orderType === 'local' && (
-                                <>
-                                    <p><strong>Pessoas:</strong> {order.numberOfPeople}</p>
-                                    <p><strong>Reserva:</strong> {order.customer.reservationTime}</p>
-                                </>
-                            )}
-                        </div>
-                        <div className="bg-gray-50 p-3 rounded-md border">
-                            <h4 className="font-bold mb-2 text-base"><i className="fas fa-credit-card mr-2 text-gray-400"></i>Pagamento</h4>
-                             <p><strong>Método:</strong> {order.paymentMethod ? paymentMethodMap[order.paymentMethod] : 'N/A'}</p>
-                            <p><strong>Status:</strong> <span className={`font-semibold ${paymentStatusInfo.color}`}>{paymentStatusInfo.text}</span></p>
-                            {order.paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {order.changeNeeded ? `para R$ ${order.changeAmount}` : 'Não precisa'}</p> )}
-                            {order.deliveryFee > 0 && (<p><strong>Taxa de Entrega:</strong> {order.deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>)}
-                            <p className="mt-2 pt-2 border-t font-bold"><strong>Total:</strong> {order.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                        </div>
-                    </div>
-
-                    {order.items && order.items.length > 0 && (
-                        <div>
-                            <h4 className="font-bold mb-2 text-base"><i className="fas fa-shopping-basket mr-2 text-gray-400"></i>Itens do Pedido</h4>
-                            <ul className="space-y-1 text-sm">
-                                {order.items.map(item => (<li key={item.id} className="flex justify-between p-2 bg-gray-50 rounded"><span>{item.quantity}x {item.name} ({item.size})</span><span className="font-semibold">{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>))}
-                            </ul>
-                        </div>
-                    )}
-                     {order.allergies && <p className="text-sm mt-3 p-2 bg-red-50 rounded-md border border-red-200"><strong>Alergias/Restrições:</strong> {order.allergies}</p>}
-                     {order.notes && <p className="text-sm mt-3 p-2 bg-yellow-50 rounded-md border border-yellow-200"><strong>Obs:</strong> {order.notes}</p>}
-                 </div>
-            </div>
-        </div>
-    );
-};
-
 
 const AddressForm: React.FC<{
     address: Partial<Address> | null;
@@ -667,6 +482,17 @@ const MyAddressesTab: React.FC<MyAddressesTabProps> = ({
     </div>
 );
 
+// FIX: Added the missing UserAreaModalProps interface definition.
+interface UserAreaModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    user: firebase.User | null;
+    profile: UserProfile | null;
+    onLogout: () => void;
+    addToast: (message: string, type: 'success' | 'error') => void;
+    initialTab?: 'profile' | 'orders' | 'addresses';
+    showAddAddressForm?: boolean;
+}
 
 export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, user, profile, onLogout, addToast, initialTab = 'orders', showAddAddressForm = false }) => {
     const [name, setName] = useState('');
