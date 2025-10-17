@@ -171,6 +171,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
             if (profile?.cpf) {
                 setCpf(profile.cpf);
             }
+            if (profile?.allergies) {
+                setAllergies(profile.allergies);
+            }
         } else {
             // Full reset when closing
             setCpf(''); setOrderType('');
@@ -205,6 +208,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                 setStreet(selectedAddr.street);
                 setNumber(selectedAddr.number);
                 setComplement(selectedAddr.complement || '');
+                setIsNoNumber(selectedAddr.number === 'S/N');
             }
         }
     }, [selectedAddressId, profile, orderType]);

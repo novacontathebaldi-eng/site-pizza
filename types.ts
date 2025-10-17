@@ -24,6 +24,7 @@ export interface UserProfile {
     phone?: string;
     cpf?: string;
     addresses?: Address[];
+    allergies?: string;
 }
 
 export interface Product {

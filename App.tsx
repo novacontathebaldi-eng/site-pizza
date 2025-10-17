@@ -23,6 +23,15 @@ import defaultHeroBg from './assets/ambiente-pizzaria.webp';
 import defaultAboutImg from './assets/sobre-imagem.webp';
 import firebase from 'firebase/compat/app';
 
+// Type declarations for Google GAPI library to avoid TypeScript errors
+declare global {
+    interface Window {
+        gapi: any;
+        googleScriptLoaded: boolean;
+        onGoogleScriptLoadCallback: () => void;
+    }
+}
+
 interface Toast {
     id: number;
     message: string;
@@ -182,6 +191,7 @@ const App: React.FC = () => {
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
     const [isUserAreaModalOpen, setIsUserAreaModalOpen] = useState<boolean>(false);
+    const [isGapiReady, setIsGapiReady] = useState(false);
     const [postRegisterAction, setPostRegisterAction] = useState<string | null>(null);
 
 
@@ -254,6 +264,42 @@ const App: React.FC = () => {
         }, 4000);
     }, []);
 
+    // Effect to initialize Google Auth
+    useEffect(() => {
+        const initGoogleAuth = () => {
+            if (window.gapi && !isGapiReady) {
+                window.gapi.load('auth2', () => {
+                    try {
+                        window.gapi.auth2.init({
+                            client_id: '914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com',
+                        }).then(() => {
+                            setIsGapiReady(true);
+                        }, (error: any) => {
+                            // Don't show toast on initial load failure, only on interaction.
+                            console.error('Error initializing Google Auth2:', error);
+                        });
+                    } catch (error) {
+                        console.error('Error loading Google Auth2:', error);
+                    }
+                });
+            }
+        };
+
+        // Assign callback for the script in index.html to call
+        window.onGoogleScriptLoadCallback = initGoogleAuth;
+
+        // If script is already loaded and callback was missed (race condition), run init
+        if (window.googleScriptLoaded) {
+            initGoogleAuth();
+        }
+
+        return () => {
+            // @ts-ignore
+            delete window.onGoogleScriptLoadCallback;
+        };
+    }, [isGapiReady]);
+
+
     // Effect for Firebase Auth state changes
     useEffect(() => {
         if (!auth) return;
@@ -272,36 +318,6 @@ const App: React.FC = () => {
         });
         return () => unsubscribe();
     }, []);
-    
-    // Effect to handle the result of a redirect sign-in flow
-    // FIX: Replaced the Firebase v9 modular `getRedirectResult` function with the v8 compatibility equivalent `auth.getRedirectResult()`.
-    // This resolves type mismatches for `UserCredential` and `User` objects, fixing errors where the `additionalUserInfo` property
-    // was not found and where the `user` object was not assignable to the expected type in `firebaseService.createUserProfile`.
-    useEffect(() => {
-        if (!auth) return;
-        setIsProcessingOrder(true);
-        auth.getRedirectResult()
-            .then(async (result) => {
-                if (result && result.user) {
-                    // This means the user has just signed in via redirect.
-                    const user = result.user;
-                     if (result.additionalUserInfo?.isNewUser) {
-                        await firebaseService.createUserProfile(user, user.displayName || 'Novo Usuário', user.phoneNumber || '', '');
-                    }
-                    addToast(`Bem-vindo(a), ${user.displayName}!`, 'success');
-                }
-            })
-            .catch((error) => {
-                console.error("Google Redirect Sign-In Error:", error);
-                 if (error.code !== 'auth/popup-closed-by-user') {
-                     addToast('Falha no login com Google. Tente novamente.', 'error');
-                }
-            })
-            .finally(() => {
-                setIsProcessingOrder(false);
-            });
-    }, [auth, addToast]);
-
 
     // Effect to listen for profile updates in real-time
     useEffect(() => {
@@ -386,17 +402,26 @@ const App: React.FC = () => {
 
     // --- Auth Handlers ---
     const handleGoogleSignIn = async () => {
-        if (!auth) {
-            addToast('Serviço de autenticação não disponível.', 'error');
+        if (!isGapiReady || !auth) {
+            addToast('Serviço de login não está pronto. Tente em instantes.', 'error');
             return;
         }
         try {
-            const provider = new firebase.auth.GoogleAuthProvider();
+            const googleAuth = window.gapi.auth2.getAuthInstance();
+            const googleUser = await googleAuth.signIn();
+            const idToken = googleUser.getAuthResponse().id_token;
+
+            // Garante que a sessão do usuário persista após o navegador ser fechado.
             await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-            await auth.signInWithRedirect(provider);
+
+            const customToken = await firebaseService.verifyGoogleToken(idToken);
+            await auth.signInWithCustomToken(customToken);
+
+            setIsLoginModalOpen(false);
+            addToast(`Bem-vindo(a), ${googleUser.getBasicProfile().getName()}!`, 'success');
         } catch (error: any) {
             console.error("Google Sign-In Error:", error);
-            if (error.code !== 'auth/popup-closed-by-user') {
+            if (error.error !== 'popup_closed_by_user') {
                 addToast('Falha no login com Google. Tente novamente.', 'error');
             }
         }
@@ -410,7 +435,12 @@ const App: React.FC = () => {
     const handleLogout = async () => {
         if (!auth) return;
         try {
-            // O signOut do Firebase já lida com o logout de provedores como o Google.
+            if (isGapiReady) {
+                const googleAuth = window.gapi.auth2.getAuthInstance();
+                if (googleAuth && googleAuth.isSignedIn.get()) {
+                    await googleAuth.signOut();
+                }
+            }
             await auth.signOut();
             setIsUserAreaModalOpen(false);
             addToast('Você foi desconectado.', 'success');

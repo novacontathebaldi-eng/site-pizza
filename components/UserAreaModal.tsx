@@ -217,11 +217,24 @@ const AddressForm: React.FC<{
     isSaving: boolean;
     totalAddresses: number;
 }> = ({ address, onSave, onCancel, isSaving, totalAddresses }) => {
+    const [isNoNumber, setIsNoNumber] = useState(address?.number === 'S/N');
     const [formData, setFormData] = useState<Partial<Address>>({
         label: '', localidade: 'Centro', street: '', number: '', complement: '', isFavorite: false,
         bairro: '', cep: '29640-000', city: 'Santa Leopoldina',
         ...address
     });
+
+    useEffect(() => {
+        setIsNoNumber(formData.number === 'S/N');
+    }, [formData.number]);
+    
+    useEffect(() => {
+        if (isNoNumber) {
+            setFormData(prev => ({ ...prev, number: 'S/N' }));
+        } else if (formData.number === 'S/N') {
+            setFormData(prev => ({ ...prev, number: '' }));
+        }
+    }, [isNoNumber]);
     
     useEffect(() => {
         const isOther = formData.localidade === 'Outra';
@@ -284,22 +297,31 @@ const AddressForm: React.FC<{
                     <input type="text" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} className="w-full px-3 py-2 border rounded-md disabled:bg-gray-200" required disabled={!isOtherLocality} />
                 </div>
             </div>
-             <div className={`grid grid-cols-1 md:grid-cols-[${isOtherLocality ? '1fr_2fr_1fr' : '2fr_1fr'}] gap-4`}>
-                 {isOtherLocality && (
-                     <div>
-                        <label className="block text-sm font-semibold mb-1">Bairro *</label>
-                        <input type="text" value={formData.bairro} onChange={e => setFormData({ ...formData, bairro: e.target.value })} className="w-full px-3 py-2 border rounded-md" required={isOtherLocality} />
-                    </div>
-                 )}
+            
+            {isOtherLocality && (
+                <div>
+                    <label className="block text-sm font-semibold mb-1">Bairro *</label>
+                    <input type="text" value={formData.bairro} onChange={e => setFormData({ ...formData, bairro: e.target.value })} className="w-full px-3 py-2 border rounded-md" required={isOtherLocality} />
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4 items-end">
                 <div>
                     <label className="block text-sm font-semibold mb-1">Rua *</label>
                     <input type="text" value={formData.street} onChange={e => setFormData({ ...formData, street: e.target.value })} className="w-full px-3 py-2 border rounded-md" required />
                 </div>
                 <div>
                     <label className="block text-sm font-semibold mb-1">Número *</label>
-                    <input type="text" value={formData.number} onChange={e => setFormData({ ...formData, number: e.target.value })} className="w-full px-3 py-2 border rounded-md" required />
+                    <input type="text" value={formData.number} onChange={e => setFormData({ ...formData, number: e.target.value })} className="w-full px-3 py-2 border rounded-md" required disabled={isNoNumber} />
                 </div>
             </div>
+            <div className="flex justify-end -mt-2">
+                <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={isNoNumber} onChange={e => setIsNoNumber(e.target.checked)} />
+                    <span>Sem número</span>
+                </label>
+            </div>
+
             <div>
                 <label className="block text-sm font-semibold mb-1">Complemento (opcional)</label>
                 <input type="text" value={formData.complement} onChange={e => setFormData({ ...formData, complement: e.target.value })} className="w-full px-3 py-2 border rounded-md" />
@@ -351,13 +373,16 @@ interface UserProfileTabProps {
     setPhone: (phone: string) => void;
     cpf: string;
     setCpf: (cpf: string) => void;
+    allergies: string;
+    setAllergies: (allergies: string) => void;
     isSaving: boolean;
     addToast: (message: string, type: 'success' | 'error') => void;
 }
 
 const UserProfileTab: React.FC<UserProfileTabProps> = ({
     profile, user, onLogout, handleResendVerification, handleProfileUpdate,
-    name, setName, phone, setPhone, cpf, setCpf, isSaving, addToast,
+    name, setName, phone, setPhone, cpf, setCpf, allergies, setAllergies,
+    isSaving, addToast,
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isPhotoUploading, setIsPhotoUploading] = useState(false);
@@ -497,6 +522,10 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
             <label className="block text-sm font-semibold mb-1">CPF (opcional)</label>
             <input type="text" value={cpf} onChange={e => setCpf(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="000.000.000-00" />
              <p className="text-xs text-gray-500 mt-1">Seu CPF é usado para agilizar o pagamento com PIX.</p>
+        </div>
+        <div>
+            <label className="block text-sm font-semibold mb-1">Restrições Alimentares? (opcional)</label>
+            <textarea value={allergies} onChange={e => setAllergies(e.target.value)} className="w-full px-3 py-2 border rounded-md" rows={2} placeholder="Ex: alergia a camarão, intolerância à lactose..."/>
         </div>
         <div className="text-right pt-2">
              <button type="submit" disabled={isSaving || isPhotoUploading} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[120px] disabled:bg-opacity-70">
@@ -643,6 +672,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [cpf, setCpf] = useState('');
+    const [allergies, setAllergies] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [myOrders, setMyOrders] = useState<Order[]>([]);
     const [isLoadingOrders, setIsLoadingOrders] = useState(true);
@@ -660,6 +690,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                 setName(profile.name || '');
                 setPhone(profile.phone || '');
                 setCpf(profile.cpf || '');
+                setAllergies(profile.allergies || '');
             }
              setActiveTab(initialTab);
              setIsAddressFormVisible(showAddAddressForm);
@@ -728,7 +759,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
             return;
         }
         try {
-            await firebaseService.updateUserProfile(user.uid, { name, phone, cpf });
+            await firebaseService.updateUserProfile(user.uid, { name, phone, cpf, allergies });
             addToast('Seu perfil foi salvo!', 'success');
         } catch (error) {
             addToast('Erro ao salvar seu perfil.', 'error');
@@ -810,6 +841,8 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                                     setPhone={setPhone}
                                     cpf={cpf}
                                     setCpf={setCpf}
+                                    allergies={allergies}
+                                    setAllergies={setAllergies}
                                     isSaving={isSaving}
                                 />
                             )}

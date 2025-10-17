@@ -185,6 +185,7 @@ export const createUserProfile = async (user: firebase.User, name: string, phone
         phone: phone,
         cpf: cpf,
         addresses: [],
+        allergies: '',
     };
     await userRef.set(profile);
 };
@@ -196,7 +197,7 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
     return { uid, ...doc.data() } as UserProfile;
 };
 
-export const updateUserProfile = async (uid: string, data: Partial<Pick<UserProfile, 'name' | 'phone' | 'cpf'>>): Promise<void> => {
+export const updateUserProfile = async (uid: string, data: Partial<Pick<UserProfile, 'name' | 'phone' | 'cpf' | 'allergies'>>): Promise<void> => {
     if (!db) throw new Error("Firestore not initialized.");
     await db.collection('users').doc(uid).set(data, { merge: true });
 };
