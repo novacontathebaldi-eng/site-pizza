@@ -708,9 +708,14 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
     const handleResendVerification = async () => {
         try {
             await user.sendEmailVerification();
-            addToast('E-mail de verificação reenviado!', 'success');
-        } catch (error) {
-            addToast('Erro ao reenviar e-mail. Tente mais tarde.', 'error');
+            addToast('E-mail de verificação reenviado! Verifique sua caixa de entrada e spam.', 'success');
+        } catch (error: any) {
+            console.error("Erro ao reenviar email de verificação:", error);
+            let message = 'Erro ao reenviar e-mail. Tente mais tarde.';
+            if (error.code === 'auth/too-many-requests') {
+                message = 'Você solicitou o reenvio muitas vezes. Por favor, aguarde um pouco antes de tentar novamente.';
+            }
+            addToast(message, 'error');
         }
     };
     
