@@ -111,7 +111,7 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     }
     
     if (details.allergies) {
-        message += `\n⚠️ ALERGIAS/RESTRIÇÕES:*\n${details.allergies}\n`;
+        message += `\n*⚠️ ALERGIAS/RESTRIÇÕES:*\n${details.allergies}\n`;
     }
 
     message += `\n*🛒 ITENS DO PEDIDO:*\n`;
@@ -381,7 +381,7 @@ const App: React.FC = () => {
             if (footerElement) footerObserver.unobserve(footerElement);
             if (cardapioEl) buttonObserver.unobserve(cardapioEl);
         };
-    }, []);
+    }, [isLoading]);
     
 
 
