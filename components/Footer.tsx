@@ -1,16 +1,72 @@
 import React from 'react';
-import { SiteSettings } from '../types';
+import { SiteSettings, DaySchedule } from '../types';
 
 interface FooterProps {
     settings: SiteSettings;
     onOpenChatbot: () => void;
 }
 
+const formatOperatingHours = (operatingHours?: DaySchedule[]): string[] => {
+    if (!operatingHours?.length) {
+        return ['Funcionamento não informado.'];
+    }
+
+    const openSchedules = operatingHours
+        .map((h, index) => ({...h, originalIndex: index})) // Preserve original order for sorting
+        .filter(h => h.isOpen)
+        .sort((a, b) => a.originalIndex - b.originalIndex);
+        
+    if (openSchedules.length === 0) {
+        return ['Fechado todos os dias.'];
+    }
+
+    const scheduleByTime = openSchedules.reduce((acc, schedule) => {
+        const timeKey = `${schedule.openTime}h às ${schedule.closeTime}h`;
+        if (!acc[timeKey]) {
+            acc[timeKey] = [];
+        }
+        acc[timeKey].push(schedule.dayName);
+        return acc;
+    }, {} as Record<string, string[]>);
+    
+    // Attempt to group consecutive days
+    const dayOrder = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    const finalStrings: string[] = [];
+
+    Object.entries(scheduleByTime).forEach(([time, days]) => {
+        if (days.length > 2) {
+            let isConsecutive = true;
+            for (let i = 0; i < days.length - 1; i++) {
+                if (dayOrder.indexOf(days[i+1]) - dayOrder.indexOf(days[i]) !== 1) {
+                    isConsecutive = false;
+                    break;
+                }
+            }
+            if (isConsecutive) {
+                finalStrings.push(`${days[0]} a ${days[days.length-1]}`);
+                finalStrings.push(`das ${time}`);
+                return;
+            }
+        }
+        // Fallback for non-consecutive or short lists
+        finalStrings.push(days.join(' e '));
+        finalStrings.push(`das ${time}`);
+    });
+
+    if (finalStrings.length === 2 && finalStrings[0] === 'Quarta a Domingo') {
+        return ['Quarta a Domingo', finalStrings[1]]
+    }
+
+    return finalStrings;
+};
+
+
 export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot }) => {
     
     const visibleLinks = settings.footerLinks?.filter(link => link.isVisible !== false) ?? [];
     const socialLinks = visibleLinks.filter(link => link.icon.startsWith('fab'));
     const otherLinks = visibleLinks.filter(link => !link.icon.startsWith('fab'));
+    const operatingHoursParts = formatOperatingHours(settings.operatingHours);
 
     return (
         <footer className="bg-brand-green-700 text-text-on-dark pt-16 pb-8">
@@ -45,16 +101,15 @@ export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot }) => {
                             <li><i className="fas fa-phone mr-2 text-accent"></i>(27) 99650-0341</li>
                         </ul>
                     </div>
-                    {settings.operatingHours && (
-                        <div>
-                            <h4 className="font-bold text-lg mb-4">{settings.operatingHours.title}</h4>
-                            <ul className="space-y-2 text-brand-green-300">
-                                <li><i className="fas fa-clock mr-2 text-accent"></i>{settings.operatingHours.line1}</li>
-                                <li>{settings.operatingHours.line2}</li>
-                                {settings.operatingHours.line3 && <li><i className="fas fa-truck mr-2 text-accent"></i>{settings.operatingHours.line3}</li>}
-                            </ul>
-                        </div>
-                    )}
+                    <div>
+                        <h4 className="font-bold text-lg mb-4">Funcionamento</h4>
+                         <ul className="space-y-2 text-brand-green-300">
+                            {operatingHoursParts.map((part, index) => (
+                                <li key={index}><i className={`fas ${index === 0 ? 'fa-clock' : 'fa-none'} mr-2 text-accent`}></i>{part}</li>
+                            ))}
+                            <li><i className="fas fa-truck mr-2 text-accent"></i>Delivery disponível</li>
+                        </ul>
+                    </div>
                      <div>
                         <h4 className="font-bold text-lg mb-4">Acesso</h4>
                          <ul className="space-y-2 text-brand-green-300">

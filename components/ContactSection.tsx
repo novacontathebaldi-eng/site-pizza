@@ -1,11 +1,6 @@
 import React from 'react';
-import { SiteSettings } from '../types';
 
-interface ContactSectionProps {
-    settings: SiteSettings;
-}
-
-export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
+export const ContactSection: React.FC = () => {
     const address = "Rua Porfilio Furtado, 178, Centro - Santa Leopoldina, ES";
     const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
     // Vou colocar um botão no personalizar para carlinhos mudar isso fácil heheheh
@@ -40,15 +35,13 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
                                 </div>
                             </div>
                             
-                            {settings.operatingHours && (
-                                <div className="flex items-start gap-4">
-                                    <i className="fas fa-clock text-accent text-xl mt-1 w-6 text-center flex-shrink-0"></i>
-                                    <div>
-                                        <h3 className="text-lg font-bold text-text-on-light">{settings.operatingHours.title}</h3>
-                                        <p className="text-gray-700">{settings.operatingHours.line1}, {settings.operatingHours.line2}</p>
-                                    </div>
+                            <div className="flex items-start gap-4">
+                                <i className="fas fa-clock text-accent text-xl mt-1 w-6 text-center flex-shrink-0"></i>
+                                <div>
+                                    <h3 className="text-lg font-bold text-text-on-light">Funcionamento</h3>
+                                    <p className="text-gray-700">Quarta a Domingo, das 19h às 22h</p>
                                 </div>
-                            )}
+                            </div>
                         </div>
 
                         <a 
