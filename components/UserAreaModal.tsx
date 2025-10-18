@@ -3,13 +3,10 @@ import firebase from 'firebase/compat/app';
 import { UserProfile, Order, OrderStatus, Address } from '../types';
 import { db } from '../services/firebase';
 import * as firebaseService from '../services/firebaseService';
+import defaultProfilePic from '../assets/perfil.png';
+import userAreaBackground from '../assets/fundocliente.png';
 import { OrderStatusTracker } from './OrderStatusTracker';
 import { OrderDetailsModal } from './OrderDetailsModal';
-
-// FIX: Replaced local asset imports with placeholder URLs as the asset files were not provided.
-const defaultProfilePic = 'https://via.placeholder.com/100/CCCCCC/FFFFFF?text=Perfil';
-const userAreaBackground = 'https://via.placeholder.com/1920x1080/2C5633/FFFFFF?text=Fundo';
-
 
 const LOCALIDADES = ['Centro', 'Olaria', 'Vila Nova', 'Moxafongo', 'Cocal', 'Funil'];
 

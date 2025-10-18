@@ -5,11 +5,12 @@ interface MenuItemCardProps {
     product: Product;
     onAddToCart: (product: Product, size: string, price: number) => void;
     isStoreOnline: boolean;
+    isInCart: boolean;
 }
 
 const sizeOrder = ['P', 'M', 'G', 'Única'];
 
-export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart, isStoreOnline }) => {
+export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart, isStoreOnline, isInCart }) => {
     const prices = product.prices ?? {};
     const hasPrices = Object.keys(prices).length > 0;
     const isOutOfStock = product.stockStatus === 'out_of_stock';
@@ -69,8 +70,13 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
     const displayPrice = hasPrices ? formatPrice(prices[selectedSize] || prices[sortedSizes[0]]) : "Indisponível";
 
     return (
-        <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col overflow-hidden border border-gray-200">
+        <div className={`bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 flex flex-col overflow-hidden ${isInCart ? 'border-2 border-green-500' : 'border border-gray-200'}`}>
             <div className="relative">
+                {isInCart && (
+                    <div className="absolute top-2 left-2 bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs z-10 shadow">
+                        <i className="fas fa-check"></i>
+                    </div>
+                )}
                 <img src={product.imageUrl} alt={product.name} className="w-full aspect-square object-cover" />
                 {product.badge && (
                     <span className="absolute top-2 right-2 bg-accent text-white px-2 py-0.5 text-xs font-bold rounded-full">{product.badge}</span>
