@@ -26,6 +26,7 @@ import firebase from 'firebase/compat/app';
 import { OrderDetailsModal } from './components/OrderDetailsModal';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { CookieConsentBanner } from './components/CookieConsentBanner';
+import { TermsOfServiceModal } from './components/TermsOfServiceModal';
 
 // Type declarations for Google GAPI library to avoid TypeScript errors
 declare global {
@@ -200,6 +201,7 @@ const App: React.FC = () => {
     const [isFooterVisible, setIsFooterVisible] = useState(false);
     const [showFloatingButton, setShowFloatingButton] = useState(false);
     const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState<boolean>(false);
+    const [isTermsModalOpen, setIsTermsModalOpen] = useState<boolean>(false);
     const [showCookieBanner, setShowCookieBanner] = useState<boolean>(false);
     
     // Auth State
@@ -249,7 +251,8 @@ const App: React.FC = () => {
                !!confirmedOrderData || 
                !!confirmedReservationData ||
                !!trackingOrder ||
-               isPrivacyPolicyOpen;
+               isPrivacyPolicyOpen ||
+               isTermsModalOpen;
     }, [
         isCartOpen, 
         isCheckoutModalOpen, 
@@ -262,7 +265,8 @@ const App: React.FC = () => {
         confirmedOrderData, 
         confirmedReservationData,
         trackingOrder,
-        isPrivacyPolicyOpen
+        isPrivacyPolicyOpen,
+        isTermsModalOpen
     ]);
 
     // Effect to lock body scroll when a modal is open
@@ -942,6 +946,8 @@ const App: React.FC = () => {
                 onGoogleSignIn={handleGoogleSignIn} 
                 addToast={addToast} 
                 onRegisterSuccess={handleRegisterSuccess}
+                onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
+                onOpenTermsOfService={() => setIsTermsModalOpen(true)}
             />
             <UserAreaModal 
                 isOpen={isUserAreaModalOpen} 
@@ -954,6 +960,7 @@ const App: React.FC = () => {
                 showAddAddressForm={postRegisterAction === 'add_address_flow'}
             />
             <PrivacyPolicyModal isOpen={isPrivacyPolicyOpen} onClose={() => setIsPrivacyPolicyOpen(false)} />
+            <TermsOfServiceModal isOpen={isTermsModalOpen} onClose={() => setIsTermsModalOpen(false)} />
             {showCookieBanner && <CookieConsentBanner onAccept={handleAcceptCookies} />}
 
             {(isProcessingOrder) && <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-6 font-semibold text-lg text-gray-700">Processando seu pedido...</p><p className="mt-2 text-sm text-gray-500">Por favor, aguarde um instante.</p></div></div>}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { auth } from '../services/firebase';
 import * as firebaseService from '../services/firebaseService';
 import firebase from 'firebase/compat/app';
@@ -9,6 +9,8 @@ interface LoginModalProps {
     onGoogleSignIn: () => void;
     addToast: (message: string, type: 'success' | 'error') => void;
     onRegisterSuccess: () => void;
+    onOpenPrivacyPolicy: () => void;
+    onOpenTermsOfService: () => void;
 }
 
 function validarCPF(cpf: string): boolean {
@@ -44,15 +46,25 @@ function validarCPF(cpf: string): boolean {
   return true;
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogleSignIn, addToast, onRegisterSuccess }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogleSignIn, addToast, onRegisterSuccess, onOpenPrivacyPolicy, onOpenTermsOfService }) => {
     const [isRegistering, setIsRegistering] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [cpf, setCpf] = useState('');
+    const [acceptedTerms, setAcceptedTerms] = useState(false);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen) {
+            // Reset state when modal is closed
+            setIsRegistering(false);
+            setError('');
+            setAcceptedTerms(false);
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
@@ -113,6 +125,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
             setIsLoading(false);
         }
     };
+    
+    const handleTabChange = (registering: boolean) => {
+        setIsRegistering(registering);
+        setError('');
+        setAcceptedTerms(false);
+    };
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-fade-in-up">
@@ -124,8 +142,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
 
                 <div className="p-6 overflow-y-auto">
                     <div className="flex border-b mb-6">
-                        <button onClick={() => { setIsRegistering(false); setError(''); }} className={`flex-1 font-semibold py-2 transition-colors ${!isRegistering ? 'text-accent border-b-2 border-accent' : 'text-gray-500'}`}>Entrar</button>
-                        <button onClick={() => { setIsRegistering(true); setError(''); }} className={`flex-1 font-semibold py-2 transition-colors ${isRegistering ? 'text-accent border-b-2 border-accent' : 'text-gray-500'}`}>Registrar</button>
+                        <button onClick={() => handleTabChange(false)} className={`flex-1 font-semibold py-2 transition-colors ${!isRegistering ? 'text-accent border-b-2 border-accent' : 'text-gray-500'}`}>Entrar</button>
+                        <button onClick={() => handleTabChange(true)} className={`flex-1 font-semibold py-2 transition-colors ${isRegistering ? 'text-accent border-b-2 border-accent' : 'text-gray-500'}`}>Registrar</button>
                     </div>
 
                     <form onSubmit={handleEmailPasswordSubmit} className="space-y-4">
@@ -150,16 +168,39 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
                             <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
                         </div>
                          {isRegistering && (
-                            <div>
-                                <label className="block text-sm font-semibold mb-1" htmlFor="cpf">CPF (opcional)</label>
-                                <input id="cpf" type="text" value={cpf} onChange={e => setCpf(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="000.000.000-00" />
-                                <p className="text-xs text-gray-500 mt-1">Ajuda a agilizar pagamentos com PIX.</p>
-                            </div>
+                            <>
+                                <div>
+                                    <label className="block text-sm font-semibold mb-1" htmlFor="cpf">CPF (opcional)</label>
+                                    <input id="cpf" type="text" value={cpf} onChange={e => setCpf(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="000.000.000-00" />
+                                    <p className="text-xs text-gray-500 mt-1">Ajuda a agilizar pagamentos com PIX.</p>
+                                </div>
+                                <div className="pt-2">
+                                    <label className="flex items-start gap-2 text-sm text-gray-600">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={acceptedTerms} 
+                                            onChange={e => setAcceptedTerms(e.target.checked)}
+                                            className="mt-1 h-4 w-4 rounded border-gray-400 text-accent focus:ring-accent"
+                                        />
+                                        <span className="leading-snug">
+                                            Eu li e aceito os{' '}
+                                            <button type="button" onClick={onOpenTermsOfService} className="font-semibold text-accent hover:underline focus:outline-none">
+                                                Termos de Serviço
+                                            </button>
+                                            {' '}e a{' '}
+                                            <button type="button" onClick={onOpenPrivacyPolicy} className="font-semibold text-accent hover:underline focus:outline-none">
+                                                Política de Privacidade
+                                            </button>
+                                            .
+                                        </span>
+                                    </label>
+                                </div>
+                            </>
                         )}
 
                         {error && <p className="text-red-600 text-sm text-center bg-red-50 p-2 rounded-md">{error}</p>}
 
-                        <button type="submit" disabled={isLoading} className="w-full bg-accent text-white font-bold py-3 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center disabled:bg-opacity-70">
+                        <button type="submit" disabled={isLoading || (isRegistering && !acceptedTerms)} className="w-full bg-accent text-white font-bold py-3 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center disabled:bg-opacity-70 disabled:cursor-not-allowed">
                             {isLoading ? <i className="fas fa-spinner fa-spin"></i> : (isRegistering ? 'Criar Conta' : 'Entrar')}
                         </button>
                     </form>
