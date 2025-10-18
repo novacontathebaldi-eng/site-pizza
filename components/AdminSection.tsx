@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, FaqItem } from '../types';
+// FIX: The 'Partial' type is a built-in TypeScript utility and does not need to be imported.
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, DaySchedule } from '../types';
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
 import { SiteCustomizationTab } from './SiteCustomizationTab';
@@ -10,10 +11,7 @@ import { CSS } from '@dnd-kit/utilities';
 import firebase from 'firebase/compat/app';
 import { auth } from '../services/firebase';
 import { SupportModal } from './SupportModal';
-import { FaqModal } from './FaqModal';
-
-// FIX: Replaced local asset import with an empty string as the asset file was not provided.
-const notificationSound = '';
+import notificationSound from '../assets/notf1.mp3';
 
 interface AdminSectionProps {
     allProducts: Product[];
@@ -21,7 +19,6 @@ interface AdminSectionProps {
     isStoreOnline: boolean;
     siteSettings: SiteSettings;
     orders: Order[];
-    allFaqItems: FaqItem[];
     onSaveProduct: (product: Product) => Promise<void>;
     onDeleteProduct: (productId: string) => Promise<void>;
     onProductStatusChange: (productId: string, active: boolean) => Promise<void>;
@@ -34,6 +31,7 @@ interface AdminSectionProps {
     onReorderCategories: (categoriesToUpdate: { id: string; order: number }[]) => Promise<void>;
     onSeedDatabase: () => Promise<void>;
     onSaveSiteSettings: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
+    onUpdateSiteSettingsField: (updates: Partial<SiteSettings>) => Promise<void>;
     onUpdateOrderStatus: (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => Promise<void>;
     onUpdateOrderPaymentStatus: (orderId: string, paymentStatus: PaymentStatus) => Promise<void>;
     onUpdateOrderReservationTime: (orderId: string, reservationTime: string) => Promise<void>;
@@ -42,10 +40,6 @@ interface AdminSectionProps {
     onPermanentDeleteMultipleOrders: (orderIds: string[]) => Promise<void>;
     onRefundOrder: (orderId: string) => Promise<void>;
     refundingOrderId: string | null;
-    onSaveFaqItem: (item: FaqItem) => Promise<void>;
-    onDeleteFaqItem: (itemId: string) => Promise<void>;
-    onFaqItemStatusChange: (itemId: string, active: boolean) => Promise<void>;
-    onReorderFaqItems: (itemsToUpdate: { id: string; order: number }[]) => Promise<void>;
 }
 
 interface SortableProductItemProps {
@@ -149,63 +143,17 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
     );
 };
 
-interface SortableFaqItemProps {
-    item: FaqItem;
-    onEdit: (item: FaqItem) => void;
-    onDelete: (itemId: string) => void;
-    onStatusChange: (itemId: string, active: boolean) => void;
-}
-
-const SortableFaqItem: React.FC<SortableFaqItemProps> = ({ item, onEdit, onDelete, onStatusChange }) => {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: item.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 10 : 'auto',
-        boxShadow: isDragging ? '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' : 'none',
-    };
-
-    return (
-        <div ref={setNodeRef} style={style} className={`bg-gray-50 p-3 rounded-lg flex justify-between items-center transition-opacity ${!item.active ? 'opacity-50' : ''}`}>
-            <div className="flex items-center gap-4 flex-grow min-w-0">
-                <button {...attributes} {...listeners} className="cursor-grab touch-none p-2" aria-label="Mover item">
-                    <i className="fas fa-grip-vertical text-gray-500 hover:text-gray-800"></i>
-                </button>
-                <p className="font-semibold truncate text-sm">{item.ensinamento}</p>
-            </div>
-            <div className="flex items-center gap-4 flex-shrink-0">
-                 <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" checked={item.active} onChange={e => onStatusChange(item.id, e.target.checked)} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                </label>
-                <button onClick={() => onEdit(item)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label="Editar item"><i className="fas fa-edit"></i></button>
-                <button onClick={() => window.confirm('Tem certeza que deseja excluir este ensinamento?') && onDelete(item.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label="Deletar item"><i className="fas fa-trash"></i></button>
-            </div>
-        </div>
-    );
-};
-
-
 // Define a type for the tabs in the admin UI to handle the split view
 type OrderTabKey = 'accepted' | 'reserved' | 'pronto' | 'emRota' | 'completed' | 'cancelled';
 
 
 export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const { 
-        allProducts, allCategories, isStoreOnline, siteSettings, orders, allFaqItems,
+        allProducts, allCategories, isStoreOnline, siteSettings, orders,
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
-        onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
-        onDeleteOrder, onPermanentDeleteOrder, onPermanentDeleteMultipleOrders, onRefundOrder, refundingOrderId,
-        onSaveFaqItem, onDeleteFaqItem, onFaqItemStatusChange, onReorderFaqItems
+        onSeedDatabase, onSaveSiteSettings, onUpdateSiteSettingsField, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
+        onDeleteOrder, onPermanentDeleteOrder, onPermanentDeleteMultipleOrders, onRefundOrder, refundingOrderId
     } = props;
     
     const [user, setUser] = useState<firebase.User | null>(null);
@@ -219,7 +167,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     
     const [localProducts, setLocalProducts] = useState<Product[]>(allProducts);
     const [localCategories, setLocalCategories] = useState<Category[]>(allCategories);
-    const [localFaqItems, setLocalFaqItems] = useState<FaqItem[]>(allFaqItems);
 
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -227,9 +174,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
     const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
-    
-    const [isFaqModalOpen, setIsFaqModalOpen] = useState(false);
-    const [editingFaqItem, setEditingFaqItem] = useState<FaqItem | null>(null);
 
     // State for order management
     const [orderSearchTerm, setOrderSearchTerm] = useState('');
@@ -238,6 +182,12 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const [activeOrdersTab, setActiveOrdersTab] = useState<OrderTabKey>('accepted');
     const [isTrashVisible, setIsTrashVisible] = useState(false);
     const [selectedOrderIds, setSelectedOrderIds] = useState(new Set<string>());
+
+    // State for Status Tab
+    const [localSettings, setLocalSettings] = useState<SiteSettings>(siteSettings);
+    const [hasSettingsChanged, setHasSettingsChanged] = useState(false);
+    const [isSavingStatus, setIsSavingStatus] = useState(false);
+    const [isSavingAutoSchedule, setIsSavingAutoSchedule] = useState(false);
 
 
     // State for sound notification
@@ -248,10 +198,23 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const prevPendingOrdersCount = useRef(0);
     const audioRef = useRef<HTMLAudioElement>(null);
 
+    // Sync Status tab settings with props, but don't overwrite local changes
+    useEffect(() => {
+        // This effect runs when siteSettings prop changes from Firestore listener
+        // We want to update our local state with the new values, but without
+        // destroying unsaved changes in operatingHours.
+        setLocalSettings(currentLocalSettings => ({
+            ...currentLocalSettings, // Keep current local values (like dirty operatingHours)
+            ...siteSettings, // Overwrite with fresh data from Firestore
+            operatingHours: hasSettingsChanged // If operatingHours are dirty...
+                ? currentLocalSettings.operatingHours // ...keep the dirty version
+                : siteSettings.operatingHours, // ...otherwise, take the fresh version.
+        }));
+    }, [siteSettings]);
+
 
     useEffect(() => setLocalProducts(allProducts), [allProducts]);
     useEffect(() => setLocalCategories([...allCategories].sort((a, b) => a.order - b.order)), [allCategories]);
-    useEffect(() => setLocalFaqItems([...allFaqItems].sort((a, b) => a.order - b.order)), [allFaqItems]);
 
     useEffect(() => {
         if (!auth) {
@@ -368,15 +331,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         onReorderCategories(reordered.map((c, index) => ({ id: c.id, order: index })));
     };
     
-    const handleFaqDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
-        if (!over || active.id === over.id) return;
-        const oldIndex = localFaqItems.findIndex(c => c.id === active.id);
-        const newIndex = localFaqItems.findIndex(c => c.id === over.id);
-        const reordered = arrayMove(localFaqItems, oldIndex, newIndex);
-        onReorderFaqItems(reordered.map((c, index) => ({ id: c.id, order: index })));
-    };
-    
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -417,8 +371,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const handleEditProduct = (p: Product) => { setEditingProduct(p); setIsProductModalOpen(true); };
     const handleAddNewCategory = () => { setEditingCategory(null); setIsCategoryModalOpen(true); };
     const handleEditCategory = (c: Category) => { setEditingCategory(c); setIsCategoryModalOpen(true); };
-    const handleAddNewFaqItem = () => { setEditingFaqItem(null); setIsFaqModalOpen(true); };
-    const handleEditFaqItem = (item: FaqItem) => { setEditingFaqItem(item); setIsFaqModalOpen(true); };
 
     const handleSeedDatabase = async () => { if (window.confirm('Tem certeza? Isso adicionará dados iniciais.')) { try { await onSeedDatabase(); alert('Banco de dados populado!'); } catch (e) { console.error(e); alert("Erro ao popular o banco."); } } };
     const handleBackup = () => { try { const backupData = { products: allProducts, categories: allCategories, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); alert('Backup concluído!'); } catch (e) { console.error(e); alert("Falha no backup."); } };
@@ -535,6 +487,54 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         setTimeout(() => scrollToContent('order-list-container'), 50);
     };
 
+    // --- Handlers for Status Tab ---
+    const handleAutomaticSchedulingChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const isEnabled = e.target.checked;
+        setIsSavingAutoSchedule(true);
+        try {
+            await onUpdateSiteSettingsField({ automaticSchedulingEnabled: isEnabled });
+        } catch (error) {
+            // Error toast is shown by the parent App component.
+        } finally {
+            setIsSavingAutoSchedule(false);
+        }
+    };
+
+    const handleOperatingHoursChange = (dayOfWeek: number, field: keyof DaySchedule, value: any) => {
+        const newHours = (localSettings.operatingHours || []).map(schedule => {
+            if (schedule.dayOfWeek === dayOfWeek) {
+                const updatedSchedule = { ...schedule };
+                (updatedSchedule as any)[field] = value;
+                return updatedSchedule;
+            }
+            return schedule;
+        });
+
+        setLocalSettings(prev => ({
+            ...prev,
+            operatingHours: newHours,
+        }));
+        setHasSettingsChanged(true);
+    };
+
+    const handleSaveStatusSettings = async () => {
+        setIsSavingStatus(true);
+        try {
+            // Merge the latest siteSettings (which has the correct auto-schedule value)
+            // with the local changes (which has the correct operating hours).
+            const settingsToSave = {
+                ...siteSettings, // Start with the most up-to-date settings from props
+                operatingHours: localSettings.operatingHours, // Overwrite with only the locally managed field
+            };
+            await onSaveSiteSettings(settingsToSave, {});
+            setHasSettingsChanged(false);
+        } catch (e) {
+            console.error("Failed to save status settings", e);
+        } finally {
+            setIsSavingStatus(false);
+        }
+    };
+
 
     if (!showAdminPanel) return null;
     if (authLoading) return <section id="admin" className="py-20 bg-brand-ivory-50"><div className="text-center"><i className="fas fa-spinner fa-spin text-4xl text-accent"></i></div></section>;
@@ -563,9 +563,9 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                         </div>
                         <div className="border-b mb-6">
                             <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
-                                {['status', 'orders', 'products', 'categories', 'chatbot', 'customization', 'data'].map(tab => {
-                                    const icons: { [key: string]: string } = { status: 'fa-store-alt', orders: 'fa-receipt', products: 'fa-pizza-slice', categories: 'fa-tags', chatbot: 'fa-question-circle', customization: 'fa-paint-brush', data: 'fa-database' };
-                                    const labels: { [key: string]: string } = { status: 'Status', orders: 'Pedidos', products: 'Produtos', categories: 'Categorias', chatbot: 'Ensinar o Chatbot', customization: 'Personalização', data: 'Dados' };
+                                {['status', 'orders', 'products', 'categories', 'customization', 'data'].map(tab => {
+                                    const icons: { [key: string]: string } = { status: 'fa-store-alt', orders: 'fa-receipt', products: 'fa-pizza-slice', categories: 'fa-tags', customization: 'fa-paint-brush', data: 'fa-database' };
+                                    const labels: { [key: string]: string } = { status: 'Status', orders: 'Pedidos', products: 'Produtos', categories: 'Categorias', customization: 'Personalização', data: 'Dados' };
                                     return (
                                         <button 
                                             key={tab} 
@@ -581,7 +581,103 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                             </div>
                         </div>
 
-                        <div id="admin-content-status"> {activeTab === 'status' && ( <div> <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3> <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg"> <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer"> <input type="checkbox" id="store-status-toggle" className="sr-only peer" checked={isStoreOnline} onChange={e => onStoreStatusChange(e.target.checked)} /> <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600"></div> </label> <span className={`font-semibold text-lg ${isStoreOnline ? 'text-green-600' : 'text-red-600'}`}>{isStoreOnline ? 'Aberta' : 'Fechada'}</span> </div> </div> )} </div>
+                        <div id="admin-content-status">
+                            {activeTab === 'status' && (
+                                <div>
+                                    <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3>
+                                    <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg border">
+                                        <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                id="store-status-toggle"
+                                                className="sr-only peer"
+                                                checked={isStoreOnline}
+                                                onChange={e => onStoreStatusChange(e.target.checked)}
+                                                disabled={siteSettings.automaticSchedulingEnabled}
+                                            />
+                                            <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600 peer-disabled:bg-gray-300 peer-disabled:cursor-not-allowed"></div>
+                                        </label>
+                                        <div>
+                                            <span className={`font-semibold text-lg ${siteSettings.automaticSchedulingEnabled ? 'text-gray-500' : (isStoreOnline ? 'text-green-600' : 'text-red-600')}`}>
+                                                {isStoreOnline ? 'Aberta' : 'Fechada'}
+                                            </span>
+                                            {siteSettings.automaticSchedulingEnabled && <span className="text-sm text-gray-500 ml-2">(Gerenciado automaticamente)</span>}
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
+                                        <div className="flex items-center gap-4">
+                                            <label htmlFor="automatic-scheduling-toggle" className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    id="automatic-scheduling-toggle"
+                                                    className="sr-only peer"
+                                                    checked={siteSettings.automaticSchedulingEnabled ?? false}
+                                                    onChange={handleAutomaticSchedulingChange}
+                                                    disabled={isSavingAutoSchedule}
+                                                />
+                                                <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600 peer-disabled:opacity-50 peer-disabled:cursor-wait"></div>
+                                            </label>
+                                            <span className="font-semibold text-gray-800">Gerir horário automaticamente.</span>
+                                            {isSavingAutoSchedule && <i className="fas fa-spinner fa-spin text-accent ml-2"></i>}
+                                        </div>
+                                        <p className="text-sm text-gray-500 mt-2 pl-14">Quando ativado, o status da loja mudará para "Aberta" ou "Fechada" conforme o horário de funcionamento definido abaixo, mesmo com o painel fechado.</p>
+                                    </div>
+
+                                    <div className="mt-8">
+                                        <h3 className="text-xl font-bold mb-4">Editar Horário de Funcionamento</h3>
+                                        <div className="space-y-3 bg-white p-4 rounded-lg border">
+                                            {(localSettings.operatingHours || []).map((schedule) => (
+                                                <div key={schedule.dayOfWeek} className="grid grid-cols-1 md:grid-cols-[120px_1fr_2fr] items-center gap-4 p-3 rounded-md border bg-gray-50/50">
+                                                    <div className="font-semibold">{schedule.dayName}</div>
+                                                    <div className="flex items-center gap-3">
+                                                        <label className="relative inline-flex items-center cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="sr-only peer"
+                                                                checked={schedule.isOpen}
+                                                                onChange={e => handleOperatingHoursChange(schedule.dayOfWeek, 'isOpen', e.target.checked)}
+                                                            />
+                                                            <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                                                        </label>
+                                                        <span className={`font-medium ${schedule.isOpen ? 'text-green-600' : 'text-gray-500'}`}>{schedule.isOpen ? 'Aberto' : 'Fechado'}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="time"
+                                                            value={schedule.openTime}
+                                                            onChange={e => handleOperatingHoursChange(schedule.dayOfWeek, 'openTime', e.target.value)}
+                                                            disabled={!schedule.isOpen}
+                                                            className="w-full px-2 py-1 border rounded-md bg-white disabled:bg-gray-200 disabled:cursor-not-allowed"
+                                                        />
+                                                        <span>às</span>
+                                                        <input
+                                                            type="time"
+                                                            value={schedule.closeTime}
+                                                            onChange={e => handleOperatingHoursChange(schedule.dayOfWeek, 'closeTime', e.target.value)}
+                                                            disabled={!schedule.isOpen}
+                                                            className="w-full px-2 py-1 border rounded-md bg-white disabled:bg-gray-200 disabled:cursor-not-allowed"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {hasSettingsChanged && (
+                                        <div className="mt-6 pt-6 border-t flex justify-end">
+                                            <button
+                                                onClick={handleSaveStatusSettings}
+                                                disabled={isSavingStatus}
+                                                className="bg-accent text-white font-semibold py-2 px-6 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[200px] disabled:bg-opacity-70"
+                                            >
+                                                {isSavingStatus ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-2"></i> Salvar Alterações</>}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                         
                         <div id="admin-content-orders"> {activeTab === 'orders' && (
                              <div>
@@ -707,14 +803,12 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                         <div id="admin-content-customization"> {activeTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> )} </div>
                         <div id="admin-content-products"> {activeTab === 'products' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Produtos</h3> <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Produto</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}> <div className="space-y-6"> {localCategories.map(category => { const categoryProducts = localProducts.filter(p => p.categoryId === category.id).sort((a, b) => a.orderIndex - b.orderIndex); return ( <div key={category.id}> <h4 className={`text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4> <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3 min-h-[50px]"> {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} />)} </div> </SortableContext> </div> ) })} </div> </DndContext> </div> )} </div>
                         <div id="admin-content-categories"> {activeTab === 'categories' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Categorias</h3> <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Categoria</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}> <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localCategories.map(cat => <SortableCategoryItem key={cat.id} category={cat} onEdit={handleEditCategory} onDelete={onDeleteCategory} onStatusChange={onCategoryStatusChange} />)} </div> </SortableContext> </DndContext> </div> )} </div>
-                        <div id="admin-content-chatbot"> {activeTab === 'chatbot' && ( <div> <div className="flex justify-between items-center mb-4"> <div> <h3 className="text-xl font-bold">Ensinar o Chatbot</h3> <p className="text-sm text-gray-600">Adicione regras e informações que o "Sensação" deve seguir como prioridade.</p> </div> <button onClick={handleAddNewFaqItem} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Ensinamento</button> </div> {localFaqItems.length > 0 ? ( <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleFaqDragEnd}> <SortableContext items={localFaqItems.map(c => c.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localFaqItems.map(item => <SortableFaqItem key={item.id} item={item} onEdit={handleEditFaqItem} onDelete={onDeleteFaqItem} onStatusChange={onFaqItemStatusChange} />)} </div> </SortableContext> </DndContext> ) : ( <div className="text-center py-12 border-2 border-dashed rounded-lg"> <p className="text-gray-500 mb-4">Nenhum ensinamento cadastrado ainda.</p> <button onClick={handleAddNewFaqItem} className="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300"> <i className="fas fa-plus mr-2"></i>Clique aqui para ensinar o Sensação </button> </div> )} </div> )} </div>
                         <div id="admin-content-data"> {activeTab === 'data' && ( <div> <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus dados.</p> <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados iniciais. Use apenas uma vez.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> )} </div>
                     </div>
                 </div>
             </section>
             <ProductModal isOpen={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} onSave={onSaveProduct} product={editingProduct} categories={allCategories} />
             <CategoryModal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} onSave={onSaveCategory} category={editingCategory} />
-            <FaqModal isOpen={isFaqModalOpen} onClose={() => setIsFaqModalOpen(false)} onSave={onSaveFaqItem} item={editingFaqItem} />
             <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
         </>
     );

@@ -1,7 +1,7 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
 import { db, storage, functions } from './firebase';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem, ChatMessage, ReservationDetails, UserProfile, Address, FaqItem } from '../types';
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem, ChatMessage, ReservationDetails, UserProfile, Address } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -398,45 +398,4 @@ export const refundPayment = async (orderId: string): Promise<any> => {
         // The error from the cloud function is more user-friendly
         throw error;
     }
-};
-
-// Chatbot Knowledge Base (FAQ) Functions
-export const addFaqItem = async (itemData: Omit<FaqItem, 'id'>): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    await db.collection('chatbot_aprende').add({
-        ...itemData,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    });
-};
-
-export const updateFaqItem = async (itemId: string, itemData: Omit<FaqItem, 'id'>): Promise<void> => {
-    if (!itemId) throw new Error("Item ID is missing for update.");
-    if (!db) throw new Error("Firestore is not initialized.");
-    const itemRef = db.collection('chatbot_aprende').doc(itemId);
-    await itemRef.update({
-        ...(itemData as { [key: string]: any }),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    });
-};
-
-export const deleteFaqItem = async (itemId: string): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    if (!itemId) throw new Error("Invalid Item ID for deletion.");
-    await db.collection('chatbot_aprende').doc(itemId).delete();
-};
-
-export const updateFaqItemStatus = async (itemId: string, active: boolean): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    await db.collection('chatbot_aprende').doc(itemId).update({ active });
-};
-
-export const updateFaqItemsOrder = async (itemsToUpdate: { id: string; order: number }[]): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const batch = db.batch();
-    itemsToUpdate.forEach(itemUpdate => {
-        const itemRef = db.collection('chatbot_aprende').doc(itemUpdate.id);
-        batch.update(itemRef, { order: itemUpdate.order });
-    });
-    await batch.commit();
 };
