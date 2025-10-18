@@ -4,6 +4,7 @@ import { SiteSettings, DaySchedule } from '../types';
 interface FooterProps {
     settings: SiteSettings;
     onOpenChatbot: () => void;
+    onOpenPrivacyPolicy: () => void;
 }
 
 // Helper function to process operating hours into structured groups
@@ -92,7 +93,7 @@ const formatOperatingHours = (operatingHours?: DaySchedule[]): string[] => {
 };
 
 
-export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot }) => {
+export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot, onOpenPrivacyPolicy }) => {
     
     const visibleLinks = settings.footerLinks?.filter(link => link.isVisible !== false) ?? [];
     const socialLinks = visibleLinks.filter(link => link.icon.startsWith('fab'));
@@ -156,6 +157,12 @@ export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot }) => {
                                 <button onClick={onOpenChatbot} className="inline-flex items-center gap-2 hover:text-white transition-colors">
                                     <i className="fas fa-headset mr-1 text-accent"></i>
                                     <span>Ajuda e Suporte</span>
+                                </button>
+                            </li>
+                            <li>
+                                <button onClick={onOpenPrivacyPolicy} className="inline-flex items-center gap-2 hover:text-white transition-colors">
+                                    <i className="fas fa-user-shield mr-1 text-accent"></i>
+                                    <span>Política de Privacidade</span>
                                 </button>
                             </li>
                         </ul>

@@ -24,6 +24,8 @@ import defaultHeroBg from './assets/ambiente-pizzaria.webp';
 import defaultAboutImg from './assets/sobre-imagem.webp';
 import firebase from 'firebase/compat/app';
 import { OrderDetailsModal } from './components/OrderDetailsModal';
+import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
+import { CookieConsentBanner } from './components/CookieConsentBanner';
 
 // Type declarations for Google GAPI library to avoid TypeScript errors
 declare global {
@@ -197,6 +199,8 @@ const App: React.FC = () => {
     const [isChatbotOpen, setIsChatbotOpen] = useState<boolean>(false);
     const [isFooterVisible, setIsFooterVisible] = useState(false);
     const [showFloatingButton, setShowFloatingButton] = useState(false);
+    const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState<boolean>(false);
+    const [showCookieBanner, setShowCookieBanner] = useState<boolean>(false);
     
     // Auth State
     const [currentUser, setCurrentUser] = useState<firebase.User | null>(null);
@@ -244,7 +248,8 @@ const App: React.FC = () => {
                showPaymentFailureModal || 
                !!confirmedOrderData || 
                !!confirmedReservationData ||
-               !!trackingOrder;
+               !!trackingOrder ||
+               isPrivacyPolicyOpen;
     }, [
         isCartOpen, 
         isCheckoutModalOpen, 
@@ -256,7 +261,8 @@ const App: React.FC = () => {
         showPaymentFailureModal, 
         confirmedOrderData, 
         confirmedReservationData,
-        trackingOrder
+        trackingOrder,
+        isPrivacyPolicyOpen
     ]);
 
     // Effect to lock body scroll when a modal is open
@@ -280,6 +286,19 @@ const App: React.FC = () => {
             setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
         }, 4000);
     }, []);
+
+    // Effect to check for cookie consent on initial load
+    useEffect(() => {
+        const consent = localStorage.getItem('santaSensacaoCookieConsent');
+        if (!consent) {
+            setShowCookieBanner(true);
+        }
+    }, []);
+
+    const handleAcceptCookies = () => {
+        localStorage.setItem('santaSensacaoCookieConsent', 'true');
+        setShowCookieBanner(false);
+    };
 
     // Effect to initialize Google Auth
     useEffect(() => {
@@ -829,7 +848,7 @@ const App: React.FC = () => {
             </main>
             
             <div id="footer-section">
-                <Footer settings={siteSettings} onOpenChatbot={() => setIsChatbotOpen(true)} />
+                <Footer settings={siteSettings} onOpenChatbot={() => setIsChatbotOpen(true)} onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)} />
             </div>
             
             <div className="fixed bottom-5 right-5 z-40 flex flex-col-reverse items-end gap-3">
@@ -934,6 +953,8 @@ const App: React.FC = () => {
                 initialTab={postRegisterAction === 'add_address_flow' ? 'addresses' : undefined}
                 showAddAddressForm={postRegisterAction === 'add_address_flow'}
             />
+            <PrivacyPolicyModal isOpen={isPrivacyPolicyOpen} onClose={() => setIsPrivacyPolicyOpen(false)} />
+            {showCookieBanner && <CookieConsentBanner onAccept={handleAcceptCookies} />}
 
             {(isProcessingOrder) && <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-6 font-semibold text-lg text-gray-700">Processando seu pedido...</p><p className="mt-2 text-sm text-gray-500">Por favor, aguarde um instante.</p></div></div>}
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]"><div className="w-full flex flex-col items-center space-y-4 sm:items-end">{toasts.map((toast) => (<div key={toast.id} className="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden animate-fade-in-up"><div className="p-4"><div className="flex items-start"><div className="flex-shrink-0">{toast.type === 'success' ? <i className="fas fa-check-circle h-6 w-6 text-green-500"></i> : <i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>}</div><div className="ml-3 w-0 flex-1 pt-0.5"><p className="text-sm font-medium text-gray-900">{toast.message}</p></div></div></div></div>))}</div></div>
