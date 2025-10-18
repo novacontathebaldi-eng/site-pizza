@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, ChatMessage, ReservationDetails, UserProfile } from './types';
+// FIX: The 'Partial' type is a built-in TypeScript utility and does not need to be imported.
+import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, ChatMessage, ReservationDetails, UserProfile, DaySchedule } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
@@ -45,6 +46,16 @@ const defaultSiteSettings: SiteSettings = {
     heroTitle: "Pizzaria Santa Sensação",
     heroSubtitle: "A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.",
     heroBgUrl: defaultHeroBg,
+    automaticSchedulingEnabled: true,
+    operatingHours: [
+        { dayOfWeek: 0, dayName: 'Domingo', isOpen: true, openTime: '19:00', closeTime: '22:00' },
+        { dayOfWeek: 1, dayName: 'Segunda', isOpen: false, openTime: '19:00', closeTime: '22:00' },
+        { dayOfWeek: 2, dayName: 'Terça', isOpen: false, openTime: '19:00', closeTime: '22:00' },
+        { dayOfWeek: 3, dayName: 'Quarta', isOpen: true, openTime: '19:00', closeTime: '22:00' },
+        { dayOfWeek: 4, dayName: 'Quinta', isOpen: true, openTime: '19:00', closeTime: '22:00' },
+        { dayOfWeek: 5, dayName: 'Sexta', isOpen: true, openTime: '19:00', closeTime: '22:00' },
+        { dayOfWeek: 6, dayName: 'Sábado', isOpen: true, openTime: '19:00', closeTime: '22:00' },
+    ],
     contentSections: [
         {
             id: 'section-1',
@@ -693,6 +704,16 @@ const App: React.FC = () => {
     const handleReorderProducts = useCallback(async (productsToUpdate: { id: string; orderIndex: number }[]) => { try { await firebaseService.updateProductsOrder(productsToUpdate); addToast("Ordem dos produtos atualizada.", 'success'); } catch (error) { console.error("Failed to reorder products:", error); addToast("Erro ao reordenar produtos.", 'error'); } }, [addToast]);
     const handleReorderCategories = useCallback(async (categoriesToUpdate: { id: string; order: number }[]): Promise<void> => { try { await firebaseService.updateCategoriesOrder(categoriesToUpdate); addToast("Ordem das categorias atualizada.", 'success'); } catch (error) { console.error("Failed to reorder categories:", error); addToast("Erro ao reordenar categorias.", 'error'); } }, [addToast]);
     const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => { try { const settingsToUpdate = JSON.parse(JSON.stringify(settings)); for (const key in files) { const file = files[key]; if (file) { const url = await firebaseService.uploadSiteAsset(file, key); if (key === 'logo') settingsToUpdate.logoUrl = url; else if (key === 'heroBg') settingsToUpdate.heroBgUrl = url; else { const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key); if (sectionIndex > -1) settingsToUpdate.contentSections[sectionIndex].imageUrl = url; } } } await firebaseService.updateSiteSettings(settingsToUpdate); addToast("Personalização salva!", 'success'); } catch (error) { console.error("Failed to save site settings:", error); addToast("Erro ao salvar configurações.", 'error'); } }, [addToast]);
+    const handleUpdateSiteSettingsField = useCallback(async (updates: Partial<SiteSettings>) => {
+        try {
+            await firebaseService.updateSiteSettings(updates);
+            addToast('Configuração salva com sucesso!', 'success');
+        } catch (error) {
+            console.error('Failed to update site settings field:', error);
+            addToast('Erro ao salvar a configuração.', 'error');
+            throw error; // Re-throw to allow UI to handle failure states if needed
+        }
+    }, [addToast]);
     const handleUpdateOrderStatus = useCallback(async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => { try { let finalStatus = status; const order = orders.find(o => o.id === orderId); if (status === 'accepted' && order?.customer.orderType === 'local') finalStatus = 'reserved'; await firebaseService.updateOrderStatus(orderId, finalStatus, payload); addToast("Status do pedido atualizado!", 'success'); } catch (error) { console.error("Failed to update order status:", error); addToast("Erro ao atualizar status.", 'error'); } }, [orders, addToast]);
     const handleUpdateOrderPaymentStatus = useCallback(async (orderId: string, paymentStatus: PaymentStatus) => { try { await firebaseService.updateOrderPaymentStatus(orderId, paymentStatus); addToast("Status de pagamento atualizado!", 'success'); } catch (error) { console.error("Failed to update order payment status:", error); addToast("Erro ao atualizar pagamento.", 'error'); } }, [addToast]);
     const handleUpdateOrderReservationTime = useCallback(async (orderId: string, reservationTime: string) => { try { await firebaseService.updateOrderReservationTime(orderId, reservationTime); addToast("Horário da reserva atualizado!", 'success'); } catch (error) { console.error("Failed to update reservation time:", error); addToast("Erro ao atualizar horário.", 'error'); } }, [addToast]);
@@ -803,8 +824,8 @@ const App: React.FC = () => {
                 {error && <div className="container mx-auto px-4 py-8"><div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-6 rounded-lg shadow-md" role="alert"><p className="font-bold text-lg mb-2">Falha na Conexão</p><p className="mb-4">{error}</p></div></div>}
                 {isLoading ? <div className="text-center py-20"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p></div> : !error && <MenuSection categories={categories} products={products} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} activeCategoryId={activeMenuCategory} setActiveCategoryId={setActiveMenuCategory} cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} cartItems={cart}/>}
                 <div id="sobre">{siteSettings.contentSections?.filter(section => section.isVisible).sort((a, b) => a.order - b.order).map((section, index) => <DynamicContentSection key={section.id} section={section} order={index} />)}</div>
-                <ContactSection />
-                <AdminSection allProducts={products} allCategories={categories} isStoreOnline={isStoreOnline} siteSettings={siteSettings} orders={orders} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onProductStatusChange={handleProductStatusChange} onProductStockStatusChange={handleProductStockStatusChange} onStoreStatusChange={handleStoreStatusChange} onSaveCategory={handleSaveCategory} onDeleteCategory={handleDeleteCategory} onCategoryStatusChange={handleCategoryStatusChange} onReorderProducts={handleReorderProducts} onReorderCategories={handleReorderCategories} onSeedDatabase={seedDatabase} onSaveSiteSettings={handleSaveSiteSettings} onUpdateOrderStatus={handleUpdateOrderStatus} onUpdateOrderPaymentStatus={handleUpdateOrderPaymentStatus} onUpdateOrderReservationTime={handleUpdateOrderReservationTime} onDeleteOrder={handleDeleteOrder} onPermanentDeleteOrder={handlePermanentDeleteOrder} onPermanentDeleteMultipleOrders={handlePermanentDeleteMultipleOrders} onRefundOrder={handleRefundOrder} refundingOrderId={refundingOrderId}/>
+                <ContactSection settings={siteSettings} />
+                <AdminSection allProducts={products} allCategories={categories} isStoreOnline={isStoreOnline} siteSettings={siteSettings} orders={orders} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onProductStatusChange={handleProductStatusChange} onProductStockStatusChange={handleProductStockStatusChange} onStoreStatusChange={handleStoreStatusChange} onSaveCategory={handleSaveCategory} onDeleteCategory={handleDeleteCategory} onCategoryStatusChange={handleCategoryStatusChange} onReorderProducts={handleReorderProducts} onReorderCategories={handleReorderCategories} onSeedDatabase={seedDatabase} onSaveSiteSettings={handleSaveSiteSettings} onUpdateSiteSettingsField={handleUpdateSiteSettingsField} onUpdateOrderStatus={handleUpdateOrderStatus} onUpdateOrderPaymentStatus={handleUpdateOrderPaymentStatus} onUpdateOrderReservationTime={handleUpdateOrderReservationTime} onDeleteOrder={handleDeleteOrder} onPermanentDeleteOrder={handlePermanentDeleteOrder} onPermanentDeleteMultipleOrders={handlePermanentDeleteMultipleOrders} onRefundOrder={handleRefundOrder} refundingOrderId={refundingOrderId}/>
             </main>
             
             <div id="footer-section">

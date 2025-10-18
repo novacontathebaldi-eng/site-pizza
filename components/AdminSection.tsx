@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
+// FIX: The 'Partial' type is a built-in TypeScript utility and does not need to be imported.
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, DaySchedule } from '../types';
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
 import { SiteCustomizationTab } from './SiteCustomizationTab';
@@ -30,6 +31,7 @@ interface AdminSectionProps {
     onReorderCategories: (categoriesToUpdate: { id: string; order: number }[]) => Promise<void>;
     onSeedDatabase: () => Promise<void>;
     onSaveSiteSettings: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
+    onUpdateSiteSettingsField: (updates: Partial<SiteSettings>) => Promise<void>;
     onUpdateOrderStatus: (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => Promise<void>;
     onUpdateOrderPaymentStatus: (orderId: string, paymentStatus: PaymentStatus) => Promise<void>;
     onUpdateOrderReservationTime: (orderId: string, reservationTime: string) => Promise<void>;
@@ -150,7 +152,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         allProducts, allCategories, isStoreOnline, siteSettings, orders,
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
-        onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
+        onSeedDatabase, onSaveSiteSettings, onUpdateSiteSettingsField, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
         onDeleteOrder, onPermanentDeleteOrder, onPermanentDeleteMultipleOrders, onRefundOrder, refundingOrderId
     } = props;
     
@@ -181,6 +183,12 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const [isTrashVisible, setIsTrashVisible] = useState(false);
     const [selectedOrderIds, setSelectedOrderIds] = useState(new Set<string>());
 
+    // State for Status Tab
+    const [localSettings, setLocalSettings] = useState<SiteSettings>(siteSettings);
+    const [hasSettingsChanged, setHasSettingsChanged] = useState(false);
+    const [isSavingStatus, setIsSavingStatus] = useState(false);
+    const [isSavingAutoSchedule, setIsSavingAutoSchedule] = useState(false);
+
 
     // State for sound notification
     const [isSoundEnabled, setIsSoundEnabled] = useState(() => {
@@ -189,6 +197,20 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     });
     const prevPendingOrdersCount = useRef(0);
     const audioRef = useRef<HTMLAudioElement>(null);
+
+    // Sync Status tab settings with props, but don't overwrite local changes
+    useEffect(() => {
+        // This effect runs when siteSettings prop changes from Firestore listener
+        // We want to update our local state with the new values, but without
+        // destroying unsaved changes in operatingHours.
+        setLocalSettings(currentLocalSettings => ({
+            ...currentLocalSettings, // Keep current local values (like dirty operatingHours)
+            ...siteSettings, // Overwrite with fresh data from Firestore
+            operatingHours: hasSettingsChanged // If operatingHours are dirty...
+                ? currentLocalSettings.operatingHours // ...keep the dirty version
+                : siteSettings.operatingHours, // ...otherwise, take the fresh version.
+        }));
+    }, [siteSettings]);
 
 
     useEffect(() => setLocalProducts(allProducts), [allProducts]);
@@ -465,6 +487,54 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         setTimeout(() => scrollToContent('order-list-container'), 50);
     };
 
+    // --- Handlers for Status Tab ---
+    const handleAutomaticSchedulingChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const isEnabled = e.target.checked;
+        setIsSavingAutoSchedule(true);
+        try {
+            await onUpdateSiteSettingsField({ automaticSchedulingEnabled: isEnabled });
+        } catch (error) {
+            // Error toast is shown by the parent App component.
+        } finally {
+            setIsSavingAutoSchedule(false);
+        }
+    };
+
+    const handleOperatingHoursChange = (dayOfWeek: number, field: keyof DaySchedule, value: any) => {
+        const newHours = (localSettings.operatingHours || []).map(schedule => {
+            if (schedule.dayOfWeek === dayOfWeek) {
+                const updatedSchedule = { ...schedule };
+                (updatedSchedule as any)[field] = value;
+                return updatedSchedule;
+            }
+            return schedule;
+        });
+
+        setLocalSettings(prev => ({
+            ...prev,
+            operatingHours: newHours,
+        }));
+        setHasSettingsChanged(true);
+    };
+
+    const handleSaveStatusSettings = async () => {
+        setIsSavingStatus(true);
+        try {
+            // Merge the latest siteSettings (which has the correct auto-schedule value)
+            // with the local changes (which has the correct operating hours).
+            const settingsToSave = {
+                ...siteSettings, // Start with the most up-to-date settings from props
+                operatingHours: localSettings.operatingHours, // Overwrite with only the locally managed field
+            };
+            await onSaveSiteSettings(settingsToSave, {});
+            setHasSettingsChanged(false);
+        } catch (e) {
+            console.error("Failed to save status settings", e);
+        } finally {
+            setIsSavingStatus(false);
+        }
+    };
+
 
     if (!showAdminPanel) return null;
     if (authLoading) return <section id="admin" className="py-20 bg-brand-ivory-50"><div className="text-center"><i className="fas fa-spinner fa-spin text-4xl text-accent"></i></div></section>;
@@ -511,7 +581,103 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                             </div>
                         </div>
 
-                        <div id="admin-content-status"> {activeTab === 'status' && ( <div> <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3> <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg"> <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer"> <input type="checkbox" id="store-status-toggle" className="sr-only peer" checked={isStoreOnline} onChange={e => onStoreStatusChange(e.target.checked)} /> <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600"></div> </label> <span className={`font-semibold text-lg ${isStoreOnline ? 'text-green-600' : 'text-red-600'}`}>{isStoreOnline ? 'Aberta' : 'Fechada'}</span> </div> </div> )} </div>
+                        <div id="admin-content-status">
+                            {activeTab === 'status' && (
+                                <div>
+                                    <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3>
+                                    <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg border">
+                                        <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                id="store-status-toggle"
+                                                className="sr-only peer"
+                                                checked={isStoreOnline}
+                                                onChange={e => onStoreStatusChange(e.target.checked)}
+                                                disabled={siteSettings.automaticSchedulingEnabled}
+                                            />
+                                            <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600 peer-disabled:bg-gray-300 peer-disabled:cursor-not-allowed"></div>
+                                        </label>
+                                        <div>
+                                            <span className={`font-semibold text-lg ${siteSettings.automaticSchedulingEnabled ? 'text-gray-500' : (isStoreOnline ? 'text-green-600' : 'text-red-600')}`}>
+                                                {isStoreOnline ? 'Aberta' : 'Fechada'}
+                                            </span>
+                                            {siteSettings.automaticSchedulingEnabled && <span className="text-sm text-gray-500 ml-2">(Gerenciado automaticamente)</span>}
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
+                                        <div className="flex items-center gap-4">
+                                            <label htmlFor="automatic-scheduling-toggle" className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    id="automatic-scheduling-toggle"
+                                                    className="sr-only peer"
+                                                    checked={siteSettings.automaticSchedulingEnabled ?? false}
+                                                    onChange={handleAutomaticSchedulingChange}
+                                                    disabled={isSavingAutoSchedule}
+                                                />
+                                                <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600 peer-disabled:opacity-50 peer-disabled:cursor-wait"></div>
+                                            </label>
+                                            <span className="font-semibold text-gray-800">Gerir horário automaticamente.</span>
+                                            {isSavingAutoSchedule && <i className="fas fa-spinner fa-spin text-accent ml-2"></i>}
+                                        </div>
+                                        <p className="text-sm text-gray-500 mt-2 pl-14">Quando ativado, o status da loja mudará para "Aberta" ou "Fechada" conforme o horário de funcionamento definido abaixo, mesmo com o painel fechado.</p>
+                                    </div>
+
+                                    <div className="mt-8">
+                                        <h3 className="text-xl font-bold mb-4">Editar Horário de Funcionamento</h3>
+                                        <div className="space-y-3 bg-white p-4 rounded-lg border">
+                                            {(localSettings.operatingHours || []).map((schedule) => (
+                                                <div key={schedule.dayOfWeek} className="grid grid-cols-1 md:grid-cols-[120px_1fr_2fr] items-center gap-4 p-3 rounded-md border bg-gray-50/50">
+                                                    <div className="font-semibold">{schedule.dayName}</div>
+                                                    <div className="flex items-center gap-3">
+                                                        <label className="relative inline-flex items-center cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="sr-only peer"
+                                                                checked={schedule.isOpen}
+                                                                onChange={e => handleOperatingHoursChange(schedule.dayOfWeek, 'isOpen', e.target.checked)}
+                                                            />
+                                                            <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                                                        </label>
+                                                        <span className={`font-medium ${schedule.isOpen ? 'text-green-600' : 'text-gray-500'}`}>{schedule.isOpen ? 'Aberto' : 'Fechado'}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="time"
+                                                            value={schedule.openTime}
+                                                            onChange={e => handleOperatingHoursChange(schedule.dayOfWeek, 'openTime', e.target.value)}
+                                                            disabled={!schedule.isOpen}
+                                                            className="w-full px-2 py-1 border rounded-md bg-white disabled:bg-gray-200 disabled:cursor-not-allowed"
+                                                        />
+                                                        <span>às</span>
+                                                        <input
+                                                            type="time"
+                                                            value={schedule.closeTime}
+                                                            onChange={e => handleOperatingHoursChange(schedule.dayOfWeek, 'closeTime', e.target.value)}
+                                                            disabled={!schedule.isOpen}
+                                                            className="w-full px-2 py-1 border rounded-md bg-white disabled:bg-gray-200 disabled:cursor-not-allowed"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {hasSettingsChanged && (
+                                        <div className="mt-6 pt-6 border-t flex justify-end">
+                                            <button
+                                                onClick={handleSaveStatusSettings}
+                                                disabled={isSavingStatus}
+                                                className="bg-accent text-white font-semibold py-2 px-6 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[200px] disabled:bg-opacity-70"
+                                            >
+                                                {isSavingStatus ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-2"></i> Salvar Alterações</>}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                         
                         <div id="admin-content-orders"> {activeTab === 'orders' && (
                              <div>
