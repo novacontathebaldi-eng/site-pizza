@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { SiteSettings } from '../types';
 import firebase from 'firebase/compat/app';
-import defaultProfilePic from '../assets/perfil.png';
+// FIX: Replaced local asset import with a placeholder URL as the asset file was not provided.
+const defaultProfilePic = 'https://via.placeholder.com/100/CCCCCC/FFFFFF?text=Perfil';
 
 interface HeaderProps {
     cartItemCount: number;

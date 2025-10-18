@@ -10,8 +10,10 @@ import { CSS } from '@dnd-kit/utilities';
 import firebase from 'firebase/compat/app';
 import { auth } from '../services/firebase';
 import { SupportModal } from './SupportModal';
-import notificationSound from '../assets/notf1.mp3';
 import { FaqModal } from './FaqModal';
+
+// FIX: Replaced local asset import with an empty string as the asset file was not provided.
+const notificationSound = '';
 
 interface AdminSectionProps {
     allProducts: Product[];
@@ -563,7 +565,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                             <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
                                 {['status', 'orders', 'products', 'categories', 'chatbot', 'customization', 'data'].map(tab => {
                                     const icons: { [key: string]: string } = { status: 'fa-store-alt', orders: 'fa-receipt', products: 'fa-pizza-slice', categories: 'fa-tags', chatbot: 'fa-question-circle', customization: 'fa-paint-brush', data: 'fa-database' };
-                                    const labels: { [key: string]: string } = { status: 'Status', orders: 'Pedidos', products: 'Produtos', categories: 'Categorias', chatbot: 'Chatbot', customization: 'Personalização', data: 'Dados' };
+                                    const labels: { [key: string]: string } = { status: 'Status', orders: 'Pedidos', products: 'Produtos', categories: 'Categorias', chatbot: 'Ensinar o Chatbot', customization: 'Personalização', data: 'Dados' };
                                     return (
                                         <button 
                                             key={tab} 

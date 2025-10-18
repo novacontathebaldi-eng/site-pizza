@@ -12,17 +12,21 @@ import { CheckoutModal, OrderConfirmationModal, ReservationConfirmationModal } f
 import { ReservationModal } from './components/ReservationModal';
 import { PixPaymentModal } from './components/PixPaymentModal';
 import { PaymentFailureModal } from './components/PaymentFailureModal';
-import { Chatbot } from '@/components/Chatbot';
-import { LoginModal } from '@/components/LoginModal';
-import { UserAreaModal } from '@/components/UserAreaModal';
+import { Chatbot } from './components/Chatbot';
+import { LoginModal } from './components/LoginModal';
+import { UserAreaModal } from './components/UserAreaModal';
 import { db, auth } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
-import defaultLogo from './assets/logo.png';
-import defaultHeroBg from './assets/ambiente-pizzaria.webp';
-import defaultAboutImg from './assets/sobre-imagem.webp';
 import firebase from 'firebase/compat/app';
 import { OrderDetailsModal } from './components/OrderDetailsModal';
+
+// FIX: Replaced local asset imports with placeholder URLs as the asset files were not provided.
+// This resolves a build error that was causing a blank screen.
+const defaultLogo = 'https://via.placeholder.com/150/2C5633/FFFFFF?text=Logo';
+const defaultHeroBg = 'https://via.placeholder.com/1920x1080/596D44/FFFFFF?text=Pizzaria';
+const defaultAboutImg = 'https://via.placeholder.com/800x600/B2C4AC/2C5633?text=Sobre+Nós';
+
 
 // Type declarations for Google GAPI library to avoid TypeScript errors
 declare global {
