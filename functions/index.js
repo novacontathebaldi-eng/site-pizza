@@ -1,5 +1,6 @@
 /* eslint-disable max-len */
 const {onCall, onRequest} = require("firebase-functions/v2/https");
+const {onSchedule} = require("firebase-functions/v2/scheduler");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago");
@@ -13,6 +14,56 @@ const storage = admin.storage();
 
 // Define os secrets que as funções irão usar.
 const secrets = ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET", "GEMINI_API_KEY", "GOOGLE_CLIENT_ID"];
+
+// --- Scheduled Function for Automatic Store Status ---
+exports.updateStoreStatusBySchedule = onSchedule({
+  schedule: "every 5 minutes",
+  timeZone: "America/Sao_Paulo",
+}, async (event) => {
+  logger.info("Executando verificação de horário da loja...");
+
+  const settingsRef = db.doc("store_config/site_settings");
+  const statusRef = db.doc("store_config/status");
+
+  try {
+    const settingsDoc = await settingsRef.get();
+    if (!settingsDoc.exists) {
+      logger.warn("Documento de configurações do site não encontrado.");
+      return;
+    }
+
+    const settings = settingsDoc.data();
+    if (!settings.automaticSchedulingEnabled || !settings.operatingHours) {
+      logger.info("Agendamento automático desativado. Nenhuma ação tomada.");
+      return;
+    }
+
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ...
+    const currentTime = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+
+    const todaySchedule = settings.operatingHours.find((d) => d.dayOfWeek === dayOfWeek);
+
+    let shouldBeOpen = false;
+    if (todaySchedule && todaySchedule.isOpen) {
+      if (currentTime >= todaySchedule.openTime && currentTime < todaySchedule.closeTime) {
+        shouldBeOpen = true;
+      }
+    }
+
+    const statusDoc = await statusRef.get();
+    const currentStatus = statusDoc.exists ? statusDoc.data().isOpen : !shouldBeOpen;
+
+    if (currentStatus !== shouldBeOpen) {
+      await statusRef.set({isOpen: shouldBeOpen});
+      logger.info(`Status da loja atualizado para: ${shouldBeOpen ? "ABERTA" : "FECHADA"}`);
+    } else {
+      logger.info("Status da loja já está correto. Nenhuma atualização necessária.");
+    }
+  } catch (error) {
+    logger.error("Erro ao atualizar status da loja por agendamento:", error);
+  }
+});
 
 // --- Chatbot Santo ---
 let ai; // Mantém a instância da IA no escopo global para ser reutilizada após a primeira chamada.
