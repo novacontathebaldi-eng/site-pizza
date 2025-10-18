@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, FaqItem } from '../types';
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
-import { FaqModal } from './FaqModal';
 import { SiteCustomizationTab } from './SiteCustomizationTab';
 import { OrderCard } from './OrderCard';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
@@ -12,14 +11,15 @@ import firebase from 'firebase/compat/app';
 import { auth } from '../services/firebase';
 import { SupportModal } from './SupportModal';
 import notificationSound from '../assets/notf1.mp3';
+import { FaqModal } from './FaqModal';
 
 interface AdminSectionProps {
     allProducts: Product[];
     allCategories: Category[];
-    faqs: FaqItem[];
     isStoreOnline: boolean;
     siteSettings: SiteSettings;
     orders: Order[];
+    allFaqItems: FaqItem[];
     onSaveProduct: (product: Product) => Promise<void>;
     onDeleteProduct: (productId: string) => Promise<void>;
     onProductStatusChange: (productId: string, active: boolean) => Promise<void>;
@@ -30,10 +30,6 @@ interface AdminSectionProps {
     onCategoryStatusChange: (categoryId: string, active: boolean) => Promise<void>;
     onReorderProducts: (productsToUpdate: { id: string; orderIndex: number }[]) => Promise<void>;
     onReorderCategories: (categoriesToUpdate: { id: string; order: number }[]) => Promise<void>;
-    onSaveFaq: (faqData: Omit<FaqItem, 'id' | 'createdAt' | 'updatedAt'>, id?: string) => Promise<void>;
-    onDeleteFaq: (faqId: string) => Promise<void>;
-    onFaqStatusChange: (faqId: string, active: boolean) => Promise<void>;
-    onReorderFaqs: (faqsToUpdate: { id: string; order: number }[]) => Promise<void>;
     onSeedDatabase: () => Promise<void>;
     onSaveSiteSettings: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
     onUpdateOrderStatus: (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => Promise<void>;
@@ -44,52 +40,11 @@ interface AdminSectionProps {
     onPermanentDeleteMultipleOrders: (orderIds: string[]) => Promise<void>;
     onRefundOrder: (orderId: string) => Promise<void>;
     refundingOrderId: string | null;
+    onSaveFaqItem: (item: FaqItem) => Promise<void>;
+    onDeleteFaqItem: (itemId: string) => Promise<void>;
+    onFaqItemStatusChange: (itemId: string, active: boolean) => Promise<void>;
+    onReorderFaqItems: (itemsToUpdate: { id: string; order: number }[]) => Promise<void>;
 }
-
-interface SortableFaqItemProps {
-    faq: FaqItem;
-    onEdit: (faq: FaqItem) => void;
-    onDelete: (faqId: string) => void;
-    onStatusChange: (faqId: string, active: boolean) => void;
-}
-
-const SortableFaqItem: React.FC<SortableFaqItemProps> = ({ faq, onEdit, onDelete, onStatusChange }) => {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: faq.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 10 : 'auto',
-        boxShadow: isDragging ? '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' : 'none',
-    };
-
-    return (
-        <div ref={setNodeRef} style={style} className={`bg-gray-50 p-3 rounded-lg flex justify-between items-center transition-opacity ${!faq.active ? 'opacity-50' : ''}`}>
-            <div className="flex items-center gap-4">
-                <button {...attributes} {...listeners} className="cursor-grab touch-none p-2" aria-label="Mover pergunta">
-                    <i className="fas fa-grip-vertical text-gray-500 hover:text-gray-800"></i>
-                </button>
-                <p className="font-bold">{faq.question}</p>
-            </div>
-            <div className="flex items-center gap-4">
-                 <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" checked={faq.active} onChange={e => onStatusChange(faq.id, e.target.checked)} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                </label>
-                <button onClick={() => onEdit(faq)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${faq.question}`}><i className="fas fa-edit"></i></button>
-                <button onClick={() => window.confirm(`Tem certeza que deseja excluir a pergunta "${faq.question}"?`) && onDelete(faq.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${faq.question}`}><i className="fas fa-trash"></i></button>
-            </div>
-        </div>
-    );
-};
-
 
 interface SortableProductItemProps {
     product: Product;
@@ -192,18 +147,63 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
     );
 };
 
+interface SortableFaqItemProps {
+    item: FaqItem;
+    onEdit: (item: FaqItem) => void;
+    onDelete: (itemId: string) => void;
+    onStatusChange: (itemId: string, active: boolean) => void;
+}
+
+const SortableFaqItem: React.FC<SortableFaqItemProps> = ({ item, onEdit, onDelete, onStatusChange }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: item.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 10 : 'auto',
+        boxShadow: isDragging ? '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' : 'none',
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} className={`bg-gray-50 p-3 rounded-lg flex justify-between items-center transition-opacity ${!item.active ? 'opacity-50' : ''}`}>
+            <div className="flex items-center gap-4 flex-grow min-w-0">
+                <button {...attributes} {...listeners} className="cursor-grab touch-none p-2" aria-label="Mover item">
+                    <i className="fas fa-grip-vertical text-gray-500 hover:text-gray-800"></i>
+                </button>
+                <p className="font-semibold truncate text-sm">{item.ensinamento}</p>
+            </div>
+            <div className="flex items-center gap-4 flex-shrink-0">
+                 <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" checked={item.active} onChange={e => onStatusChange(item.id, e.target.checked)} className="sr-only peer" />
+                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                </label>
+                <button onClick={() => onEdit(item)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label="Editar item"><i className="fas fa-edit"></i></button>
+                <button onClick={() => window.confirm('Tem certeza que deseja excluir este ensinamento?') && onDelete(item.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label="Deletar item"><i className="fas fa-trash"></i></button>
+            </div>
+        </div>
+    );
+};
+
+
 // Define a type for the tabs in the admin UI to handle the split view
 type OrderTabKey = 'accepted' | 'reserved' | 'pronto' | 'emRota' | 'completed' | 'cancelled';
 
 
 export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const { 
-        allProducts, allCategories, isStoreOnline, siteSettings, orders, faqs,
+        allProducts, allCategories, isStoreOnline, siteSettings, orders, allFaqItems,
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
-        onSaveFaq, onDeleteFaq, onFaqStatusChange, onReorderFaqs,
         onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
-        onDeleteOrder, onPermanentDeleteOrder, onPermanentDeleteMultipleOrders, onRefundOrder, refundingOrderId
+        onDeleteOrder, onPermanentDeleteOrder, onPermanentDeleteMultipleOrders, onRefundOrder, refundingOrderId,
+        onSaveFaqItem, onDeleteFaqItem, onFaqItemStatusChange, onReorderFaqItems
     } = props;
     
     const [user, setUser] = useState<firebase.User | null>(null);
@@ -217,18 +217,17 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     
     const [localProducts, setLocalProducts] = useState<Product[]>(allProducts);
     const [localCategories, setLocalCategories] = useState<Category[]>(allCategories);
-    const [localFaqs, setLocalFaqs] = useState<FaqItem[]>(faqs);
+    const [localFaqItems, setLocalFaqItems] = useState<FaqItem[]>(allFaqItems);
 
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+    const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
     
     const [isFaqModalOpen, setIsFaqModalOpen] = useState(false);
-    const [editingFaq, setEditingFaq] = useState<FaqItem | null>(null);
-
-    const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+    const [editingFaqItem, setEditingFaqItem] = useState<FaqItem | null>(null);
 
     // State for order management
     const [orderSearchTerm, setOrderSearchTerm] = useState('');
@@ -250,7 +249,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
     useEffect(() => setLocalProducts(allProducts), [allProducts]);
     useEffect(() => setLocalCategories([...allCategories].sort((a, b) => a.order - b.order)), [allCategories]);
-    useEffect(() => setLocalFaqs([...faqs].sort((a, b) => a.order - b.order)), [faqs]);
+    useEffect(() => setLocalFaqItems([...allFaqItems].sort((a, b) => a.order - b.order)), [allFaqItems]);
 
     useEffect(() => {
         if (!auth) {
@@ -370,12 +369,12 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const handleFaqDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
-        const oldIndex = localFaqs.findIndex(f => f.id === active.id);
-        const newIndex = localFaqs.findIndex(f => f.id === over.id);
-        const reordered = arrayMove(localFaqs, oldIndex, newIndex);
-        onReorderFaqs(reordered.map((f, index) => ({ id: f.id, order: index })));
+        const oldIndex = localFaqItems.findIndex(c => c.id === active.id);
+        const newIndex = localFaqItems.findIndex(c => c.id === over.id);
+        const reordered = arrayMove(localFaqItems, oldIndex, newIndex);
+        onReorderFaqItems(reordered.map((c, index) => ({ id: c.id, order: index })));
     };
-
+    
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -416,8 +415,8 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const handleEditProduct = (p: Product) => { setEditingProduct(p); setIsProductModalOpen(true); };
     const handleAddNewCategory = () => { setEditingCategory(null); setIsCategoryModalOpen(true); };
     const handleEditCategory = (c: Category) => { setEditingCategory(c); setIsCategoryModalOpen(true); };
-    const handleAddNewFaq = () => { setEditingFaq(null); setIsFaqModalOpen(true); };
-    const handleEditFaq = (f: FaqItem) => { setEditingFaq(f); setIsFaqModalOpen(true); };
+    const handleAddNewFaqItem = () => { setEditingFaqItem(null); setIsFaqModalOpen(true); };
+    const handleEditFaqItem = (item: FaqItem) => { setEditingFaqItem(item); setIsFaqModalOpen(true); };
 
     const handleSeedDatabase = async () => { if (window.confirm('Tem certeza? Isso adicionará dados iniciais.')) { try { await onSeedDatabase(); alert('Banco de dados populado!'); } catch (e) { console.error(e); alert("Erro ao popular o banco."); } } };
     const handleBackup = () => { try { const backupData = { products: allProducts, categories: allCategories, store_config: { status: { isOpen: isStoreOnline }, site_settings: siteSettings }, backupDate: new Date().toISOString() }; const jsonString = JSON.stringify(backupData, null, 2); const blob = new Blob([jsonString], { type: 'application/json' }); const href = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = href; link.download = `backup_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href); alert('Backup concluído!'); } catch (e) { console.error(e); alert("Falha no backup."); } };
@@ -562,9 +561,9 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                         </div>
                         <div className="border-b mb-6">
                             <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
-                                {['status', 'orders', 'products', 'categories', 'customization', 'faq', 'data'].map(tab => {
-                                    const icons: { [key: string]: string } = { status: 'fa-store-alt', orders: 'fa-receipt', products: 'fa-pizza-slice', categories: 'fa-tags', customization: 'fa-paint-brush', faq: 'fa-question-circle', data: 'fa-database' };
-                                    const labels: { [key: string]: string } = { status: 'Status', orders: 'Pedidos', products: 'Produtos', categories: 'Categorias', customization: 'Personalização', faq: 'Chatbot FAQ', data: 'Dados' };
+                                {['status', 'orders', 'products', 'categories', 'chatbot', 'customization', 'data'].map(tab => {
+                                    const icons: { [key: string]: string } = { status: 'fa-store-alt', orders: 'fa-receipt', products: 'fa-pizza-slice', categories: 'fa-tags', chatbot: 'fa-question-circle', customization: 'fa-paint-brush', data: 'fa-database' };
+                                    const labels: { [key: string]: string } = { status: 'Status', orders: 'Pedidos', products: 'Produtos', categories: 'Categorias', chatbot: 'Chatbot', customization: 'Personalização', data: 'Dados' };
                                     return (
                                         <button 
                                             key={tab} 
@@ -706,14 +705,14 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                         <div id="admin-content-customization"> {activeTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> )} </div>
                         <div id="admin-content-products"> {activeTab === 'products' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Produtos</h3> <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Produto</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}> <div className="space-y-6"> {localCategories.map(category => { const categoryProducts = localProducts.filter(p => p.categoryId === category.id).sort((a, b) => a.orderIndex - b.orderIndex); return ( <div key={category.id}> <h4 className={`text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4> <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3 min-h-[50px]"> {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} />)} </div> </SortableContext> </div> ) })} </div> </DndContext> </div> )} </div>
                         <div id="admin-content-categories"> {activeTab === 'categories' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Categorias</h3> <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Categoria</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}> <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localCategories.map(cat => <SortableCategoryItem key={cat.id} category={cat} onEdit={handleEditCategory} onDelete={onDeleteCategory} onStatusChange={onCategoryStatusChange} />)} </div> </SortableContext> </DndContext> </div> )} </div>
-                        <div id="admin-content-faq"> {activeTab === 'faq' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar FAQ do Chatbot</h3> <button onClick={handleAddNewFaq} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Pergunta</button> </div> {localFaqs.length > 0 ? ( <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleFaqDragEnd}> <SortableContext items={localFaqs.map(f => f.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localFaqs.map(faq => <SortableFaqItem key={faq.id} faq={faq} onEdit={handleEditFaq} onDelete={onDeleteFaq} onStatusChange={onFaqStatusChange} />)} </div> </SortableContext> </DndContext> ) : ( <div className="text-center py-12 border-2 border-dashed rounded-lg"> <i className="fas fa-comment-slash text-4xl text-gray-300 mb-4"></i> <h4 className="font-bold text-lg text-gray-600">Nenhuma pergunta encontrada.</h4> <p className="text-gray-500 mb-4">Adicione a primeira pergunta para ajudar o chatbot a responder os clientes.</p> <button onClick={handleAddNewFaq} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Adicionar a Primeira Pergunta</button> </div> )} </div> )} </div>
+                        <div id="admin-content-chatbot"> {activeTab === 'chatbot' && ( <div> <div className="flex justify-between items-center mb-4"> <div> <h3 className="text-xl font-bold">Ensinar o Chatbot</h3> <p className="text-sm text-gray-600">Adicione regras e informações que o "Sensação" deve seguir como prioridade.</p> </div> <button onClick={handleAddNewFaqItem} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Ensinamento</button> </div> {localFaqItems.length > 0 ? ( <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleFaqDragEnd}> <SortableContext items={localFaqItems.map(c => c.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localFaqItems.map(item => <SortableFaqItem key={item.id} item={item} onEdit={handleEditFaqItem} onDelete={onDeleteFaqItem} onStatusChange={onFaqItemStatusChange} />)} </div> </SortableContext> </DndContext> ) : ( <div className="text-center py-12 border-2 border-dashed rounded-lg"> <p className="text-gray-500 mb-4">Nenhum ensinamento cadastrado ainda.</p> <button onClick={handleAddNewFaqItem} className="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300"> <i className="fas fa-plus mr-2"></i>Clique aqui para ensinar o Sensação </button> </div> )} </div> )} </div>
                         <div id="admin-content-data"> {activeTab === 'data' && ( <div> <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus dados.</p> <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados iniciais. Use apenas uma vez.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> )} </div>
                     </div>
                 </div>
             </section>
             <ProductModal isOpen={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} onSave={onSaveProduct} product={editingProduct} categories={allCategories} />
             <CategoryModal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} onSave={onSaveCategory} category={editingCategory} />
-            <FaqModal isOpen={isFaqModalOpen} onClose={() => setIsFaqModalOpen(false)} onSave={onSaveFaq} faq={editingFaq} />
+            <FaqModal isOpen={isFaqModalOpen} onClose={() => setIsFaqModalOpen(false)} onSave={onSaveFaqItem} item={editingFaqItem} />
             <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
         </>
     );

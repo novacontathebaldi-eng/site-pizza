@@ -1,77 +1,63 @@
 import React, { useState, useEffect } from 'react';
 import { FaqItem } from '../types';
-import firebase from 'firebase/compat/app';
 
 interface FaqModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (faq: Omit<FaqItem, 'id' | 'createdAt' | 'updatedAt'>, id?: string) => Promise<void>;
-    faq: FaqItem | null;
+    onSave: (item: FaqItem) => void;
+    item: FaqItem | null;
 }
 
-export const FaqModal: React.FC<FaqModalProps> = ({ isOpen, onClose, onSave, faq }) => {
-    const [question, setQuestion] = useState('');
-    const [keywords, setKeywords] = useState('');
-    const [answer, setAnswer] = useState('');
-    const [isSaving, setIsSaving] = useState(false);
+export const FaqModal: React.FC<FaqModalProps> = ({ isOpen, onClose, onSave, item }) => {
+    const [ensinamento, setEnsinamento] = useState('');
 
     useEffect(() => {
         if (isOpen) {
-            if (faq) {
-                setQuestion(faq.question);
-                setKeywords(faq.keywords.join(', '));
-                setAnswer(faq.answer);
-            } else {
-                setQuestion('');
-                setKeywords('');
-                setAnswer('');
-            }
+            setEnsinamento(item ? item.ensinamento : '');
         }
-    }, [faq, isOpen]);
+    }, [item, isOpen]);
 
     if (!isOpen) return null;
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        setIsSaving(true);
-        const faqData = {
-            question,
-            answer,
-            keywords: keywords.split(',').map(k => k.trim()).filter(Boolean),
-            active: faq?.active ?? true,
-            order: faq?.order ?? 0,
+        if (!ensinamento.trim()) return;
+
+        const finalItem: FaqItem = {
+            id: item?.id || '',
+            ensinamento: ensinamento,
+            active: item?.active ?? true,
+            order: item?.order ?? 0,
         };
-        await onSave(faqData, faq?.id);
-        setIsSaving(false);
+        onSave(finalItem);
         onClose();
     };
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
                 <div className="flex justify-between items-center p-5 border-b border-gray-200">
-                    <h2 className="text-2xl font-bold text-text-on-light">{faq ? 'Editar Pergunta' : 'Nova Pergunta'}</h2>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl" disabled={isSaving}>&times;</button>
+                    <h2 className="text-2xl font-bold text-text-on-light">{item ? 'Editar Ensinamento' : 'Novo Ensinamento para o Chatbot'}</h2>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
                 </div>
                 <div className="overflow-y-auto p-6">
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label className="block text-sm font-semibold mb-1" htmlFor="faq-question">Pergunta Principal *</label>
-                            <input id="faq-question" value={question} onChange={(e) => setQuestion(e.target.value)} className="w-full px-3 py-2 border rounded-md" required />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold mb-1" htmlFor="faq-keywords">Variações da Pergunta (separadas por vírgula)</label>
-                            <input id="faq-keywords" value={keywords} onChange={(e) => setKeywords(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="Ex: horário de entrega, que horas entregam" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold mb-1" htmlFor="faq-answer">Resposta *</label>
-                            <textarea id="faq-answer" value={answer} onChange={(e) => setAnswer(e.target.value)} className="w-full px-3 py-2 border rounded-md" rows={5} required />
+                            <label className="block text-sm font-semibold mb-1" htmlFor="faq-ensinamento">Comando / Regra / Explicação *</label>
+                            <textarea 
+                                id="faq-ensinamento" 
+                                value={ensinamento} 
+                                onChange={(e) => setEnsinamento(e.target.value)} 
+                                className="w-full px-3 py-2 border rounded-md" 
+                                rows={8}
+                                placeholder="Ex: Hoje, dia 16, não teremos taxa de entrega por ser uma promoção especial do dia."
+                                required 
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Escreva a regra ou informação que o chatbot deve seguir. Ele tratará esta instrução como uma ordem prioritária.</p>
                         </div>
                         <div className="flex justify-end gap-3 pt-4">
-                            <button type="button" onClick={onClose} disabled={isSaving} className="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 disabled:opacity-50">Cancelar</button>
-                            <button type="submit" disabled={isSaving} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[120px] disabled:bg-opacity-70">
-                                {isSaving ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-2"></i><span>Salvar</span></>}
-                            </button>
+                            <button type="button" onClick={onClose} className="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Cancelar</button>
+                            <button type="submit" className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-save mr-2"></i>Salvar Ensinamento</button>
                         </div>
                     </form>
                 </div>

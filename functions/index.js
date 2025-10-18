@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-const {onCall, onRequest} = require("firebase-functions/v2/h");
+const {onCall, onRequest} = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago");
@@ -15,17 +15,14 @@ const storage = admin.storage();
 const secrets = ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET", "GEMINI_API_KEY", "GOOGLE_CLIENT_ID"];
 
 // --- Chatbot Santo ---
-let ai; // Mantém a instância da IA no escopo global para ser reutilizada.
-let faqCache = {
-  data: null,
-  timestamp: 0,
-};
-const FAQ_CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+let ai; // Mantém a instância da IA no escopo global para ser reutilizada após a primeira chamada.
 
 /**
  * Chatbot Cloud Function to interact with Gemini API.
  */
 exports.askSanto = onCall({secrets}, async (request) => {
+  // "Lazy Initialization": Inicializa a IA somente na primeira vez que a função é chamada.
+  // Isso evita timeouts durante o deploy.
   if (!ai) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -36,48 +33,15 @@ exports.askSanto = onCall({secrets}, async (request) => {
     logger.info("Gemini AI client initialized on first call.");
   }
 
-  // Fetch and format FAQs from cache or Firestore
-  let faqKnowledgeBase = "";
-  const cacheNow = Date.now();
-  if (faqCache.data && (cacheNow - faqCache.timestamp < FAQ_CACHE_DURATION)) {
-    faqKnowledgeBase = faqCache.data;
-    logger.info("Using cached FAQs for chatbot.");
-  } else {
-    try {
-      const faqSnapshot = await db.collection("chatbot_faqs").where("active", "==", true).orderBy("order").get();
-      if (!faqSnapshot.empty) {
-        const faqs = faqSnapshot.docs.map((doc, index) => {
-          const data = doc.data();
-          let faqString = `[PERGUNTA ${index + 1}]\n`;
-          faqString += `P: ${data.question}\n`;
-          if (data.keywords && data.keywords.length > 0) {
-            faqString += `Variações: ${data.keywords.join(", ")}\n`;
-          }
-          faqString += `R: ${data.answer}\n`;
-          return faqString;
-        });
-
-        const faqHeader = "--- BASE DE CONHECIMENTO (FAQ) ---\nUse estritamente as informações abaixo para responder às perguntas dos clientes.\n\n";
-        const faqFooter = "------------------------------------\n";
-        faqKnowledgeBase = faqHeader + faqs.join("\n") + faqFooter;
-        
-        faqCache = {
-          data: faqKnowledgeBase,
-          timestamp: cacheNow,
-        };
-        logger.info("Fetched and cached new FAQs for chatbot.");
-      }
-    } catch (err) {
-      logger.error("Failed to fetch FAQs for chatbot:", err);
-      // Continue without FAQ knowledge base if it fails
-    }
-  }
-
+  // 1. Recebemos o histórico da conversa (que veio do frontend)
   const conversationHistory = request.data.history;
   if (!conversationHistory || conversationHistory.length === 0) {
     throw new Error("No conversation history provided.");
   }
 
+  // 2. Formatamos o histórico para o formato que a API do Gemini espera.
+  // A API espera um array de objetos { role: 'user'|'model', parts: [{ text: '...' }] }
+  // O papel do nosso bot ('bot') é traduzido para 'model' para a API.
   const contents = conversationHistory.map((message) => ({
     role: message.role === "bot" ? "model" : "user",
     parts: [{text: message.content}],
@@ -97,7 +61,25 @@ exports.askSanto = onCall({secrets}, async (request) => {
     });
     const timeInstruction = `INFORMAÇÃO DE CONTEXTO EM TEMPO REAL: A data e hora atual em Brasília são: ${brasiliaTime}. Use esta informação para responder sobre horários de funcionamento e disponibilidade.`;
 
-    const systemInstruction = `${faqKnowledgeBase}\n${timeInstruction}\n
+    const faqCollectionRef = db.collection("chatbot_aprende");
+    const faqSnapshot = await faqCollectionRef.where("active", "==", true).orderBy("order").get();
+
+    let knowledgeBaseString = "";
+    if (!faqSnapshot.empty) {
+      const teachings = faqSnapshot.docs.map((doc, index) => {
+        const data = doc.data();
+        return `[Regra da Gerência ${index + 1}]\n${data.ensinamento}`;
+      });
+
+      knowledgeBaseString = `
+--- BASE DE CONHECIMENTO (REGRAS DA GERÊNCIA) ---
+Os administradores estão dando essas ordens, explicações, ensinamentos e informações. Essas regras devem ser soberanas a quaisquer outras regras ou conhecimentos que você tenha:
+${teachings.join("\n\n")}
+--- FIM DA BASE DE CONHECIMENTO ---\n
+`;
+    }
+
+    const baseSystemInstruction = `
         Você é um atendente virtual amigável, prestativo e um pouco divertido da pizzaria 'Santa Sensação'. Seu nome é Santo. Sua principal função é ser o maior especialista no site da pizzaria, ajudando os clientes com qualquer dúvida sobre o cardápio, sabores, horário de funcionamento, endereço e, principalmente, como fazer um pedido, seja objetivo, mas também ofereça detalhes passo a passo se o cliente preferir. Seja sempre cordial e, como o nosso site já envia a primeira mensagem com seu nome automaticamente se a conversa já começou, não se apresente novamente, apenas continue o diálogo. Se o cliente por acaso se apresentar, passe a chama-lo pelo nome. Se o cliente perguntar quem é o dono diga que somos uma família e o dono é ele, o cliente, ele quem manda hahahaha, seja engraçado nesse momento. Se o cliente perguntar se você é um robô, diga que é o assistente virtual da casa, pronto para ajudar com um toque de magia. Para fazer Negrito use dois ** no início da palavra ou frase e dois ** no final da palavra ou frase, como no exemplo: **Exemplo Negrito**. A taxa de entrega é R$ 3,00. Atendemos a Região do Centro de Santa Leopoldina, as comunidades de Olaria, Vila Nova, Centro, Moxafongo, Cocal, Funil. Vou te explicar uma coisa agora para você ficar sabendo e explicar melhor sobre os locais até aonde entregamos: para o lado da Olaria, Entregamos até a Piscina (Canaã Campreste Clube). Subindo pra o funil entregamos até aquelas primeiras casas depois da ponte do Funil. No cocal entregamos até aquelas primeiras casas depois de passar aonde estão construindo a nova Escola Municipal.Mas a princípio diga que entregamos nas comunidades de Olaria, Vila Nova, Centro, Moxafongo, Cocal, Funil. Mas pergunte se o cliente quer enviar uma mensagem para o restaurante pelo WhatsApp confirmar o endereço, se ele responder que quer, usando o mesmo modelo ensinado abaixo crie um link para o cliente 'Continuar as conversa pelo WhatsApp' já faça um resumo e crie o link usando o modelo ensinado abaixo para criar os links clícáveis já com uma menssagem adequada pré escrita.
 
 INFORMAÇÕES GERAIS (SEU CONHECIMENTO BASE)
@@ -197,7 +179,7 @@ Diacríticos do português: á → %C3%A1, à → %C3%A0, â → %C3%A2, ã → 
 
 Não adicione parâmetros extras; use apenas ?text= e coloque toda a mensagem codificada após text=.​
 
-Nunca faça double-encoding; se já estiver codificado, não reencode.​
+Nunca faça double-encoding; se já estiver codificada, não reencode.​
 
 Algoritmo determinístico.​
 
@@ -282,8 +264,11 @@ Referências técnicas utilizadas: formato wa.me e parâmetro text do WhatsApp, 
 REGRAS DE ESCALONAMENTO SUPORTE TECNICO E BUGS: Quando o cliente relatar problemas no site, bugs, erros de carregamento, falhas de pagamento, travamentos ou comportamento inesperado, pergunte se ele prefere falar com o Restaurante ou com o Suporte Tecnico. Se escolher Restaurante: gere link do WhatsApp para 5527996500341 com mensagem curta resumindo o problema. Se escolher Suporte Tecnico: gere link para 5527996670426 com detalhamento tecnico suficiente para reproduzir o erro. Estrutura da mensagem bruta antes de codificar: L1 sempre Ola! Vim da secao de ajuda do site. O assistente Sensacao me encaminhou para o WhatsApp. L2 Resumo: descreva o problema em uma frase. L3 opcional para Restaurante: dados do pedido, itens, bairro, entrega, pagamento. L3 opcional para Suporte Tecnico: dispositivo, navegador, versao, data/hora, URL afetada, passos para reproduzir, erro exibido. L4 opcional: numero do pedido ou referencia do chat. Use 1 a 4 linhas separadas por %0A, maximo 500 caracteres, portugues claro, sem dados sensiveis. Monte a mensagem bruta, aplique encoding UTF-8 com encodeURIComponent ou manual (espaco %20, quebra %0A, virgula %2C, parenteses %28%29, acentos a %C3%A1, ã %C3%A3, ç %C3%A7, õ %C3%B5), concatene em https://wa.me/NUMERO?text= mais mensagem codificada. Nao adicione parametros alem de ?text= e nunca faca double-encoding. Se cliente nao escolher destino, ofereca as duas opcoes. Se ambiguo: Restaurante para pedido/cardapio/preco/entrega/pagamento, Suporte Tecnico para erros de navegacao/checkout/travamentos/telas em branco/loops/mensagens tecnicas/bugs. Checklist: link wa.me correto, numero certo, apenas ?text=, sem double-encoding, primeira linha cita Sensacao e secao de ajuda, resumo fiel ao historico, ate 4 linhas legivel. Disponibilize o link final para o cliente sempre neste formato de anchor clicavel: Conversar com um atendente pelo WhatsApp onde link_gerado_aqui e a URL completa que voce construiu. Exemplo Restaurante texto bruto: Ola! Vim da secao de ajuda do site. O assistente Sensacao me encaminhou para o WhatsApp. Resumo: erro ao finalizar pedido no bairro Jardim Camburi. Detalhes: total nao atualiza apos escolher PIX; cliente deseja concluir hoje. Exemplo Suporte Tecnico texto bruto: Ola! Vim da secao de ajuda do site. O assistente Sensacao me encaminhou para o WhatsApp. Resumo: bug no checkout impede conclusao do pedido. Detalhes: Ambiente: Android 14, Chrome 129 | Passos: adicionar pizza, abrir checkout, escolher PIX | Observado: botao Confirmar inativo | Esperado: finalizar pagamento | URL: /checkout. Aplique as mesmas regras de encoding e construcao de URL ja definidas anteriormente.
       `;
 
+    const systemInstruction = `${knowledgeBaseString}${timeInstruction}\n${baseSystemInstruction}`;
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
+      // 3. Enviamos o histórico completo para a API
       contents: contents,
       config: {
         systemInstruction: systemInstruction,

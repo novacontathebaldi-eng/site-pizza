@@ -47,17 +47,6 @@ export interface Category {
     active: boolean;
 }
 
-export interface FaqItem {
-    id: string;
-    question: string;
-    answer: string;
-    keywords: string[];
-    active: boolean;
-    order: number;
-    createdAt: firebase.firestore.Timestamp;
-    updatedAt: firebase.firestore.Timestamp;
-}
-
 export interface CartItem {
     id: string;
     productId: string;
@@ -189,4 +178,13 @@ export interface SiteSettings {
 export interface ChatMessage {
     role: 'user' | 'bot';
     content: string;
+}
+
+export interface FaqItem {
+    id: string;
+    ensinamento: string;
+    active: boolean;
+    order: number;
+    createdAt?: firebase.firestore.Timestamp | any;
+    updatedAt?: firebase.firestore.Timestamp | any;
 }
