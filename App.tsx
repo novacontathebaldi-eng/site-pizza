@@ -785,14 +785,14 @@ const App: React.FC = () => {
 
     const statusIconMap: { [key in OrderStatus]?: string } = {
         pending: 'fas fa-hourglass-start',
-        accepted: 'fas fa-cogs',
+        accepted: 'fas fa-pizza',
         reserved: 'fas fa-chair',
         'awaiting-payment': 'fas fa-clock',
     };
 
     const getStatusIcon = (order: Order): string => {
         if (order.status === 'ready') {
-            return order.customer.orderType === 'delivery' ? 'fas fa-motorcycle' : 'fas fa-box-open';
+            return order.customer.orderType === 'delivery' ? 'fas fa-motorcycle' : 'fas fa-hand-holding-box';
         }
         return statusIconMap[order.status] || 'fas fa-receipt';
     };
