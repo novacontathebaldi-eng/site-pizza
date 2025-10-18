@@ -792,7 +792,7 @@ const App: React.FC = () => {
 
     const getStatusIcon = (order: Order): string => {
         if (order.status === 'ready') {
-            return order.customer.orderType === 'delivery' ? 'fas fa-motorcycle' : 'fas fa-hand-holding-box';
+            return order.customer.orderType === 'delivery' ? 'fas fa-motorcycle' : 'fas fa-store';
         }
         return statusIconMap[order.status] || 'fas fa-receipt';
     };
