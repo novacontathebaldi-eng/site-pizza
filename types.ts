@@ -173,6 +173,12 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
+    operatingHours?: {
+        title: string;
+        line1: string;
+        line2: string;
+        line3?: string;
+    };
 }
 
 export interface ChatMessage {

@@ -1,103 +1,16 @@
 import React from 'react';
-import { SiteSettings, DaySchedule } from '../types';
+import { SiteSettings } from '../types';
 
 interface FooterProps {
     settings: SiteSettings;
     onOpenChatbot: () => void;
 }
 
-// Helper function to process operating hours into structured groups
-function formatOperatingHoursGroups(operatingHours?: DaySchedule[]): { days: string, time: string }[] {
-    if (!operatingHours?.length) return [];
-    
-    const openSchedules = operatingHours.filter(h => h.isOpen);
-    if (openSchedules.length === 0) return [];
-    
-    const schedulesByTime = openSchedules.reduce((acc, schedule) => {
-        const timeKey = `${schedule.openTime}-${schedule.closeTime}`;
-        if (!acc[timeKey]) acc[timeKey] = [];
-        acc[timeKey].push(schedule);
-        return acc;
-    }, {} as Record<string, DaySchedule[]>);
-
-    const result: { days: string, time: string }[] = [];
-
-    for (const timeKey in schedulesByTime) {
-        const schedules = schedulesByTime[timeKey].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
-        if (schedules.length === 0) continue;
-
-        let dayString;
-        if (schedules.length === 7) {
-            dayString = 'Todos os dias';
-        } else {
-            const sequences: DaySchedule[][] = [];
-            if (schedules.length > 0) {
-                let currentSequence: DaySchedule[] = [schedules[0]];
-                for (let i = 1; i < schedules.length; i++) {
-                    if (schedules[i].dayOfWeek === schedules[i - 1].dayOfWeek + 1) {
-                        currentSequence.push(schedules[i]);
-                    } else {
-                        sequences.push(currentSequence);
-                        currentSequence = [schedules[i]];
-                    }
-                }
-                sequences.push(currentSequence);
-            }
-            
-            // Handle Sunday-Saturday wrap-around (e.g., Fri, Sat, Sun)
-            if (sequences.length > 1 && sequences[0][0].dayOfWeek === 0 && schedules[schedules.length - 1].dayOfWeek === 6) {
-               const firstSeq = sequences.shift()!;
-               sequences[sequences.length - 1].push(...firstSeq);
-            }
-
-            const formattedSequences = sequences.map(seq => {
-                if (seq.length === 1) return seq[0].dayName;
-                if (seq.length === 2) return `${seq[0].dayName} e ${seq[1].dayName}`;
-                return `De ${seq[0].dayName} a ${seq[seq.length - 1].dayName}`;
-            });
-            dayString = formattedSequences.join(' e ');
-        }
-
-        const [openTime, closeTime] = timeKey.split('-');
-        result.push({
-            days: dayString,
-            time: `das ${openTime}h às ${closeTime}h`
-        });
-    }
-    return result;
-}
-
-
-const formatOperatingHours = (operatingHours?: DaySchedule[]): string[] => {
-    if (!operatingHours?.length) {
-        return ['Funcionamento não informado.'];
-    }
-    const openSchedules = operatingHours.filter(h => h.isOpen);
-    if (openSchedules.length === 0) {
-        return ['Fechado todos os dias.'];
-    }
-
-    const groups = formatOperatingHoursGroups(operatingHours);
-    if (groups.length === 0) {
-        return ['Fechado todos os dias.'];
-    }
-
-    const finalStrings: string[] = [];
-    groups.forEach(group => {
-        finalStrings.push(group.days);
-        finalStrings.push(group.time);
-    });
-
-    return finalStrings;
-};
-
-
 export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot }) => {
     
     const visibleLinks = settings.footerLinks?.filter(link => link.isVisible !== false) ?? [];
     const socialLinks = visibleLinks.filter(link => link.icon.startsWith('fab'));
     const otherLinks = visibleLinks.filter(link => !link.icon.startsWith('fab'));
-    const operatingHoursParts = formatOperatingHours(settings.operatingHours);
 
     return (
         <footer className="bg-brand-green-700 text-text-on-dark pt-16 pb-8">
@@ -132,15 +45,16 @@ export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot }) => {
                             <li><i className="fas fa-phone mr-2 text-accent"></i>(27) 99650-0341</li>
                         </ul>
                     </div>
-                    <div>
-                        <h4 className="font-bold text-lg mb-4">Funcionamento</h4>
-                         <ul className="space-y-2 text-brand-green-300">
-                            {operatingHoursParts.map((part, index) => (
-                                <li key={index}><i className={`fas ${index % 2 === 0 ? 'fa-clock' : 'fa-none'} mr-2 text-accent`}></i>{part}</li>
-                            ))}
-                            <li><i className="fas fa-truck mr-2 text-accent"></i>Delivery disponível</li>
-                        </ul>
-                    </div>
+                    {settings.operatingHours && (
+                        <div>
+                            <h4 className="font-bold text-lg mb-4">{settings.operatingHours.title}</h4>
+                            <ul className="space-y-2 text-brand-green-300">
+                                <li><i className="fas fa-clock mr-2 text-accent"></i>{settings.operatingHours.line1}</li>
+                                <li>{settings.operatingHours.line2}</li>
+                                {settings.operatingHours.line3 && <li><i className="fas fa-truck mr-2 text-accent"></i>{settings.operatingHours.line3}</li>}
+                            </ul>
+                        </div>
+                    )}
                      <div>
                         <h4 className="font-bold text-lg mb-4">Acesso</h4>
                          <ul className="space-y-2 text-brand-green-300">

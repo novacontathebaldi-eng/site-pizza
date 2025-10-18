@@ -89,7 +89,13 @@ const defaultSiteSettings: SiteSettings = {
         { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996500341', isVisible: true },
         { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/santasensacao.sl', isVisible: true },
         { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin', isVisible: true }
-    ]
+    ],
+    operatingHours: {
+        title: "Funcionamento",
+        line1: "Quarta a Domingo",
+        line2: "19h às 22h",
+        line3: "Delivery disponível"
+    }
 };
 
 const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, orderNumber: number, isPaid: boolean) => {
@@ -816,7 +822,7 @@ const App: React.FC = () => {
                 {error && <div className="container mx-auto px-4 py-8"><div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-6 rounded-lg shadow-md" role="alert"><p className="font-bold text-lg mb-2">Falha na Conexão</p><p className="mb-4">{error}</p></div></div>}
                 {isLoading ? <div className="text-center py-20"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p></div> : !error && <MenuSection categories={categories} products={products} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} activeCategoryId={activeMenuCategory} setActiveCategoryId={setActiveMenuCategory} cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} cartItems={cart}/>}
                 <div id="sobre">{siteSettings.contentSections?.filter(section => section.isVisible).sort((a, b) => a.order - b.order).map((section, index) => <DynamicContentSection key={section.id} section={section} order={index} />)}</div>
-                <ContactSection />
+                <ContactSection settings={siteSettings} />
                 <AdminSection allProducts={products} allCategories={categories} isStoreOnline={isStoreOnline} siteSettings={siteSettings} orders={orders} allFaqItems={faqItems} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onProductStatusChange={handleProductStatusChange} onProductStockStatusChange={handleProductStockStatusChange} onStoreStatusChange={handleStoreStatusChange} onSaveCategory={handleSaveCategory} onDeleteCategory={handleDeleteCategory} onCategoryStatusChange={handleCategoryStatusChange} onReorderProducts={handleReorderProducts} onReorderCategories={handleReorderCategories} onSeedDatabase={seedDatabase} onSaveSiteSettings={handleSaveSiteSettings} onUpdateOrderStatus={handleUpdateOrderStatus} onUpdateOrderPaymentStatus={handleUpdateOrderPaymentStatus} onUpdateOrderReservationTime={handleUpdateOrderReservationTime} onDeleteOrder={handleDeleteOrder} onPermanentDeleteOrder={handlePermanentDeleteOrder} onPermanentDeleteMultipleOrders={handlePermanentDeleteMultipleOrders} onRefundOrder={handleRefundOrder} refundingOrderId={refundingOrderId} onSaveFaqItem={handleSaveFaqItem} onDeleteFaqItem={handleDeleteFaqItem} onFaqItemStatusChange={handleFaqItemStatusChange} onReorderFaqItems={handleReorderFaqItems}/>
             </main>
             
