@@ -134,11 +134,11 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
                 <div className="mt-auto pt-2 flex justify-between items-center">
                      <div className="flex flex-col items-start">
                         {isPromo && hasPrices && (
-                            <span className="text-sm text-gray-400 line-through">
+                            <span className="text-xs text-gray-500 line-through">
                                 {formatPrice(prices[selectedSize] || prices[sortedSizes[0]])}
                             </span>
                         )}
-                        <span className="text-xl font-bold text-accent">
+                        <span className={`${isPromo ? 'text-2xl leading-none' : 'text-xl'} font-bold text-accent`}>
                             {isPromo ? formatPrice(product.promotionalPrice!) : displayPrice}
                         </span>
                     </div>
