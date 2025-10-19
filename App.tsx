@@ -881,13 +881,13 @@ const App: React.FC = () => {
         accepted: (
             <span className="relative inline-block leading-none">
                 <i className="fa-solid fa-utensils fa-lg" aria-hidden="true"></i>
-                <i className="fa-solid fa-clock absolute text-xs text-gray-800 bg-white rounded-full p-px" style={{ top: '-4px', right: '-6px', border: '1px solid #e5e7eb' }} aria-hidden="true"></i>
+                <i className="fa-solid fa-clock absolute text-xs text-white bg-brand-olive-600 rounded-full p-px" style={{ top: '-5px', right: '-7px' }}></i>
             </span>
         ),
         reserved: (
             <span className="relative inline-block leading-none">
                 <i className="fa-solid fa-chair fa-lg" aria-hidden="true"></i>
-                <i className="fa-solid fa-check-circle absolute text-xs text-white bg-green-500 rounded-full" style={{ top: '-4px', right: '-6px' }} aria-hidden="true"></i>
+                <i className="fa-solid fa-check-circle absolute text-xs text-white bg-green-500 rounded-full" style={{ top: '-5px', right: '-7px' }}></i>
             </span>
         ),
         'awaiting-payment': <i className="fas fa-clock" />,
@@ -902,7 +902,7 @@ const App: React.FC = () => {
             return (
                 <span className="relative inline-block leading-none">
                     <i className="fa-solid fa-pizza-slice fa-lg" aria-hidden="true"></i>
-                    <i className="fa-solid fa-check-circle absolute text-xs text-white bg-green-500 rounded-full" style={{ top: '-4px', right: '-6px' }} aria-hidden="true"></i>
+                    <i className="fa-solid fa-check-circle absolute text-xs text-white bg-green-500 rounded-full" style={{ top: '-5px', right: '-7px' }}></i>
                 </span>
             );
         }
@@ -1020,12 +1020,21 @@ const App: React.FC = () => {
                             }
                         }}
                         className="w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110"
-                        aria-label={activeOrders.length === 1 ? `Acompanhar pedido #${activeOrders[0].orderNumber}` : `${activeOrders.length} pedidos ativos`}
+                        aria-label={activeOrders.length === 1 ? `Acompanhar pedido #${activeOrders[0].orderNumber}` : isOrderTrackerExpanded ? 'Recolher pedidos' : `${activeOrders.length} pedidos ativos`}
                     >
                         {activeOrders.length === 1 ? (
                             <span className="text-2xl">{getStatusIcon(activeOrders[0])}</span>
+                        ) : isOrderTrackerExpanded ? (
+                            <i className="fas fa-chevron-down text-2xl"></i>
                         ) : (
-                            <span className="text-2xl font-bold">{activeOrders.length}</span>
+                            <span className="relative">
+                                <i className="fas fa-chevron-up text-2xl"></i>
+                                <span
+                                    className="absolute -top-2 -right-3 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center"
+                                >
+                                    {activeOrders.length}
+                                </span>
+                            </span>
                         )}
                     </button>
                 )}
