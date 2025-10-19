@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Order, OrderStatus } from '../types';
 
 const statusConfig: { [key in OrderStatus]?: { text: string; icon: string; color: string; } } = {
@@ -29,12 +29,21 @@ export const formatTimestamp = (timestamp: any, includeTime: boolean = false): s
 
 export const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
     if (order.customer.orderType === 'local') {
-        const config = statusConfig[order.status === 'pending' ? 'pending' : 'reserved'] || statusConfig[order.status];
+        const isReserved = order.status === 'reserved';
+        const config = statusConfig[isReserved ? 'reserved' : order.status] || statusConfig.pending;
         if (!config) return null;
+
+        const iconNode = isReserved ? (
+            <span className="fa-layers fa-lg">
+                <i className="fa-solid fa-chair"></i>
+                <i className="fa-solid fa-check-circle" data-fa-transform="shrink-8 up-6 right-6" style={{ color: 'limegreen' }}></i>
+            </span>
+        ) : <i className={config.icon}></i>;
+
         return (
              <div className="bg-blue-50 border-l-4 border-blue-400 text-blue-800 p-3 my-2 rounded-r-lg text-sm">
-                <div className="flex">
-                    <div className="py-1"><i className={`text-xl mr-3 ${config.icon}`}></i></div>
+                <div className="flex items-center">
+                    <div className="w-10 text-center text-xl mr-2 flex items-center justify-center">{iconNode}</div>
                     <div>
                         <p className="font-bold">{config.text}</p>
                         <p className="text-xs">Sua reserva para {order.numberOfPeople} pessoa(s) em {formatTimestamp(order.createdAt, true)}.</p>
@@ -50,9 +59,9 @@ export const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
             id: 'accepted', 
             label: 'Em Preparo', 
             icon: (
-                <span className="fa-layers fa-fw">
+                <span className="fa-layers">
                     <i className="fa-solid fa-utensils"></i>
-                    <i className="fa-solid fa-clock" data-fa-transform="shrink-8 up-8 right-6"></i>
+                    <i className="fa-solid fa-clock" data-fa-transform="shrink-8 up-6 right-6"></i>
                 </span>
             )
         },
@@ -62,9 +71,9 @@ export const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
             icon: order.customer.orderType === 'delivery' 
                 ? <i className="fas fa-motorcycle"></i> 
                 : (
-                    <span className="fa-layers fa-fw">
+                    <span className="fa-layers">
                         <i className="fa-solid fa-pizza-slice"></i>
-                        <i className="fa-solid fa-check-circle" data-fa-transform="shrink-6 up-6 right-6" style={{ color: 'limegreen' }}></i>
+                        <i className="fa-solid fa-check-circle" data-fa-transform="shrink-8 up-6 right-6" style={{ color: 'limegreen' }}></i>
                     </span>
                 )
         },

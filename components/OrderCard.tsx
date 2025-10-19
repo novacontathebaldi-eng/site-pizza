@@ -23,14 +23,23 @@ const getStatusConfig = (order: Order): { text: string; icon: React.ReactNode; c
         accepted: { 
             text: 'Aceito / Em Preparo', 
             icon: (
-                <span className="fa-layers fa-fw">
+                <span className="fa-layers fa-lg">
                     <i className="fa-solid fa-utensils"></i>
-                    <i className="fa-solid fa-clock" data-fa-transform="shrink-8 up-8 right-6"></i>
+                    <i className="fa-solid fa-clock" data-fa-transform="shrink-8 up-6 right-6"></i>
                 </span>
             ), 
             color: 'border-blue-500' 
         },
-        reserved: { text: 'Reserva (No Local)', icon: <i className="fas fa-chair"></i>, color: 'border-teal-500' },
+        reserved: { 
+            text: 'Reserva (No Local)', 
+            icon: (
+                 <span className="fa-layers fa-lg">
+                    <i className="fa-solid fa-chair"></i>
+                    <i className="fa-solid fa-check-circle" data-fa-transform="shrink-8 up-6 right-6" style={{ color: 'limegreen' }}></i>
+                </span>
+            ), 
+            color: 'border-teal-500' 
+        },
         ready: { text: 'Pronto / Em Rota', icon: <i className="fas fa-shipping-fast"></i>, color: 'border-purple-500' }, // Default text
         completed: { text: 'Finalizado', icon: <i className="fas fa-check-circle"></i>, color: 'border-green-500' },
         cancelled: { text: 'Cancelado', icon: <i className="fas fa-times-circle"></i>, color: 'border-red-500' },
@@ -44,15 +53,15 @@ const getStatusConfig = (order: Order): { text: string; icon: React.ReactNode; c
                 ...staticConfig.ready, 
                 text: 'Pronto para Retirada',
                 icon: (
-                    <span className="fa-layers fa-fw">
+                    <span className="fa-layers fa-lg">
                         <i className="fa-solid fa-pizza-slice"></i>
-                        <i className="fa-solid fa-check-circle" data-fa-transform="shrink-6 up-6 right-6" style={{ color: 'limegreen' }}></i>
+                        <i className="fa-solid fa-check-circle" data-fa-transform="shrink-8 up-6 right-6" style={{ color: 'limegreen' }}></i>
                     </span>
                 )
             };
         }
         if (order.customer.orderType === 'delivery') {
-            return { ...staticConfig.ready, text: 'Saiu para Entrega' };
+            return { ...staticConfig.ready, text: 'Saiu para Entrega', icon: <i className="fas fa-motorcycle"></i> };
         }
     }
     

@@ -879,12 +879,17 @@ const App: React.FC = () => {
     const statusIconMap: { [key in OrderStatus]?: React.ReactNode } = {
         pending: <i className="fas fa-hourglass-start" />,
         accepted: (
-            <span className="fa-layers fa-fw">
+            <span className="fa-layers">
                 <i className="fa-solid fa-utensils"></i>
-                <i className="fa-solid fa-clock" data-fa-transform="shrink-8 up-8 right-6"></i>
+                <i className="fa-solid fa-clock" data-fa-transform="shrink-8 up-6 right-6"></i>
             </span>
         ),
-        reserved: <i className="fas fa-chair" />,
+        reserved: (
+            <span className="fa-layers">
+                <i className="fa-solid fa-chair"></i>
+                <i className="fa-solid fa-check-circle" data-fa-transform="shrink-8 up-6 right-6" style={{ color: 'limegreen' }}></i>
+            </span>
+        ),
         'awaiting-payment': <i className="fas fa-clock" />,
     };
 
@@ -895,9 +900,9 @@ const App: React.FC = () => {
             }
             // Ready for pickup
             return (
-                <span className="fa-layers fa-fw">
+                <span className="fa-layers">
                     <i className="fa-solid fa-pizza-slice"></i>
-                    <i className="fa-solid fa-check-circle" data-fa-transform="shrink-6 up-6 right-6" style={{ color: 'limegreen' }}></i>
+                    <i className="fa-solid fa-check-circle" data-fa-transform="shrink-8 up-6 right-6" style={{ color: 'limegreen' }}></i>
                 </span>
             );
         }
