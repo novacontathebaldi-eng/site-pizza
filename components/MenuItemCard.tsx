@@ -176,7 +176,7 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
                     )}
                 </div>
 
-                <div className="mt-auto pt-2 flex justify-between items-center">
+                <div className="mt-auto pt-2 flex justify-between items-end">
                      <div className="flex flex-col items-start">
                         {originalPriceText && (
                             <span className="text-xs text-gray-500 line-through">
