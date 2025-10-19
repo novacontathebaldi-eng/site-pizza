@@ -367,6 +367,7 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
     );
 
     const renderOrderSummaryCard = (order: Order, isOngoing: boolean) => {
+        const isReservation = order.customer.orderType === 'local';
         const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo no Local' };
         const paymentStatusInfo = {
             'pending': { text: 'Pendente', color: 'text-yellow-600' },
@@ -382,12 +383,14 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
                         <p className="font-bold text-lg text-text-on-light">Pedido #{order.orderNumber}</p>
                         <p className="text-xs text-gray-500">{formatTimestamp(order.createdAt, true)}</p>
                     </div>
-                    {order.total != null && <p className="font-bold text-xl text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
+                    {!isReservation && order.total != null && <p className="font-bold text-xl text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
                 </div>
                 <div className="text-sm space-y-1 mb-4">
                      <p><strong>Cliente:</strong> {order.customer.name}</p>
                      <p><strong>Tipo:</strong> {orderTypeMap[order.customer.orderType]}</p>
-                     <p><strong>Pagamento:</strong> <span className={`font-semibold ${paymentStatusInfo.color}`}>{paymentStatusInfo.text}</span></p>
+                     {!isReservation && (
+                        <p><strong>Pagamento:</strong> <span className={`font-semibold ${paymentStatusInfo.color}`}>{paymentStatusInfo.text}</span></p>
+                     )}
                 </div>
                 
                 {isOngoing && <OrderStatusTracker order={order} />}

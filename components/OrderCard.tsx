@@ -62,6 +62,7 @@ const getPaymentStatusInfo = (order: Order): { text: string; isPaid: boolean; is
 
 export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete, onRefund, isRefunding, isSelectable, isSelected, onSelect }) => {
     const { id, orderNumber, customer, items, total, paymentMethod, changeNeeded, changeAmount, notes, status, paymentStatus, createdAt, pickupTimeEstimate, mercadoPagoDetails, numberOfPeople, deliveryFee, allergies } = order;
+    const isReservation = customer.orderType === 'local';
     const config = getStatusConfig(order);
     const { text: paymentStatusText, isPaid, isRefunded } = getPaymentStatusInfo(order);
 
@@ -81,7 +82,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
     
     const handleAccept = () => {
         // Se o pedido for uma reserva, 'Aceitar' muda o status para 'reserved'.
-        if (customer.orderType === 'local' && status === 'pending') {
+        if (isReservation && status === 'pending') {
             onUpdateStatus(id, 'reserved');
             return;
         }
@@ -150,11 +151,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
     };
 
     const allowedStatusesForOrderType = useMemo<OrderStatus[]>(() => {
-        if (customer.orderType === 'local') {
+        if (isReservation) {
             return ['pending', 'reserved', 'completed', 'cancelled'];
         }
         return ['pending', 'accepted', 'ready', 'completed', 'cancelled'];
-    }, [customer.orderType]);
+    }, [isReservation]);
     
     // Helper function to get the correct label for the dropdown based on order type.
     const getStatusLabelForDropdown = (status: OrderStatus, orderType: 'delivery' | 'pickup' | 'local'): string => {
@@ -185,7 +186,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
         </div>
     );
     
-    const paymentStatusChanger = !isArchived && !isRefunded && order.paymentStatus !== 'paid_online' && (
+    const paymentStatusChanger = !isArchived && !isRefunded && order.paymentStatus !== 'paid_online' && !isReservation && (
         <div className="flex items-center gap-2">
             <label htmlFor={`payment-status-select-${order.id}`} className="text-sm font-semibold text-gray-700 whitespace-nowrap">Pgto:</label>
             <select
@@ -233,7 +234,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                             <div className="flex flex-col items-end gap-1">
                                 <div className="flex items-start gap-2">
                                     <div className="text-right">
-                                        {total != null && (
+                                        {!isReservation && total != null && (
                                             <p className="font-bold text-2xl text-accent">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                                         )}
                                         {items && items.length > 0 && (
@@ -257,14 +258,14 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
+                        <div className={`grid grid-cols-1 ${!isReservation ? 'md:grid-cols-2' : ''} gap-4 text-sm mb-4`}>
                             <div className="bg-gray-50 p-3 rounded-md">
                                 <h4 className="font-bold mb-2"><i className="fas fa-user mr-2"></i>Cliente</h4>
                                 <p><strong>Nome:</strong> {customer.name}</p>
                                 <p><strong>Telefone:</strong> {customer.phone}</p>
                                 <p><strong>Pedido:</strong> {orderTypeMap[customer.orderType]}</p>
                                 {customer.orderType === 'delivery' && fullAddress && <p><strong>Endereço:</strong> {fullAddress}</p>}
-                                {customer.orderType === 'local' && (
+                                {isReservation && (
                                     <>
                                         <p><strong>Pessoas:</strong> {numberOfPeople}</p>
                                         <div className="flex items-center gap-2">
@@ -290,7 +291,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 )}
                                 {customer.orderType === 'pickup' && pickupTimeEstimate && <p><strong>Retirada:</strong> <span className="font-bold text-accent">{pickupTimeEstimate}</span></p>}
                             </div>
-                            {paymentMethod && (
+                            {paymentMethod && !isReservation && (
                              <div className="bg-gray-50 p-3 rounded-md flex flex-col">
                                 <h4 className="font-bold mb-2"><i className="fas fa-credit-card mr-2"></i>Pagamento</h4>
                                 <div className="space-y-1 flex-grow">
@@ -373,7 +374,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                     <div className="flex-grow"></div>
                                     
                                     {/* Next-step buttons */}
-                                    {status === 'accepted' && customer.orderType !== 'local' && <button onClick={() => onUpdateStatus(id, 'ready')} className="bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-blue-600"><i className="fas fa-box-open mr-2"></i>Pronto</button>}
+                                    {status === 'accepted' && !isReservation && <button onClick={() => onUpdateStatus(id, 'ready')} className="bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-blue-600"><i className="fas fa-box-open mr-2"></i>Pronto</button>}
                                     {(status === 'ready' || status === 'reserved') && <button onClick={() => onUpdateStatus(id, 'completed')} className="bg-purple-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-purple-600"><i className="fas fa-flag-checkered mr-2"></i>Finalizar</button>}
                                     
                                     {status === 'reserved' && !isRefunded && <button onClick={() => onUpdateStatus(id, 'cancelled')} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Cancelar</button>}

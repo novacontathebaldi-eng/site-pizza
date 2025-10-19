@@ -11,7 +11,8 @@ interface OrderDetailsModalProps {
 export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onClose, title }) => {
     if (!order) return null;
 
-    const isOngoing = ['pending', 'accepted', 'ready', 'awaiting-payment'].includes(order.status);
+    const isReservation = order.customer.orderType === 'local';
+    const isOngoing = ['pending', 'accepted', 'ready', 'awaiting-payment', 'reserved'].includes(order.status);
     const paymentMethodMap = { credit: 'Crédito', debit: 'Débito', pix: 'PIX', cash: 'Dinheiro' };
     const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo no Local' };
     
@@ -35,28 +36,30 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onC
                  <div className="overflow-y-auto p-4 sm:p-6 space-y-4">
                     {isOngoing && <OrderStatusTracker order={order} />}
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div className={`grid grid-cols-1 ${!isReservation ? 'md:grid-cols-2' : ''} gap-4 text-sm`}>
                         <div className="bg-gray-50 p-3 rounded-md border">
                             <h4 className="font-bold mb-2 text-base"><i className="fas fa-user mr-2 text-gray-400"></i>Cliente</h4>
                             <p><strong>Nome:</strong> {order.customer.name}</p>
                             <p><strong>Telefone:</strong> {order.customer.phone}</p>
                             <p><strong>Pedido:</strong> {orderTypeMap[order.customer.orderType]}</p>
                             {fullAddress && <p><strong>Endereço:</strong> {fullAddress}</p>}
-                            {order.customer.orderType === 'local' && (
+                            {isReservation && (
                                 <>
                                     <p><strong>Pessoas:</strong> {order.numberOfPeople}</p>
                                     <p><strong>Reserva:</strong> {order.customer.reservationTime}</p>
                                 </>
                             )}
                         </div>
-                        <div className="bg-gray-50 p-3 rounded-md border">
-                            <h4 className="font-bold mb-2 text-base"><i className="fas fa-credit-card mr-2 text-gray-400"></i>Pagamento</h4>
-                             <p><strong>Método:</strong> {order.paymentMethod ? paymentMethodMap[order.paymentMethod] : 'N/A'}</p>
-                            <p><strong>Status:</strong> <span className={`font-semibold ${paymentStatusInfo.color}`}>{paymentStatusInfo.text}</span></p>
-                            {order.paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {order.changeNeeded ? `para R$ ${order.changeAmount}` : 'Não precisa'}</p> )}
-                            {order.deliveryFee > 0 && (<p><strong>Taxa de Entrega:</strong> {order.deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>)}
-                            <p className="mt-2 pt-2 border-t font-bold"><strong>Total:</strong> {order.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                        </div>
+                        {!isReservation && (
+                            <div className="bg-gray-50 p-3 rounded-md border">
+                                <h4 className="font-bold mb-2 text-base"><i className="fas fa-credit-card mr-2 text-gray-400"></i>Pagamento</h4>
+                                <p><strong>Método:</strong> {order.paymentMethod ? paymentMethodMap[order.paymentMethod] : 'N/A'}</p>
+                                <p><strong>Status:</strong> <span className={`font-semibold ${paymentStatusInfo.color}`}>{paymentStatusInfo.text}</span></p>
+                                {order.paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {order.changeNeeded ? `para R$ ${order.changeAmount}` : 'Não precisa'}</p> )}
+                                {order.deliveryFee > 0 && (<p><strong>Taxa de Entrega:</strong> {order.deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>)}
+                                <p className="mt-2 pt-2 border-t font-bold"><strong>Total:</strong> {order.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                            </div>
+                        )}
                     </div>
 
                     {order.items && order.items.length > 0 && (
