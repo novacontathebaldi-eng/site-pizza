@@ -40,8 +40,12 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onC
                         <div className="mb-4">
                             {order.status === 'completed' && (
                                 <div className="bg-green-50 border border-green-200 text-green-800 text-sm font-semibold p-3 rounded-lg flex items-center gap-3">
-                                    <i className="fas fa-pizza-slice"></i>
-                                    <span>Pedido Finalizado. Bom apetite!</span>
+                                    <i className={`fas ${isReservation ? 'fa-glass-cheers' : 'fa-pizza-slice'}`}></i>
+                                    <span>
+                                        {isReservation
+                                            ? "Você faz nossa casa ficar mais alegre. Valeu pela visita e até a próxima rodada de sabor!"
+                                            : "Pedido Finalizado. Bom apetite!"}
+                                    </span>
                                 </div>
                             )}
                             {order.status === 'cancelled' && (

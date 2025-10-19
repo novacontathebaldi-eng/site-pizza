@@ -32,12 +32,31 @@ const AddressForm: React.FC<{
     isSaving: boolean;
     totalAddresses: number;
 }> = ({ address, onSave, onCancel, isSaving, totalAddresses }) => {
+    const getInitialLabelSelection = (label: string | undefined): 'Casa' | 'Trabalho' | 'Outro' | '' => {
+        if (label === 'Casa' || label === 'Trabalho') return label;
+        if (label) return 'Outro';
+        return '';
+    };
+
     const [isNoNumber, setIsNoNumber] = useState(address?.number === 'S/N');
     const [formData, setFormData] = useState<Partial<Address>>({
         label: '', localidade: 'Centro', street: '', number: '', complement: '', isFavorite: false,
         bairro: '', cep: '29640-000', city: 'Santa Leopoldina',
         ...address
     });
+    const [labelSelection, setLabelSelection] = useState<'Casa' | 'Trabalho' | 'Outro' | ''>(getInitialLabelSelection(address?.label));
+
+    const handleLabelButtonClick = (selection: 'Casa' | 'Trabalho' | 'Outro') => {
+        setLabelSelection(selection);
+        if (selection !== 'Outro') {
+            setFormData(prev => ({ ...prev, label: selection }));
+        } else {
+            // When switching to 'Outro', if the label was one of the presets, clear it to let the user type.
+            if (formData.label === 'Casa' || formData.label === 'Trabalho') {
+                 setFormData(prev => ({ ...prev, label: '' }));
+            }
+        }
+    };
 
     useEffect(() => {
         setIsNoNumber(formData.number === 'S/N');
@@ -86,22 +105,54 @@ const AddressForm: React.FC<{
     const isFavoriteDisabled = isOtherLocality || isOnlyAddress;
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-3 p-4 border rounded-lg bg-gray-50 mt-4 animate-fade-in-up">
+        <form onSubmit={handleSubmit} className="space-y-4 p-4 border rounded-lg bg-gray-50 mt-4 animate-fade-in-up">
             <h5 className="font-bold">{formData.id ? 'Editar Endereço' : 'Novo Endereço'}</h5>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-sm font-semibold mb-1">Rótulo (Ex: Casa, Trabalho)</label>
-                    <input type="text" value={formData.label} onChange={e => setFormData({ ...formData, label: e.target.value })} className="w-full px-3 py-2 border rounded-md" required />
+            
+            <div>
+                <label className="block text-sm font-semibold mb-2">Rótulo *</label>
+                <div className="flex flex-col sm:flex-row justify-start gap-3">
+                    <button
+                        type="button"
+                        onClick={() => handleLabelButtonClick('Casa')}
+                        className={`flex-1 font-bold py-2 px-4 rounded-lg transition-all border-2 flex items-center justify-center gap-2 ${labelSelection === 'Casa' ? 'bg-accent text-white border-accent' : 'bg-white text-gray-700 border-gray-300 hover:border-accent'}`}>
+                        <i className="fas fa-home fa-fw"></i> Casa
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleLabelButtonClick('Trabalho')}
+                        className={`flex-1 font-bold py-2 px-4 rounded-lg transition-all border-2 flex items-center justify-center gap-2 ${labelSelection === 'Trabalho' ? 'bg-accent text-white border-accent' : 'bg-white text-gray-700 border-gray-300 hover:border-accent'}`}>
+                        <i className="fas fa-briefcase fa-fw"></i> Trabalho
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleLabelButtonClick('Outro')}
+                        className={`flex-1 font-bold py-2 px-4 rounded-lg transition-all border-2 flex items-center justify-center gap-2 ${labelSelection === 'Outro' ? 'bg-accent text-white border-accent' : 'bg-white text-gray-700 border-gray-300 hover:border-accent'}`}>
+                        <i className="fas fa-tag fa-fw"></i> Outro
+                    </button>
                 </div>
-                <div>
-                    <label className="block text-sm font-semibold mb-1">Localidade *</label>
-                    <select value={formData.localidade} onChange={e => setFormData({ ...formData, localidade: e.target.value })} className="w-full px-3 py-2 border rounded-md bg-white" required>
-                        <option value="" disabled>Selecione...</option>
-                        {LOCALIDADES.map(loc => <option key={loc} value={loc}>{loc}</option>)}
-                         <option value="Outra">Outra (Fora da área de entrega)</option>
-                    </select>
-                </div>
+                {labelSelection === 'Outro' && (
+                    <div className="mt-3 animate-fade-in-up">
+                        <input
+                            type="text"
+                            value={(formData.label === 'Casa' || formData.label === 'Trabalho') ? '' : formData.label}
+                            onChange={e => setFormData({ ...formData, label: e.target.value })}
+                            className="w-full px-3 py-2 border rounded-md"
+                            placeholder="Digite um rótulo personalizado (Ex: Casa de Praia)"
+                            required
+                        />
+                    </div>
+                )}
             </div>
+
+            <div>
+                <label className="block text-sm font-semibold mb-1">Localidade *</label>
+                <select value={formData.localidade} onChange={e => setFormData({ ...formData, localidade: e.target.value })} className="w-full px-3 py-2 border rounded-md bg-white" required>
+                    <option value="" disabled>Selecione...</option>
+                    {LOCALIDADES.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                     <option value="Outra">Outra (Fora da área de entrega)</option>
+                </select>
+            </div>
+
              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label className="block text-sm font-semibold mb-1">CEP</label>
@@ -399,8 +450,12 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
                     <div className="mt-2 mb-4">
                         {order.status === 'completed' && (
                             <div className="bg-green-50 border border-green-200 text-green-800 text-sm font-semibold p-3 rounded-lg flex items-center gap-3">
-                                <i className="fas fa-pizza-slice"></i>
-                                <span>Pedido Finalizado. Bom apetite!</span>
+                                <i className={`fas ${isReservation ? 'fa-glass-cheers' : 'fa-pizza-slice'}`}></i>
+                                <span>
+                                    {isReservation
+                                        ? "Você faz nossa casa ficar mais alegre. Valeu pela visita e até a próxima rodada de sabor!"
+                                        : "Pedido Finalizado. Bom apetite!"}
+                                </span>
                             </div>
                         )}
                         {order.status === 'cancelled' && (
