@@ -732,7 +732,7 @@ const App: React.FC = () => {
     };
 
     const handleSaveProduct = useCallback(async (product: Product) => { try { const { id, ...dataToSave } = product; if (id) await firebaseService.updateProduct(id, dataToSave); else await firebaseService.addProduct({ ...dataToSave, orderIndex: products.length, stockStatus: 'available' }); addToast(id ? "Produto atualizado!" : "Produto adicionado!", 'success'); } catch (error) { console.error("Failed to save product:", error); addToast("Erro ao salvar produto.", 'error'); } }, [products.length, addToast]);
-    const handleDeleteProduct = useCallback(async (productId: string) => { try { await firebaseService.deleteProduct(productId); addToast("Produto deletado!", 'success'); } catch (error) { console.error("Failed to delete product:", error); addToast("Erro ao deletar produto.", 'error'); } }, [addToast]);
+    const handleDeleteProduct = useCallback(async (productId: string) => { try { await firebaseService.deleteProduct(productId); addToast("Produto movido para a lixeira!", 'success'); } catch (error) { console.error("Failed to delete product:", error); addToast("Erro ao mover para a lixeira.", 'error'); } }, [addToast]);
     const handleProductStatusChange = useCallback(async (productId: string, active: boolean) => { try { await firebaseService.updateProductStatus(productId, active); addToast(`Produto ${active ? 'ativado' : 'desativado'}.`, 'success'); } catch (error) { console.error("Failed to update product status:", error); addToast("Erro ao atualizar status.", 'error'); } }, [addToast]);
     const handleProductStockStatusChange = useCallback(async (productId: string, stockStatus: 'available' | 'out_of_stock') => { try { await firebaseService.updateProductStockStatus(productId, stockStatus); addToast(`Estoque atualizado.`, 'success'); } catch (error) { console.error("Failed to update product stock status:", error); addToast("Erro ao atualizar estoque.", 'error'); } }, [addToast]);
     const handleStoreStatusChange = useCallback(async (isOnline: boolean) => { try { await firebaseService.updateStoreStatus(isOnline); addToast("Status da loja atualizado.", 'success'); } catch (error) { console.error("Failed to update store status:", error); addToast("Erro ao atualizar status da loja.", 'error'); } }, [addToast]);
@@ -756,7 +756,7 @@ const App: React.FC = () => {
     const handleUpdateOrderPaymentStatus = useCallback(async (orderId: string, paymentStatus: PaymentStatus) => { try { await firebaseService.updateOrderPaymentStatus(orderId, paymentStatus); addToast("Status de pagamento atualizado!", 'success'); } catch (error) { console.error("Failed to update order payment status:", error); addToast("Erro ao atualizar pagamento.", 'error'); } }, [addToast]);
     const handleUpdateOrderReservationTime = useCallback(async (orderId: string, reservationTime: string) => { try { await firebaseService.updateOrderReservationTime(orderId, reservationTime); addToast("Horário da reserva atualizado!", 'success'); } catch (error) { console.error("Failed to update reservation time:", error); addToast("Erro ao atualizar horário.", 'error'); } }, [addToast]);
     const handleDeleteOrder = useCallback(async (orderId: string) => { if (window.confirm("Mover este pedido para a lixeira? 🗑️")) { try { await firebaseService.updateOrderStatus(orderId, 'deleted'); addToast("Pedido movido para a lixeira.", 'success'); } catch (error) { console.error("Failed to move order to trash:", error); addToast("Erro ao mover para lixeira.", 'error'); } } }, [addToast]);
-    const handlePermanentDeleteOrder = useCallback(async (orderId: string) => { if (window.confirm("Apagar PERMANENTEMENTE? Esta ação não pode ser desfeita.")) { try { await firebaseService.deleteOrder(orderId); addToast("Pedido apagado permanentemente.", 'success'); } catch (error) { console.error("Failed to permanently delete order:", error); addToast("Erro ao apagar permanentemente.", 'error'); } } }, [addToast]);
+    const handlePermanentDeleteOrder = useCallback(async (orderId: string) => { if (window.confirm("Apagar PERMANENTEMENTE? Esta ação não pode ser desfeita.")) { try { await firebaseService.permanentDeleteProduct(orderId); addToast("Pedido apagado permanentemente.", 'success'); } catch (error) { console.error("Failed to permanently delete order:", error); addToast("Erro ao apagar permanentemente.", 'error'); } } }, [addToast]);
     
     const handlePermanentDeleteMultipleOrders = useCallback(async (orderIds: string[]) => {
         if (orderIds.length === 0) return;
@@ -773,6 +773,52 @@ const App: React.FC = () => {
     }, [addToast]);
 
     const handleRefundOrder = useCallback(async (orderId: string) => { if (window.confirm("Estornar o valor total deste pagamento? Esta ação não pode ser desfeita.")) { const orderToRefund = orders.find(o => o.id === orderId); const paymentId = orderToRefund?.mercadoPagoDetails?.paymentId; if (!paymentId) { addToast("ID do pagamento não encontrado.", 'error'); return; } setRefundingOrderId(orderId); addToast("Processando estorno...", 'success'); try { await firebaseService.refundPayment(orderId); addToast(`Estorno solicitado com sucesso!`, 'success'); } catch (error: any) { console.error("Failed to refund order:", error); addToast(error.message || "Erro ao solicitar estorno.", 'error'); } finally { setRefundingOrderId(null); } } }, [addToast, orders]);
+
+    const handleBulkDeleteProducts = useCallback(async (productIds: string[]) => {
+        try {
+            await firebaseService.bulkDeleteProducts(productIds);
+            addToast(`${productIds.length} produto(s) movido(s) para a lixeira.`, 'success');
+        } catch (error) {
+            console.error("Failed to bulk delete products:", error);
+            addToast("Erro ao mover produtos para a lixeira.", 'error');
+        }
+    }, [addToast]);
+
+    const handleRestoreProduct = useCallback(async (productId: string) => {
+        try {
+            await firebaseService.restoreProduct(productId);
+            addToast('Produto restaurado com sucesso!', 'success');
+        } catch (error) {
+            console.error("Failed to restore product:", error);
+            addToast("Erro ao restaurar produto.", 'error');
+        }
+    }, [addToast]);
+
+    const handlePermanentDeleteProduct = useCallback(async (productId: string) => {
+        if (window.confirm('APAGAR PERMANENTEMENTE? Esta ação não pode ser desfeita.')) {
+            try {
+                await firebaseService.permanentDeleteProduct(productId);
+                addToast('Produto apagado permanentemente.', 'success');
+            } catch (error) {
+                console.error("Failed to permanently delete product:", error);
+                addToast("Erro ao apagar produto.", 'error');
+            }
+        }
+    }, [addToast]);
+
+    const handleBulkPermanentDeleteProducts = useCallback(async (productIds: string[]) => {
+        if (productIds.length === 0) return;
+        if (window.confirm(`APAGAR PERMANENTEMENTE ${productIds.length} produto(s)? Esta ação não pode ser desfeita.`)) {
+            try {
+                await firebaseService.bulkPermanentDeleteProducts(productIds);
+                addToast(`${productIds.length} produto(s) apagados permanentemente.`, 'success');
+            } catch (error) {
+                console.error("Failed to bulk delete products:", error);
+                addToast("Erro ao apagar produtos.", 'error');
+            }
+        }
+    }, [addToast]);
+
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
 
@@ -860,10 +906,41 @@ const App: React.FC = () => {
                 />
                 
                 {error && <div className="container mx-auto px-4 py-8"><div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-6 rounded-lg shadow-md" role="alert"><p className="font-bold text-lg mb-2">Falha na Conexão</p><p className="mb-4">{error}</p></div></div>}
-                {isLoading ? <div className="text-center py-20"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p></div> : !error && <MenuSection categories={categories} products={products} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} activeCategoryId={activeMenuCategory} setActiveCategoryId={setActiveMenuCategory} cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} cartItems={cart}/>}
+                {isLoading ? <div className="text-center py-20"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p></div> : !error && <MenuSection categories={categories} products={products.filter(p => !p.deleted)} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} activeCategoryId={activeMenuCategory} setActiveCategoryId={setActiveMenuCategory} cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} cartItems={cart}/>}
                 <div id="sobre">{siteSettings.contentSections?.filter(section => section.isVisible).sort((a, b) => a.order - b.order).map((section, index) => <DynamicContentSection key={section.id} section={section} order={index} />)}</div>
                 <ContactSection settings={siteSettings} />
-                <AdminSection allProducts={products} allCategories={categories} isStoreOnline={isStoreOnline} siteSettings={siteSettings} orders={orders} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onProductStatusChange={handleProductStatusChange} onProductStockStatusChange={handleProductStockStatusChange} onStoreStatusChange={handleStoreStatusChange} onSaveCategory={handleSaveCategory} onDeleteCategory={handleDeleteCategory} onCategoryStatusChange={handleCategoryStatusChange} onReorderProducts={handleReorderProducts} onReorderCategories={handleReorderCategories} onSeedDatabase={seedDatabase} onSaveSiteSettings={handleSaveSiteSettings} onUpdateSiteSettingsField={handleUpdateSiteSettingsField} onUpdateOrderStatus={handleUpdateOrderStatus} onUpdateOrderPaymentStatus={handleUpdateOrderPaymentStatus} onUpdateOrderReservationTime={handleUpdateOrderReservationTime} onDeleteOrder={handleDeleteOrder} onPermanentDeleteOrder={handlePermanentDeleteOrder} onPermanentDeleteMultipleOrders={handlePermanentDeleteMultipleOrders} onRefundOrder={handleRefundOrder} refundingOrderId={refundingOrderId}/>
+                <AdminSection 
+                    allProducts={products} 
+                    allCategories={categories} 
+                    isStoreOnline={isStoreOnline} 
+                    siteSettings={siteSettings} 
+                    orders={orders} 
+                    onSaveProduct={handleSaveProduct} 
+                    onDeleteProduct={handleDeleteProduct} 
+                    onProductStatusChange={handleProductStatusChange} 
+                    onProductStockStatusChange={handleProductStockStatusChange} 
+                    onStoreStatusChange={handleStoreStatusChange} 
+                    onSaveCategory={handleSaveCategory} 
+                    onDeleteCategory={handleDeleteCategory} 
+                    onCategoryStatusChange={handleCategoryStatusChange} 
+                    onReorderProducts={handleReorderProducts} 
+                    onReorderCategories={handleReorderCategories} 
+                    onSeedDatabase={seedDatabase} 
+                    onSaveSiteSettings={handleSaveSiteSettings} 
+                    onUpdateSiteSettingsField={handleUpdateSiteSettingsField} 
+                    onUpdateOrderStatus={handleUpdateOrderStatus} 
+                    onUpdateOrderPaymentStatus={handleUpdateOrderPaymentStatus} 
+                    onUpdateOrderReservationTime={handleUpdateOrderReservationTime} 
+                    onDeleteOrder={handleDeleteOrder} 
+                    onPermanentDeleteOrder={handlePermanentDeleteOrder} 
+                    onPermanentDeleteMultipleOrders={handlePermanentDeleteMultipleOrders} 
+                    onRefundOrder={handleRefundOrder} 
+                    refundingOrderId={refundingOrderId}
+                    onBulkDeleteProducts={handleBulkDeleteProducts}
+                    onRestoreProduct={handleRestoreProduct}
+                    onPermanentDeleteProduct={handlePermanentDeleteProduct}
+                    onBulkPermanentDeleteProducts={handleBulkPermanentDeleteProducts}
+                />
             </main>
             
             <div id="footer-section">

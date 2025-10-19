@@ -63,12 +63,52 @@ export const updateProductStockStatus = async (productId: string, stockStatus: '
     await productRef.update({ stockStatus });
 };
 
+// Soft deletes a product by marking it as 'deleted'
 export const deleteProduct = async (productId: string): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     if (!productId) throw new Error("Invalid Product ID for deletion.");
     const productRef = db.collection('products').doc(productId);
+    await productRef.update({ deleted: true });
+};
+
+// Restores a soft-deleted product
+export const restoreProduct = async (productId: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    if (!productId) throw new Error("Invalid Product ID for restoration.");
+    const productRef = db.collection('products').doc(productId);
+    await productRef.update({ deleted: false });
+};
+
+// Permanently deletes a product from Firestore
+export const permanentDeleteProduct = async (productId: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    if (!productId) throw new Error("Invalid Product ID for permanent deletion.");
+    const productRef = db.collection('products').doc(productId);
     await productRef.delete();
 };
+
+// Bulk soft-deletes products
+export const bulkDeleteProducts = async (productIds: string[]): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const batch = db.batch();
+    productIds.forEach(id => {
+        const productRef = db.collection('products').doc(id);
+        batch.update(productRef, { deleted: true });
+    });
+    await batch.commit();
+};
+
+// Bulk permanently deletes products
+export const bulkPermanentDeleteProducts = async (productIds: string[]): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const batch = db.batch();
+    productIds.forEach(id => {
+        const productRef = db.collection('products').doc(id);
+        batch.delete(productRef);
+    });
+    await batch.commit();
+};
+
 
 export const updateProductsOrder = async (productsToUpdate: { id: string; orderIndex: number }[]): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");

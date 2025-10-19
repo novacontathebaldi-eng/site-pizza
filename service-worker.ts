@@ -59,9 +59,12 @@ self.addEventListener('fetch', (event: FetchEvent) => {
           }
           return networkResponse;
         }).catch(error => {
-          // Network failed, which is okay if we have a cached version.
+          // Network failed. If there's a cached version, it will be used.
+          // If not, we must re-throw the error to let the browser handle the failure.
           console.warn(`Service Worker: Fetch failed for ${request.url};`, error);
-          // We don't have to return anything here, the cached response will be used.
+          // FIX: Re-throw the error to ensure the promise chain correctly propagates the failure
+          // in case of a cache miss. This fixes the TypeScript type error on `respondWith`.
+          throw error;
         });
 
         // Try to get the response from the cache first.
@@ -77,6 +80,9 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 
 // Immediately activate the new service worker
 // FIX: The service worker global scope (`self`) is now correctly typed, allowing access to `skipWaiting`.
-self.addEventListener('install', () => {
-    self.skipWaiting();
+self.addEventListener('install', (event: ExtendableEvent) => {
+    // FIX: It's best practice to wrap skipWaiting in waitUntil to ensure
+    // it completes before the install event is considered finished.
+    // FIX: Explicitly cast `self` to the correct type to resolve a type inference issue where `skipWaiting` was not being identified as a function. This addresses the "not callable" error.
+    event.waitUntil((self as unknown as ServiceWorkerGlobalScope).skipWaiting());
 });

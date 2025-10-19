@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 // FIX: The 'Partial' type is a built-in TypeScript utility and does not need to be imported.
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, DaySchedule } from '../types';
@@ -40,6 +41,10 @@ interface AdminSectionProps {
     onPermanentDeleteMultipleOrders: (orderIds: string[]) => Promise<void>;
     onRefundOrder: (orderId: string) => Promise<void>;
     refundingOrderId: string | null;
+    onBulkDeleteProducts: (productIds: string[]) => Promise<void>;
+    onRestoreProduct: (productId: string) => Promise<void>;
+    onPermanentDeleteProduct: (productId: string) => Promise<void>;
+    onBulkPermanentDeleteProducts: (productIds: string[]) => Promise<void>;
 }
 
 interface SortableProductItemProps {
@@ -49,9 +54,12 @@ interface SortableProductItemProps {
     onDelete: (productId: string) => void;
     onStatusChange: (productId: string, active: boolean) => void;
     onStockStatusChange: (productId: string, stockStatus: 'available' | 'out_of_stock') => void;
+    isDeleteMode: boolean;
+    isSelected: boolean;
+    onSelect: (productId: string) => void;
 }
 
-const SortableProductItem: React.FC<SortableProductItemProps> = ({ product, isCategoryActive, onEdit, onDelete, onStatusChange, onStockStatusChange }) => {
+const SortableProductItem: React.FC<SortableProductItemProps> = ({ product, isCategoryActive, onEdit, onDelete, onStatusChange, onStockStatusChange, isDeleteMode, isSelected, onSelect }) => {
     const {
         attributes,
         listeners,
@@ -59,7 +67,7 @@ const SortableProductItem: React.FC<SortableProductItemProps> = ({ product, isCa
         transform,
         transition,
         isDragging,
-    } = useSortable({ id: product.id });
+    } = useSortable({ id: product.id, disabled: isDeleteMode });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -74,27 +82,39 @@ const SortableProductItem: React.FC<SortableProductItemProps> = ({ product, isCa
     return (
         <div ref={setNodeRef} style={style} className={`bg-gray-50 p-3 rounded-lg flex justify-between items-center transition-opacity ${itemOpacityClass}`}>
             <div className="flex items-center gap-4">
-                <button {...attributes} {...listeners} className="cursor-grab touch-none p-2" aria-label="Mover produto">
-                    <i className="fas fa-grip-vertical text-gray-500 hover:text-gray-800"></i>
-                </button>
+                {isDeleteMode ? (
+                     <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => onSelect(product.id)}
+                        className="h-5 w-5 rounded border-gray-400 text-accent focus:ring-accent cursor-pointer"
+                        aria-label={`Selecionar ${product.name}`}
+                    />
+                ) : (
+                    <button {...attributes} {...listeners} className="cursor-grab touch-none p-2" aria-label="Mover produto">
+                        <i className="fas fa-grip-vertical text-gray-500 hover:text-gray-800"></i>
+                    </button>
+                )}
                 <p className={`font-bold ${!isAvailable ? 'line-through text-gray-400' : ''}`}>{product.name}</p>
             </div>
-            <div className="flex items-center gap-2 sm:gap-4">
-                <button 
-                    onClick={() => onStockStatusChange(product.id, isAvailable ? 'out_of_stock' : 'available')} 
-                    className={`text-white w-8 h-8 rounded-md flex items-center justify-center transition-colors ${isAvailable ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'}`}
-                    aria-label={isAvailable ? 'Marcar como esgotado' : 'Marcar como disponível'}
-                    title={isAvailable ? 'Disponível (clique para esgotar)' : 'Esgotado (clique para disponibilizar)'}
-                >
-                    <i className={`fas ${isAvailable ? 'fa-box-open' : 'fa-box'}`}></i>
-                </button>
-                <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" checked={product.active} onChange={e => onStatusChange(product.id, e.target.checked)} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                </label>
-                <button onClick={() => onEdit(product)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${product.name}`}><i className="fas fa-edit"></i></button>
-                <button onClick={() => window.confirm('Tem certeza que deseja excluir este produto?') && onDelete(product.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${product.name}`}><i className="fas fa-trash"></i></button>
-            </div>
+            {!isDeleteMode && (
+                <div className="flex items-center gap-2 sm:gap-4">
+                    <button 
+                        onClick={() => onStockStatusChange(product.id, isAvailable ? 'out_of_stock' : 'available')} 
+                        className={`text-white w-8 h-8 rounded-md flex items-center justify-center transition-colors ${isAvailable ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'}`}
+                        aria-label={isAvailable ? 'Marcar como esgotado' : 'Marcar como disponível'}
+                        title={isAvailable ? 'Disponível (clique para esgotar)' : 'Esgotado (clique para disponibilizar)'}
+                    >
+                        <i className={`fas ${isAvailable ? 'fa-box-open' : 'fa-box'}`}></i>
+                    </button>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" checked={product.active} onChange={e => onStatusChange(product.id, e.target.checked)} className="sr-only peer" />
+                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                    </label>
+                    <button onClick={() => onEdit(product)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${product.name}`}><i className="fas fa-edit"></i></button>
+                    <button onClick={() => window.confirm('Tem certeza que deseja mover este produto para a lixeira?') && onDelete(product.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${product.name}`}><i className="fas fa-trash"></i></button>
+                </div>
+            )}
         </div>
     );
 };
@@ -153,7 +173,8 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
         onSeedDatabase, onSaveSiteSettings, onUpdateSiteSettingsField, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
-        onDeleteOrder, onPermanentDeleteOrder, onPermanentDeleteMultipleOrders, onRefundOrder, refundingOrderId
+        onDeleteOrder, onPermanentDeleteOrder, onPermanentDeleteMultipleOrders, onRefundOrder, refundingOrderId,
+        onBulkDeleteProducts, onRestoreProduct, onPermanentDeleteProduct, onBulkPermanentDeleteProducts
     } = props;
     
     const [user, setUser] = useState<firebase.User | null>(null);
@@ -182,6 +203,12 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const [activeOrdersTab, setActiveOrdersTab] = useState<OrderTabKey>('accepted');
     const [isTrashVisible, setIsTrashVisible] = useState(false);
     const [selectedOrderIds, setSelectedOrderIds] = useState(new Set<string>());
+
+    // State for product management
+    const [isProductDeleteMode, setIsProductDeleteMode] = useState(false);
+    const [selectedProductIds, setSelectedProductIds] = useState(new Set<string>());
+    const [isProductTrashVisible, setIsProductTrashVisible] = useState(false);
+
 
     // State for Status Tab
     const [localSettings, setLocalSettings] = useState<SiteSettings>(siteSettings);
@@ -237,7 +264,10 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         if (!isTrashVisible) {
             setSelectedOrderIds(new Set());
         }
-    }, [isTrashVisible]);
+        if (!isProductTrashVisible) {
+            setSelectedProductIds(new Set());
+        }
+    }, [isTrashVisible, isProductTrashVisible]);
 
     // Scroll main admin tabs into view
     useEffect(() => {
@@ -534,6 +564,65 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
             setIsSavingStatus(false);
         }
     };
+    
+    // --- Product Deletion Mode Handlers ---
+    const activeProducts = useMemo(() => localProducts.filter(p => !p.deleted), [localProducts]);
+    const deletedProducts = useMemo(() => localProducts.filter(p => p.deleted), [localProducts]);
+    
+    const handleSelectProduct = (productId: string) => {
+        setSelectedProductIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(productId)) newSet.delete(productId);
+            else newSet.add(productId);
+            return newSet;
+        });
+    };
+
+    const handleSelectAllProductsInCategory = (categoryId: string, isSelecting: boolean) => {
+        const productIdsInCategory = activeProducts.filter(p => p.categoryId === categoryId).map(p => p.id);
+        setSelectedProductIds(prev => {
+            const newSet = new Set(prev);
+            if (isSelecting) {
+                productIdsInCategory.forEach(id => newSet.add(id));
+            } else {
+                productIdsInCategory.forEach(id => newSet.delete(id));
+            }
+            return newSet;
+        });
+    };
+
+    const handleSelectAllActiveProducts = () => {
+        if (selectedProductIds.size === activeProducts.length) {
+            setSelectedProductIds(new Set());
+        } else {
+            setSelectedProductIds(new Set(activeProducts.map(p => p.id)));
+        }
+    };
+
+    const handleDeleteSelectedProducts = async () => {
+        if (selectedProductIds.size === 0) return;
+        if (window.confirm(`Tem certeza que deseja mover ${selectedProductIds.size} produto(s) para a lixeira?`)) {
+            await onBulkDeleteProducts(Array.from(selectedProductIds));
+            setSelectedProductIds(new Set());
+            setIsProductDeleteMode(false);
+        }
+    };
+    
+    const handleSelectAllDeletedProducts = () => {
+        if(selectedProductIds.size === deletedProducts.length) {
+            setSelectedProductIds(new Set());
+        } else {
+            setSelectedProductIds(new Set(deletedProducts.map(p => p.id)));
+        }
+    };
+    
+    const handlePermanentDeleteSelectedProducts = async () => {
+        if (selectedProductIds.size === 0) return;
+        if (window.confirm(`Apagar PERMANENTEMENTE ${selectedProductIds.size} produto(s)? Esta ação não pode ser desfeita.`)) {
+            await onBulkPermanentDeleteProducts(Array.from(selectedProductIds));
+            setSelectedProductIds(new Set());
+        }
+    };
 
 
     if (!showAdminPanel) return null;
@@ -801,7 +890,96 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                         )} </div>
                         
                         <div id="admin-content-customization"> {activeTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> )} </div>
-                        <div id="admin-content-products"> {activeTab === 'products' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Produtos</h3> <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Produto</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}> <div className="space-y-6"> {localCategories.map(category => { const categoryProducts = localProducts.filter(p => p.categoryId === category.id).sort((a, b) => a.orderIndex - b.orderIndex); return ( <div key={category.id}> <h4 className={`text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4> <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3 min-h-[50px]"> {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} />)} </div> </SortableContext> </div> ) })} </div> </DndContext> </div> )} </div>
+                        <div id="admin-content-products">
+                            {activeTab === 'products' && (
+                                isProductTrashVisible ? (
+                                    <div>
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="text-xl font-bold">Lixeira de Produtos</h3>
+                                            <button onClick={() => { setIsProductTrashVisible(false); setSelectedProductIds(new Set()); }} className="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">
+                                                <i className="fas fa-arrow-left mr-2"></i>Voltar aos Produtos
+                                            </button>
+                                        </div>
+                                        {deletedProducts.length > 0 ? (
+                                             <div className="space-y-3">
+                                                <div className="bg-gray-100 p-2 rounded-lg mb-4 flex items-center gap-4 border sticky top-20 z-20">
+                                                    <input type="checkbox" onChange={handleSelectAllDeletedProducts} checked={selectedProductIds.size > 0 && selectedProductIds.size === deletedProducts.length} className="h-5 w-5 rounded border-gray-400 text-accent focus:ring-accent cursor-pointer" />
+                                                    <span className="font-semibold text-sm text-gray-700">{selectedProductIds.size} selecionado(s)</span>
+                                                    <button onClick={handlePermanentDeleteSelectedProducts} disabled={selectedProductIds.size === 0} className="ml-auto bg-red-500 text-white font-semibold py-1 px-3 rounded-md text-sm hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed">
+                                                        <i className="fas fa-trash-alt mr-2"></i>Apagar Selecionados
+                                                    </button>
+                                                </div>
+                                                {deletedProducts.map(product => (
+                                                    <div key={product.id} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
+                                                        <div className="flex items-center gap-4">
+                                                            <input type="checkbox" checked={selectedProductIds.has(product.id)} onChange={() => handleSelectProduct(product.id)} className="h-5 w-5 rounded border-gray-400 text-accent focus:ring-accent cursor-pointer" />
+                                                            <p className="font-bold text-gray-500 line-through">{product.name}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <button onClick={() => onRestoreProduct(product.id)} className="bg-blue-500 text-white font-semibold py-1 px-3 rounded-md text-sm hover:bg-blue-600"><i className="fas fa-undo mr-2"></i>Restaurar</button>
+                                                            <button onClick={() => onPermanentDeleteProduct(product.id)} className="bg-red-500 text-white font-semibold py-1 px-3 rounded-md text-sm hover:bg-red-600"><i className="fas fa-trash-alt mr-2"></i>Apagar Perm.</button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                             </div>
+                                        ) : (
+                                            <div className="text-center py-12"><p className="text-gray-500">Lixeira de produtos vazia.</p></div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div> 
+                                        <div className="flex justify-between items-center mb-4"> 
+                                            <h3 className="text-xl font-bold">Gerenciar Produtos</h3> 
+                                            {!isProductDeleteMode && <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Produto</button>}
+                                        </div>
+                                        {isProductDeleteMode && (
+                                            <div className="bg-blue-50 p-2 rounded-lg mb-4 flex items-center gap-4 border border-blue-200 sticky top-20 z-20">
+                                                <input type="checkbox" onChange={handleSelectAllActiveProducts} checked={selectedProductIds.size > 0 && selectedProductIds.size === activeProducts.length} className="h-5 w-5 rounded border-gray-400 text-accent focus:ring-accent cursor-pointer" />
+                                                <span className="font-semibold text-sm text-blue-800">{selectedProductIds.size} selecionado(s)</span>
+                                                <button onClick={handleDeleteSelectedProducts} disabled={selectedProductIds.size === 0} className="ml-auto bg-red-500 text-white font-semibold py-1 px-3 rounded-md text-sm hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed">
+                                                    <i className="fas fa-trash-alt mr-2"></i>Mover para Lixeira
+                                                </button>
+                                                <button onClick={() => { setIsProductDeleteMode(false); setSelectedProductIds(new Set()); }} className="bg-gray-200 text-gray-800 font-semibold py-1 px-3 rounded-md text-sm hover:bg-gray-300">Cancelar</button>
+                                            </div>
+                                        )}
+                                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}> 
+                                            <div className="space-y-6"> 
+                                                {localCategories.map(category => { 
+                                                    const categoryProducts = activeProducts.filter(p => p.categoryId === category.id).sort((a, b) => a.orderIndex - b.orderIndex); 
+                                                    const areAllInCategorySelected = categoryProducts.length > 0 && categoryProducts.every(p => selectedProductIds.has(p.id));
+                                                    return ( 
+                                                        <div key={category.id}> 
+                                                            <div className="flex items-center gap-3 mb-2 pb-1 border-b-2 border-brand-green-300">
+                                                                {isProductDeleteMode && categoryProducts.length > 0 && (
+                                                                    // FIX: Corrected function call from handleSelectAllInCategory to handleSelectAllProductsInCategory
+                                                                    <input type="checkbox" checked={areAllInCategorySelected} onChange={e => handleSelectAllProductsInCategory(category.id, e.target.checked)} className="h-5 w-5 rounded border-gray-400 text-accent focus:ring-accent cursor-pointer" />
+                                                                )}
+                                                                <h4 className={`text-lg font-semibold text-brand-olive-600 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4>
+                                                            </div>
+                                                            <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> 
+                                                                <div className="space-y-3 min-h-[50px]"> 
+                                                                    {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} isDeleteMode={isProductDeleteMode} isSelected={selectedProductIds.has(product.id)} onSelect={handleSelectProduct} />)} 
+                                                                </div> 
+                                                            </SortableContext> 
+                                                        </div> 
+                                                    ) 
+                                                })} 
+                                            </div> 
+                                        </DndContext>
+                                        <div className="mt-6 pt-6 border-t flex justify-end items-center gap-4">
+                                            <button onClick={() => setIsProductTrashVisible(true)} className="font-semibold text-gray-600 hover:text-gray-900 text-sm py-2 px-4 rounded-lg hover:bg-gray-100">
+                                                <i className="fas fa-trash-alt mr-2"></i>Ver Lixeira
+                                            </button>
+                                            {!isProductDeleteMode && (
+                                                <button onClick={() => setIsProductDeleteMode(true)} className="w-10 h-10 bg-red-50 text-red-600 rounded-full flex items-center justify-center hover:bg-red-100" title="Excluir múltiplos produtos">
+                                                    <i className="fas fa-trash"></i>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            )}
+                        </div>
                         <div id="admin-content-categories"> {activeTab === 'categories' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Categorias</h3> <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Categoria</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}> <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localCategories.map(cat => <SortableCategoryItem key={cat.id} category={cat} onEdit={handleEditCategory} onDelete={onDeleteCategory} onStatusChange={onCategoryStatusChange} />)} </div> </SortableContext> </DndContext> </div> )} </div>
                         <div id="admin-content-data"> {activeTab === 'data' && ( <div> <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus dados.</p> <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados iniciais. Use apenas uma vez.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> )} </div>
                     </div>
