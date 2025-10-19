@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 // FIX: The 'Partial' type is a built-in TypeScript utility and does not need to be imported.
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, DaySchedule } from '../types';
@@ -125,10 +124,10 @@ interface SortableCategoryItemProps {
     onEdit: (category: Category) => void;
     onDelete: (categoryId: string) => void;
     onStatusChange: (categoryId: string, active: boolean) => void;
-    isCategoryEmpty: boolean;
+    isCategoryDisabled: boolean;
 }
 
-const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, onEdit, onDelete, onStatusChange, isCategoryEmpty }) => {
+const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, onEdit, onDelete, onStatusChange, isCategoryDisabled }) => {
     const {
         attributes,
         listeners,
@@ -146,14 +145,13 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
     };
 
     const handleToggleClick = (e: React.MouseEvent) => {
-        if (isCategoryEmpty) {
+        if (isCategoryDisabled) {
             e.preventDefault();
-            alert("Esta categoria não pode ser ativada pois não contém produtos. Adicione um produto a esta categoria para poder ativá-la.");
+            alert("Esta categoria não pode ser ativada pois não contém produtos ou todos os seus produtos estão inativos.");
         }
     };
     
-    // A category is active only if it's not empty AND its active flag is true.
-    const isEffectivelyActive = !isCategoryEmpty && category.active;
+    const isEffectivelyActive = !isCategoryDisabled && category.active;
 
     return (
         <div ref={setNodeRef} style={style} className={`bg-gray-50 p-3 rounded-lg flex justify-between items-center transition-opacity ${!isEffectivelyActive ? 'opacity-50' : ''}`}>
@@ -166,15 +164,15 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
             <div className="flex items-center gap-4">
                  <label 
                     onClick={handleToggleClick}
-                    className={`relative inline-flex items-center ${isCategoryEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                    title={isCategoryEmpty ? "Esta categoria não pode ser ativada pois não contém produtos." : (category.active ? 'Desativar categoria' : 'Ativar categoria')}
+                    className={`relative inline-flex items-center ${isCategoryDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    title={isCategoryDisabled ? "Adicione ou ative um produto nesta categoria para poder ativá-la." : (category.active ? 'Desativar categoria' : 'Ativar categoria')}
                 >
                     <input 
                         type="checkbox" 
                         checked={isEffectivelyActive} 
                         onChange={e => onStatusChange(category.id, e.target.checked)} 
                         className="sr-only peer"
-                        disabled={isCategoryEmpty}
+                        disabled={isCategoryDisabled}
                     />
                     <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600 peer-disabled:bg-gray-300"></div>
                 </label>
@@ -372,16 +370,19 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         const newIndex = sortedProducts.findIndex((p: Product) => p.id === over.id);
         if (oldIndex === -1 || newIndex === -1) return;
         const reordered = arrayMove(sortedProducts, oldIndex, newIndex);
-        onReorderProducts(reordered.map((p, index) => ({ id: p.id, orderIndex: index })));
+        // FIX: Explicitly typed 'p' as Product to resolve the 'unknown' type error during mapping.
+        onReorderProducts(reordered.map((p: Product, index) => ({ id: p.id, orderIndex: index })));
     };
 
     const handleCategoryDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
-        const oldIndex = localCategories.findIndex(c => c.id === active.id);
-        const newIndex = localCategories.findIndex(c => c.id === over.id);
+        // FIX: Explicitly typed the 'c' parameter in findIndex callbacks to 'Category' to resolve an 'unknown' type error.
+        const oldIndex = localCategories.findIndex((c: Category) => c.id === active.id);
+        const newIndex = localCategories.findIndex((c: Category) => c.id === over.id);
         const reordered = arrayMove(localCategories, oldIndex, newIndex);
-        onReorderCategories(reordered.map((c, index) => ({ id: c.id, order: index })));
+        // FIX: Explicitly typed 'c' as Category to resolve the 'unknown' type error during mapping.
+        onReorderCategories(reordered.map((c: Category, index) => ({ id: c.id, order: index })));
     };
     
     const handleLogin = async (e: React.FormEvent) => {
@@ -979,13 +980,11 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                                 )}
                                                                 <h4 className={`text-lg font-semibold text-brand-olive-600 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4>
                                                             </div>
-                                                            {/* FIX: The SortableContext component was throwing a spurious error about a missing 'children' prop.
-                                                            Restructuring the JSX by moving the styled div outside of the context and having the sortable items as direct children resolves the issue. */}
-                                                            <div className="space-y-3 min-h-[50px]"> 
-                                                                <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> 
-                                                                    {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} isDeleteMode={isProductDeleteMode} isSelected={selectedProductIds.has(product.id)} onSelect={handleSelectProduct} />)} 
-                                                                </SortableContext> 
-                                                            </div> 
+                                                            {/* FIX: Removed the wrapper div from inside SortableContext.
+                                                            The component expects an array of sortable elements as direct children, and the extra div caused a 'children' prop type error. */}
+                                                            <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> 
+                                                                {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} isDeleteMode={isProductDeleteMode} isSelected={selectedProductIds.has(product.id)} onSelect={handleSelectProduct} />)} 
+                                                            </SortableContext> 
                                                         </div> 
                                                     ) 
                                                 })} 
@@ -1015,25 +1014,24 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                         </button>
                                     </div>
                                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
-                                        {/* FIX: The SortableContext component was throwing a spurious error about a missing 'children' prop.
-                                        Restructuring the JSX by moving the styled div outside of the context and having the sortable items as direct children resolves the issue. */}
-                                        <div className="space-y-3">
-                                            <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                                                {localCategories.map(cat => {
-                                                    const isCategoryEmpty = !allProducts.some(p => p.categoryId === cat.id && !p.deleted);
-                                                    return (
-                                                        <SortableCategoryItem
-                                                            key={cat.id}
-                                                            category={cat}
-                                                            onEdit={handleEditCategory}
-                                                            onDelete={onDeleteCategory}
-                                                            onStatusChange={onCategoryStatusChange}
-                                                            isCategoryEmpty={isCategoryEmpty}
-                                                        />
-                                                    );
-                                                })}
-                                            </SortableContext>
-                                        </div>
+                                        {/* FIX: Removed the wrapper div from inside SortableContext.
+                                        The component expects an array of sortable elements as direct children, and the extra div caused a 'children' prop type error. */}
+                                        <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                                            {localCategories.map(cat => {
+                                                const productsInCategory = allProducts.filter(p => p.categoryId === cat.id && !p.deleted);
+                                                const isCategoryDisabled = productsInCategory.length === 0 || productsInCategory.every(p => !p.active);
+                                                return (
+                                                    <SortableCategoryItem
+                                                        key={cat.id}
+                                                        category={cat}
+                                                        onEdit={handleEditCategory}
+                                                        onDelete={onDeleteCategory}
+                                                        onStatusChange={onCategoryStatusChange}
+                                                        isCategoryDisabled={isCategoryDisabled}
+                                                    />
+                                                );
+                                            })}
+                                        </SortableContext>
                                     </DndContext>
                                 </div>
                             )}
