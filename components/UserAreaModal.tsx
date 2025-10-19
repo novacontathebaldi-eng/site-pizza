@@ -395,6 +395,23 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
                 
                 {isOngoing && <OrderStatusTracker order={order} />}
 
+                {!isOngoing && (
+                    <div className="mt-2 mb-4">
+                        {order.status === 'completed' && (
+                            <div className="bg-green-50 border border-green-200 text-green-800 text-sm font-semibold p-3 rounded-lg flex items-center gap-3">
+                                <i className="fas fa-pizza-slice"></i>
+                                <span>Pedido Finalizado. Bom apetite!</span>
+                            </div>
+                        )}
+                        {order.status === 'cancelled' && (
+                            <div className="bg-red-50 border border-red-200 text-red-800 text-sm font-semibold p-3 rounded-lg flex items-center gap-3">
+                                <i className="fas fa-ban"></i>
+                                <span>Pedido Cancelado</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                  <button onClick={() => onViewDetails(order.id)} className="mt-auto w-full bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
                     <i className="fas fa-receipt mr-2"></i>Ver Detalhes do Pedido
                 </button>

@@ -36,6 +36,23 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onC
                  <div className="overflow-y-auto p-4 sm:p-6 space-y-4">
                     {isOngoing && <OrderStatusTracker order={order} />}
                     
+                    {!isOngoing && (
+                        <div className="mb-4">
+                            {order.status === 'completed' && (
+                                <div className="bg-green-50 border border-green-200 text-green-800 text-sm font-semibold p-3 rounded-lg flex items-center gap-3">
+                                    <i className="fas fa-pizza-slice"></i>
+                                    <span>Pedido Finalizado. Bom apetite!</span>
+                                </div>
+                            )}
+                            {order.status === 'cancelled' && (
+                                <div className="bg-red-50 border border-red-200 text-red-800 text-sm font-semibold p-3 rounded-lg flex items-center gap-3">
+                                    <i className="fas fa-ban"></i>
+                                    <span>Pedido Cancelado</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     <div className={`grid grid-cols-1 ${!isReservation ? 'md:grid-cols-2' : ''} gap-4 text-sm`}>
                         <div className="bg-gray-50 p-3 rounded-md border">
                             <h4 className="font-bold mb-2 text-base"><i className="fas fa-user mr-2 text-gray-400"></i>Cliente</h4>
