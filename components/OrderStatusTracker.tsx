@@ -3,7 +3,7 @@ import { Order, OrderStatus } from '../types';
 
 const statusConfig: { [key in OrderStatus]?: { text: string; icon: string; color: string; } } = {
     pending: { text: 'Pendente', icon: 'fas fa-hourglass-start', color: 'text-yellow-500' },
-    accepted: { text: 'Em Preparo', icon: 'fas fa-cogs', color: 'text-blue-500' },
+    accepted: { text: 'Em Preparo', icon: 'fas fa-utensils', color: 'text-blue-500' },
     reserved: { text: 'Reserva Confirmada', icon: 'fas fa-chair', color: 'text-teal-500' },
     ready: { text: 'Pronto / Em Rota', icon: 'fas fa-shipping-fast', color: 'text-purple-500' },
     completed: { text: 'Finalizado', icon: 'fas fa-check-circle', color: 'text-green-500' },
@@ -33,12 +33,7 @@ export const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
         const config = statusConfig[isReserved ? 'reserved' : order.status] || statusConfig.pending;
         if (!config) return null;
 
-        const iconNode = isReserved ? (
-            <span className="relative inline-block leading-none">
-                <i className="fa-solid fa-chair fa-lg" aria-hidden="true"></i>
-                <i className="fa-solid fa-check-circle absolute text-[0.7rem] text-white bg-green-500 rounded-full" style={{ top: '-4px', right: '-6px' }} aria-hidden="true"></i>
-            </span>
-        ) : <i className={config.icon}></i>;
+        const iconNode = <i className={config.icon}></i>;
 
         return (
              <div className="bg-blue-50 border-l-4 border-blue-400 text-blue-800 p-3 my-2 rounded-r-lg text-sm">
@@ -58,24 +53,14 @@ export const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
         { 
             id: 'accepted', 
             label: 'Em Preparo', 
-            icon: (
-                <span className="relative inline-block leading-none">
-                    <i className="fa-solid fa-utensils" aria-hidden="true"></i>
-                    <i className="fa-solid fa-clock absolute text-xs text-gray-800 bg-white rounded-full p-px" style={{ top: '-4px', right: '-4px', border: '1px solid #e5e7eb' }} aria-hidden="true"></i>
-                </span>
-            )
+            icon: <i className="fas fa-utensils"></i>
         },
         { 
             id: 'ready', 
             label: order.customer.orderType === 'delivery' ? 'Saiu p/ Entrega' : 'Pronto p/ Retirada', 
             icon: order.customer.orderType === 'delivery' 
                 ? <i className="fas fa-motorcycle"></i> 
-                : (
-                    <span className="relative inline-block leading-none">
-                        <i className="fa-solid fa-pizza-slice" aria-hidden="true"></i>
-                        <i className="fa-solid fa-check-circle absolute text-xs text-white bg-green-500 rounded-full" style={{ top: '-4px', right: '-4px' }} aria-hidden="true"></i>
-                    </span>
-                )
+                : <i className="fas fa-pizza-slice"></i>
         },
         { id: 'completed', label: 'Finalizado', icon: <i className="fas fa-check"></i> }
     ];

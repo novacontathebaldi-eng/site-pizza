@@ -22,22 +22,12 @@ const getStatusConfig = (order: Order): { text: string; icon: React.ReactNode; c
         pending: { text: 'Pendente', icon: <i className="fas fa-hourglass-start"></i>, color: 'border-yellow-500' },
         accepted: { 
             text: 'Aceito / Em Preparo', 
-            icon: (
-                <span className="relative inline-block leading-none">
-                    <i className="fa-solid fa-utensils fa-lg" aria-hidden="true"></i>
-                    <i className="fa-solid fa-clock absolute text-[0.6rem] text-gray-800 bg-white rounded-full p-px" style={{ top: '-3px', right: '-5px', border: '1px solid #e5e7eb' }} aria-hidden="true"></i>
-                </span>
-            ), 
+            icon: <i className="fas fa-utensils"></i>, 
             color: 'border-blue-500' 
         },
         reserved: { 
             text: 'Reserva (No Local)', 
-            icon: (
-                 <span className="relative inline-block leading-none">
-                    <i className="fa-solid fa-chair fa-lg" aria-hidden="true"></i>
-                    <i className="fa-solid fa-check-circle absolute text-[0.7rem] text-white bg-green-500 rounded-full" style={{ top: '-4px', right: '-6px' }} aria-hidden="true"></i>
-                </span>
-            ), 
+            icon: <i className="fas fa-chair"></i>, 
             color: 'border-teal-500' 
         },
         ready: { text: 'Pronto / Em Rota', icon: <i className="fas fa-shipping-fast"></i>, color: 'border-purple-500' }, // Default text
@@ -52,12 +42,7 @@ const getStatusConfig = (order: Order): { text: string; icon: React.ReactNode; c
             return { 
                 ...staticConfig.ready, 
                 text: 'Pronto para Retirada',
-                icon: (
-                    <span className="relative inline-block leading-none">
-                        <i className="fa-solid fa-pizza-slice fa-lg" aria-hidden="true"></i>
-                        <i className="fa-solid fa-check-circle absolute text-[0.7rem] text-white bg-green-500 rounded-full" style={{ top: '-4px', right: '-6px' }} aria-hidden="true"></i>
-                    </span>
-                )
+                icon: <i className="fas fa-pizza-slice"></i>
             };
         }
         if (order.customer.orderType === 'delivery') {
