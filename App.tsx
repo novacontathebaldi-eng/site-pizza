@@ -1030,7 +1030,7 @@ const App: React.FC = () => {
                             <span className="relative">
                                 <i className="fas fa-chevron-up text-2xl"></i>
                                 <span
-                                    className="absolute -top-2 -right-3 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center"
+                                    className="absolute -top-4 -right-3 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center"
                                 >
                                     {activeOrders.length}
                                 </span>
