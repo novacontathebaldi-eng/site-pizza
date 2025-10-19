@@ -747,8 +747,60 @@ const App: React.FC = () => {
         }
     };
 
-    const handleSaveProduct = useCallback(async (product: Product) => { try { const { id, ...dataToSave } = product; if (id) await firebaseService.updateProduct(id, dataToSave); else await firebaseService.addProduct({ ...dataToSave, orderIndex: products.length, stockStatus: 'available' }); addToast(id ? "Produto atualizado!" : "Produto adicionado!", 'success'); } catch (error) { console.error("Failed to save product:", error); addToast("Erro ao salvar produto.", 'error'); } }, [products.length, addToast]);
-    const handleDeleteProduct = useCallback(async (productId: string) => { try { await firebaseService.deleteProduct(productId); addToast("Produto movido para a lixeira!", 'success'); } catch (error) { console.error("Failed to delete product:", error); addToast("Erro ao mover para a lixeira.", 'error'); } }, [addToast]);
+    const handleSaveProduct = useCallback(async (product: Product) => {
+        try {
+            const { id, ...dataToSave } = product;
+    
+            // Logic to check old category if it's an update
+            if (id) {
+                const originalProduct = products.find(p => p.id === id);
+                if (originalProduct && originalProduct.categoryId !== product.categoryId) {
+                    // Category has changed, check if the old one is now empty
+                    const isOldCategoryNowEmpty = !products.some(p => p.id !== id && p.categoryId === originalProduct.categoryId && !p.deleted);
+                    if (isOldCategoryNowEmpty) {
+                        // Deactivate the old category
+                        await firebaseService.updateCategoryStatus(originalProduct.categoryId, false);
+                        addToast(`Categoria "${categories.find(c => c.id === originalProduct.categoryId)?.name}" desativada por estar vazia.`, 'success');
+                    }
+                }
+                await firebaseService.updateProduct(id, dataToSave);
+            } else {
+                // It's a new product
+                await firebaseService.addProduct({ ...dataToSave, orderIndex: products.length, stockStatus: 'available' });
+            }
+            addToast(id ? "Produto atualizado!" : "Produto adicionado!", 'success');
+        } catch (error) {
+            console.error("Failed to save product:", error);
+            addToast("Erro ao salvar produto.", 'error');
+        }
+    }, [products, categories, addToast]);
+    
+    const handleDeleteProduct = useCallback(async (productId: string) => {
+        try {
+            const productToDelete = products.find(p => p.id === productId);
+            if (productToDelete) {
+                const { categoryId } = productToDelete;
+                // Check if this is the last non-deleted product in its category
+                const isCategoryBecomingEmpty = !products.some(p => 
+                    !p.deleted && 
+                    p.id !== productId &&
+                    p.categoryId === categoryId
+                );
+    
+                if (isCategoryBecomingEmpty) {
+                     await firebaseService.updateCategoryStatus(categoryId, false);
+                     addToast(`Categoria "${categories.find(c => c.id === categoryId)?.name}" desativada por estar vazia.`, 'success');
+                }
+            }
+            
+            await firebaseService.deleteProduct(productId); // This just sets deleted: true
+            addToast("Produto movido para a lixeira!", 'success');
+        } catch (error) {
+            console.error("Failed to delete product:", error);
+            addToast("Erro ao mover para a lixeira.", 'error');
+        }
+    }, [products, categories, addToast]);
+
     const handleProductStatusChange = useCallback(async (productId: string, active: boolean) => { try { await firebaseService.updateProductStatus(productId, active); addToast(`Produto ${active ? 'ativado' : 'desativado'}.`, 'success'); } catch (error) { console.error("Failed to update product status:", error); addToast("Erro ao atualizar status.", 'error'); } }, [addToast]);
     const handleProductStockStatusChange = useCallback(async (productId: string, stockStatus: 'available' | 'out_of_stock') => { try { await firebaseService.updateProductStockStatus(productId, stockStatus); addToast(`Estoque atualizado.`, 'success'); } catch (error) { console.error("Failed to update product stock status:", error); addToast("Erro ao atualizar estoque.", 'error'); } }, [addToast]);
     const handleStoreStatusChange = useCallback(async (isOnline: boolean) => { try { await firebaseService.updateStoreStatus(isOnline); addToast("Status da loja atualizado.", 'success'); } catch (error) { console.error("Failed to update store status:", error); addToast("Erro ao atualizar status da loja.", 'error'); } }, [addToast]);
@@ -792,13 +844,31 @@ const App: React.FC = () => {
 
     const handleBulkDeleteProducts = useCallback(async (productIds: string[]) => {
         try {
+            const categoriesToUpdate = new Set<string>();
+            
+            const productsToDelete = products.filter(p => productIds.includes(p.id));
+            productsToDelete.forEach(p => categoriesToUpdate.add(p.categoryId));
+    
+            for (const categoryId of categoriesToUpdate) {
+                const otherProductsInCategory = products.filter(p => 
+                    p.categoryId === categoryId &&
+                    !productIds.includes(p.id) &&
+                    !p.deleted
+                );
+    
+                if (otherProductsInCategory.length === 0) {
+                    await firebaseService.updateCategoryStatus(categoryId, false);
+                    addToast(`Categoria "${categories.find(c => c.id === categoryId)?.name}" desativada por estar vazia.`, 'success');
+                }
+            }
+    
             await firebaseService.bulkDeleteProducts(productIds);
             addToast(`${productIds.length} produto(s) movido(s) para a lixeira.`, 'success');
         } catch (error) {
             console.error("Failed to bulk delete products:", error);
             addToast("Erro ao mover produtos para a lixeira.", 'error');
         }
-    }, [addToast]);
+    }, [products, categories, addToast]);
 
     const handleRestoreProduct = useCallback(async (productId: string) => {
         try {
@@ -887,7 +957,7 @@ const App: React.FC = () => {
         pending: <i className="fas fa-hourglass-start" />,
         accepted: (
             <span className="relative inline-block leading-none">
-                <i className="fa-solid fa-fire-burner fa-lg" aria-hidden="true"></i>
+                <i className="fa-solid fire-burner fa-lg" aria-hidden="true"></i>
                 <i className="fa-solid fa-clock absolute text-xs text-white bg-brand-olive-600 rounded-full p-px" style={{ top: '-5px', right: '-7px' }}></i>
             </span>
         ),

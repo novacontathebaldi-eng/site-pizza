@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 // FIX: The 'Partial' type is a built-in TypeScript utility and does not need to be imported.
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, DaySchedule } from '../types';
@@ -124,9 +125,10 @@ interface SortableCategoryItemProps {
     onEdit: (category: Category) => void;
     onDelete: (categoryId: string) => void;
     onStatusChange: (categoryId: string, active: boolean) => void;
+    isCategoryEmpty: boolean;
 }
 
-const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, onEdit, onDelete, onStatusChange }) => {
+const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, onEdit, onDelete, onStatusChange, isCategoryEmpty }) => {
     const {
         attributes,
         listeners,
@@ -143,8 +145,18 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
         boxShadow: isDragging ? '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' : 'none',
     };
 
+    const handleToggleClick = (e: React.MouseEvent) => {
+        if (isCategoryEmpty) {
+            e.preventDefault();
+            alert("Esta categoria não pode ser ativada pois não contém produtos. Adicione um produto a esta categoria para poder ativá-la.");
+        }
+    };
+    
+    // A category is active only if it's not empty AND its active flag is true.
+    const isEffectivelyActive = !isCategoryEmpty && category.active;
+
     return (
-        <div ref={setNodeRef} style={style} className={`bg-gray-50 p-3 rounded-lg flex justify-between items-center transition-opacity ${!category.active ? 'opacity-50' : ''}`}>
+        <div ref={setNodeRef} style={style} className={`bg-gray-50 p-3 rounded-lg flex justify-between items-center transition-opacity ${!isEffectivelyActive ? 'opacity-50' : ''}`}>
             <div className="flex items-center gap-4">
                 <button {...attributes} {...listeners} className="cursor-grab touch-none p-2" aria-label="Mover categoria">
                     <i className="fas fa-grip-vertical text-gray-500 hover:text-gray-800"></i>
@@ -152,9 +164,19 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
                 <p className="font-bold">{category.name}</p>
             </div>
             <div className="flex items-center gap-4">
-                 <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" checked={category.active} onChange={e => onStatusChange(category.id, e.target.checked)} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                 <label 
+                    onClick={handleToggleClick}
+                    className={`relative inline-flex items-center ${isCategoryEmpty ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    title={isCategoryEmpty ? "Esta categoria não pode ser ativada pois não contém produtos." : (category.active ? 'Desativar categoria' : 'Ativar categoria')}
+                >
+                    <input 
+                        type="checkbox" 
+                        checked={isEffectivelyActive} 
+                        onChange={e => onStatusChange(category.id, e.target.checked)} 
+                        className="sr-only peer"
+                        disabled={isCategoryEmpty}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600 peer-disabled:bg-gray-300"></div>
                 </label>
                 <button onClick={() => onEdit(category)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${category.name}`}><i className="fas fa-edit"></i></button>
                 <button onClick={() => window.confirm(`Tem certeza que deseja excluir a categoria "${category.name}"?`) && onDelete(category.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${category.name}`}><i className="fas fa-trash"></i></button>
@@ -345,8 +367,9 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
         const sortedProducts = [...localProducts].sort((a, b) => a.orderIndex - b.orderIndex);
-        const oldIndex = sortedProducts.findIndex(p => p.id === active.id);
-        const newIndex = sortedProducts.findIndex(p => p.id === over.id);
+        // FIX: Explicitly typed the 'p' parameter in findIndex callbacks to 'Product' to resolve an 'unknown' type error.
+        const oldIndex = sortedProducts.findIndex((p: Product) => p.id === active.id);
+        const newIndex = sortedProducts.findIndex((p: Product) => p.id === over.id);
         if (oldIndex === -1 || newIndex === -1) return;
         const reordered = arrayMove(sortedProducts, oldIndex, newIndex);
         onReorderProducts(reordered.map((p, index) => ({ id: p.id, orderIndex: index })));
@@ -956,11 +979,13 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                                 )}
                                                                 <h4 className={`text-lg font-semibold text-brand-olive-600 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4>
                                                             </div>
-                                                            <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> 
-                                                                <div className="space-y-3 min-h-[50px]"> 
+                                                            {/* FIX: The SortableContext component was throwing a spurious error about a missing 'children' prop.
+                                                            Restructuring the JSX by moving the styled div outside of the context and having the sortable items as direct children resolves the issue. */}
+                                                            <div className="space-y-3 min-h-[50px]"> 
+                                                                <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> 
                                                                     {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} isDeleteMode={isProductDeleteMode} isSelected={selectedProductIds.has(product.id)} onSelect={handleSelectProduct} />)} 
-                                                                </div> 
-                                                            </SortableContext> 
+                                                                </SortableContext> 
+                                                            </div> 
                                                         </div> 
                                                     ) 
                                                 })} 
@@ -980,7 +1005,39 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                 )
                             )}
                         </div>
-                        <div id="admin-content-categories"> {activeTab === 'categories' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Categorias</h3> <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Categoria</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}> <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localCategories.map(cat => <SortableCategoryItem key={cat.id} category={cat} onEdit={handleEditCategory} onDelete={onDeleteCategory} onStatusChange={onCategoryStatusChange} />)} </div> </SortableContext> </DndContext> </div> )} </div>
+                        <div id="admin-content-categories">
+                            {activeTab === 'categories' && (
+                                <div>
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-xl font-bold">Gerenciar Categorias</h3>
+                                        <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
+                                            <i className="fas fa-plus mr-2"></i>Nova Categoria
+                                        </button>
+                                    </div>
+                                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
+                                        {/* FIX: The SortableContext component was throwing a spurious error about a missing 'children' prop.
+                                        Restructuring the JSX by moving the styled div outside of the context and having the sortable items as direct children resolves the issue. */}
+                                        <div className="space-y-3">
+                                            <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                                                {localCategories.map(cat => {
+                                                    const isCategoryEmpty = !allProducts.some(p => p.categoryId === cat.id && !p.deleted);
+                                                    return (
+                                                        <SortableCategoryItem
+                                                            key={cat.id}
+                                                            category={cat}
+                                                            onEdit={handleEditCategory}
+                                                            onDelete={onDeleteCategory}
+                                                            onStatusChange={onCategoryStatusChange}
+                                                            isCategoryEmpty={isCategoryEmpty}
+                                                        />
+                                                    );
+                                                })}
+                                            </SortableContext>
+                                        </div>
+                                    </DndContext>
+                                </div>
+                            )}
+                        </div>
                         <div id="admin-content-data"> {activeTab === 'data' && ( <div> <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus dados.</p> <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados iniciais. Use apenas uma vez.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> )} </div>
                     </div>
                 </div>

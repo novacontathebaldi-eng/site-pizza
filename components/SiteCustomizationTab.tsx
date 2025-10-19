@@ -206,7 +206,9 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
 
     // --- Footer Link Handlers ---
     const handleFooterLinkChange = (id: string, field: keyof Omit<FooterLink, 'id'>, value: string | boolean) => {
-        const newLinks = formData.footerLinks.map(link => link.id === id ? { ...link, [field]: value } : link);
+        // FIX: Added a fallback to an empty array for `formData.footerLinks` to prevent a spread error
+        // on a potentially non-object type if the array is missing.
+        const newLinks = (formData.footerLinks || []).map(link => link.id === id ? { ...link, [field]: value } : link);
         setFormData({ ...formData, footerLinks: newLinks });
     };
 
@@ -271,8 +273,10 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                 <div className="p-4 border rounded-lg bg-gray-50/50">
                     <h3 className="text-lg font-bold mb-4 pb-2 border-b">Seções de Conteúdo da Página</h3>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
-                        <SortableContext items={formData.contentSections.map(s => s.id)} strategy={verticalListSortingStrategy}>
-                            <div className="space-y-3">
+                        {/* FIX: The SortableContext component was throwing a spurious error about a missing 'children' prop.
+                        Restructuring the JSX by moving the styled div outside of the context and having the sortable items as direct children resolves the issue. */}
+                        <div className="space-y-3">
+                            <SortableContext items={formData.contentSections.map(s => s.id)} strategy={verticalListSortingStrategy}>
                                 {formData.contentSections.map(section => (
                                     <SortableContentSectionItem 
                                         key={section.id} 
@@ -287,8 +291,8 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                                         onFileChange={handleFileChange}
                                     />
                                 ))}
-                            </div>
-                        </SortableContext>
+                            </SortableContext>
+                        </div>
                     </DndContext>
                      <button type="button" onClick={handleAddNewSection} className="mt-4 bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600">
                         <i className="fas fa-plus mr-2"></i>Adicionar Nova Seção
@@ -299,8 +303,10 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                  <div className="p-4 border rounded-lg bg-gray-50/50">
                     <h3 className="text-lg font-bold mb-4 pb-2 border-b">Links do Rodapé</h3>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleFooterLinkDragEnd}>
-                        <SortableContext items={formData.footerLinks.map(l => l.id)} strategy={verticalListSortingStrategy}>
-                            <div className="space-y-3">
+                        {/* FIX: The SortableContext component was throwing a spurious error about a missing 'children' prop.
+                        Restructuring the JSX by moving the styled div outside of the context and having the sortable items as direct children resolves the issue. */}
+                        <div className="space-y-3">
+                            <SortableContext items={formData.footerLinks.map(l => l.id)} strategy={verticalListSortingStrategy}>
                                 {formData.footerLinks.map(link => (
                                     <SortableFooterLinkItem 
                                         key={link.id}
@@ -309,8 +315,8 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                                         onDelete={handleRemoveFooterLink}
                                     />
                                 ))}
-                            </div>
-                        </SortableContext>
+                            </SortableContext>
+                        </div>
                     </DndContext>
                     <button type="button" onClick={handleAddFooterLink} className="mt-4 bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600">
                         <i className="fas fa-plus mr-2"></i>Adicionar Link
