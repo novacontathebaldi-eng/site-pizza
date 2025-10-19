@@ -879,15 +879,15 @@ const App: React.FC = () => {
     const statusIconMap: { [key in OrderStatus]?: React.ReactNode } = {
         pending: <i className="fas fa-hourglass-start" />,
         accepted: (
-            <span className="fa-layers">
-                <i className="fa-solid fa-utensils"></i>
-                <i className="fa-solid fa-clock" data-fa-transform="shrink-8 up-6 right-6"></i>
+            <span className="relative inline-block leading-none">
+                <i className="fa-solid fa-utensils fa-lg" aria-hidden="true"></i>
+                <i className="fa-solid fa-clock absolute text-[0.6rem] text-gray-800 bg-white rounded-full p-px" style={{ top: '-3px', right: '-5px', border: '1px solid #e5e7eb' }} aria-hidden="true"></i>
             </span>
         ),
         reserved: (
-            <span className="fa-layers">
-                <i className="fa-solid fa-chair"></i>
-                <i className="fa-solid fa-check-circle" data-fa-transform="shrink-8 up-6 right-6" style={{ color: 'limegreen' }}></i>
+            <span className="relative inline-block leading-none">
+                <i className="fa-solid fa-chair fa-lg" aria-hidden="true"></i>
+                <i className="fa-solid fa-check-circle absolute text-[0.7rem] text-white bg-green-500 rounded-full" style={{ top: '-4px', right: '-6px' }} aria-hidden="true"></i>
             </span>
         ),
         'awaiting-payment': <i className="fas fa-clock" />,
@@ -900,9 +900,9 @@ const App: React.FC = () => {
             }
             // Ready for pickup
             return (
-                <span className="fa-layers">
-                    <i className="fa-solid fa-pizza-slice"></i>
-                    <i className="fa-solid fa-check-circle" data-fa-transform="shrink-8 up-6 right-6" style={{ color: 'limegreen' }}></i>
+                <span className="relative inline-block leading-none">
+                    <i className="fa-solid fa-pizza-slice fa-lg" aria-hidden="true"></i>
+                    <i className="fa-solid fa-check-circle absolute text-[0.7rem] text-white bg-green-500 rounded-full" style={{ top: '-4px', right: '-6px' }} aria-hidden="true"></i>
                 </span>
             );
         }

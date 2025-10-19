@@ -23,9 +23,9 @@ const getStatusConfig = (order: Order): { text: string; icon: React.ReactNode; c
         accepted: { 
             text: 'Aceito / Em Preparo', 
             icon: (
-                <span className="fa-layers fa-lg">
-                    <i className="fa-solid fa-utensils"></i>
-                    <i className="fa-solid fa-clock" data-fa-transform="shrink-8 up-6 right-6"></i>
+                <span className="relative inline-block leading-none">
+                    <i className="fa-solid fa-utensils fa-lg" aria-hidden="true"></i>
+                    <i className="fa-solid fa-clock absolute text-[0.6rem] text-gray-800 bg-white rounded-full p-px" style={{ top: '-3px', right: '-5px', border: '1px solid #e5e7eb' }} aria-hidden="true"></i>
                 </span>
             ), 
             color: 'border-blue-500' 
@@ -33,9 +33,9 @@ const getStatusConfig = (order: Order): { text: string; icon: React.ReactNode; c
         reserved: { 
             text: 'Reserva (No Local)', 
             icon: (
-                 <span className="fa-layers fa-lg">
-                    <i className="fa-solid fa-chair"></i>
-                    <i className="fa-solid fa-check-circle" data-fa-transform="shrink-8 up-6 right-6" style={{ color: 'limegreen' }}></i>
+                 <span className="relative inline-block leading-none">
+                    <i className="fa-solid fa-chair fa-lg" aria-hidden="true"></i>
+                    <i className="fa-solid fa-check-circle absolute text-[0.7rem] text-white bg-green-500 rounded-full" style={{ top: '-4px', right: '-6px' }} aria-hidden="true"></i>
                 </span>
             ), 
             color: 'border-teal-500' 
@@ -53,9 +53,9 @@ const getStatusConfig = (order: Order): { text: string; icon: React.ReactNode; c
                 ...staticConfig.ready, 
                 text: 'Pronto para Retirada',
                 icon: (
-                    <span className="fa-layers fa-lg">
-                        <i className="fa-solid fa-pizza-slice"></i>
-                        <i className="fa-solid fa-check-circle" data-fa-transform="shrink-8 up-6 right-6" style={{ color: 'limegreen' }}></i>
+                    <span className="relative inline-block leading-none">
+                        <i className="fa-solid fa-pizza-slice fa-lg" aria-hidden="true"></i>
+                        <i className="fa-solid fa-check-circle absolute text-[0.7rem] text-white bg-green-500 rounded-full" style={{ top: '-4px', right: '-6px' }} aria-hidden="true"></i>
                     </span>
                 )
             };
