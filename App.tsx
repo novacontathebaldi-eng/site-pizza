@@ -980,9 +980,9 @@ const App: React.FC = () => {
         pending: <i className="fas fa-hourglass-start" />,
         accepted: (
             <span className="relative inline-block leading-none">
-                <i className="fa-solid fa-utensils fa-lg" aria-hidden="true"></i>
-                <span className="absolute flex items-center justify-center w-5 h-5 bg-green-500 text-white border-2 border-white rounded-full" style={{ top: '-8px', right: '-8px' }}>
-                    <i className="fa-solid fa-clock text-[10px]"></i>
+                <i className="fa-solid fa-fire-burner fa-lg" aria-hidden="true"></i>
+                <span className="absolute flex items-center justify-center w-5 h-5 text-white border- border-white rounded-full" style={{ top: '-8px', right: '-8px' }}>
+                    <i className="fa-solid fa-hourglass-start text-[13px]"></i>
                 </span>
             </span>
         ),
