@@ -28,93 +28,54 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
         });
     }, [prices, hasPrices]);
 
-    const [selectedSize, setSelectedSize] = useState<string>('');
-    const [showSizeError, setShowSizeError] = useState(false);
+    const [selectedSize, setSelectedSize] = useState<string>(sortedSizes[0] || '');
     const [wasAdded, setWasAdded] = useState(false);
-    
-    const addedTimerRef = useRef<number | null>(null);
-    const errorTimerRef = useRef<number | null>(null);
+    const timerRef = useRef<number | null>(null);
 
-    // Auto-select size if there's only one option, otherwise reset.
+    // Garante que o tamanho selecionado seja resetado quando o produto mudar (ex: ao filtrar)
     useEffect(() => {
-        if (sortedSizes.length === 1) {
-            setSelectedSize(sortedSizes[0]);
-        } else {
-            setSelectedSize('');
-        }
+        setSelectedSize(sortedSizes[0] || '');
     }, [product, sortedSizes]);
 
-    // Cleanup timers on component unmount
+    // Limpa o timer se o componente for desmontado
     useEffect(() => {
         return () => {
-            if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
-            if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+            if (timerRef.current) {
+                clearTimeout(timerRef.current);
+            }
         };
     }, []);
     
     const handleAddToCart = () => {
         if (!isStoreOnline || wasAdded || (!hasPrices && !isPromo) || isOutOfStock) return;
         
-        // Validate size selection if multiple sizes are available
-        if (hasPrices && sortedSizes.length > 1 && !selectedSize) {
-            setShowSizeError(true);
-            if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-            errorTimerRef.current = window.setTimeout(() => setShowSizeError(false), 2500);
-            return;
-        }
-
+        // Se for promoção, usa o preço promocional. Senão, busca o preço do tamanho selecionado.
         const price = isPromo ? product.promotionalPrice! : prices[selectedSize];
+        
+        // Para promoções, o 'tamanho' ainda é relevante para o controle do carrinho, mesmo que o preço seja único.
         const size = selectedSize || 'Única';
 
         onAddToCart(product, size, price);
         setWasAdded(true);
 
-        if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
-        addedTimerRef.current = window.setTimeout(() => setWasAdded(false), 1500);
-    };
-
-    const handleSizeClick = (size: string) => {
-        setSelectedSize(size);
-        if (showSizeError) {
-            setShowSizeError(false);
-            if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
         }
+
+        timerRef.current = window.setTimeout(() => {
+            setWasAdded(false);
+        }, 1500);
     };
 
     const formatPrice = (price: number) => {
         return price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     };
 
-    const { priceText, originalPriceText } = useMemo(() => {
-        let priceText: string;
-        let originalPriceText: string | null = null;
-
-        if (isPromo && product.promotionalPrice) {
-            priceText = formatPrice(product.promotionalPrice);
-            if (hasPrices && prices[selectedSize]) {
-                originalPriceText = formatPrice(prices[selectedSize]);
-            }
-        } else if (hasPrices) {
-            if (selectedSize) {
-                priceText = formatPrice(prices[selectedSize]);
-            } else if (sortedSizes.length > 1) {
-                const minPrice = Math.min(...Object.values(prices));
-                priceText = `A partir de ${formatPrice(minPrice)}`;
-            } else if (sortedSizes.length === 1) {
-                priceText = formatPrice(prices[sortedSizes[0]]);
-            } else {
-                priceText = "Indisponível";
-            }
-        } else {
-            priceText = "Indisponível";
-        }
-        return { priceText, originalPriceText };
-    }, [isPromo, product.promotionalPrice, hasPrices, prices, selectedSize, sortedSizes]);
-
-
     const buttonClass = wasAdded
         ? 'bg-green-500 text-white font-bold py-2 px-5 rounded-lg transition-all cursor-default'
         : 'bg-accent text-white font-bold py-2 px-5 rounded-lg transition-all transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed';
+        
+    const displayPrice = hasPrices ? formatPrice(prices[selectedSize] || prices[sortedSizes[0]]) : "Indisponível";
 
     return (
         <div className={`bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 flex flex-col overflow-hidden border border-gray-200`}>
@@ -125,6 +86,7 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
                     </span>
                 )}
                 
+                {/* Selo Inteligente: Mostra "Adicionado" com prioridade, ou o selo de destaque se não estiver no carrinho. */}
                 {isInCart ? (
                     <div className="absolute top-2 right-2 bg-green-600 text-white text-xs font-bold rounded-full flex items-center justify-center gap-1.5 z-10 shadow-md h-7 w-7 sm:w-auto sm:px-2.5">
                         <i className="fas fa-check"></i>
@@ -150,41 +112,34 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
                     <p className="text-gray-500 text-xs mb-3 line-clamp-2">{product.description}</p>
                     
                     {hasPrices && sortedSizes.length > 1 && (
-                        <div className="mb-3">
-                            <div className="flex flex-wrap gap-2">
-                                {sortedSizes.map(size => (
-                                    <button
-                                        key={size}
-                                        onClick={() => handleSizeClick(size)}
-                                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg border-2 transition-colors ${
-                                            selectedSize === size
-                                                ? 'bg-brand-olive-600 text-white border-brand-olive-600'
-                                                : 'bg-gray-100 text-gray-700 border-gray-300 hover:border-brand-olive-600/50'
-                                        }`}
-                                        disabled={isOutOfStock}
-                                    >
-                                        {size}
-                                    </button>
-                                ))}
-                            </div>
-                            {showSizeError && (
-                                <p className="text-red-600 text-xs mt-1.5 animate-pulse">
-                                    Por favor, selecione um tamanho.
-                                </p>
-                            )}
+                        <div className="flex flex-wrap gap-1 mb-3">
+                            {sortedSizes.map(size => (
+                                <button
+                                    key={size}
+                                    onClick={() => setSelectedSize(size)}
+                                    className={`px-2 py-1 text-[11px] font-semibold rounded-md border transition-colors ${
+                                        selectedSize === size
+                                            ? 'bg-brand-olive-600 text-white border-brand-olive-600'
+                                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:border-brand-olive-600'
+                                    }`}
+                                    disabled={isOutOfStock}
+                                >
+                                    {size}
+                                </button>
+                            ))}
                         </div>
                     )}
                 </div>
 
-                <div className="mt-auto pt-2 flex justify-between items-end">
+                <div className="mt-auto pt-2 flex justify-between items-center">
                      <div className="flex flex-col items-start">
-                        {originalPriceText && (
+                        {isPromo && hasPrices && (
                             <span className="text-xs text-gray-500 line-through">
-                                {originalPriceText}
+                                {formatPrice(prices[selectedSize] || prices[sortedSizes[0]])}
                             </span>
                         )}
-                        <span className={`${isPromo ? 'text-2xl' : 'text-xl'} font-bold text-accent leading-none`}>
-                           {priceText}
+                        <span className={`${isPromo ? 'text-2xl leading-none' : 'text-xl'} font-bold text-accent`}>
+                            {isPromo ? formatPrice(product.promotionalPrice!) : displayPrice}
                         </span>
                     </div>
                     <button 
