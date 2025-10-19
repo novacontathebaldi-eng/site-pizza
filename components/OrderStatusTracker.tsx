@@ -45,10 +45,30 @@ export const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
     }
 
     const steps = [
-        { id: 'pending', label: 'Pedido Recebido', icon: 'fas fa-receipt' },
-        { id: 'accepted', label: 'Em Preparo', icon: 'fas fa-utensils' },
-        { id: 'ready', label: order.customer.orderType === 'delivery' ? 'Saiu p/ Entrega' : 'Pronto p/ Retirada', icon: order.customer.orderType === 'delivery' ? 'fas fa-motorcycle' : 'fas fa-box-open' },
-        { id: 'completed', label: 'Finalizado', icon: 'fas fa-check' }
+        { id: 'pending', label: 'Pedido Recebido', icon: <i className="fas fa-receipt"></i> },
+        { 
+            id: 'accepted', 
+            label: 'Em Preparo', 
+            icon: (
+                <span className="fa-layers fa-fw">
+                    <i className="fa-solid fa-utensils"></i>
+                    <i className="fa-solid fa-clock" data-fa-transform="shrink-8 up-8 right-6"></i>
+                </span>
+            )
+        },
+        { 
+            id: 'ready', 
+            label: order.customer.orderType === 'delivery' ? 'Saiu p/ Entrega' : 'Pronto p/ Retirada', 
+            icon: order.customer.orderType === 'delivery' 
+                ? <i className="fas fa-motorcycle"></i> 
+                : (
+                    <span className="fa-layers fa-fw">
+                        <i className="fa-solid fa-pizza-slice"></i>
+                        <i className="fa-solid fa-check-circle" data-fa-transform="shrink-6 up-6 right-6" style={{ color: 'limegreen' }}></i>
+                    </span>
+                )
+        },
+        { id: 'completed', label: 'Finalizado', icon: <i className="fas fa-check"></i> }
     ];
 
     const statusOrder: OrderStatus[] = ['pending', 'accepted', 'ready', 'completed'];
@@ -110,7 +130,7 @@ export const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
                         return (
                             <div key={step.id} className="z-10 flex flex-col items-center text-center">
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all duration-300 ${circleClass}`}>
-                                    <i className={step.icon}></i>
+                                    {step.icon}
                                 </div>
                                 <p className={`mt-2 text-xs font-semibold leading-tight w-20 ${textClass} transition-colors duration-300`}>
                                     {steps[index].label}

@@ -876,18 +876,32 @@ const App: React.FC = () => {
         }
     }, [orders, currentUser]);
 
-    const statusIconMap: { [key in OrderStatus]?: string } = {
-        pending: 'fas fa-hourglass-start',
-        accepted: 'fas fa-pizza',
-        reserved: 'fas fa-chair',
-        'awaiting-payment': 'fas fa-clock',
+    const statusIconMap: { [key in OrderStatus]?: React.ReactNode } = {
+        pending: <i className="fas fa-hourglass-start" />,
+        accepted: (
+            <span className="fa-layers fa-fw">
+                <i className="fa-solid fa-utensils"></i>
+                <i className="fa-solid fa-clock" data-fa-transform="shrink-8 up-8 right-6"></i>
+            </span>
+        ),
+        reserved: <i className="fas fa-chair" />,
+        'awaiting-payment': <i className="fas fa-clock" />,
     };
 
-    const getStatusIcon = (order: Order): string => {
+    const getStatusIcon = (order: Order): React.ReactNode => {
         if (order.status === 'ready') {
-            return order.customer.orderType === 'delivery' ? 'fas fa-motorcycle' : 'fas fa-store';
+            if (order.customer.orderType === 'delivery') {
+                return <i className="fas fa-motorcycle" />;
+            }
+            // Ready for pickup
+            return (
+                <span className="fa-layers fa-fw">
+                    <i className="fa-solid fa-pizza-slice"></i>
+                    <i className="fa-solid fa-check-circle" data-fa-transform="shrink-6 up-6 right-6" style={{ color: 'limegreen' }}></i>
+                </span>
+            );
         }
-        return statusIconMap[order.status] || 'fas fa-receipt';
+        return statusIconMap[order.status] || <i className="fas fa-receipt" />;
     };
 
     return (
@@ -986,7 +1000,7 @@ const App: React.FC = () => {
                                 className="w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110"
                                 aria-label={`Acompanhar pedido #${order.orderNumber}`}
                             >
-                                <i className={`${getStatusIcon(order)} text-2xl`}></i>
+                                <span className="text-2xl">{getStatusIcon(order)}</span>
                             </button>
                         ))}
                     </div>
@@ -1004,7 +1018,7 @@ const App: React.FC = () => {
                         aria-label={activeOrders.length === 1 ? `Acompanhar pedido #${activeOrders[0].orderNumber}` : `${activeOrders.length} pedidos ativos`}
                     >
                         {activeOrders.length === 1 ? (
-                            <i className={`${getStatusIcon(activeOrders[0])} text-2xl`}></i>
+                            <span className="text-2xl">{getStatusIcon(activeOrders[0])}</span>
                         ) : (
                             <span className="text-2xl font-bold">{activeOrders.length}</span>
                         )}

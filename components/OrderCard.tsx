@@ -17,21 +17,39 @@ interface OrderCardProps {
 }
 
 // This is now a function to provide dynamic text based on the order type
-const getStatusConfig = (order: Order): { text: string; icon: string; color: string; } => {
-    const staticConfig: { [key in OrderStatus]: { text: string; icon: string; color: string; } } = {
-        pending: { text: 'Pendente', icon: 'fas fa-hourglass-start', color: 'border-yellow-500' },
-        accepted: { text: 'Aceito / Em Preparo', icon: 'fas fa-cogs', color: 'border-blue-500' },
-        reserved: { text: 'Reserva (No Local)', icon: 'fas fa-chair', color: 'border-teal-500' },
-        ready: { text: 'Pronto / Em Rota', icon: 'fas fa-shipping-fast', color: 'border-purple-500' }, // Default text
-        completed: { text: 'Finalizado', icon: 'fas fa-check-circle', color: 'border-green-500' },
-        cancelled: { text: 'Cancelado', icon: 'fas fa-times-circle', color: 'border-red-500' },
-        deleted: { text: 'Na Lixeira', icon: 'fas fa-trash-alt', color: 'border-gray-500' },
-        'awaiting-payment': { text: 'Aguardando Pgto', icon: 'fas fa-clock', color: 'border-gray-400' },
+const getStatusConfig = (order: Order): { text: string; icon: React.ReactNode; color: string; } => {
+    const staticConfig: { [key in OrderStatus]: { text: string; icon: React.ReactNode; color: string; } } = {
+        pending: { text: 'Pendente', icon: <i className="fas fa-hourglass-start"></i>, color: 'border-yellow-500' },
+        accepted: { 
+            text: 'Aceito / Em Preparo', 
+            icon: (
+                <span className="fa-layers fa-fw">
+                    <i className="fa-solid fa-utensils"></i>
+                    <i className="fa-solid fa-clock" data-fa-transform="shrink-8 up-8 right-6"></i>
+                </span>
+            ), 
+            color: 'border-blue-500' 
+        },
+        reserved: { text: 'Reserva (No Local)', icon: <i className="fas fa-chair"></i>, color: 'border-teal-500' },
+        ready: { text: 'Pronto / Em Rota', icon: <i className="fas fa-shipping-fast"></i>, color: 'border-purple-500' }, // Default text
+        completed: { text: 'Finalizado', icon: <i className="fas fa-check-circle"></i>, color: 'border-green-500' },
+        cancelled: { text: 'Cancelado', icon: <i className="fas fa-times-circle"></i>, color: 'border-red-500' },
+        deleted: { text: 'Na Lixeira', icon: <i className="fas fa-trash-alt"></i>, color: 'border-gray-500' },
+        'awaiting-payment': { text: 'Aguardando Pgto', icon: <i className="fas fa-clock"></i>, color: 'border-gray-400' },
     };
 
     if (order.status === 'ready') {
         if (order.customer.orderType === 'pickup') {
-            return { ...staticConfig.ready, text: 'Pronto para Retirada' };
+            return { 
+                ...staticConfig.ready, 
+                text: 'Pronto para Retirada',
+                icon: (
+                    <span className="fa-layers fa-fw">
+                        <i className="fa-solid fa-pizza-slice"></i>
+                        <i className="fa-solid fa-check-circle" data-fa-transform="shrink-6 up-6 right-6" style={{ color: 'limegreen' }}></i>
+                    </span>
+                )
+            };
         }
         if (order.customer.orderType === 'delivery') {
             return { ...staticConfig.ready, text: 'Saiu para Entrega' };
@@ -224,8 +242,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                     <div className="p-4">
                         <div className="flex justify-between items-start mb-4">
                             <div>
-                                <div className="flex items-center gap-3 text-lg font-bold">
-                                    <i className={`${config.icon} ${config.color.replace('border', 'text')}`}></i>
+                                <div className={`flex items-center gap-3 text-lg font-bold ${config.color.replace('border', 'text')}`}>
+                                    {config.icon}
                                     <span>{config.text}</span>
                                 </div>
                                 <p className="text-sm font-bold text-gray-500 mt-1">Pedido #{orderNumber}</p>
