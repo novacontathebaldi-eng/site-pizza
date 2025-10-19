@@ -222,7 +222,7 @@ const App: React.FC = () => {
     const [isProcessingOrder, setIsProcessingOrder] = useState<boolean>(false);
     const [confirmedOrderData, setConfirmedOrderData] = useState<Order | null>(null);
     const [confirmedReservationData, setConfirmedReservationData] = useState<Order | null>(null);
-    const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
+    const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
     const [isOrderTrackerExpanded, setIsOrderTrackerExpanded] = useState<boolean>(false);
 
     // Admin State
@@ -233,6 +233,15 @@ const App: React.FC = () => {
         { role: 'bot', content: `🍕 Olá! Bem-vindo(a) à Pizzaria Santa Sensação!\n\nEu sou o Sensação, seu assistente virtual. Estou aqui para te ajudar a fazer pedidos, tirar dúvidas sobre nosso cardápio, acompanhar entregas e muito mais.\n\nComo posso te ajudar hoje?` }
     ]);
     const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
+    
+    // FIX: Replaced direct state for the tracking order object with a memoized selector.
+    // This ensures that when the main `orders` array updates from Firestore, the `trackingOrder`
+    // variable is automatically recalculated, providing the live data to the OrderDetailsModal.
+    const trackingOrder = useMemo(() => {
+        if (!trackingOrderId) return null;
+        return orders.find(o => o.id === trackingOrderId) || null;
+    }, [orders, trackingOrderId]);
+
 
     const scrollToTop = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -973,7 +982,7 @@ const App: React.FC = () => {
                         {activeOrders.map(order => (
                             <button
                                 key={order.id}
-                                onClick={() => { setTrackingOrder(order); setIsOrderTrackerExpanded(false); }}
+                                onClick={() => { setTrackingOrderId(order.id); setIsOrderTrackerExpanded(false); }}
                                 className="w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110"
                                 aria-label={`Acompanhar pedido #${order.orderNumber}`}
                             >
@@ -986,7 +995,7 @@ const App: React.FC = () => {
                     <button
                         onClick={() => {
                             if (activeOrders.length === 1) {
-                                setTrackingOrder(activeOrders[0]);
+                                setTrackingOrderId(activeOrders[0].id);
                             } else {
                                 setIsOrderTrackerExpanded(prev => !prev);
                             }
@@ -1030,7 +1039,7 @@ const App: React.FC = () => {
             <OrderConfirmationModal order={confirmedOrderData} onClose={() => setConfirmedOrderData(null)} onSendWhatsApp={handleSendOrderToWhatsApp}/>
             <ReservationConfirmationModal reservation={confirmedReservationData} onClose={() => setConfirmedReservationData(null)} onSendWhatsApp={handleSendReservationToWhatsApp}/>
             <Chatbot isOpen={isChatbotOpen} onClose={() => setIsChatbotOpen(false)} messages={chatMessages} onSendMessage={handleSendMessageToBot} isSending={isBotReplying}/>
-            <OrderDetailsModal order={trackingOrder} onClose={() => setTrackingOrder(null)} title="Acompanhar Pedido" />
+            <OrderDetailsModal order={trackingOrder} onClose={() => setTrackingOrderId(null)} title="Acompanhar Pedido" />
             
             <LoginModal 
                 isOpen={isLoginModalOpen} 
