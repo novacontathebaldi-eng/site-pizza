@@ -75,22 +75,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ settings, isLoading, o
                 <div className="inline-block bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 mb-6">
                     <p className="font-semibold text-sm flex items-center gap-2"><i className="fas fa-award text-brand-gold-600"></i> {heroSlogan}</p>
                 </div>
-
-                <div className="mb-6 flex flex-wrap justify-center gap-3">
-                    <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 text-brand-ivory-50/90">
-                        <i className="fas fa-motorcycle text-brand-gold-600"></i>
-                        <span className="font-semibold text-sm">Delivery</span>
-                    </div>
-                    <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 text-brand-ivory-50/90">
-                        <i className="fas fa-shopping-bag text-brand-gold-600"></i>
-                        <span className="font-semibold text-sm">Retirada</span>
-                    </div>
-                    <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 text-brand-ivory-50/90">
-                        <i className="fas fa-utensils text-brand-gold-600"></i>
-                        <span className="font-semibold text-sm">No Local</span>
-                    </div>
-                </div>
-
                 <h1 className="text-4xl md:text-6xl font-extrabold mb-4 leading-tight">
                     {heroTitle.split(' ').map((word, index, arr) => 
                         word.toLowerCase() === 'santa' || word.toLowerCase() === 'sensação' 
@@ -101,7 +85,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ settings, isLoading, o
                 <p className="text-lg md:text-xl font-medium text-brand-ivory-50/90 mb-8 max-w-2xl mx-auto">
                     {heroSubtitle}
                 </p>
-
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <button 
                         onClick={scrollToCardapio} 
@@ -127,6 +110,21 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ settings, isLoading, o
                         <i className="fas fa-calendar-alt mr-2"></i>
                         <span>Fazer uma Reserva</span>
                     </button>
+                </div>
+
+                <div className="mt-8 flex flex-wrap justify-center gap-3">
+                    <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 text-brand-ivory-50/90">
+                        <i className="fas fa-motorcycle text-brand-gold-600"></i>
+                        <span className="font-semibold text-sm">Delivery</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 text-brand-ivory-50/90">
+                        <i className="fas fa-shopping-bag text-brand-gold-600"></i>
+                        <span className="font-semibold text-sm">Retirada</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 text-brand-ivory-50/90">
+                        <i className="fas fa-utensils text-brand-gold-600"></i>
+                        <span className="font-semibold text-sm">No Local</span>
+                    </div>
                 </div>
             </div>
         </section>
