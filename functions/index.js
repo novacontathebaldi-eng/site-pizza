@@ -1,6 +1,7 @@
 /* eslint-disable max-len */
 const {onCall, onRequest} = require("firebase-functions/v2/https");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
+const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago");
@@ -15,11 +16,8 @@ const storage = admin.storage();
 // Define os secrets que as funções irão usar.
 const secrets = ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET", "GEMINI_API_KEY", "GOOGLE_CLIENT_ID"];
 
-// --- Scheduled Function for Automatic Store Status ---
-exports.updateStoreStatusBySchedule = onSchedule({
-  schedule: "every 5 minutes",
-  timeZone: "America/Sao_Paulo",
-}, async (event) => {
+// --- Reusable function to check and set store status based on schedule ---
+const runStoreStatusCheck = async () => {
   logger.info("Executando verificação de horário da loja...");
 
   const settingsRef = db.doc("store_config/site_settings");
@@ -34,19 +32,16 @@ exports.updateStoreStatusBySchedule = onSchedule({
 
     const settings = settingsDoc.data();
     if (!settings.automaticSchedulingEnabled || !settings.operatingHours) {
-      logger.info("Agendamento automático desativado. Nenhuma ação tomada.");
+      logger.info("Agendamento automático desativado. Nenhuma ação tomada pela verificação.");
       return;
     }
 
-    // FIX: The previous method for getting São Paulo time was unreliable.
-    // This new method uses Intl.DateTimeFormat to correctly extract date/time parts
-    // for the "America/Sao_Paulo" timezone, avoiding parsing issues with `new Date()`.
     const now = new Date();
     const formatter = new Intl.DateTimeFormat("en-US", {
       timeZone: "America/Sao_Paulo",
-      weekday: "long", // e.g., "Sunday"
-      hour: "2-digit",   // e.g., "00"-"23" or "24"
-      minute: "2-digit", // e.g., "05"
+      weekday: "long",
+      hour: "2-digit",
+      minute: "2-digit",
       hour12: false,
     });
 
@@ -54,7 +49,6 @@ exports.updateStoreStatusBySchedule = onSchedule({
     const getPart = (type) => parts.find((p) => p.type === type)?.value;
 
     let hour = getPart("hour");
-    // Some environments might return "24" for midnight. Convert it to "00" for correct string comparison.
     if (hour === "24") {
       hour = "00";
     }
@@ -83,7 +77,31 @@ exports.updateStoreStatusBySchedule = onSchedule({
       logger.info(`Status da loja já está correto. Nenhuma atualização necessária. Atualmente: ${currentStatus ? "ABERTA" : "FECHADA"}`);
     }
   } catch (error) {
-    logger.error("Erro ao atualizar status da loja por agendamento:", error);
+    logger.error("Erro ao executar a verificação de status da loja:", error);
+  }
+};
+
+
+// --- Scheduled Function for Automatic Store Status ---
+exports.updateStoreStatusBySchedule = onSchedule({
+  schedule: "every 5 minutes",
+  timeZone: "America/Sao_Paulo",
+}, async (event) => {
+  await runStoreStatusCheck();
+});
+
+// --- Firestore Trigger to run status check when automatic scheduling is enabled ---
+exports.onSettingsChange = onDocumentUpdated("store_config/site_settings", async (event) => {
+  const beforeData = event.data.before.data();
+  const afterData = event.data.after.data();
+
+  const wasEnabled = beforeData.automaticSchedulingEnabled === true;
+  const isEnabled = afterData.automaticSchedulingEnabled === true;
+
+  // Trigger the check only when the feature is toggled from OFF to ON.
+  if (!wasEnabled && isEnabled) {
+    logger.info("Agendamento automático foi ativado. Acionando verificação de status imediata.");
+    await runStoreStatusCheck();
   }
 });
 
