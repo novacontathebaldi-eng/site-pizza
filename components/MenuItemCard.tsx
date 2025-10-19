@@ -14,6 +14,8 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
     const prices = product.prices ?? {};
     const hasPrices = Object.keys(prices).length > 0;
     const isOutOfStock = product.stockStatus === 'out_of_stock';
+    const isPromo = product.isPromotion && product.promotionalPrice != null && product.promotionalPrice > 0;
+
 
     const sortedSizes = useMemo(() => {
         if (!hasPrices) return [];
@@ -45,9 +47,15 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
     }, []);
     
     const handleAddToCart = () => {
-        if (!isStoreOnline || !selectedSize || wasAdded || !hasPrices || isOutOfStock) return;
-        const price = prices[selectedSize];
-        onAddToCart(product, selectedSize, price);
+        if (!isStoreOnline || wasAdded || (!hasPrices && !isPromo) || isOutOfStock) return;
+        
+        // Se for promoção, usa o preço promocional. Senão, busca o preço do tamanho selecionado.
+        const price = isPromo ? product.promotionalPrice! : prices[selectedSize];
+        
+        // Para promoções, o 'tamanho' ainda é relevante para o controle do carrinho, mesmo que o preço seja único.
+        const size = selectedSize || 'Única';
+
+        onAddToCart(product, size, price);
         setWasAdded(true);
 
         if (timerRef.current) {
@@ -72,8 +80,13 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
     return (
         <div className={`bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 flex flex-col overflow-hidden ${isInCart ? 'border-2 border-green-500' : 'border border-gray-200'}`}>
             <div className="relative">
+                {isPromo && (
+                    <span className="absolute top-2 left-2 bg-red-600 text-white px-2 py-0.5 text-xs font-bold rounded-full flex items-center gap-1 z-10 animate-pulse">
+                        <i className="fas fa-tags text-xs"></i> PROMO
+                    </span>
+                )}
                 {isInCart && (
-                    <div className="absolute top-2 left-2 bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs z-10 shadow">
+                    <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs z-10 shadow">
                         <i className="fas fa-check"></i>
                     </div>
                 )}
@@ -113,12 +126,19 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
                 </div>
 
                 <div className="mt-auto pt-2 flex justify-between items-center">
-                    <span className="text-xl font-bold text-accent">
-                        {displayPrice}
-                    </span>
+                     <div className="flex flex-col items-start">
+                        {isPromo && hasPrices && (
+                            <span className="text-sm text-gray-400 line-through">
+                                {formatPrice(prices[selectedSize] || prices[sortedSizes[0]])}
+                            </span>
+                        )}
+                        <span className="text-xl font-bold text-accent">
+                            {isPromo ? formatPrice(product.promotionalPrice!) : displayPrice}
+                        </span>
+                    </div>
                     <button 
                         onClick={handleAddToCart}
-                        disabled={!isStoreOnline || wasAdded || !hasPrices || isOutOfStock}
+                        disabled={!isStoreOnline || wasAdded || (!hasPrices && !isPromo) || isOutOfStock}
                         className={buttonClass}
                     >
                         {isOutOfStock ? (

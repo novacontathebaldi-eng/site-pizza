@@ -42,6 +42,8 @@ export interface Product {
     orderIndex: number;
     stockStatus?: 'available' | 'out_of_stock';
     deleted?: boolean;
+    isPromotion?: boolean;
+    promotionalPrice?: number;
 }
 
 export interface Category {
