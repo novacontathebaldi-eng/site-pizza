@@ -513,23 +513,31 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const selectedOrderDetails = useMemo(() => myOrders.find(o => o.id === selectedOrderId) || null, [myOrders, selectedOrderId]);
 
+    // This effect handles the opening and closing of the modal.
+    // It sets the initial tab and visibility of the address form ONLY when `isOpen` changes from false to true.
     useEffect(() => {
         if (isOpen) {
-            if (profile) {
-                setName(profile.name || '');
-                setPhone(profile.phone || '');
-                setCpf(profile.cpf || '');
-                setAllergies(profile.allergies || '');
-            }
-             setActiveTab(initialTab);
-             setIsAddressFormVisible(showAddAddressForm);
+            setActiveTab(initialTab);
+            setIsAddressFormVisible(showAddAddressForm);
         } else {
-            setActiveTab('orders');
+            // Reset state on close
+            setActiveTab('orders'); // Default tab on close/re-open
             setIsAddressFormVisible(false);
             setEditingAddress(null);
             setSelectedOrderId(null);
         }
-    }, [isOpen, initialTab, showAddAddressForm, profile]);
+    }, [isOpen, initialTab, showAddAddressForm]);
+
+    // This separate effect handles syncing form data with the profile data from props.
+    // It runs when the modal is open and the profile data changes, without resetting the active tab.
+    useEffect(() => {
+        if (isOpen && profile) {
+            setName(profile.name || '');
+            setPhone(profile.phone || '');
+            setCpf(profile.cpf || '');
+            setAllergies(profile.allergies || '');
+        }
+    }, [isOpen, profile]);
 
 
     useEffect(() => {
