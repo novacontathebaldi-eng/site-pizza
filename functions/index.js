@@ -4,16 +4,14 @@ const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
-const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago");
 const crypto = require("crypto");
-const {GoogleGenAI} = require("@google/genai");
-const {OAuth2Client} = require("google-auth-library");
 
+// Initialize Firebase Admin SDK globally. This is lightweight.
 admin.initializeApp();
 const db = admin.firestore();
 const storage = admin.storage();
 
-// Define os secrets que as funções irão usar.
+// Define secrets. This is just a string array, also lightweight.
 const secrets = ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET", "GEMINI_API_KEY", "GOOGLE_CLIENT_ID"];
 
 // --- Reusable function to check and set store status based on schedule ---
@@ -81,7 +79,6 @@ const runStoreStatusCheck = async () => {
   }
 };
 
-
 // --- Scheduled Function for Automatic Store Status ---
 exports.updateStoreStatusBySchedule = onSchedule({
   schedule: "every 5 minutes",
@@ -98,24 +95,18 @@ exports.onSettingsChange = onDocumentUpdated("store_config/site_settings", async
   const wasEnabled = beforeData.automaticSchedulingEnabled === true;
   const isEnabled = afterData.automaticSchedulingEnabled === true;
 
-  // Trigger the check only when the feature is toggled from OFF to ON.
   if (!wasEnabled && isEnabled) {
     logger.info("Agendamento automático foi ativado. Acionando verificação de status imediata.");
     await runStoreStatusCheck();
   }
 });
 
-
 // --- Chatbot Santo ---
-let ai; // Mantém a instância da IA no escopo global para ser reutilizada após a primeira chamada.
+let ai; // Lazy initialization instance for Gemini
 
-/**
- * Chatbot Cloud Function to interact with Gemini API.
- */
 exports.askSanto = onCall({secrets}, async (request) => {
-  // "Lazy Initialization": Inicializa a IA somente na primeira vez que a função é chamada.
-  // Isso evita timeouts durante o deploy.
   if (!ai) {
+    const {GoogleGenAI} = require("@google/genai"); // Lazy require
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       logger.error("GEMINI_API_KEY not set. Cannot initialize Gemini AI.");
@@ -125,15 +116,11 @@ exports.askSanto = onCall({secrets}, async (request) => {
     logger.info("Gemini AI client initialized on first call.");
   }
 
-  // 1. Recebemos o histórico da conversa (que veio do frontend)
   const conversationHistory = request.data.history;
   if (!conversationHistory || conversationHistory.length === 0) {
     throw new Error("No conversation history provided.");
   }
 
-  // 2. Formatamos o histórico para o formato que a API do Gemini espera.
-  // A API espera um array de objetos { role: 'user'|'model', parts: [{ text: '...' }] }
-  // O papel do nosso bot ('bot') é traduzido para 'model' para a API.
   const contents = conversationHistory.map((message) => ({
     role: message.role === "bot" ? "model" : "user",
     parts: [{text: message.content}],
@@ -340,7 +327,6 @@ REGRAS DE ESCALONAMENTO SUPORTE TECNICO E BUGS: Quando o cliente relatar problem
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      // 3. Enviamos o histórico completo para a API
       contents: contents,
       config: {
         systemInstruction: systemInstruction,
@@ -355,11 +341,8 @@ REGRAS DE ESCALONAMENTO SUPORTE TECNICO E BUGS: Quando o cliente relatar problem
 });
 
 
-/**
- * Verifies a Google ID token, creates or updates a Firebase user,
- * and returns a custom token for session authentication.
- */
 exports.verifyGoogleToken = onCall({secrets}, async (request) => {
+  const {OAuth2Client} = require("google-auth-library"); // Lazy require
   const {idToken} = request.data;
   const clientId = process.env.GOOGLE_CLIENT_ID;
 
@@ -385,11 +368,9 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
     }
 
     const {sub: googleUid, email, name, picture} = payload;
-    // We create a unique UID for Firebase Auth based on the Google UID
     const uid = `google:${googleUid}`;
     let isNewUser = false;
 
-    // Update or create user in Firebase Auth
     try {
       await admin.auth().updateUser(uid, {
         email: email,
@@ -406,25 +387,22 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
           photoURL: picture,
         });
       } else {
-        throw error; // Re-throw other errors
+        throw error;
       }
     }
 
-    // Create or update user profile in Firestore 'users' collection
     const userRef = db.collection("users").doc(uid);
     const userDoc = await userRef.get();
 
-    // Create profile in Firestore only if it doesn't exist
     if (isNewUser || !userDoc.exists) {
       await userRef.set({
         name,
         email,
         photoURL: picture,
-        addresses: [], // Initialize with empty addresses
+        addresses: [],
       }, {merge: true});
     }
 
-    // Create a custom token for the Firebase user
     const customToken = await admin.auth().createCustomToken(uid);
     return {customToken};
   } catch (error) {
@@ -434,10 +412,8 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
 });
 
 
-/**
- * Creates an order in Firestore and optionally initiates a PIX payment.
- */
 exports.createOrder = onCall({secrets}, async (request) => {
+  const {MercadoPagoConfig, Payment} = require("mercadopago"); // Lazy require
   const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
   if (!accessToken) {
     logger.error("MERCADO_PAGO_ACCESS_TOKEN não está configurado.");
@@ -448,12 +424,10 @@ exports.createOrder = onCall({secrets}, async (request) => {
   const {details, cart, total, pixOption} = request.data;
   const userId = request.auth?.uid || null;
 
-  // 1. Validate input
   if (!details || !cart || !total) {
     throw new Error("Dados do pedido incompletos.");
   }
 
-  // 2. Generate a sequential order number atomically
   const counterRef = db.doc("_internal/counters");
   let orderNumber;
   try {
@@ -472,13 +446,11 @@ exports.createOrder = onCall({secrets}, async (request) => {
     throw new Error("Não foi possível gerar o número do pedido.");
   }
 
-
-  // 3. Prepare order data for Firestore
   const isPixPayNow = details.paymentMethod === "pix" && pixOption === "payNow";
   const orderStatus = isPixPayNow ? "awaiting-payment" : "pending";
 
   const orderData = {
-    userId, // Associate order with user if logged in
+    userId,
     orderNumber,
     customer: {
       name: details.name,
@@ -501,21 +473,18 @@ exports.createOrder = onCall({secrets}, async (request) => {
     status: orderStatus,
     paymentStatus: "pending",
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    mercadoPagoDetails: {}, // Initialize the object
+    mercadoPagoDetails: {},
   };
 
-  // 4. Create the order document
   const orderRef = await db.collection("orders").add(orderData);
   const orderId = orderRef.id;
   logger.info(`Pedido #${orderNumber} (ID: ${orderId}) criado no Firestore.`);
 
-  // 5. If it's a PIX payment, create it in Mercado Pago
   if (isPixPayNow) {
     if (!details.cpf) {
       throw new Error("CPF é obrigatório para pagamento com PIX.");
     }
 
-    // FIX: Use process.env.FUNCTION_REGION which is a standard populated env var for v2 functions.
     const region = process.env.FUNCTION_REGION || "us-central1";
     const notificationUrl = `https://${region}-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/mercadoPagoWebhook`;
     logger.info(`Usando a URL de notificação: ${notificationUrl}`);
@@ -525,12 +494,12 @@ exports.createOrder = onCall({secrets}, async (request) => {
       description: `Pedido #${orderNumber} - ${details.name}`,
       payment_method_id: "pix",
       payer: {
-        email: `cliente_${orderId}@santasensacao.me`, // MP requires an email
+        email: `cliente_${orderId}@santasensacao.me`,
         first_name: details.name.split(" ")[0],
         last_name: details.name.split(" ").slice(1).join(" ") || "Cliente",
         identification: {
           type: "CPF",
-          number: details.cpf.replace(/\D/g, ""), // Ensure only digits are sent
+          number: details.cpf.replace(/\D/g, ""),
         },
       },
       notification_url: notificationUrl,
@@ -553,7 +522,6 @@ exports.createOrder = onCall({secrets}, async (request) => {
         throw new Error("Dados PIX não retornados pelo Mercado Pago.");
       }
 
-      // Save payment details to our order
       await orderRef.update({
         "mercadoPagoDetails.paymentId": paymentId,
         "mercadoPagoDetails.qrCodeBase64": qrCodeBase64,
@@ -573,26 +541,17 @@ exports.createOrder = onCall({secrets}, async (request) => {
     }
   }
 
-  // 6. Return order info for non-PIX or "Pay Later" orders
   return {orderId, orderNumber};
 });
 
-// FIX: Added the missing `createReservation` Cloud Function.
-// This function handles the creation of reservations, which are stored as a special type of order.
-// It generates an atomic order number and saves the reservation details to Firestore.
-/**
- * Creates a reservation (as an order) in Firestore.
- */
 exports.createReservation = onCall({secrets}, async (request) => {
   const {details} = request.data;
   const userId = request.auth?.uid || null;
 
-  // 1. Validate input
   if (!details || !details.name || !details.phone || !details.reservationDate || !details.reservationTime || !details.numberOfPeople) {
     throw new Error("Dados da reserva incompletos.");
   }
 
-  // 2. Generate a sequential order number atomically
   const counterRef = db.doc("_internal/counters");
   let orderNumber;
   try {
@@ -611,7 +570,6 @@ exports.createReservation = onCall({secrets}, async (request) => {
     throw new Error("Não foi possível gerar o número do pedido.");
   }
 
-  // 3. Prepare reservation data for Firestore (as an Order)
   const orderData = {
     userId,
     orderNumber,
@@ -629,20 +587,15 @@ exports.createReservation = onCall({secrets}, async (request) => {
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 
-  // 4. Create the order document
   const orderRef = await db.collection("orders").add(orderData);
   const orderId = orderRef.id;
   logger.info(`Reserva #${orderNumber} (ID: ${orderId}) criada no Firestore.`);
 
-  // 5. Return order info
   return {orderId, orderNumber};
 });
 
-
-/**
- * Webhook to receive payment status updates from Mercado Pago.
- */
 exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
+  const {MercadoPagoConfig, Payment} = require("mercadopago"); // Lazy require
   const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
   const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
 
@@ -657,12 +610,9 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
   }
 
   try {
-    // 1. Validate Signature for security
     const signature = request.headers["x-signature"];
     const requestId = request.headers["x-request-id"];
     const receivedTopic = request.body.type;
-
-    // The 'data.id' for signature validation comes from the query parameters
     const paymentIdFromQuery = request.query["data.id"];
 
     if (!signature || !requestId || !paymentIdFromQuery || receivedTopic !== "payment") {
@@ -671,14 +621,26 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
         query: request.query,
         body: request.body,
       });
-      return response.status(200).send("OK"); // Respond OK to prevent retries
+      return response.status(200).send("OK");
     }
 
-    const [ts, hash] = signature.split(",").map((part) => part.split("=")[1]);
+    // Robust parsing of the x-signature header
+    const signatureParts = signature.split(',').reduce((acc, part) => {
+      const [key, value] = part.split('=');
+      if (key && value) {
+        acc[key.trim()] = value.trim();
+      }
+      return acc;
+    }, {});
+    const ts = signatureParts.ts;
+    const hash = signatureParts.v1;
 
-    // The manifest MUST be built from query params as per Mercado Pago docs.
+    if (!ts || !hash) {
+      logger.error("Falha ao parsear o header x-signature.", {signature});
+      return response.status(401).send("Invalid Signature Header");
+    }
+
     const manifest = `id:${paymentIdFromQuery};request-id:${requestId};ts:${ts};`;
-
     const hmac = crypto.createHmac("sha256", webhookSecret);
     hmac.update(manifest);
     const expectedHash = hmac.digest("hex");
@@ -688,7 +650,6 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
       return response.status(401).send("Invalid Signature");
     }
 
-    // 2. Process the payment update
     const paymentId = request.body.data.id;
     logger.info(`Webhook validado recebido para o pagamento: ${paymentId}`);
 
@@ -702,7 +663,6 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
     const orderId = paymentInfo.external_reference;
     const orderRef = db.collection("orders").doc(orderId);
 
-    // 3. Update Firestore based on payment status
     const updateData = {
       "mercadoPagoDetails.status": paymentInfo.status,
       "mercadoPagoDetails.statusDetail": paymentInfo.status_detail,
@@ -710,7 +670,7 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
 
     if (paymentInfo.status === "approved") {
       updateData.paymentStatus = "paid_online";
-      updateData.status = "pending"; // Move from 'awaiting-payment' to 'pending' for the kitchen
+      updateData.status = "pending";
       updateData["mercadoPagoDetails.transactionId"] = paymentInfo.transaction_details?.transaction_id || null;
       await orderRef.update(updateData);
       logger.info(`Pedido ${orderId} atualizado para PAGO via webhook.`);
@@ -730,10 +690,8 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
   }
 });
 
-/**
- * Processes a full refund for a given order.
- */
 exports.refundPayment = onCall({secrets}, async (request) => {
+  const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago"); // Lazy require
   const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
   if (!accessToken) {
     logger.error("MERCADO_PAGO_ACCESS_TOKEN não está configurado.");
@@ -767,7 +725,6 @@ exports.refundPayment = onCall({secrets}, async (request) => {
     const refund = new PaymentRefund(client);
     await refund.create({payment_id: paymentId});
 
-    // For confirmation, fetch the payment again from Mercado Pago
     const payment = new Payment(client);
     const updatedPaymentInfo = await payment.get({id: paymentId});
 
@@ -787,9 +744,6 @@ exports.refundPayment = onCall({secrets}, async (request) => {
   }
 });
 
-/**
- * Manages user profile picture upload and removal securely.
- */
 exports.manageProfilePicture = onCall({secrets}, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) {
@@ -801,7 +755,6 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
   const filePath = `user-profiles/${uid}/profile.jpg`;
   const file = bucket.file(filePath);
 
-  // Case 1: Remove photo (imageBase64 is null)
   if (imageBase64 === null) {
     try {
       await file.delete({ignoreNotFound: true});
@@ -815,7 +768,6 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
     }
   }
 
-  // Case 2: Upload/update photo (imageBase64 is a string)
   if (typeof imageBase64 === "string") {
     try {
       const matches = imageBase64.match(/^data:(image\/[a-z]+);base64,(.+)$/);
@@ -826,18 +778,14 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
       const base64Data = matches[2];
       const buffer = Buffer.from(base64Data, "base64");
 
-      // Upload the file and make it public
       await file.save(buffer, {
         metadata: {contentType: mimeType},
         public: true,
       });
 
       const publicUrl = file.publicUrl();
-      // Appending a timestamp as a query parameter to act as a cache buster.
-      // This ensures the browser always fetches the latest version of the profile picture.
       const photoURL = `${publicUrl}?t=${new Date().getTime()}`;
 
-      // Update Firebase Auth and Firestore user records
       await admin.auth().updateUser(uid, {photoURL});
       await db.collection("users").doc(uid).update({photoURL});
 
