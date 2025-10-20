@@ -212,6 +212,8 @@ const App: React.FC = () => {
     const [isGapiReady, setIsGapiReady] = useState(false);
     const [postRegisterAction, setPostRegisterAction] = useState<string | null>(null);
     const prevUser = useRef<firebase.User | null>(null);
+    // FIX: Added state to handle the password reset code from URL parameters.
+    const [passwordResetCode, setPasswordResetCode] = useState<string | null>(null);
 
 
     // Order/Payment Flow State
@@ -327,6 +329,24 @@ const App: React.FC = () => {
         const consent = localStorage.getItem('santaSensacaoCookieConsent');
         if (!consent) {
             setShowCookieBanner(true);
+        }
+    }, []);
+
+    // FIX: Added an effect to parse URL parameters for Firebase email action links (e.g., password reset).
+    // This allows the app to open the LoginModal in the correct state when a user clicks a password reset link.
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const mode = urlParams.get('mode');
+        const oobCode = urlParams.get('oobCode');
+
+        if (mode === 'resetPassword' && oobCode) {
+            setPasswordResetCode(oobCode);
+            setIsLoginModalOpen(true);
+            // Clean up the URL to remove the query parameters
+            const url = new URL(window.location.href);
+            url.searchParams.delete('mode');
+            url.searchParams.delete('oobCode');
+            window.history.replaceState({}, document.title, url.toString());
         }
     }, []);
 
@@ -642,14 +662,19 @@ const App: React.FC = () => {
         const total = subtotal + (details.deliveryFee || 0);
         try {
             const { orderId, orderNumber, pixData } = await firebaseService.createOrder(details, cart, total, pixOption);
-
+    
             if (!currentUser) {
                 const guestOrders = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
                 guestOrders.push(orderId);
                 localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
             }
-
+    
             if (!pixData || !pixData.qrCodeBase64) throw new Error("A resposta do servidor não incluiu os dados do PIX.");
+            
+            // Limpa o carrinho e fecha a sidebar antes de mostrar o modal do PIX
+            setCart([]);
+            setIsCartOpen(false);
+    
             const newOrder: Order = {
                 id: orderId, orderNumber: orderNumber,
                 customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.address, cpf: details.cpf },
@@ -1177,12 +1202,16 @@ const App: React.FC = () => {
             
             <LoginModal 
                 isOpen={isLoginModalOpen} 
-                onClose={() => setIsLoginModalOpen(false)} 
+                onClose={() => {
+                    setIsLoginModalOpen(false);
+                    setPasswordResetCode(null);
+                }} 
                 onGoogleSignIn={handleGoogleSignIn} 
                 addToast={addToast} 
                 onRegisterSuccess={handleRegisterSuccess}
                 onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
                 onOpenTermsOfService={() => setIsTermsModalOpen(true)}
+                passwordResetCode={passwordResetCode}
             />
             <UserAreaModal 
                 isOpen={isUserAreaModalOpen} 
