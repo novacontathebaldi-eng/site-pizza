@@ -67,24 +67,19 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
         };
     }, [sortedActiveCategories, setActiveCategoryId, isStoreOnline]);
 
-    // New Effect: Automatically scrolls the active tab to the center of the tab bar
-    useEffect(() => {
-        const activeTab = tabRefs.current.get(activeCategoryId);
-        if (activeTab && window.scrollY > 0) {
+    const handleTabClick = (e: React.MouseEvent<HTMLAnchorElement>, categoryId: string) => {
+        e.preventDefault();
+
+        // Scroll the clicked tab into the center of the tab bar
+        const activeTab = tabRefs.current.get(categoryId);
+        if (activeTab) {
             activeTab.scrollIntoView({
-                // FIX: Changed behavior to 'auto' to prevent scroll animation conflicts.
-                // The smooth scrolling of the tab bar, triggered by the IntersectionObserver during
-                // manual page scrolling, was causing the main scroll to feel jerky or to stop.
-                // An instant scroll ('auto') resolves this conflict.
-                behavior: 'auto',
+                behavior: 'smooth',
                 block: 'nearest',
                 inline: 'center'
             });
         }
-    }, [activeCategoryId]);
-
-    const handleTabClick = (e: React.MouseEvent<HTMLAnchorElement>, categoryId: string) => {
-        e.preventDefault();
+        
         const element = document.getElementById(`category-section-${categoryId}`);
         const stickyHeader = document.getElementById('sticky-menu-header');
         const statusBanner = document.getElementById('status-banner');
