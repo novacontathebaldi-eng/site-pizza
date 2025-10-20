@@ -9,7 +9,7 @@ interface PixPaymentModalProps {
     isProcessing: boolean;
 }
 
-const PIX_EXPIRATION_SECONDS = 600; // Era 5 minutos e eu aumentei para 10 dia 20 10 25
+const PIX_EXPIRATION_SECONDS = 300; // 5 minutes
 
 export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose, onPaymentSuccess, isProcessing }) => {
     const [isLoading, setIsLoading] = useState(true);
@@ -46,7 +46,7 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
                 setTimeLeft(prev => {
                     if (prev <= 1) {
                         clearInterval(timerRef.current!);
-                        setError("O código PIX expirou. Por favor, tente novamente.");
+                        setError("O código PIX expirou. Por favor, feche e tente novamente.");
                         return 0;
                     }
                     return prev - 1;
