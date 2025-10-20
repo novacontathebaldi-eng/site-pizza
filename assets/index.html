@@ -28,9 +28,6 @@
     <!-- Ícone do Navegador (Favicon) -->
     <link rel="icon" type="image/png" href="/assets/logo para icones.png">
 
-    <!-- Preload da imagem de fundo da área do cliente -->
-    <link rel="preload" href="/assets/fundocliente.png" as="image">
-
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -40,9 +37,6 @@
       body {
         font-family: 'Inter', sans-serif;
         overflow-x: hidden;
-      }
-      body.modal-open {
-        overflow: hidden;
       }
       .line-clamp-2 {
         overflow: hidden;
@@ -100,30 +94,14 @@
     "firebase/": "https://aistudiocdn.com/firebase@^12.3.0/",
     "@dnd-kit/core": "https://esm.sh/@dnd-kit/core@6.1.0",
     "@dnd-kit/sortable": "https://esm.sh/@dnd-kit/sortable@8.0.0",
-    "@dnd-kit/utilities": "https://esm.sh/@dnd-kit/utilities@3.2.2",
-    "url": "https://aistudiocdn.com/url@^0.11.4",
-    "vite": "https://aistudiocdn.com/vite@^7.1.9",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.0.4"
+    "@dnd-kit/utilities": "https://esm.sh/@dnd-kit/utilities@3.2.2"
   }
 }
 </script>
-
-<link rel="stylesheet" href="/index.css">
 <link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-brand-ivory-50 text-text-on-light antialiased">
     <div id="root"></div>
-    <script>
-      function onGoogleScriptLoad() {
-        // Set a flag to indicate the script has loaded, in case React mounts after this.
-        window.googleScriptLoaded = true;
-        // If the React callback is already on the window object, call it.
-        if (window.onGoogleScriptLoadCallback) {
-          window.onGoogleScriptLoadCallback();
-        }
-      }
-    </script>
-    <script src="https://apis.google.com/js/platform.js?onload=onGoogleScriptLoad" async defer></script>
-    <script type="module" src="/index.tsx"></script>
+<script type="module" src="/index.tsx"></script>
 </body>
 </html>

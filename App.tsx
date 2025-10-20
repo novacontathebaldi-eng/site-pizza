@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-// FIX: The 'Partial' type is a built-in TypeScript utility and does not need to be imported.
-import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, ChatMessage, ReservationDetails, UserProfile, DaySchedule } from './types';
+import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, ChatMessage, ReservationDetails, UserProfile } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { MenuSection } from './components/MenuSection';
@@ -23,10 +22,6 @@ import defaultLogo from './assets/logo.png';
 import defaultHeroBg from './assets/ambiente-pizzaria.webp';
 import defaultAboutImg from './assets/sobre-imagem.webp';
 import firebase from 'firebase/compat/app';
-import { OrderDetailsModal } from './components/OrderDetailsModal';
-import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
-import { CookieConsentBanner } from './components/CookieConsentBanner';
-import { TermsOfServiceModal } from './components/TermsOfServiceModal';
 
 // Type declarations for Google GAPI library to avoid TypeScript errors
 declare global {
@@ -49,16 +44,6 @@ const defaultSiteSettings: SiteSettings = {
     heroTitle: "Pizzaria Santa Sensação",
     heroSubtitle: "A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.",
     heroBgUrl: defaultHeroBg,
-    automaticSchedulingEnabled: true,
-    operatingHours: [
-        { dayOfWeek: 0, dayName: 'Domingo', isOpen: true, openTime: '19:00', closeTime: '22:00' },
-        { dayOfWeek: 1, dayName: 'Segunda', isOpen: false, openTime: '19:00', closeTime: '22:00' },
-        { dayOfWeek: 2, dayName: 'Terça', isOpen: false, openTime: '19:00', closeTime: '22:00' },
-        { dayOfWeek: 3, dayName: 'Quarta', isOpen: true, openTime: '19:00', closeTime: '22:00' },
-        { dayOfWeek: 4, dayName: 'Quinta', isOpen: true, openTime: '19:00', closeTime: '22:00' },
-        { dayOfWeek: 5, dayName: 'Sexta', isOpen: true, openTime: '19:00', closeTime: '22:00' },
-        { dayOfWeek: 6, dayName: 'Sábado', isOpen: true, openTime: '19:00', closeTime: '22:00' },
-    ],
     contentSections: [
         {
             id: 'section-1',
@@ -200,21 +185,14 @@ const App: React.FC = () => {
     const [isChatbotOpen, setIsChatbotOpen] = useState<boolean>(false);
     const [isFooterVisible, setIsFooterVisible] = useState(false);
     const [showFloatingButton, setShowFloatingButton] = useState(false);
-    const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState<boolean>(false);
-    const [isTermsModalOpen, setIsTermsModalOpen] = useState<boolean>(false);
-    const [showCookieBanner, setShowCookieBanner] = useState<boolean>(false);
     
     // Auth State
     const [currentUser, setCurrentUser] = useState<firebase.User | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-    const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
     const [isUserAreaModalOpen, setIsUserAreaModalOpen] = useState<boolean>(false);
     const [isGapiReady, setIsGapiReady] = useState(false);
     const [postRegisterAction, setPostRegisterAction] = useState<string | null>(null);
-    const prevUser = useRef<firebase.User | null>(null);
-    // FIX: Added state to handle the password reset code from URL parameters.
-    const [passwordResetCode, setPasswordResetCode] = useState<string | null>(null);
 
 
     // Order/Payment Flow State
@@ -225,8 +203,6 @@ const App: React.FC = () => {
     const [isProcessingOrder, setIsProcessingOrder] = useState<boolean>(false);
     const [confirmedOrderData, setConfirmedOrderData] = useState<Order | null>(null);
     const [confirmedReservationData, setConfirmedReservationData] = useState<Order | null>(null);
-    const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
-    const [isOrderTrackerExpanded, setIsOrderTrackerExpanded] = useState<boolean>(false);
 
     // Admin State
     const [refundingOrderId, setRefundingOrderId] = useState<string | null>(null);
@@ -236,41 +212,10 @@ const App: React.FC = () => {
         { role: 'bot', content: `🍕 Olá! Bem-vindo(a) à Pizzaria Santa Sensação!\n\nEu sou o Sensação, seu assistente virtual. Estou aqui para te ajudar a fazer pedidos, tirar dúvidas sobre nosso cardápio, acompanhar entregas e muito mais.\n\nComo posso te ajudar hoje?` }
     ]);
     const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
-    
-    // FIX: Replaced direct state for the tracking order object with a memoized selector.
-    // This ensures that when the main `orders` array updates from Firestore, the `trackingOrder`
-    // variable is automatically recalculated, providing the live data to the OrderDetailsModal.
-    const trackingOrder = useMemo(() => {
-        if (!trackingOrderId) return null;
-        return orders.find(o => o.id === trackingOrderId) || null;
-    }, [orders, trackingOrderId]);
-
-    const orderDetailsModalTitle = useMemo(() => {
-        if (trackingOrder?.customer.orderType === 'local') {
-            return "Acompanhar Reserva";
-        }
-        return "Acompanhar Pedido";
-    }, [trackingOrder]);
-
 
     const scrollToTop = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
-
-    // Service Worker Registration for Image Caching
-    useEffect(() => {
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js')
-                    .then(registration => {
-                        console.log('Service Worker registrado com sucesso:', registration.scope);
-                    })
-                    .catch(error => {
-                        console.log('Falha ao registrar o Service Worker:', error);
-                    });
-            });
-        }
-    }, []);
     
     // Logic to determine if any modal is visible
     const isModalVisible = useMemo(() => {
@@ -283,10 +228,7 @@ const App: React.FC = () => {
                !!payingOrder || 
                showPaymentFailureModal || 
                !!confirmedOrderData || 
-               !!confirmedReservationData ||
-               !!trackingOrder ||
-               isPrivacyPolicyOpen ||
-               isTermsModalOpen;
+               !!confirmedReservationData;
     }, [
         isCartOpen, 
         isCheckoutModalOpen, 
@@ -297,10 +239,7 @@ const App: React.FC = () => {
         payingOrder, 
         showPaymentFailureModal, 
         confirmedOrderData, 
-        confirmedReservationData,
-        trackingOrder,
-        isPrivacyPolicyOpen,
-        isTermsModalOpen
+        confirmedReservationData
     ]);
 
     // Effect to lock body scroll when a modal is open
@@ -324,37 +263,6 @@ const App: React.FC = () => {
             setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
         }, 4000);
     }, []);
-
-    // Effect to check for cookie consent on initial load
-    useEffect(() => {
-        const consent = localStorage.getItem('santaSensacaoCookieConsent');
-        if (!consent) {
-            setShowCookieBanner(true);
-        }
-    }, []);
-
-    // FIX: Added an effect to parse URL parameters for Firebase email action links (e.g., password reset).
-    // This allows the app to open the LoginModal in the correct state when a user clicks a password reset link.
-    useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const mode = urlParams.get('mode');
-        const oobCode = urlParams.get('oobCode');
-
-        if (mode === 'resetPassword' && oobCode) {
-            setPasswordResetCode(oobCode);
-            setIsLoginModalOpen(true);
-            // Clean up the URL to remove the query parameters
-            const url = new URL(window.location.href);
-            url.searchParams.delete('mode');
-            url.searchParams.delete('oobCode');
-            window.history.replaceState({}, document.title, url.toString());
-        }
-    }, []);
-
-    const handleAcceptCookies = () => {
-        localStorage.setItem('santaSensacaoCookieConsent', 'true');
-        setShowCookieBanner(false);
-    };
 
     // Effect to initialize Google Auth
     useEffect(() => {
@@ -394,10 +302,7 @@ const App: React.FC = () => {
 
     // Effect for Firebase Auth state changes
     useEffect(() => {
-        if (!auth) {
-            setIsAuthLoading(false);
-            return;
-        }
+        if (!auth) return;
         const unsubscribe = auth.onAuthStateChanged(async (user) => {
             setCurrentUser(user);
             if (user) {
@@ -410,36 +315,9 @@ const App: React.FC = () => {
                 setName('');
                 setPhone('');
             }
-            setIsAuthLoading(false);
         });
         return () => unsubscribe();
     }, []);
-    
-    // Effect to sync guest orders on login
-    useEffect(() => {
-        const syncGuestOrders = async (user: firebase.User) => {
-            const guestOrderIds: string[] = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
-            if (guestOrderIds.length > 0) {
-                try {
-                    await firebaseService.syncGuestOrders(user.uid, guestOrderIds);
-                    localStorage.removeItem('santaSensacaoGuestOrders');
-                    addToast('Seus pedidos anteriores foram associados à sua conta!', 'success');
-                } catch (error) {
-                    console.error('Failed to sync guest orders:', error);
-                    addToast('Não foi possível associar seus pedidos anteriores.', 'error');
-                }
-            }
-        };
-
-        // Check if user has just logged in (was null, is now not null)
-        if (currentUser && !prevUser.current) {
-            syncGuestOrders(currentUser);
-        }
-
-        // Update the ref for the next render
-        prevUser.current = currentUser;
-    }, [currentUser, addToast]);
-
 
     // Effect to listen for profile updates in real-time
     useEffect(() => {
@@ -532,9 +410,6 @@ const App: React.FC = () => {
             const googleAuth = window.gapi.auth2.getAuthInstance();
             const googleUser = await googleAuth.signIn();
             const idToken = googleUser.getAuthResponse().id_token;
-
-            // Garante que a sessão do usuário persista após o navegador ser fechado.
-            await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
             const customToken = await firebaseService.verifyGoogleToken(idToken);
             await auth.signInWithCustomToken(customToken);
@@ -635,13 +510,6 @@ const App: React.FC = () => {
         const total = subtotal + (details.deliveryFee || 0);
         try {
             const { orderId, orderNumber } = await firebaseService.createOrder(details, cart, total, 'payLater');
-            
-            if (!currentUser) {
-                const guestOrders = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
-                guestOrders.push(orderId);
-                localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
-            }
-
             addToast(`Pedido #${orderNumber} criado!`, 'success');
             const confirmedOrder: Order = {
                 id: orderId, orderNumber,
@@ -667,19 +535,7 @@ const App: React.FC = () => {
         const total = subtotal + (details.deliveryFee || 0);
         try {
             const { orderId, orderNumber, pixData } = await firebaseService.createOrder(details, cart, total, pixOption);
-    
-            if (!currentUser) {
-                const guestOrders = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
-                guestOrders.push(orderId);
-                localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
-            }
-    
             if (!pixData || !pixData.qrCodeBase64) throw new Error("A resposta do servidor não incluiu os dados do PIX.");
-            
-            // Limpa o carrinho e fecha a sidebar antes de mostrar o modal do PIX
-            setCart([]);
-            setIsCartOpen(false);
-    
             const newOrder: Order = {
                 id: orderId, orderNumber: orderNumber,
                 customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.address, cpf: details.cpf },
@@ -777,81 +633,9 @@ const App: React.FC = () => {
         }
     };
 
-    const handleSaveProduct = useCallback(async (product: Product) => {
-        try {
-            const { id, ...dataToSave } = product;
-    
-            if (id) {
-                const originalProduct = products.find(p => p.id === id);
-                if (originalProduct && originalProduct.categoryId !== product.categoryId) {
-                    const oldCategoryId = originalProduct.categoryId;
-                    const remainingProductsInOldCategory = products.filter(p => p.id !== id && p.categoryId === oldCategoryId && !p.deleted);
-                    const shouldDeactivateOldCategory = remainingProductsInOldCategory.length === 0 || remainingProductsInOldCategory.every(p => !p.active);
-                    
-                    if (shouldDeactivateOldCategory) {
-                        await firebaseService.updateCategoryStatus(oldCategoryId, false);
-                        const category = categories.find(c => c.id === oldCategoryId);
-                        addToast(`Categoria "${category?.name || 'Anterior'}" desativada por estar vazia ou ter apenas produtos inativos.`, 'success');
-                    }
-                }
-                await firebaseService.updateProduct(id, dataToSave);
-            } else {
-                await firebaseService.addProduct({ ...dataToSave, orderIndex: products.length, stockStatus: 'available' });
-            }
-            addToast(id ? "Produto atualizado!" : "Produto adicionado!", 'success');
-        } catch (error) {
-            console.error("Failed to save product:", error);
-            addToast("Erro ao salvar produto.", 'error');
-        }
-    }, [products, categories, addToast]);
-    
-    const handleDeleteProduct = useCallback(async (productId: string) => {
-        try {
-            const productToDelete = products.find(p => p.id === productId);
-            if (productToDelete) {
-                const { categoryId } = productToDelete;
-                const remainingProductsInCategory = products.filter(p => !p.deleted && p.id !== productId && p.categoryId === categoryId);
-                const shouldDeactivate = remainingProductsInCategory.length === 0 || remainingProductsInCategory.every(p => !p.active);
-    
-                if (shouldDeactivate) {
-                     await firebaseService.updateCategoryStatus(categoryId, false);
-                     const category = categories.find(c => c.id === categoryId);
-                     addToast(`Categoria "${category?.name || 'desconhecida'}" desativada por estar vazia ou ter apenas produtos inativos.`, 'success');
-                }
-            }
-            
-            await firebaseService.deleteProduct(productId);
-            addToast("Produto movido para a lixeira!", 'success');
-        } catch (error) {
-            console.error("Failed to delete product:", error);
-            addToast("Erro ao mover para a lixeira.", 'error');
-        }
-    }, [products, categories, addToast]);
-
-    const handleProductStatusChange = useCallback(async (productId: string, active: boolean) => {
-        try {
-            await firebaseService.updateProductStatus(productId, active);
-            addToast(`Produto ${active ? 'ativado' : 'desativado'}.`, 'success');
-    
-            if (!active) {
-                const changedProduct = products.find(p => p.id === productId);
-                if (changedProduct) {
-                    const { categoryId } = changedProduct;
-                    const hasOtherActiveProducts = products.some(p => p.categoryId === categoryId && p.id !== productId && p.active && !p.deleted);
-    
-                    if (!hasOtherActiveProducts) {
-                        await firebaseService.updateCategoryStatus(categoryId, false);
-                        const category = categories.find(c => c.id === categoryId);
-                        addToast(`Categoria "${category?.name || 'desconhecida'}" desativada pois todos os seus produtos estão inativos.`, 'success');
-                    }
-                }
-            }
-        } catch (error) {
-            console.error("Failed to update product status:", error);
-            addToast("Erro ao atualizar status.", 'error');
-        }
-    }, [addToast, products, categories]);
-    
+    const handleSaveProduct = useCallback(async (product: Product) => { try { const { id, ...dataToSave } = product; if (id) await firebaseService.updateProduct(id, dataToSave); else await firebaseService.addProduct({ ...dataToSave, orderIndex: products.length, stockStatus: 'available' }); addToast(id ? "Produto atualizado!" : "Produto adicionado!", 'success'); } catch (error) { console.error("Failed to save product:", error); addToast("Erro ao salvar produto.", 'error'); } }, [products.length, addToast]);
+    const handleDeleteProduct = useCallback(async (productId: string) => { try { await firebaseService.deleteProduct(productId); addToast("Produto deletado!", 'success'); } catch (error) { console.error("Failed to delete product:", error); addToast("Erro ao deletar produto.", 'error'); } }, [addToast]);
+    const handleProductStatusChange = useCallback(async (productId: string, active: boolean) => { try { await firebaseService.updateProductStatus(productId, active); addToast(`Produto ${active ? 'ativado' : 'desativado'}.`, 'success'); } catch (error) { console.error("Failed to update product status:", error); addToast("Erro ao atualizar status.", 'error'); } }, [addToast]);
     const handleProductStockStatusChange = useCallback(async (productId: string, stockStatus: 'available' | 'out_of_stock') => { try { await firebaseService.updateProductStockStatus(productId, stockStatus); addToast(`Estoque atualizado.`, 'success'); } catch (error) { console.error("Failed to update product stock status:", error); addToast("Erro ao atualizar estoque.", 'error'); } }, [addToast]);
     const handleStoreStatusChange = useCallback(async (isOnline: boolean) => { try { await firebaseService.updateStoreStatus(isOnline); addToast("Status da loja atualizado.", 'success'); } catch (error) { console.error("Failed to update store status:", error); addToast("Erro ao atualizar status da loja.", 'error'); } }, [addToast]);
     const handleSaveCategory = useCallback(async (category: Category) => { try { const { id, ...dataToSave } = category; if (id) await firebaseService.updateCategory(id, dataToSave); else await firebaseService.addCategory({ ...dataToSave, order: categories.length }); addToast(id ? "Categoria atualizada!" : "Categoria adicionada!", 'success'); } catch (error) { console.error("Failed to save category:", error); addToast("Erro ao salvar categoria.", 'error'); } }, [categories.length, addToast]);
@@ -860,104 +644,12 @@ const App: React.FC = () => {
     const handleReorderProducts = useCallback(async (productsToUpdate: { id: string; orderIndex: number }[]) => { try { await firebaseService.updateProductsOrder(productsToUpdate); addToast("Ordem dos produtos atualizada.", 'success'); } catch (error) { console.error("Failed to reorder products:", error); addToast("Erro ao reordenar produtos.", 'error'); } }, [addToast]);
     const handleReorderCategories = useCallback(async (categoriesToUpdate: { id: string; order: number }[]): Promise<void> => { try { await firebaseService.updateCategoriesOrder(categoriesToUpdate); addToast("Ordem das categorias atualizada.", 'success'); } catch (error) { console.error("Failed to reorder categories:", error); addToast("Erro ao reordenar categorias.", 'error'); } }, [addToast]);
     const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => { try { const settingsToUpdate = JSON.parse(JSON.stringify(settings)); for (const key in files) { const file = files[key]; if (file) { const url = await firebaseService.uploadSiteAsset(file, key); if (key === 'logo') settingsToUpdate.logoUrl = url; else if (key === 'heroBg') settingsToUpdate.heroBgUrl = url; else { const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key); if (sectionIndex > -1) settingsToUpdate.contentSections[sectionIndex].imageUrl = url; } } } await firebaseService.updateSiteSettings(settingsToUpdate); addToast("Personalização salva!", 'success'); } catch (error) { console.error("Failed to save site settings:", error); addToast("Erro ao salvar configurações.", 'error'); } }, [addToast]);
-    const handleUpdateSiteSettingsField = useCallback(async (updates: Partial<SiteSettings>) => {
-        try {
-            await firebaseService.updateSiteSettings(updates);
-            addToast('Configuração salva com sucesso!', 'success');
-        } catch (error) {
-            console.error('Failed to update site settings field:', error);
-            addToast('Erro ao salvar a configuração.', 'error');
-            throw error; // Re-throw to allow UI to handle failure states if needed
-        }
-    }, [addToast]);
     const handleUpdateOrderStatus = useCallback(async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => { try { let finalStatus = status; const order = orders.find(o => o.id === orderId); if (status === 'accepted' && order?.customer.orderType === 'local') finalStatus = 'reserved'; await firebaseService.updateOrderStatus(orderId, finalStatus, payload); addToast("Status do pedido atualizado!", 'success'); } catch (error) { console.error("Failed to update order status:", error); addToast("Erro ao atualizar status.", 'error'); } }, [orders, addToast]);
     const handleUpdateOrderPaymentStatus = useCallback(async (orderId: string, paymentStatus: PaymentStatus) => { try { await firebaseService.updateOrderPaymentStatus(orderId, paymentStatus); addToast("Status de pagamento atualizado!", 'success'); } catch (error) { console.error("Failed to update order payment status:", error); addToast("Erro ao atualizar pagamento.", 'error'); } }, [addToast]);
     const handleUpdateOrderReservationTime = useCallback(async (orderId: string, reservationTime: string) => { try { await firebaseService.updateOrderReservationTime(orderId, reservationTime); addToast("Horário da reserva atualizado!", 'success'); } catch (error) { console.error("Failed to update reservation time:", error); addToast("Erro ao atualizar horário.", 'error'); } }, [addToast]);
     const handleDeleteOrder = useCallback(async (orderId: string) => { if (window.confirm("Mover este pedido para a lixeira? 🗑️")) { try { await firebaseService.updateOrderStatus(orderId, 'deleted'); addToast("Pedido movido para a lixeira.", 'success'); } catch (error) { console.error("Failed to move order to trash:", error); addToast("Erro ao mover para lixeira.", 'error'); } } }, [addToast]);
-    const handlePermanentDeleteOrder = useCallback(async (orderId: string) => { if (window.confirm("Apagar PERMANENTEMENTE? Esta ação não pode ser desfeita.")) { try { await firebaseService.permanentDeleteProduct(orderId); addToast("Pedido apagado permanentemente.", 'success'); } catch (error) { console.error("Failed to permanently delete order:", error); addToast("Erro ao apagar permanentemente.", 'error'); } } }, [addToast]);
-    
-    const handlePermanentDeleteMultipleOrders = useCallback(async (orderIds: string[]) => {
-        if (orderIds.length === 0) return;
-        if (window.confirm(`Apagar PERMANENTEMENTE ${orderIds.length} pedido(s)? Esta ação não pode ser desfeita.`)) {
-            addToast(`Apagando ${orderIds.length} pedido(s)...`, 'success');
-            try {
-                await firebaseService.permanentDeleteMultipleOrders(orderIds);
-                addToast(`${orderIds.length} pedido(s) apagado(s) permanentemente.`, 'success');
-            } catch (error) {
-                console.error("Failed to permanently delete multiple orders:", error);
-                addToast("Erro ao apagar os pedidos.", 'error');
-            }
-        }
-    }, [addToast]);
-
+    const handlePermanentDeleteOrder = useCallback(async (orderId: string) => { if (window.confirm("Apagar PERMANENTEMENTE? Esta ação não pode ser desfeita.")) { try { await firebaseService.deleteOrder(orderId); addToast("Pedido apagado permanentemente.", 'success'); } catch (error) { console.error("Failed to permanently delete order:", error); addToast("Erro ao apagar permanentemente.", 'error'); } } }, [addToast]);
     const handleRefundOrder = useCallback(async (orderId: string) => { if (window.confirm("Estornar o valor total deste pagamento? Esta ação não pode ser desfeita.")) { const orderToRefund = orders.find(o => o.id === orderId); const paymentId = orderToRefund?.mercadoPagoDetails?.paymentId; if (!paymentId) { addToast("ID do pagamento não encontrado.", 'error'); return; } setRefundingOrderId(orderId); addToast("Processando estorno...", 'success'); try { await firebaseService.refundPayment(orderId); addToast(`Estorno solicitado com sucesso!`, 'success'); } catch (error: any) { console.error("Failed to refund order:", error); addToast(error.message || "Erro ao solicitar estorno.", 'error'); } finally { setRefundingOrderId(null); } } }, [addToast, orders]);
-
-    const handleBulkDeleteProducts = useCallback(async (productIds: string[]) => {
-        try {
-            const categoriesToUpdate = new Set<string>();
-            const productsToDelete = products.filter(p => productIds.includes(p.id));
-            productsToDelete.forEach(p => categoriesToUpdate.add(p.categoryId));
-    
-            await firebaseService.bulkDeleteProducts(productIds);
-            addToast(`${productIds.length} produto(s) movido(s) para a lixeira.`, 'success');
-    
-            // Check categories AFTER the products are marked as deleted in the state
-            for (const categoryId of categoriesToUpdate) {
-                const remainingProducts = products.filter(p => 
-                    p.categoryId === categoryId &&
-                    !productIds.includes(p.id) &&
-                    !p.deleted
-                );
-    
-                const shouldDeactivate = remainingProducts.length === 0 || remainingProducts.every(p => !p.active);
-    
-                if (shouldDeactivate) {
-                    await firebaseService.updateCategoryStatus(categoryId, false);
-                    const category = categories.find(c => c.id === categoryId);
-                    addToast(`Categoria "${category?.name || 'desconhecida'}" desativada por estar vazia ou ter apenas produtos inativos.`, 'success');
-                }
-            }
-        } catch (error) {
-            console.error("Failed to bulk delete products:", error);
-            addToast("Erro ao mover produtos para a lixeira.", 'error');
-        }
-    }, [products, categories, addToast]);
-
-    const handleRestoreProduct = useCallback(async (productId: string) => {
-        try {
-            await firebaseService.restoreProduct(productId);
-            addToast('Produto restaurado com sucesso!', 'success');
-        } catch (error) {
-            console.error("Failed to restore product:", error);
-            addToast("Erro ao restaurar produto.", 'error');
-        }
-    }, [addToast]);
-
-    const handlePermanentDeleteProduct = useCallback(async (productId: string) => {
-        if (window.confirm('APAGAR PERMANENTEMENTE? Esta ação não pode ser desfeita.')) {
-            try {
-                await firebaseService.permanentDeleteProduct(productId);
-                addToast('Produto apagado permanentemente.', 'success');
-            } catch (error) {
-                console.error("Failed to permanently delete product:", error);
-                addToast("Erro ao apagar produto.", 'error');
-            }
-        }
-    }, [addToast]);
-
-    const handleBulkPermanentDeleteProducts = useCallback(async (productIds: string[]) => {
-        if (productIds.length === 0) return;
-        if (window.confirm(`APAGAR PERMANENTEMENTE ${productIds.length} produto(s)? Esta ação não pode ser desfeita.`)) {
-            try {
-                await firebaseService.bulkPermanentDeleteProducts(productIds);
-                addToast(`${productIds.length} produto(s) apagados permanentemente.`, 'success');
-            } catch (error) {
-                console.error("Failed to bulk delete products:", error);
-                addToast("Erro ao apagar produtos.", 'error');
-            }
-        }
-    }, [addToast]);
-
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
 
@@ -985,65 +677,6 @@ const App: React.FC = () => {
         }
     };
     
-    const activeOrders = useMemo(() => {
-        const activeStatuses: OrderStatus[] = ['pending', 'accepted', 'reserved', 'ready', 'awaiting-payment'];
-    
-        if (currentUser) {
-            // User is logged in, filter by their UID
-            return orders.filter(order =>
-                order.userId === currentUser.uid && activeStatuses.includes(order.status)
-            );
-        } else {
-            // User is a guest, filter by IDs in localStorage
-            const guestOrderIds: string[] = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
-            if (guestOrderIds.length === 0) {
-                return [];
-            }
-            const guestOrdersSet = new Set(guestOrderIds);
-            return orders.filter(order =>
-                guestOrdersSet.has(order.id) && activeStatuses.includes(order.status)
-            );
-        }
-    }, [orders, currentUser]);
-
-    const statusIconMap: { [key in OrderStatus]?: React.ReactNode } = {
-        pending: <i className="fas fa-hourglass-start" />,
-        accepted: (
-            <span className="relative inline-block leading-none">
-                <i className="fa-solid fa-fire-burner fa-lg" aria-hidden="true"></i>
-                <span className="absolute flex items-center justify-center w-5 h-5 text-white border- border-white rounded-full" style={{ top: '-8px', right: '-8px' }}>
-                    <i className="fa-solid fa-hourglass-start text-[13px]"></i>
-                </span>
-            </span>
-        ),
-        reserved: (
-            <span className="relative inline-block leading-none">
-                <i className="fa-solid fa-chair fa-lg" aria-hidden="true"></i>
-                <span className="absolute flex items-center justify-center w-5 h-5 bg-green-500 text-white border-2 border-white rounded-full" style={{ top: '-8px', right: '-8px' }}>
-                    <i className="fa-solid fa-check text-[10px]"></i>
-                </span>
-            </span>
-        ),
-        'awaiting-payment': <i className="fas fa-clock" />,
-    };
-
-    const getStatusIcon = (order: Order): React.ReactNode => {
-        if (order.status === 'ready') {
-            if (order.customer.orderType === 'delivery') {
-                return <i className="fas fa-motorcycle" />;
-            }
-            // Ready for pickup
-            return (
-                <span className="relative inline-block leading-none">
-                    <i className="fa-solid fa-pizza-slice fa-lg" aria-hidden="true"></i>
-                    <span className="absolute flex items-center justify-center w-5 h-5 bg-green-500 text-white border-2 border-white rounded-full" style={{ top: '-8px', right: '-8px' }}>
-                        <i className="fa-solid fa-check text-[10px]"></i>
-                    </span>
-                </span>
-            );
-        }
-        return statusIconMap[order.status] || <i className="fas fa-receipt" />;
-    };
 
     return (
         <div className="flex flex-col min-h-screen">
@@ -1055,7 +688,6 @@ const App: React.FC = () => {
                 settings={siteSettings} 
                 user={currentUser}
                 onUserIconClick={handleUserIconClick}
-                isAuthLoading={isAuthLoading}
             />
             
             <div id="status-banner" className={`sticky top-20 z-40 bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
@@ -1071,45 +703,14 @@ const App: React.FC = () => {
                 />
                 
                 {error && <div className="container mx-auto px-4 py-8"><div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-6 rounded-lg shadow-md" role="alert"><p className="font-bold text-lg mb-2">Falha na Conexão</p><p className="mb-4">{error}</p></div></div>}
-                {isLoading ? <div className="text-center py-20"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p></div> : !error && <MenuSection categories={categories} products={products.filter(p => !p.deleted)} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} activeCategoryId={activeMenuCategory} setActiveCategoryId={setActiveMenuCategory} cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} cartItems={cart}/>}
+                {isLoading ? <div className="text-center py-20"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p></div> : !error && <MenuSection categories={categories} products={products} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} activeCategoryId={activeMenuCategory} setActiveCategoryId={setActiveMenuCategory} cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} cartItems={cart}/>}
                 <div id="sobre">{siteSettings.contentSections?.filter(section => section.isVisible).sort((a, b) => a.order - b.order).map((section, index) => <DynamicContentSection key={section.id} section={section} order={index} />)}</div>
-                <ContactSection settings={siteSettings} />
-                <AdminSection 
-                    allProducts={products} 
-                    allCategories={categories} 
-                    isStoreOnline={isStoreOnline} 
-                    siteSettings={siteSettings} 
-                    orders={orders} 
-                    onSaveProduct={handleSaveProduct} 
-                    onDeleteProduct={handleDeleteProduct} 
-                    onProductStatusChange={handleProductStatusChange} 
-                    onProductStockStatusChange={handleProductStockStatusChange} 
-                    onStoreStatusChange={handleStoreStatusChange} 
-                    onSaveCategory={handleSaveCategory} 
-                    onDeleteCategory={handleDeleteCategory} 
-                    onCategoryStatusChange={handleCategoryStatusChange} 
-                    onReorderProducts={handleReorderProducts} 
-                    onReorderCategories={handleReorderCategories} 
-                    onSeedDatabase={seedDatabase} 
-                    onSaveSiteSettings={handleSaveSiteSettings} 
-                    onUpdateSiteSettingsField={handleUpdateSiteSettingsField} 
-                    onUpdateOrderStatus={handleUpdateOrderStatus} 
-                    onUpdateOrderPaymentStatus={handleUpdateOrderPaymentStatus} 
-                    onUpdateOrderReservationTime={handleUpdateOrderReservationTime} 
-                    onDeleteOrder={handleDeleteOrder} 
-                    onPermanentDeleteOrder={handlePermanentDeleteOrder} 
-                    onPermanentDeleteMultipleOrders={handlePermanentDeleteMultipleOrders} 
-                    onRefundOrder={handleRefundOrder} 
-                    refundingOrderId={refundingOrderId}
-                    onBulkDeleteProducts={handleBulkDeleteProducts}
-                    onRestoreProduct={handleRestoreProduct}
-                    onPermanentDeleteProduct={handlePermanentDeleteProduct}
-                    onBulkPermanentDeleteProducts={handleBulkPermanentDeleteProducts}
-                />
+                <ContactSection />
+                <AdminSection allProducts={products} allCategories={categories} isStoreOnline={isStoreOnline} siteSettings={siteSettings} orders={orders} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onProductStatusChange={handleProductStatusChange} onProductStockStatusChange={handleProductStockStatusChange} onStoreStatusChange={handleStoreStatusChange} onSaveCategory={handleSaveCategory} onDeleteCategory={handleDeleteCategory} onCategoryStatusChange={handleCategoryStatusChange} onReorderProducts={handleReorderProducts} onReorderCategories={handleReorderCategories} onSeedDatabase={seedDatabase} onSaveSiteSettings={handleSaveSiteSettings} onUpdateOrderStatus={handleUpdateOrderStatus} onUpdateOrderPaymentStatus={handleUpdateOrderPaymentStatus} onUpdateOrderReservationTime={handleUpdateOrderReservationTime} onDeleteOrder={handleDeleteOrder} onPermanentDeleteOrder={handlePermanentDeleteOrder} onRefundOrder={handleRefundOrder} refundingOrderId={refundingOrderId}/>
             </main>
             
             <div id="footer-section">
-                <Footer settings={siteSettings} onOpenChatbot={() => setIsChatbotOpen(true)} onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)} />
+                <Footer settings={siteSettings} onOpenChatbot={() => setIsChatbotOpen(true)} />
             </div>
             
             <div className="fixed bottom-5 right-5 z-40 flex flex-col-reverse items-end gap-3">
@@ -1130,51 +731,6 @@ const App: React.FC = () => {
                         <i className="fas fa-utensils text-xl"></i>
                     </button>
                 ) : null}
-            </div>
-
-            <div className="fixed bottom-[5.5rem] left-5 z-40 flex flex-col-reverse items-center gap-3">
-                {activeOrders.length > 1 && isOrderTrackerExpanded && (
-                    <div className="flex flex-col-reverse gap-3 animate-fade-in-up">
-                        {activeOrders.map(order => (
-                            <button
-                                key={order.id}
-                                onClick={() => { setTrackingOrderId(order.id); setIsOrderTrackerExpanded(false); }}
-                                className="w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110"
-                                aria-label={`Acompanhar pedido #${order.orderNumber}`}
-                            >
-                                <span className="text-2xl">{getStatusIcon(order)}</span>
-                            </button>
-                        ))}
-                    </div>
-                )}
-                {activeOrders.length > 0 && (
-                    <button
-                        onClick={() => {
-                            if (activeOrders.length === 1) {
-                                setTrackingOrderId(activeOrders[0].id);
-                            } else {
-                                setIsOrderTrackerExpanded(prev => !prev);
-                            }
-                        }}
-                        className="w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110"
-                        aria-label={activeOrders.length === 1 ? `Acompanhar pedido #${activeOrders[0].orderNumber}` : isOrderTrackerExpanded ? 'Recolher pedidos' : `${activeOrders.length} pedidos ativos`}
-                    >
-                        {activeOrders.length === 1 ? (
-                            <span className="text-2xl">{getStatusIcon(activeOrders[0])}</span>
-                        ) : isOrderTrackerExpanded ? (
-                            <i className="fas fa-chevron-down text-2xl"></i>
-                        ) : (
-                            <span className="relative">
-                                <i className="fas fa-chevron-up text-2xl"></i>
-                                <span
-                                    className="absolute -top-4 -right-3 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center"
-                                >
-                                    {activeOrders.length}
-                                </span>
-                            </span>
-                        )}
-                    </button>
-                )}
             </div>
 
             <button onClick={() => setIsChatbotOpen(true)} className="fixed bottom-5 left-5 z-40 w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110" aria-label="Abrir assistente virtual"><i className="fas fa-headset text-2xl"></i></button>
@@ -1204,20 +760,13 @@ const App: React.FC = () => {
             <OrderConfirmationModal order={confirmedOrderData} onClose={() => setConfirmedOrderData(null)} onSendWhatsApp={handleSendOrderToWhatsApp}/>
             <ReservationConfirmationModal reservation={confirmedReservationData} onClose={() => setConfirmedReservationData(null)} onSendWhatsApp={handleSendReservationToWhatsApp}/>
             <Chatbot isOpen={isChatbotOpen} onClose={() => setIsChatbotOpen(false)} messages={chatMessages} onSendMessage={handleSendMessageToBot} isSending={isBotReplying}/>
-            <OrderDetailsModal order={trackingOrder} onClose={() => setTrackingOrderId(null)} title={orderDetailsModalTitle} />
             
             <LoginModal 
                 isOpen={isLoginModalOpen} 
-                onClose={() => {
-                    setIsLoginModalOpen(false);
-                    setPasswordResetCode(null);
-                }} 
+                onClose={() => setIsLoginModalOpen(false)} 
                 onGoogleSignIn={handleGoogleSignIn} 
                 addToast={addToast} 
                 onRegisterSuccess={handleRegisterSuccess}
-                onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
-                onOpenTermsOfService={() => setIsTermsModalOpen(true)}
-                passwordResetCode={passwordResetCode}
             />
             <UserAreaModal 
                 isOpen={isUserAreaModalOpen} 
@@ -1229,9 +778,6 @@ const App: React.FC = () => {
                 initialTab={postRegisterAction === 'add_address_flow' ? 'addresses' : undefined}
                 showAddAddressForm={postRegisterAction === 'add_address_flow'}
             />
-            <PrivacyPolicyModal isOpen={isPrivacyPolicyOpen} onClose={() => setIsPrivacyPolicyOpen(false)} />
-            <TermsOfServiceModal isOpen={isTermsModalOpen} onClose={() => setIsTermsModalOpen(false)} />
-            {showCookieBanner && <CookieConsentBanner onAccept={handleAcceptCookies} />}
 
             {(isProcessingOrder) && <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-6 font-semibold text-lg text-gray-700">Processando seu pedido...</p><p className="mt-2 text-sm text-gray-500">Por favor, aguarde um instante.</p></div></div>}
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]"><div className="w-full flex flex-col items-center space-y-4 sm:items-end">{toasts.map((toast) => (<div key={toast.id} className="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden animate-fade-in-up"><div className="p-4"><div className="flex items-start"><div className="flex-shrink-0">{toast.type === 'success' ? <i className="fas fa-check-circle h-6 w-6 text-green-500"></i> : <i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>}</div><div className="ml-3 w-0 flex-1 pt-0.5"><p className="text-sm font-medium text-gray-900">{toast.message}</p></div></div></div></div>))}</div></div>

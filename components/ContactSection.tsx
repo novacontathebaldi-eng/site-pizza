@@ -1,98 +1,10 @@
 import React from 'react';
-import { SiteSettings, DaySchedule } from '../types';
 
-interface ContactSectionProps {
-    settings: SiteSettings;
-}
-
-// Helper function to process operating hours into structured groups
-function formatOperatingHoursGroups(operatingHours?: DaySchedule[]): { days: string, time: string }[] {
-    if (!operatingHours?.length) return [];
-    
-    const openSchedules = operatingHours.filter(h => h.isOpen);
-    if (openSchedules.length === 0) return [];
-    
-    const schedulesByTime = openSchedules.reduce((acc, schedule) => {
-        const timeKey = `${schedule.openTime}-${schedule.closeTime}`;
-        if (!acc[timeKey]) acc[timeKey] = [];
-        acc[timeKey].push(schedule);
-        return acc;
-    }, {} as Record<string, DaySchedule[]>);
-
-    const result: { days: string, time: string }[] = [];
-
-    for (const timeKey in schedulesByTime) {
-        const schedules = schedulesByTime[timeKey].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
-        if (schedules.length === 0) continue;
-
-        let dayString;
-        if (schedules.length === 7) {
-            dayString = 'Todos os dias';
-        } else {
-            const sequences: DaySchedule[][] = [];
-            if (schedules.length > 0) {
-                let currentSequence: DaySchedule[] = [schedules[0]];
-                for (let i = 1; i < schedules.length; i++) {
-                    if (schedules[i].dayOfWeek === schedules[i - 1].dayOfWeek + 1) {
-                        currentSequence.push(schedules[i]);
-                    } else {
-                        sequences.push(currentSequence);
-                        currentSequence = [schedules[i]];
-                    }
-                }
-                sequences.push(currentSequence);
-            }
-            
-            // Handle Sunday-Saturday wrap-around (e.g., Fri, Sat, Sun)
-            if (sequences.length > 1 && sequences[0][0].dayOfWeek === 0 && schedules[schedules.length - 1].dayOfWeek === 6) {
-               const firstSeq = sequences.shift()!;
-               sequences[sequences.length - 1].push(...firstSeq);
-            }
-
-            const formattedSequences = sequences.map(seq => {
-                if (seq.length === 1) return seq[0].dayName;
-                if (seq.length === 2) return `${seq[0].dayName} e ${seq[1].dayName}`;
-                return `De ${seq[0].dayName} a ${seq[seq.length - 1].dayName}`;
-            });
-            dayString = formattedSequences.join(' e ');
-        }
-
-        const [openTime, closeTime] = timeKey.split('-');
-        result.push({
-            days: dayString,
-            time: `das ${openTime}h às ${closeTime}h`
-        });
-    }
-    return result;
-}
-
-
-const formatOperatingHours = (operatingHours?: DaySchedule[]): string => {
-    if (!operatingHours?.length) {
-        return 'Funcionamento não informado.';
-    }
-
-    const openSchedules = operatingHours.filter(h => h.isOpen);
-    if (openSchedules.length === 0) {
-        return 'Fechado todos os dias.';
-    }
-
-    const groups = formatOperatingHoursGroups(operatingHours);
-    if (groups.length === 0) {
-        return 'Fechado todos os dias.';
-    }
-
-    return groups.map(group => `${group.days}, ${group.time}`).join(' | ');
-};
-
-
-export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
+export const ContactSection: React.FC = () => {
     const address = "Rua Porfilio Furtado, 178, Centro - Santa Leopoldina, ES";
     const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
     // Vou colocar um botão no personalizar para carlinhos mudar isso fácil heheheh
     const facadeImageUrl = "https://firebasestorage.googleapis.com/v0/b/site-pizza-a2930.firebasestorage.app/o/fachada%2FFACHADA.png?alt=media&token=8010021e-a157-475e-8734-4ba56a3e967f";
-    const operatingHoursText = formatOperatingHours(settings.operatingHours);
-
 
     return (
         <section id="contato" className="py-20 bg-white">
@@ -127,7 +39,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
                                 <i className="fas fa-clock text-accent text-xl mt-1 w-6 text-center flex-shrink-0"></i>
                                 <div>
                                     <h3 className="text-lg font-bold text-text-on-light">Funcionamento</h3>
-                                    <p className="text-gray-700">{operatingHoursText}</p>
+                                    <p className="text-gray-700">Quarta a Domingo, das 19h às 22h</p>
                                 </div>
                             </div>
                         </div>

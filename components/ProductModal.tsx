@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Product, Category } from '../types';
 import * as firebaseService from '../services/firebaseService';
 import { CameraModal } from './CameraModal';
-import firebase from 'firebase/compat/app';
-
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -23,8 +21,6 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         badge: '',
         orderIndex: 0,
         stockStatus: 'available',
-        isPromotion: false,
-        promotionalPrice: 0,
     });
     
     const [formData, setFormData] = useState(getInitialFormData());
@@ -34,11 +30,6 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     const [isUploading, setIsUploading] = useState(false);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // Novos estados para a promoção
-    const [isPromotion, setIsPromotion] = useState(false);
-    const [promotionalPrice, setPromotionalPrice] = useState<number | ''>('');
-
 
     useEffect(() => {
         if (isOpen) {
@@ -55,16 +46,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     stockStatus: product.stockStatus || 'available',
                 });
                 setImagePreview(product.imageUrl);
-                // Define os estados da promoção ao editar
-                setIsPromotion(product.isPromotion || false);
-                setPromotionalPrice(product.promotionalPrice || '');
-
             } else {
                 setFormData(getInitialFormData());
                 setImagePreview('');
-                // Reseta os estados da promoção para um novo produto
-                setIsPromotion(false);
-                setPromotionalPrice('');
             }
         }
     }, [product, isOpen, categories]);
@@ -120,22 +104,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 finalImageUrl = await firebaseService.uploadImage(imageFile);
             }
 
-            const dataToSave: any = {
-                ...formData,
-                imageUrl: finalImageUrl,
-                isPromotion: isPromotion,
-                 // Se for promoção e tiver um preço válido, salve o número. Senão, delete o campo.
-                promotionalPrice: isPromotion && Number(promotionalPrice) > 0 
-                    ? Number(promotionalPrice) 
-                    : firebase.firestore.FieldValue.delete()
-            };
-
             const finalProduct: Product = {
                 id: product?.id || '',
                 active: product?.active ?? true,
-                ...dataToSave
+                ...formData,
+                imageUrl: finalImageUrl,
             };
-
             await onSave(finalProduct);
             onClose();
         } catch (error) {
@@ -209,7 +183,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                     </div>
                                 </div>
                             </div>
-                             <div>
+                            <div>
                                 <label className="block text-sm font-semibold mb-1">Preços *</label>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-gray-50 rounded-md border">
                                     {['P', 'M', 'G', 'Única'].map(size => (
@@ -221,38 +195,6 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                 </div>
                                  <p className="text-xs text-gray-500 mt-1">Deixe o campo em branco para tamanhos não aplicáveis.</p>
                             </div>
-
-                             {/* Seção de Promoção */}
-                            <div className="p-4 bg-yellow-50 rounded-md border border-yellow-200 space-y-3">
-                                <label className="flex items-center gap-3 cursor-pointer">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={isPromotion} 
-                                        onChange={e => setIsPromotion(e.target.checked)}
-                                        className="h-5 w-5 rounded border-gray-400 text-accent focus:ring-accent"
-                                    />
-                                    <span className="font-semibold text-yellow-800">Marcar como promoção</span>
-                                </label>
-
-                                {isPromotion && (
-                                    <div className="pl-8 animate-fade-in-up">
-                                        <label className="block text-sm font-semibold mb-1" htmlFor="promotional-price">Preço Promocional (R$)</label>
-                                        <input 
-                                            id="promotional-price"
-                                            type="number" 
-                                            step="0.01" 
-                                            value={promotionalPrice} 
-                                            onChange={e => setPromotionalPrice(e.target.value === '' ? '' : parseFloat(e.target.value))} 
-                                            className="w-full px-3 py-2 border rounded-md" 
-                                            placeholder="Ex: 39.90"
-                                            required 
-                                        />
-                                        <p className="text-xs text-gray-600 mt-1">Este preço único será aplicado a todos os tamanhos enquanto a promoção estiver ativa.</p>
-                                    </div>
-                                )}
-                            </div>
-
-
                             <div className="flex justify-end gap-3 pt-4">
                                 <button type="button" onClick={onClose} disabled={isUploading} className="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 disabled:opacity-50">Cancelar</button>
                                 <button type="submit" disabled={isUploading} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[150px] disabled:bg-opacity-70">

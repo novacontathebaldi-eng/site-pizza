@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { SiteSettings, ContentSection, FooterLink } from '../types';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
@@ -207,29 +206,25 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
 
     // --- Footer Link Handlers ---
     const handleFooterLinkChange = (id: string, field: keyof Omit<FooterLink, 'id'>, value: string | boolean) => {
-        // FIX: Added a fallback to an empty array for `formData.footerLinks` to prevent a spread error
-        // on a potentially non-object type if the array is missing.
-        const newLinks = (formData.footerLinks || []).map(link => link.id === id ? { ...link, [field]: value } : link);
+        const newLinks = formData.footerLinks.map(link => link.id === id ? { ...link, [field]: value } : link);
         setFormData({ ...formData, footerLinks: newLinks });
     };
 
     const handleAddFooterLink = () => {
         const newLink: FooterLink = { id: `footer-${Date.now()}`, icon: 'fas fa-link', text: 'Novo Link', url: '#', isVisible: true };
-        // FIX: Corrected a potential spread error by ensuring formData.footerLinks is an array before spreading.
-        // If formData.footerLinks is undefined, it falls back to an empty array.
-        setFormData({ ...formData, footerLinks: [...(formData.footerLinks || []), newLink] });
+        setFormData({ ...formData, footerLinks: [...formData.footerLinks, newLink] });
     };
 
     const handleRemoveFooterLink = (id: string) => {
-        setFormData({ ...formData, footerLinks: (formData.footerLinks || []).filter(l => l.id !== id) });
+        setFormData({ ...formData, footerLinks: formData.footerLinks.filter(l => l.id !== id) });
     };
 
     const handleFooterLinkDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (over && active.id !== over.id) {
-            const oldIndex = (formData.footerLinks || []).findIndex(l => l.id === active.id);
-            const newIndex = (formData.footerLinks || []).findIndex(l => l.id === over.id);
-            setFormData({ ...formData, footerLinks: arrayMove((formData.footerLinks || []), oldIndex, newIndex) });
+            const oldIndex = formData.footerLinks.findIndex(l => l.id === active.id);
+            const newIndex = formData.footerLinks.findIndex(l => l.id === over.id);
+            setFormData({ ...formData, footerLinks: arrayMove(formData.footerLinks, oldIndex, newIndex) });
         }
     };
 
@@ -276,22 +271,23 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                 <div className="p-4 border rounded-lg bg-gray-50/50">
                     <h3 className="text-lg font-bold mb-4 pb-2 border-b">Seções de Conteúdo da Página</h3>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
-                        {/* FIX: Removed the wrapper div around the mapped items. The SortableContext component expects an array of elements as direct children, which resolves the 'children' prop type error. */}
                         <SortableContext items={formData.contentSections.map(s => s.id)} strategy={verticalListSortingStrategy}>
-                            {formData.contentSections.map(section => (
-                                <SortableContentSectionItem 
-                                    key={section.id} 
-                                    section={section}
-                                    isOpen={activeAccordion === section.id}
-                                    onToggle={() => setActiveAccordion(activeAccordion === section.id ? null : section.id)}
-                                    onDelete={handleDeleteSection}
-                                    onChange={handleSectionChange}
-                                    onListItemChange={handleSectionListItemChange}
-                                    onAddListItem={handleAddSectionListItem}
-                                    onRemoveListItem={handleRemoveSectionListItem}
-                                    onFileChange={handleFileChange}
-                                />
-                            ))}
+                            <div className="space-y-3">
+                                {formData.contentSections.map(section => (
+                                    <SortableContentSectionItem 
+                                        key={section.id} 
+                                        section={section}
+                                        isOpen={activeAccordion === section.id}
+                                        onToggle={() => setActiveAccordion(activeAccordion === section.id ? null : section.id)}
+                                        onDelete={handleDeleteSection}
+                                        onChange={handleSectionChange}
+                                        onListItemChange={handleSectionListItemChange}
+                                        onAddListItem={handleAddSectionListItem}
+                                        onRemoveListItem={handleRemoveSectionListItem}
+                                        onFileChange={handleFileChange}
+                                    />
+                                ))}
+                            </div>
                         </SortableContext>
                     </DndContext>
                      <button type="button" onClick={handleAddNewSection} className="mt-4 bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600">
@@ -303,16 +299,17 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                  <div className="p-4 border rounded-lg bg-gray-50/50">
                     <h3 className="text-lg font-bold mb-4 pb-2 border-b">Links do Rodapé</h3>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleFooterLinkDragEnd}>
-                        {/* FIX: Removed the wrapper div around the mapped items. The SortableContext component expects an array of elements as direct children, which resolves the 'children' prop type error. */}
-                        <SortableContext items={(formData.footerLinks || []).map(l => l.id)} strategy={verticalListSortingStrategy}>
-                            {(formData.footerLinks || []).map(link => (
-                                <SortableFooterLinkItem 
-                                    key={link.id}
-                                    link={link}
-                                    onChange={handleFooterLinkChange}
-                                    onDelete={handleRemoveFooterLink}
-                                />
-                            ))}
+                        <SortableContext items={formData.footerLinks.map(l => l.id)} strategy={verticalListSortingStrategy}>
+                            <div className="space-y-3">
+                                {formData.footerLinks.map(link => (
+                                    <SortableFooterLinkItem 
+                                        key={link.id}
+                                        link={link}
+                                        onChange={handleFooterLinkChange}
+                                        onDelete={handleRemoveFooterLink}
+                                    />
+                                ))}
+                            </div>
                         </SortableContext>
                     </DndContext>
                     <button type="button" onClick={handleAddFooterLink} className="mt-4 bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600">

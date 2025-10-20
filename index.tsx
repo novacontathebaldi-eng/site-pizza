@@ -1,9 +1,7 @@
 
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-// FIX: Explicitly added the .tsx extension to the App import to resolve a module resolution error.
-import App from './App.tsx';
+import App from './App';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

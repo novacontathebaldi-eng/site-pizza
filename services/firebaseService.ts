@@ -63,52 +63,12 @@ export const updateProductStockStatus = async (productId: string, stockStatus: '
     await productRef.update({ stockStatus });
 };
 
-// Soft deletes a product by marking it as 'deleted'
 export const deleteProduct = async (productId: string): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     if (!productId) throw new Error("Invalid Product ID for deletion.");
     const productRef = db.collection('products').doc(productId);
-    await productRef.update({ deleted: true });
-};
-
-// Restores a soft-deleted product
-export const restoreProduct = async (productId: string): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    if (!productId) throw new Error("Invalid Product ID for restoration.");
-    const productRef = db.collection('products').doc(productId);
-    await productRef.update({ deleted: false });
-};
-
-// Permanently deletes a product from Firestore
-export const permanentDeleteProduct = async (productId: string): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    if (!productId) throw new Error("Invalid Product ID for permanent deletion.");
-    const productRef = db.collection('products').doc(productId);
     await productRef.delete();
 };
-
-// Bulk soft-deletes products
-export const bulkDeleteProducts = async (productIds: string[]): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const batch = db.batch();
-    productIds.forEach(id => {
-        const productRef = db.collection('products').doc(id);
-        batch.update(productRef, { deleted: true });
-    });
-    await batch.commit();
-};
-
-// Bulk permanently deletes products
-export const bulkPermanentDeleteProducts = async (productIds: string[]): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const batch = db.batch();
-    productIds.forEach(id => {
-        const productRef = db.collection('products').doc(id);
-        batch.delete(productRef);
-    });
-    await batch.commit();
-};
-
 
 export const updateProductsOrder = async (productsToUpdate: { id: string; orderIndex: number }[]): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -225,7 +185,6 @@ export const createUserProfile = async (user: firebase.User, name: string, phone
         phone: phone,
         cpf: cpf,
         addresses: [],
-        allergies: '',
     };
     await userRef.set(profile);
 };
@@ -237,7 +196,7 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
     return { uid, ...doc.data() } as UserProfile;
 };
 
-export const updateUserProfile = async (uid: string, data: Partial<Pick<UserProfile, 'name' | 'phone' | 'cpf' | 'allergies'>>): Promise<void> => {
+export const updateUserProfile = async (uid: string, data: Partial<Pick<UserProfile, 'name' | 'phone' | 'cpf'>>): Promise<void> => {
     if (!db) throw new Error("Firestore not initialized.");
     await db.collection('users').doc(uid).set(data, { merge: true });
 };
@@ -329,24 +288,6 @@ export const askChatbot = async (messages: ChatMessage[]): Promise<string> => {
     }
 };
 
-/**
- * Associates guest orders stored in localStorage with a user ID upon login.
- * @param userId The UID of the user who has just logged in.
- * @param orderIds An array of order document IDs to update.
- */
-export const syncGuestOrders = async (userId: string, orderIds: string[]): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    if (!userId || orderIds.length === 0) return;
-
-    const batch = db.batch();
-    orderIds.forEach(orderId => {
-        const orderRef = db.collection('orders').doc(orderId);
-        batch.update(orderRef, { userId: userId });
-    });
-
-    await batch.commit();
-};
-
 
 // --- Order Management Functions (Calling Cloud Functions) ---
 
@@ -394,29 +335,6 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     const orderRef = db.collection('orders').doc(orderId);
     await orderRef.delete();
-};
-
-export const permanentDeleteMultipleOrders = async (orderIds: string[]): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    if (orderIds.length === 0) {
-        return;
-    }
-
-    // Firestore allows a maximum of 500 writes in a single batch.
-    // Chunking the array to handle more than 500 deletions at once.
-    const chunks = [];
-    for (let i = 0; i < orderIds.length; i += 500) {
-        chunks.push(orderIds.slice(i, i + 500));
-    }
-
-    for (const chunk of chunks) {
-        const batch = db.batch();
-        chunk.forEach(orderId => {
-            const orderRef = db.collection('orders').doc(orderId);
-            batch.delete(orderRef);
-        });
-        await batch.commit();
-    }
 };
 
 

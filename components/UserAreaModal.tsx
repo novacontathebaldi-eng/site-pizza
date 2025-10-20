@@ -5,8 +5,28 @@ import { db } from '../services/firebase';
 import * as firebaseService from '../services/firebaseService';
 import defaultProfilePic from '../assets/perfil.png';
 import userAreaBackground from '../assets/fundocliente.png';
-import { OrderStatusTracker } from './OrderStatusTracker';
-import { OrderDetailsModal } from './OrderDetailsModal';
+
+interface UserAreaModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    user: firebase.User | null;
+    profile: UserProfile | null;
+    onLogout: () => void;
+    addToast: (message: string, type: 'success' | 'error') => void;
+    initialTab?: 'orders' | 'profile' | 'addresses';
+    showAddAddressForm?: boolean;
+}
+
+const statusConfig: { [key in OrderStatus]?: { text: string; icon: string; color: string; } } = {
+    pending: { text: 'Pendente', icon: 'fas fa-hourglass-start', color: 'text-yellow-500' },
+    accepted: { text: 'Em Preparo', icon: 'fas fa-cogs', color: 'text-blue-500' },
+    reserved: { text: 'Reserva Confirmada', icon: 'fas fa-chair', color: 'text-teal-500' },
+    ready: { text: 'Pronto / Em Rota', icon: 'fas fa-shipping-fast', color: 'text-purple-500' },
+    completed: { text: 'Finalizado', icon: 'fas fa-check-circle', color: 'text-green-500' },
+    cancelled: { text: 'Cancelado', icon: 'fas fa-times-circle', color: 'text-red-500' },
+    deleted: { text: 'Excluído', icon: 'fas fa-trash-alt', color: 'text-gray-500' },
+    'awaiting-payment': { text: 'Aguardando Pgto', icon: 'fas fa-clock', color: 'text-gray-500' },
+};
 
 const LOCALIDADES = ['Centro', 'Olaria', 'Vila Nova', 'Moxafongo', 'Cocal', 'Funil'];
 
@@ -25,73 +45,183 @@ const formatTimestamp = (timestamp: any, includeTime: boolean = false): string =
     return new Intl.DateTimeFormat('pt-BR', options).format(date);
 };
 
+const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
+    if (order.customer.orderType === 'local') {
+        const config = statusConfig[order.status === 'pending' ? 'pending' : 'reserved'] || statusConfig[order.status];
+        if (!config) return null;
+        return (
+             <div className="bg-blue-50 border-l-4 border-blue-400 text-blue-800 p-3 my-2 rounded-r-lg text-sm">
+                <div className="flex">
+                    <div className="py-1"><i className={`text-xl mr-3 ${config.icon}`}></i></div>
+                    <div>
+                        <p className="font-bold">{config.text}</p>
+                        <p className="text-xs">Sua reserva para {order.numberOfPeople} pessoa(s) em {formatTimestamp(order.createdAt, true)}.</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    const steps = [
+        { id: 'pending', label: 'Pedido Recebido', icon: 'fas fa-receipt' },
+        { id: 'accepted', label: 'Em Preparo', icon: 'fas fa-utensils' },
+        { id: 'ready', label: order.customer.orderType === 'delivery' ? 'Saiu p/ Entrega' : 'Pronto p/ Retirada', icon: order.customer.orderType === 'delivery' ? 'fas fa-motorcycle' : 'fas fa-box-open' },
+        { id: 'completed', label: 'Finalizado', icon: 'fas fa-check' }
+    ];
+
+    const statusOrder: OrderStatus[] = ['pending', 'accepted', 'ready', 'completed'];
+    let currentStatusIndex = statusOrder.indexOf(order.status);
+    
+    if (order.status === 'awaiting-payment') {
+        currentStatusIndex = 0;
+    }
+    
+    if (order.status === 'cancelled') {
+        return (
+            <div className="bg-red-50 border-l-4 border-red-400 text-red-800 p-3 my-4 rounded-r-lg">
+                <p className="font-bold text-sm"><i className="fas fa-times-circle mr-2"></i>Pedido Cancelado</p>
+            </div>
+        );
+   }
+
+    if (currentStatusIndex < 0 && order.status !== 'completed') {
+        return null; 
+    }
+
+    if(order.status === 'completed') {
+      currentStatusIndex = 3;
+    }
+
+    const progressPercent = currentStatusIndex < 0 ? 0 : (currentStatusIndex / (steps.length - 1)) * 100;
+
+    return (
+        <div className="w-full py-4">
+            <div className="relative h-20">
+                {/* Lines Container */}
+                <div className="absolute top-5 left-5 right-5 h-1">
+                    {/* Gray Line */}
+                    <div className="w-full h-full bg-gray-200 rounded-full" />
+                    {/* Green Line */}
+                    <div
+                        className="absolute top-0 left-0 h-full bg-green-500 rounded-full transition-all duration-500 ease-in-out"
+                        style={{ width: `${progressPercent}%` }}
+                    />
+                </div>
+
+                {/* Icons & Labels Container */}
+                <div className="absolute top-0 left-0 w-full h-full flex justify-between items-start">
+                    {steps.map((step, index) => {
+                        const isCompleted = currentStatusIndex >= index;
+                        const isActive = currentStatusIndex === index;
+
+                        let circleClass = 'bg-white border-2 border-gray-300 text-gray-400';
+                        let textClass = 'text-gray-500';
+
+                        if (isActive) {
+                            circleClass = 'bg-green-500 text-white scale-110 shadow-lg border-2 border-green-600';
+                            textClass = 'font-bold text-green-600';
+                        } else if (isCompleted) {
+                            circleClass = 'bg-green-500 text-white border-2 border-green-600';
+                            textClass = 'text-green-600';
+                        }
+
+                        return (
+                            <div key={step.id} className="z-10 flex flex-col items-center text-center">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all duration-300 ${circleClass}`}>
+                                    <i className={step.icon}></i>
+                                </div>
+                                <p className={`mt-2 text-xs font-semibold leading-tight w-20 ${textClass} transition-colors duration-300`}>
+                                    {steps[index].label}
+                                </p>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const OrderDetailsModal: React.FC<{ order: Order | null; onClose: () => void; }> = ({ order, onClose }) => {
+    if (!order) return null;
+
+    const isOngoing = ['pending', 'accepted', 'ready', 'awaiting-payment'].includes(order.status);
+    const paymentMethodMap = { credit: 'Crédito', debit: 'Débito', pix: 'PIX', cash: 'Dinheiro' };
+    const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo no Local' };
+    
+     const paymentStatusInfo = {
+        'pending': { text: 'Pendente', color: 'text-yellow-600' },
+        'paid': { text: 'Pago', color: 'text-green-600' },
+        'paid_online': { text: 'Pago Pelo Site', color: 'text-green-600 font-bold' },
+        'refunded': { text: 'Estornado', color: 'text-orange-500' }
+    }[order.paymentStatus] || { text: 'Pendente', color: 'text-yellow-600' };
+
+    const fullAddress = order.customer.orderType === 'delivery' ? `${order.customer.street || ''}, ${order.customer.number || ''} - ${order.customer.neighborhood || ''}` : null;
+
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-fade-in-up">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+                 <div className="flex justify-between items-center p-4 border-b border-gray-200">
+                    <h3 className="text-xl font-bold text-text-on-light">Detalhes do Pedido #{order.orderNumber}</h3>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                </div>
+                 <div className="overflow-y-auto p-4 sm:p-6 space-y-4">
+                    {isOngoing && <OrderStatusTracker order={order} />}
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div className="bg-gray-50 p-3 rounded-md border">
+                            <h4 className="font-bold mb-2 text-base"><i className="fas fa-user mr-2 text-gray-400"></i>Cliente</h4>
+                            <p><strong>Nome:</strong> {order.customer.name}</p>
+                            <p><strong>Telefone:</strong> {order.customer.phone}</p>
+                            <p><strong>Pedido:</strong> {orderTypeMap[order.customer.orderType]}</p>
+                            {fullAddress && <p><strong>Endereço:</strong> {fullAddress}</p>}
+                            {order.customer.orderType === 'local' && (
+                                <>
+                                    <p><strong>Pessoas:</strong> {order.numberOfPeople}</p>
+                                    <p><strong>Reserva:</strong> {order.customer.reservationTime}</p>
+                                </>
+                            )}
+                        </div>
+                        <div className="bg-gray-50 p-3 rounded-md border">
+                            <h4 className="font-bold mb-2 text-base"><i className="fas fa-credit-card mr-2 text-gray-400"></i>Pagamento</h4>
+                             <p><strong>Método:</strong> {order.paymentMethod ? paymentMethodMap[order.paymentMethod] : 'N/A'}</p>
+                            <p><strong>Status:</strong> <span className={`font-semibold ${paymentStatusInfo.color}`}>{paymentStatusInfo.text}</span></p>
+                            {order.paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {order.changeNeeded ? `para R$ ${order.changeAmount}` : 'Não precisa'}</p> )}
+                            {order.deliveryFee > 0 && (<p><strong>Taxa de Entrega:</strong> {order.deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>)}
+                            <p className="mt-2 pt-2 border-t font-bold"><strong>Total:</strong> {order.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                        </div>
+                    </div>
+
+                    {order.items && order.items.length > 0 && (
+                        <div>
+                            <h4 className="font-bold mb-2 text-base"><i className="fas fa-shopping-basket mr-2 text-gray-400"></i>Itens do Pedido</h4>
+                            <ul className="space-y-1 text-sm">
+                                {order.items.map(item => (<li key={item.id} className="flex justify-between p-2 bg-gray-50 rounded"><span>{item.quantity}x {item.name} ({item.size})</span><span className="font-semibold">{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>))}
+                            </ul>
+                        </div>
+                    )}
+                     {order.allergies && <p className="text-sm mt-3 p-2 bg-red-50 rounded-md border border-red-200"><strong>Alergias/Restrições:</strong> {order.allergies}</p>}
+                     {order.notes && <p className="text-sm mt-3 p-2 bg-yellow-50 rounded-md border border-yellow-200"><strong>Obs:</strong> {order.notes}</p>}
+                 </div>
+            </div>
+        </div>
+    );
+};
+
+
 const AddressForm: React.FC<{
     address: Partial<Address> | null;
     onSave: (address: Address) => Promise<void>;
     onCancel: () => void;
     isSaving: boolean;
-    existingAddresses: Address[];
-}> = ({ address, onSave, onCancel, isSaving, existingAddresses }) => {
-    const getInitialLabelSelection = (label: string | undefined): 'Casa' | 'Trabalho' | 'Outro' | '' => {
-        if (label === 'Casa' || label === 'Trabalho') return label;
-        if (label) return 'Outro';
-        return '';
-    };
-
-    const [isNoNumber, setIsNoNumber] = useState(address?.number === 'S/N');
+    totalAddresses: number;
+}> = ({ address, onSave, onCancel, isSaving, totalAddresses }) => {
     const [formData, setFormData] = useState<Partial<Address>>({
         label: '', localidade: 'Centro', street: '', number: '', complement: '', isFavorite: false,
         bairro: '', cep: '29640-000', city: 'Santa Leopoldina',
         ...address
     });
-    const [labelSelection, setLabelSelection] = useState<'Casa' | 'Trabalho' | 'Outro' | ''>(getInitialLabelSelection(address?.label));
-    
-    // NOVO: Estados para controlar o campo de rótulo personalizado e a mensagem
-    const [showCustomLabelField, setShowCustomLabelField] = useState(getInitialLabelSelection(address?.label) === 'Outro');
-    const [customLabelMessage, setCustomLabelMessage] = useState('');
-
-    const handleLabelButtonClick = (selection: 'Casa' | 'Trabalho' | 'Outro') => {
-        setLabelSelection(selection);
-        setCustomLabelMessage(''); // Limpa a mensagem ao trocar de aba
-
-        if (selection === 'Outro') {
-            setShowCustomLabelField(true);
-            // Se o rótulo atual era um dos presets, limpa para o usuário digitar um novo
-            if (formData.label === 'Casa' || formData.label === 'Trabalho') {
-                setFormData(prev => ({ ...prev, label: '' }));
-            }
-            return;
-        }
-
-        // Verifica se já existe um endereço com o mesmo rótulo (ignorando o que está sendo editado)
-        const alreadyExists = existingAddresses.some(
-            addr => addr.label === selection && addr.id !== formData.id
-        );
-
-        if (alreadyExists) {
-            setShowCustomLabelField(true);
-            setCustomLabelMessage(`Você já tem um endereço '${selection}'. Digite um nome específico para este novo endereço (ex: ${selection} de Praia).`);
-            // Limpa o rótulo para forçar a inserção no campo personalizado
-            if (formData.label === selection) {
-                setFormData(prev => ({ ...prev, label: '' }));
-            }
-        } else {
-            setShowCustomLabelField(false);
-            setFormData(prev => ({ ...prev, label: selection }));
-        }
-    };
-
-    useEffect(() => {
-        setIsNoNumber(formData.number === 'S/N');
-    }, [formData.number]);
-    
-    useEffect(() => {
-        if (isNoNumber) {
-            setFormData(prev => ({ ...prev, number: 'S/N' }));
-        } else if (formData.number === 'S/N') {
-            setFormData(prev => ({ ...prev, number: '' }));
-        }
-    }, [isNoNumber]);
     
     useEffect(() => {
         const isOther = formData.localidade === 'Outra';
@@ -105,25 +235,10 @@ const AddressForm: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-
-        // Validação para impedir rótulos duplicados
-        const trimmedLabel = formData.label?.trim() || '';
-        if (!trimmedLabel) {
-            setCustomLabelMessage('Por favor, defina um apelido para o endereço.');
-            return;
-        }
-        const isDuplicateLabel = existingAddresses.some(
-            addr => addr.label.trim().toLowerCase() === trimmedLabel.toLowerCase() && addr.id !== formData.id
-        );
-        if (isDuplicateLabel) {
-            setCustomLabelMessage('Este apelido já está em uso. Por favor, escolha outro.');
-            return;
-        }
-        
         const isOtherLocality = formData.localidade === 'Outra';
         const finalAddress: Address = {
             id: formData.id || '',
-            label: trimmedLabel,
+            label: formData.label || 'Endereço',
             localidade: formData.localidade || '',
             street: formData.street || '',
             number: formData.number || '',
@@ -138,66 +253,27 @@ const AddressForm: React.FC<{
         onSave(finalAddress);
     };
     
-    const totalAddresses = existingAddresses.length;
     const isOnlyAddress = totalAddresses === 1 && !!address?.id;
     const isOtherLocality = formData.localidade === 'Outra';
     const isFavoriteDisabled = isOtherLocality || isOnlyAddress;
-    const showLabelInput = labelSelection === 'Outro' || showCustomLabelField;
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4 p-4 border rounded-lg bg-gray-50 mt-4 animate-fade-in-up">
+        <form onSubmit={handleSubmit} className="space-y-3 p-4 border rounded-lg bg-gray-50 mt-4 animate-fade-in-up">
             <h5 className="font-bold">{formData.id ? 'Editar Endereço' : 'Novo Endereço'}</h5>
-            
-            <div>
-                <label className="block text-sm font-semibold mb-2">Rótulo *</label>
-                <div className="flex flex-col sm:flex-row justify-start gap-3">
-                    <button
-                        type="button"
-                        onClick={() => handleLabelButtonClick('Casa')}
-                        className={`flex-1 font-bold py-2 px-4 rounded-lg transition-all border-2 flex items-center justify-center gap-2 ${labelSelection === 'Casa' ? 'bg-accent text-white border-accent' : 'bg-white text-gray-700 border-gray-300 hover:border-accent'}`}>
-                        <i className="fas fa-home fa-fw"></i> Casa
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleLabelButtonClick('Trabalho')}
-                        className={`flex-1 font-bold py-2 px-4 rounded-lg transition-all border-2 flex items-center justify-center gap-2 ${labelSelection === 'Trabalho' ? 'bg-accent text-white border-accent' : 'bg-white text-gray-700 border-gray-300 hover:border-accent'}`}>
-                        <i className="fas fa-briefcase fa-fw"></i> Trabalho
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleLabelButtonClick('Outro')}
-                        className={`flex-1 font-bold py-2 px-4 rounded-lg transition-all border-2 flex items-center justify-center gap-2 ${labelSelection === 'Outro' ? 'bg-accent text-white border-accent' : 'bg-white text-gray-700 border-gray-300 hover:border-accent'}`}>
-                        <i className="fas fa-tag fa-fw"></i> Outro
-                    </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-semibold mb-1">Rótulo (Ex: Casa, Trabalho)</label>
+                    <input type="text" value={formData.label} onChange={e => setFormData({ ...formData, label: e.target.value })} className="w-full px-3 py-2 border rounded-md" required />
                 </div>
-                {showLabelInput && (
-                    <div className="mt-3 animate-fade-in-up">
-                        {customLabelMessage && (
-                            <div className="mb-2 p-2 bg-blue-50 text-blue-800 border border-blue-200 text-xs rounded-md">
-                                {customLabelMessage}
-                            </div>
-                        )}
-                        <input
-                            type="text"
-                            value={formData.label}
-                            onChange={e => setFormData({ ...formData, label: e.target.value })}
-                            className="w-full px-3 py-2 border rounded-md"
-                            placeholder="Digite um apelido para o endereço"
-                            required
-                        />
-                    </div>
-                )}
+                <div>
+                    <label className="block text-sm font-semibold mb-1">Localidade *</label>
+                    <select value={formData.localidade} onChange={e => setFormData({ ...formData, localidade: e.target.value })} className="w-full px-3 py-2 border rounded-md bg-white" required>
+                        <option value="" disabled>Selecione...</option>
+                        {LOCALIDADES.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                         <option value="Outra">Outra (Fora da área de entrega)</option>
+                    </select>
+                </div>
             </div>
-
-            <div>
-                <label className="block text-sm font-semibold mb-1">Localidade *</label>
-                <select value={formData.localidade} onChange={e => setFormData({ ...formData, localidade: e.target.value })} className="w-full px-3 py-2 border rounded-md bg-white" required>
-                    <option value="" disabled>Selecione...</option>
-                    {LOCALIDADES.map(loc => <option key={loc} value={loc}>{loc}</option>)}
-                     <option value="Outra">Outra (Fora da área de entrega)</option>
-                </select>
-            </div>
-
              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label className="block text-sm font-semibold mb-1">CEP</label>
@@ -208,31 +284,22 @@ const AddressForm: React.FC<{
                     <input type="text" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} className="w-full px-3 py-2 border rounded-md disabled:bg-gray-200" required disabled={!isOtherLocality} />
                 </div>
             </div>
-            
-            {isOtherLocality && (
-                <div>
-                    <label className="block text-sm font-semibold mb-1">Bairro *</label>
-                    <input type="text" value={formData.bairro} onChange={e => setFormData({ ...formData, bairro: e.target.value })} className="w-full px-3 py-2 border rounded-md" required={isOtherLocality} />
-                </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4 items-end">
+             <div className={`grid grid-cols-1 md:grid-cols-[${isOtherLocality ? '1fr_2fr_1fr' : '2fr_1fr'}] gap-4`}>
+                 {isOtherLocality && (
+                     <div>
+                        <label className="block text-sm font-semibold mb-1">Bairro *</label>
+                        <input type="text" value={formData.bairro} onChange={e => setFormData({ ...formData, bairro: e.target.value })} className="w-full px-3 py-2 border rounded-md" required={isOtherLocality} />
+                    </div>
+                 )}
                 <div>
                     <label className="block text-sm font-semibold mb-1">Rua *</label>
                     <input type="text" value={formData.street} onChange={e => setFormData({ ...formData, street: e.target.value })} className="w-full px-3 py-2 border rounded-md" required />
                 </div>
                 <div>
                     <label className="block text-sm font-semibold mb-1">Número *</label>
-                    <input type="text" value={formData.number} onChange={e => setFormData({ ...formData, number: e.target.value })} className="w-full px-3 py-2 border rounded-md" required disabled={isNoNumber} />
+                    <input type="text" value={formData.number} onChange={e => setFormData({ ...formData, number: e.target.value })} className="w-full px-3 py-2 border rounded-md" required />
                 </div>
             </div>
-            <div className="flex justify-end -mt-2">
-                <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={isNoNumber} onChange={e => setIsNoNumber(e.target.checked)} />
-                    <span>Sem número</span>
-                </label>
-            </div>
-
             <div>
                 <label className="block text-sm font-semibold mb-1">Complemento (opcional)</label>
                 <input type="text" value={formData.complement} onChange={e => setFormData({ ...formData, complement: e.target.value })} className="w-full px-3 py-2 border rounded-md" />
@@ -284,16 +351,13 @@ interface UserProfileTabProps {
     setPhone: (phone: string) => void;
     cpf: string;
     setCpf: (cpf: string) => void;
-    allergies: string;
-    setAllergies: (allergies: string) => void;
     isSaving: boolean;
     addToast: (message: string, type: 'success' | 'error') => void;
 }
 
 const UserProfileTab: React.FC<UserProfileTabProps> = ({
     profile, user, onLogout, handleResendVerification, handleProfileUpdate,
-    name, setName, phone, setPhone, cpf, setCpf, allergies, setAllergies,
-    isSaving, addToast,
+    name, setName, phone, setPhone, cpf, setCpf, isSaving, addToast,
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isPhotoUploading, setIsPhotoUploading] = useState(false);
@@ -434,10 +498,6 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
             <input type="text" value={cpf} onChange={e => setCpf(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="000.000.000-00" />
              <p className="text-xs text-gray-500 mt-1">Seu CPF é usado para agilizar o pagamento com PIX.</p>
         </div>
-        <div>
-            <label className="block text-sm font-semibold mb-1">Restrições Alimentares? (opcional)</label>
-            <textarea value={allergies} onChange={e => setAllergies(e.target.value)} className="w-full px-3 py-2 border rounded-md" rows={2} placeholder="Ex: alergia a camarão, intolerância à lactose..."/>
-        </div>
         <div className="text-right pt-2">
              <button type="submit" disabled={isSaving || isPhotoUploading} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[120px] disabled:bg-opacity-70">
                 {isSaving ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-2"></i><span>Salvar Perfil</span></>}
@@ -463,7 +523,6 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
     );
 
     const renderOrderSummaryCard = (order: Order, isOngoing: boolean) => {
-        const isReservation = order.customer.orderType === 'local';
         const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo no Local' };
         const paymentStatusInfo = {
             'pending': { text: 'Pendente', color: 'text-yellow-600' },
@@ -472,48 +531,6 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
             'refunded': { text: 'Estornado', color: 'text-orange-500' }
         }[order.paymentStatus] || { text: 'Pendente', color: 'text-yellow-600' };
 
-        const CompletedStatusBanner = () => {
-            if (order.status !== 'completed') return null;
-
-            const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date();
-            const today = new Date();
-            
-            orderDate.setHours(0, 0, 0, 0);
-            today.setHours(0, 0, 0, 0);
-
-            const diffTime = today.getTime() - orderDate.getTime();
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            
-            let message: string;
-            let iconClass: string;
-
-            if (isReservation) { // 'local'
-                if (diffDays >= 3) {
-                    message = "O cheirinho do forno aquecendo ainda nos lembra da sua visita. Quando quiser reviver o momento, a casa é sua! Obrigado novamente!";
-                    iconClass = 'fas fa-mug-hot';
-                } else {
-                    message = "Você faz nossa casa ficar mais alegre. Valeu pela visita e até a próxima rodada de sabor!";
-                    iconClass = 'fas fa-glass-cheers';
-                }
-            } else { // 'delivery' or 'pickup'
-                if (diffDays >= 1) {
-                    message = "Partiu mais uma pizza hoje? A próxima pizza tá a um clique!";
-                    iconClass = 'fas fa-pizza-slice';
-                } else { // same day
-                    message = "Pedido Finalizado. Bom apetite!";
-                    iconClass = 'fas fa-pizza-slice';
-                }
-            }
-
-            return (
-                <div className="bg-green-50 border border-green-200 text-green-800 text-sm font-semibold p-3 rounded-lg flex items-center gap-3">
-                    <i className={iconClass}></i>
-                    <span>{message}</span>
-                </div>
-            );
-        };
-
-
         return (
              <div key={order.id} className="bg-white border rounded-lg p-4 flex flex-col shadow-sm">
                 <div className="flex justify-between items-start mb-3">
@@ -521,29 +538,15 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
                         <p className="font-bold text-lg text-text-on-light">Pedido #{order.orderNumber}</p>
                         <p className="text-xs text-gray-500">{formatTimestamp(order.createdAt, true)}</p>
                     </div>
-                    {!isReservation && order.total != null && <p className="font-bold text-xl text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
+                    {order.total != null && <p className="font-bold text-xl text-accent">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
                 </div>
                 <div className="text-sm space-y-1 mb-4">
                      <p><strong>Cliente:</strong> {order.customer.name}</p>
                      <p><strong>Tipo:</strong> {orderTypeMap[order.customer.orderType]}</p>
-                     {!isReservation && (
-                        <p><strong>Pagamento:</strong> <span className={`font-semibold ${paymentStatusInfo.color}`}>{paymentStatusInfo.text}</span></p>
-                     )}
+                     <p><strong>Pagamento:</strong> <span className={`font-semibold ${paymentStatusInfo.color}`}>{paymentStatusInfo.text}</span></p>
                 </div>
                 
                 {isOngoing && <OrderStatusTracker order={order} />}
-
-                {!isOngoing && (
-                    <div className="mt-2 mb-4">
-                        <CompletedStatusBanner />
-                        {order.status === 'cancelled' && (
-                            <div className="bg-red-50 border border-red-200 text-red-800 text-sm font-semibold p-3 rounded-lg flex items-center gap-3">
-                                <i className="fas fa-ban"></i>
-                                <span>Pedido Cancelado</span>
-                            </div>
-                        )}
-                    </div>
-                )}
 
                  <button onClick={() => onViewDetails(order.id)} className="mt-auto w-full bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
                     <i className="fas fa-receipt mr-2"></i>Ver Detalhes do Pedido
@@ -631,33 +634,15 @@ const MyAddressesTab: React.FC<MyAddressesTabProps> = ({
                 <i className="fas fa-plus mr-2"></i>Adicionar Endereço
             </button>
         )}
-        {isAddressFormVisible && <AddressForm 
-            address={editingAddress} 
-            onSave={handleSaveAddress} 
-            onCancel={() => { setIsAddressFormVisible(false); setEditingAddress(null); }} 
-            isSaving={isSaving} 
-            existingAddresses={profile.addresses || []}
-        />}
+        {isAddressFormVisible && <AddressForm address={editingAddress} onSave={handleSaveAddress} onCancel={() => { setIsAddressFormVisible(false); setEditingAddress(null); }} isSaving={isSaving} totalAddresses={(profile.addresses || []).length} />}
     </div>
 );
 
-// FIX: Added the missing UserAreaModalProps interface definition.
-interface UserAreaModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    user: firebase.User | null;
-    profile: UserProfile | null;
-    onLogout: () => void;
-    addToast: (message: string, type: 'success' | 'error') => void;
-    initialTab?: 'profile' | 'orders' | 'addresses';
-    showAddAddressForm?: boolean;
-}
 
 export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, user, profile, onLogout, addToast, initialTab = 'orders', showAddAddressForm = false }) => {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [cpf, setCpf] = useState('');
-    const [allergies, setAllergies] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [myOrders, setMyOrders] = useState<Order[]>([]);
     const [isLoadingOrders, setIsLoadingOrders] = useState(true);
@@ -669,31 +654,22 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const selectedOrderDetails = useMemo(() => myOrders.find(o => o.id === selectedOrderId) || null, [myOrders, selectedOrderId]);
 
-    // This effect handles the opening and closing of the modal.
-    // It sets the initial tab and visibility of the address form ONLY when `isOpen` changes from false to true.
     useEffect(() => {
         if (isOpen) {
-            setActiveTab(initialTab);
-            setIsAddressFormVisible(showAddAddressForm);
+            if (profile) {
+                setName(profile.name || '');
+                setPhone(profile.phone || '');
+                setCpf(profile.cpf || '');
+            }
+             setActiveTab(initialTab);
+             setIsAddressFormVisible(showAddAddressForm);
         } else {
-            // Reset state on close
-            setActiveTab('orders'); // Default tab on close/re-open
+            setActiveTab('orders');
             setIsAddressFormVisible(false);
             setEditingAddress(null);
             setSelectedOrderId(null);
         }
-    }, [isOpen, initialTab, showAddAddressForm]);
-
-    // This separate effect handles syncing form data with the profile data from props.
-    // It runs when the modal is open and the profile data changes, without resetting the active tab.
-    useEffect(() => {
-        if (isOpen && profile) {
-            setName(profile.name || '');
-            setPhone(profile.phone || '');
-            setCpf(profile.cpf || '');
-            setAllergies(profile.allergies || '');
-        }
-    }, [isOpen, profile]);
+    }, [isOpen, initialTab, showAddAddressForm, profile]);
 
 
     useEffect(() => {
@@ -732,14 +708,9 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
     const handleResendVerification = async () => {
         try {
             await user.sendEmailVerification();
-            addToast('E-mail de verificação reenviado! Verifique sua caixa de entrada e spam.', 'success');
-        } catch (error: any) {
-            console.error("Erro ao reenviar email de verificação:", error);
-            let message = 'Erro ao reenviar e-mail. Tente mais tarde.';
-            if (error.code === 'auth/too-many-requests') {
-                message = 'Você solicitou o reenvio muitas vezes. Por favor, aguarde um pouco antes de tentar novamente.';
-            }
-            addToast(message, 'error');
+            addToast('E-mail de verificação reenviado!', 'success');
+        } catch (error) {
+            addToast('Erro ao reenviar e-mail. Tente mais tarde.', 'error');
         }
     };
     
@@ -752,7 +723,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
             return;
         }
         try {
-            await firebaseService.updateUserProfile(user.uid, { name, phone, cpf, allergies });
+            await firebaseService.updateUserProfile(user.uid, { name, phone, cpf });
             addToast('Seu perfil foi salvo!', 'success');
         } catch (error) {
             addToast('Erro ao salvar seu perfil.', 'error');
@@ -834,8 +805,6 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                                     setPhone={setPhone}
                                     cpf={cpf}
                                     setCpf={setCpf}
-                                    allergies={allergies}
-                                    setAllergies={setAllergies}
                                     isSaving={isSaving}
                                 />
                             )}
