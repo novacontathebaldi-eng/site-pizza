@@ -657,47 +657,40 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
   }
 
   try {
-    // 1. Robustly extract paymentId and validate notification type
+    // 1. Validate Signature for security
     const signature = request.headers["x-signature"];
     const requestId = request.headers["x-request-id"];
-    let paymentId;
+    const receivedTopic = request.body.type;
 
-    // Check for IPN format (query parameters)
-    if (request.query && request.query.topic === "payment" && request.query.id) {
-      paymentId = request.query.id;
-      logger.info(`IPN de pagamento recebido. ID: ${paymentId}`);
-    // Check for Webhook format (request body)
-    } else if (request.body && request.body.type === "payment" && request.body.data && request.body.data.id) {
-      paymentId = request.body.data.id;
-      logger.info(`Webhook de pagamento recebido. ID: ${paymentId}`);
-    } else {
-      // If it's neither a payment IPN nor a payment Webhook, ignore it.
-      logger.info("Notificação recebida que não é de pagamento ou está malformada. Ignorando.", {
+    // The 'data.id' for signature validation comes from the query parameters
+    const paymentIdFromQuery = request.query["data.id"];
+
+    if (!signature || !requestId || !paymentIdFromQuery || receivedTopic !== "payment") {
+      logger.warn("Webhook ignorado: Faltando headers, data.id no query, ou tópico inválido.", {
+        headers: request.headers,
         query: request.query,
         body: request.body,
       });
-      return response.status(200).send("OK");
-    }
-
-    // 2. Validate Signature for security
-    if (!signature || !requestId) {
-      logger.warn(`Webhook para pagamento ${paymentId} ignorado: Faltando headers de assinatura.`);
-      return response.status(400).send("Bad Request: Missing signature headers.");
+      return response.status(200).send("OK"); // Respond OK to prevent retries
     }
 
     const [ts, hash] = signature.split(",").map((part) => part.split("=")[1]);
-    const manifest = `id:${paymentId};request-id:${requestId};ts:${ts};`;
+
+    // The manifest MUST be built from query params as per Mercado Pago docs.
+    const manifest = `id:${paymentIdFromQuery};request-id:${requestId};ts:${ts};`;
+
     const hmac = crypto.createHmac("sha256", webhookSecret);
     hmac.update(manifest);
     const expectedHash = hmac.digest("hex");
 
     if (crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expectedHash)) === false) {
-      logger.error(`Falha na validação da assinatura do Webhook para o pagamento ${paymentId}.`);
+      logger.error("Falha na validação da assinatura do Webhook.");
       return response.status(401).send("Invalid Signature");
     }
 
-    // 3. Process the payment update
-    logger.info(`Webhook validado para o pagamento: ${paymentId}`);
+    // 2. Process the payment update
+    const paymentId = request.body.data.id;
+    logger.info(`Webhook validado recebido para o pagamento: ${paymentId}`);
 
     const payment = new Payment(client);
     const paymentInfo = await payment.get({id: paymentId});
@@ -709,7 +702,7 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
     const orderId = paymentInfo.external_reference;
     const orderRef = db.collection("orders").doc(orderId);
 
-    // 4. Update Firestore based on payment status
+    // 3. Update Firestore based on payment status
     const updateData = {
       "mercadoPagoDetails.status": paymentInfo.status,
       "mercadoPagoDetails.statusDetail": paymentInfo.status_detail,
@@ -736,7 +729,6 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
     return response.status(500).send("Internal Server Error");
   }
 });
-
 
 /**
  * Processes a full refund for a given order.
