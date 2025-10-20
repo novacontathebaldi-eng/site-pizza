@@ -1101,14 +1101,15 @@ const App: React.FC = () => {
                 ) : null}
             </div>
 
-            <div className="fixed bottom-[5.5rem] left-5 z-40 flex flex-col-reverse items-center gap-3">
+            {/* Floating Order Tracker */}
+            <div className="fixed bottom-24 left-5 z-40 flex flex-col-reverse items-center gap-3">
                 {activeOrders.length > 1 && isOrderTrackerExpanded && (
                     <div className="flex flex-col-reverse gap-3 animate-fade-in-up">
                         {activeOrders.map(order => (
                             <button
                                 key={order.id}
                                 onClick={() => { setTrackingOrderId(order.id); setIsOrderTrackerExpanded(false); }}
-                                className="w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110"
+                                className="w-14 h-14 bg-white/80 backdrop-blur-md text-brand-olive-600 rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110"
                                 aria-label={`Acompanhar pedido #${order.orderNumber}`}
                             >
                                 <span className="text-2xl">{getStatusIcon(order)}</span>
@@ -1125,18 +1126,18 @@ const App: React.FC = () => {
                                 setIsOrderTrackerExpanded(prev => !prev);
                             }
                         }}
-                        className="w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110"
+                        className="w-14 h-14 bg-white/80 backdrop-blur-md text-brand-olive-600 rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110"
                         aria-label={activeOrders.length === 1 ? `Acompanhar pedido #${activeOrders[0].orderNumber}` : isOrderTrackerExpanded ? 'Recolher pedidos' : `${activeOrders.length} pedidos ativos`}
                     >
                         {activeOrders.length === 1 ? (
                             <span className="text-2xl">{getStatusIcon(activeOrders[0])}</span>
                         ) : isOrderTrackerExpanded ? (
-                            <i className="fas fa-chevron-down text-2xl"></i>
+                            <i className="fas fa-times text-2xl"></i>
                         ) : (
                             <span className="relative">
-                                <i className="fas fa-chevron-up text-2xl"></i>
+                                <i className="fas fa-receipt text-2xl"></i>
                                 <span
-                                    className="absolute -top-4 -right-3 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center"
+                                    className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center"
                                 >
                                     {activeOrders.length}
                                 </span>
@@ -1146,6 +1147,7 @@ const App: React.FC = () => {
                 )}
             </div>
 
+            {/* Chatbot Button - Position Adjusted */}
             <button onClick={() => setIsChatbotOpen(true)} className="fixed bottom-5 left-5 z-40 w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110" aria-label="Abrir assistente virtual"><i className="fas fa-headset text-2xl"></i></button>
 
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cart} onUpdateQuantity={handleUpdateCartQuantity} onCheckout={() => { if (!isStoreOnline) { addToast("A loja está fechada. Não é possível finalizar o pedido.", 'error'); return; } setIsCartOpen(false); setIsCheckoutModalOpen(true); }} isStoreOnline={isStoreOnline} categories={categories} products={products} setActiveCategoryId={setActiveMenuCategory}/>

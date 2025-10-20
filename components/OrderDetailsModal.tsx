@@ -13,7 +13,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onC
 
     const isReservation = order.customer.orderType === 'local';
     const isOngoing = ['pending', 'accepted', 'ready', 'awaiting-payment', 'reserved'].includes(order.status);
-    const paymentMethodMap = { credit: 'Crédito', debit: 'Débito', pix: 'PIX', cash: 'Dinheiro' };
+    const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
     const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo no Local' };
     
      const paymentStatusInfo = {
@@ -71,11 +71,11 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onC
     return (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-fade-in-up">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-                 <div className="flex justify-between items-center p-4 border-b border-gray-200">
+                 <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl">
                     <h3 className="text-xl font-bold text-text-on-light">{title || 'Detalhes do Pedido'} #{order.orderNumber}</h3>
                     <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
                 </div>
-                 <div className="overflow-y-auto p-4 sm:p-6 space-y-4">
+                 <div className="overflow-y-auto p-4 sm:p-6 space-y-6">
                     {isOngoing && <OrderStatusTracker order={order} />}
                     
                     {!isOngoing && (
@@ -91,8 +91,8 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onC
                     )}
 
                     <div className={`grid grid-cols-1 ${!isReservation ? 'md:grid-cols-2' : ''} gap-4 text-sm`}>
-                        <div className="bg-gray-50 p-3 rounded-md border">
-                            <h4 className="font-bold mb-2 text-base"><i className="fas fa-user mr-2 text-gray-400"></i>Cliente</h4>
+                        <div className="bg-gray-50 p-4 rounded-lg border">
+                            <h4 className="font-bold mb-2 text-base text-brand-olive-600"><i className="fas fa-user mr-2 text-gray-400"></i>Cliente e Entrega</h4>
                             <p><strong>Nome:</strong> {order.customer.name}</p>
                             <p><strong>Telefone:</strong> {order.customer.phone}</p>
                             <p><strong>Pedido:</strong> {orderTypeMap[order.customer.orderType]}</p>
@@ -105,27 +105,35 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onC
                             )}
                         </div>
                         {!isReservation && (
-                            <div className="bg-gray-50 p-3 rounded-md border">
-                                <h4 className="font-bold mb-2 text-base"><i className="fas fa-credit-card mr-2 text-gray-400"></i>Pagamento</h4>
+                            <div className="bg-gray-50 p-4 rounded-lg border">
+                                <h4 className="font-bold mb-2 text-base text-brand-olive-600"><i className="fas fa-credit-card mr-2 text-gray-400"></i>Pagamento</h4>
                                 <p><strong>Método:</strong> {order.paymentMethod ? paymentMethodMap[order.paymentMethod] : 'N/A'}</p>
                                 <p><strong>Status:</strong> <span className={`font-semibold ${paymentStatusInfo.color}`}>{paymentStatusInfo.text}</span></p>
                                 {order.paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {order.changeNeeded ? `para R$ ${order.changeAmount}` : 'Não precisa'}</p> )}
                                 {order.deliveryFee > 0 && (<p><strong>Taxa de Entrega:</strong> {order.deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>)}
-                                <p className="mt-2 pt-2 border-t font-bold"><strong>Total:</strong> {order.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                <p className="mt-2 pt-2 border-t font-bold text-lg text-accent"><strong>Total:</strong> {order.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                             </div>
                         )}
                     </div>
 
                     {order.items && order.items.length > 0 && (
                         <div>
-                            <h4 className="font-bold mb-2 text-base"><i className="fas fa-shopping-basket mr-2 text-gray-400"></i>Itens do Pedido</h4>
-                            <ul className="space-y-1 text-sm">
-                                {order.items.map(item => (<li key={item.id} className="flex justify-between p-2 bg-gray-50 rounded"><span>{item.quantity}x {item.name} ({item.size})</span><span className="font-semibold">{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></li>))}
+                            <h4 className="font-bold mb-2 text-base text-brand-olive-600"><i className="fas fa-shopping-basket mr-2 text-gray-400"></i>Itens do Pedido</h4>
+                            <ul className="space-y-2 text-sm">
+                                {order.items.map(item => (
+                                    <li key={item.id} className="flex justify-between items-center p-3 bg-white rounded-md border">
+                                        <div>
+                                            <span className="font-semibold text-gray-800">{item.quantity}x {item.name}</span>
+                                            <span className="text-gray-500 ml-2">({item.size})</span>
+                                        </div>
+                                        <span className="font-semibold text-gray-800">{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                    </li>
+                                ))}
                             </ul>
                         </div>
                     )}
-                     {order.allergies && <p className="text-sm mt-3 p-2 bg-red-50 rounded-md border border-red-200"><strong>Alergias/Restrições:</strong> {order.allergies}</p>}
-                     {order.notes && <p className="text-sm mt-3 p-2 bg-yellow-50 rounded-md border border-yellow-200"><strong>Obs:</strong> {order.notes}</p>}
+                     {order.allergies && <p className="text-sm mt-3 p-3 bg-red-50 rounded-md border border-red-200"><strong>Alergias/Restrições:</strong> {order.allergies}</p>}
+                     {order.notes && <p className="text-sm mt-3 p-3 bg-yellow-50 rounded-md border border-yellow-200"><strong>Observações:</strong> {order.notes}</p>}
                  </div>
             </div>
         </div>
