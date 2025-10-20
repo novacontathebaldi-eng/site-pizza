@@ -67,24 +67,18 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
         };
     }, [sortedActiveCategories, setActiveCategoryId, isStoreOnline]);
 
-    // Effect to scroll the active tab into view when changed by the scroll-spy or a click.
-    useEffect(() => {
-        // Find the DOM element for the currently active tab using the ref map.
-        const activeTabElement = tabRefs.current.get(activeCategoryId);
-
-        // If the element exists, scroll it into the center of the tab bar.
-        if (activeTabElement) {
-            activeTabElement.scrollIntoView({
-                behavior: 'smooth', // Animate the scroll
-                block: 'nearest',   // Don't scroll vertically
-                inline: 'center'    // Horizontally center the element
-            });
-        }
-    }, [activeCategoryId]); // This effect runs whenever the activeCategoryId changes.
-
-
     const handleTabClick = (e: React.MouseEvent<HTMLAnchorElement>, categoryId: string) => {
         e.preventDefault();
+
+        // Scroll the clicked tab into the center of the tab bar
+        const activeTab = tabRefs.current.get(categoryId);
+        if (activeTab) {
+            activeTab.scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest',
+                inline: 'center'
+            });
+        }
         
         const element = document.getElementById(`category-section-${categoryId}`);
         const stickyHeader = document.getElementById('sticky-menu-header');
