@@ -207,6 +207,7 @@ const App: React.FC = () => {
     // Auth State
     const [currentUser, setCurrentUser] = useState<firebase.User | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+    const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
     const [isUserAreaModalOpen, setIsUserAreaModalOpen] = useState<boolean>(false);
     const [isGapiReady, setIsGapiReady] = useState(false);
@@ -393,7 +394,10 @@ const App: React.FC = () => {
 
     // Effect for Firebase Auth state changes
     useEffect(() => {
-        if (!auth) return;
+        if (!auth) {
+            setIsAuthLoading(false);
+            return;
+        }
         const unsubscribe = auth.onAuthStateChanged(async (user) => {
             setCurrentUser(user);
             if (user) {
@@ -406,6 +410,7 @@ const App: React.FC = () => {
                 setName('');
                 setPhone('');
             }
+            setIsAuthLoading(false);
         });
         return () => unsubscribe();
     }, []);
@@ -1050,6 +1055,7 @@ const App: React.FC = () => {
                 settings={siteSettings} 
                 user={currentUser}
                 onUserIconClick={handleUserIconClick}
+                isAuthLoading={isAuthLoading}
             />
             
             <div id="status-banner" className={`sticky top-20 z-40 bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
