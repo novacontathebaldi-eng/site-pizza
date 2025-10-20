@@ -660,13 +660,15 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
     // 1. Validate Signature for security
     const signature = request.headers["x-signature"];
     const requestId = request.headers["x-request-id"];
-    const receivedTopic = request.body.type;
 
-    // The 'data.id' for signature validation comes from the query parameters
-    const paymentIdFromQuery = request.query["data.id"];
+    // The payment ID for signature validation comes from the query parameter 'id'
+    const paymentId = request.query.id;
+    // The topic is also in the query parameter
+    const topic = request.query.topic;
 
-    if (!signature || !requestId || !paymentIdFromQuery || receivedTopic !== "payment") {
-      logger.warn("Webhook ignorado: Faltando headers, data.id no query, ou tópico inválido.", {
+    // A more robust check. We only care about payment notifications.
+    if (!signature || !requestId || !paymentId || topic !== "payment") {
+      logger.warn("Webhook ignorado: Faltando headers, ID de pagamento, ou tópico inválido.", {
         headers: request.headers,
         query: request.query,
         body: request.body,
@@ -677,7 +679,7 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
     const [ts, hash] = signature.split(",").map((part) => part.split("=")[1]);
 
     // The manifest MUST be built from query params as per Mercado Pago docs.
-    const manifest = `id:${paymentIdFromQuery};request-id:${requestId};ts:${ts};`;
+    const manifest = `id:${paymentId};request-id:${requestId};ts:${ts};`;
 
     const hmac = crypto.createHmac("sha256", webhookSecret);
     hmac.update(manifest);
@@ -689,8 +691,14 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
     }
 
     // 2. Process the payment update
-    const paymentId = request.body.data.id;
+    const receivedTopicInBody = request.body.type;
     logger.info(`Webhook validado recebido para o pagamento: ${paymentId}`);
+
+    // Check if the body also indicates a payment. This is redundant but safe.
+    if (receivedTopicInBody !== "payment") {
+      logger.info(`Tópico do corpo ('${receivedTopicInBody}') não é 'payment'. Ignorando.`);
+      return response.status(200).send("OK");
+    }
 
     const payment = new Payment(client);
     const paymentInfo = await payment.get({id: paymentId});
@@ -729,6 +737,7 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
     return response.status(500).send("Internal Server Error");
   }
 });
+
 
 /**
  * Processes a full refund for a given order.
