@@ -691,14 +691,7 @@ exports.mercadoPagoWebhook = onRequest({secrets}, async (request, response) => {
     }
 
     // 2. Process the payment update
-    const receivedTopicInBody = request.body.type;
     logger.info(`Webhook validado recebido para o pagamento: ${paymentId}`);
-
-    // Check if the body also indicates a payment. This is redundant but safe.
-    if (receivedTopicInBody !== "payment") {
-      logger.info(`Tópico do corpo ('${receivedTopicInBody}') não é 'payment'. Ignorando.`);
-      return response.status(200).send("OK");
-    }
 
     const payment = new Payment(client);
     const paymentInfo = await payment.get({id: paymentId});
