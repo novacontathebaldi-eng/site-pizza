@@ -30,8 +30,8 @@ const AddressForm: React.FC<{
     onSave: (address: Address) => Promise<void>;
     onCancel: () => void;
     isSaving: boolean;
-    totalAddresses: number;
-}> = ({ address, onSave, onCancel, isSaving, totalAddresses }) => {
+    existingAddresses: Address[];
+}> = ({ address, onSave, onCancel, isSaving, existingAddresses }) => {
     const getInitialLabelSelection = (label: string | undefined): 'Casa' | 'Trabalho' | 'Outro' | '' => {
         if (label === 'Casa' || label === 'Trabalho') return label;
         if (label) return 'Outro';
@@ -45,16 +45,39 @@ const AddressForm: React.FC<{
         ...address
     });
     const [labelSelection, setLabelSelection] = useState<'Casa' | 'Trabalho' | 'Outro' | ''>(getInitialLabelSelection(address?.label));
+    
+    // NOVO: Estados para controlar o campo de rótulo personalizado e a mensagem
+    const [showCustomLabelField, setShowCustomLabelField] = useState(getInitialLabelSelection(address?.label) === 'Outro');
+    const [customLabelMessage, setCustomLabelMessage] = useState('');
 
     const handleLabelButtonClick = (selection: 'Casa' | 'Trabalho' | 'Outro') => {
         setLabelSelection(selection);
-        if (selection !== 'Outro') {
-            setFormData(prev => ({ ...prev, label: selection }));
-        } else {
-            // When switching to 'Outro', if the label was one of the presets, clear it to let the user type.
+        setCustomLabelMessage(''); // Limpa a mensagem ao trocar de aba
+
+        if (selection === 'Outro') {
+            setShowCustomLabelField(true);
+            // Se o rótulo atual era um dos presets, limpa para o usuário digitar um novo
             if (formData.label === 'Casa' || formData.label === 'Trabalho') {
-                 setFormData(prev => ({ ...prev, label: '' }));
+                setFormData(prev => ({ ...prev, label: '' }));
             }
+            return;
+        }
+
+        // Verifica se já existe um endereço com o mesmo rótulo (ignorando o que está sendo editado)
+        const alreadyExists = existingAddresses.some(
+            addr => addr.label === selection && addr.id !== formData.id
+        );
+
+        if (alreadyExists) {
+            setShowCustomLabelField(true);
+            setCustomLabelMessage(`Você já tem um endereço '${selection}'. Digite um nome específico para este novo endereço (ex: ${selection} de Praia).`);
+            // Limpa o rótulo para forçar a inserção no campo personalizado
+            if (formData.label === selection) {
+                setFormData(prev => ({ ...prev, label: '' }));
+            }
+        } else {
+            setShowCustomLabelField(false);
+            setFormData(prev => ({ ...prev, label: selection }));
         }
     };
 
@@ -82,10 +105,25 @@ const AddressForm: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Validação para impedir rótulos duplicados
+        const trimmedLabel = formData.label?.trim() || '';
+        if (!trimmedLabel) {
+            setCustomLabelMessage('Por favor, defina um apelido para o endereço.');
+            return;
+        }
+        const isDuplicateLabel = existingAddresses.some(
+            addr => addr.label.trim().toLowerCase() === trimmedLabel.toLowerCase() && addr.id !== formData.id
+        );
+        if (isDuplicateLabel) {
+            setCustomLabelMessage('Este apelido já está em uso. Por favor, escolha outro.');
+            return;
+        }
+        
         const isOtherLocality = formData.localidade === 'Outra';
         const finalAddress: Address = {
             id: formData.id || '',
-            label: formData.label || 'Endereço',
+            label: trimmedLabel,
             localidade: formData.localidade || '',
             street: formData.street || '',
             number: formData.number || '',
@@ -100,9 +138,11 @@ const AddressForm: React.FC<{
         onSave(finalAddress);
     };
     
+    const totalAddresses = existingAddresses.length;
     const isOnlyAddress = totalAddresses === 1 && !!address?.id;
     const isOtherLocality = formData.localidade === 'Outra';
     const isFavoriteDisabled = isOtherLocality || isOnlyAddress;
+    const showLabelInput = labelSelection === 'Outro' || showCustomLabelField;
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4 p-4 border rounded-lg bg-gray-50 mt-4 animate-fade-in-up">
@@ -130,14 +170,19 @@ const AddressForm: React.FC<{
                         <i className="fas fa-tag fa-fw"></i> Outro
                     </button>
                 </div>
-                {labelSelection === 'Outro' && (
+                {showLabelInput && (
                     <div className="mt-3 animate-fade-in-up">
+                        {customLabelMessage && (
+                            <div className="mb-2 p-2 bg-blue-50 text-blue-800 border border-blue-200 text-xs rounded-md">
+                                {customLabelMessage}
+                            </div>
+                        )}
                         <input
                             type="text"
-                            value={(formData.label === 'Casa' || formData.label === 'Trabalho') ? '' : formData.label}
+                            value={formData.label}
                             onChange={e => setFormData({ ...formData, label: e.target.value })}
                             className="w-full px-3 py-2 border rounded-md"
-                            placeholder="Digite um rótulo personalizado (Ex: Casa de Praia)"
+                            placeholder="Digite um apelido para o endereço"
                             required
                         />
                     </div>
@@ -586,7 +631,13 @@ const MyAddressesTab: React.FC<MyAddressesTabProps> = ({
                 <i className="fas fa-plus mr-2"></i>Adicionar Endereço
             </button>
         )}
-        {isAddressFormVisible && <AddressForm address={editingAddress} onSave={handleSaveAddress} onCancel={() => { setIsAddressFormVisible(false); setEditingAddress(null); }} isSaving={isSaving} totalAddresses={(profile.addresses || []).length} />}
+        {isAddressFormVisible && <AddressForm 
+            address={editingAddress} 
+            onSave={handleSaveAddress} 
+            onCancel={() => { setIsAddressFormVisible(false); setEditingAddress(null); }} 
+            isSaving={isSaving} 
+            existingAddresses={profile.addresses || []}
+        />}
     </div>
 );
 
