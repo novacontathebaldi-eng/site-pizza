@@ -1,5 +1,16 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Order, OrderStatus } from '../types';
+
+const statusConfig: { [key in OrderStatus]?: { text: string; icon: string; color: string; } } = {
+    pending: { text: 'Pendente', icon: 'fas fa-hourglass-start', color: 'text-yellow-500' },
+    accepted: { text: 'Em Preparo', icon: 'fas fa-utensils', color: 'text-blue-500' },
+    reserved: { text: 'Reserva Confirmada', icon: 'fas fa-chair', color: 'text-teal-500' },
+    ready: { text: 'Pronto / Em Rota', icon: 'fas fa-shipping-fast', color: 'text-purple-500' },
+    completed: { text: 'Finalizado', icon: 'fas fa-check-circle', color: 'text-green-500' },
+    cancelled: { text: 'Cancelado', icon: 'fas fa-times-circle', color: 'text-red-500' },
+    deleted: { text: 'Excluído', icon: 'fas fa-trash-alt', color: 'text-gray-500' },
+    'awaiting-payment': { text: 'Aguardando Pgto', icon: 'fas fa-clock', color: 'text-gray-500' },
+};
 
 export const formatTimestamp = (timestamp: any, includeTime: boolean = false): string => {
     if (!timestamp) return 'N/A';
@@ -19,43 +30,48 @@ export const formatTimestamp = (timestamp: any, includeTime: boolean = false): s
 export const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
     if (order.customer.orderType === 'local') {
         const isReserved = order.status === 'reserved';
-        const config = {
-            'pending': { text: 'Aguardando Confirmação', icon: 'fas fa-hourglass-half' },
-            'reserved': { text: 'Reserva Confirmada', icon: 'fas fa-calendar-check' }
-        }[isReserved ? 'reserved' : 'pending'];
+        const config = statusConfig[isReserved ? 'reserved' : order.status] || statusConfig.pending;
+        if (!config) return null;
+
+        const iconNode = <i className={config.icon}></i>;
 
         return (
-             <div className="bg-blue-50 border-l-4 border-blue-400 text-blue-800 p-4 my-2 rounded-r-lg">
+             <div className="bg-blue-50 border-l-4 border-blue-400 text-blue-800 p-3 my-2 rounded-r-lg text-sm">
                 <div className="flex items-center">
-                    <div className="w-10 text-center text-xl mr-3 flex items-center justify-center">
-                        <i className={config.icon}></i>
-                    </div>
+                    <div className="w-10 text-center text-xl mr-2 flex items-center justify-center">{iconNode}</div>
                     <div>
                         <p className="font-bold">{config.text}</p>
-                        <p className="text-xs">Sua reserva para {order.numberOfPeople} pessoa(s) em {formatTimestamp(order.customer.reservationDate || order.createdAt)} às {order.customer.reservationTime}.</p>
+                        <p className="text-xs">Sua reserva para {order.numberOfPeople} pessoa(s) em {formatTimestamp(order.createdAt, true)}.</p>
                     </div>
                 </div>
             </div>
         );
     }
 
-    const steps: { id: OrderStatus, label: string, icon: string }[] = [
-        { id: 'pending', label: 'Pedido Recebido', icon: 'fas fa-receipt' },
-        { id: 'accepted', label: 'Em Preparo', icon: 'fas fa-utensils' },
+    const steps = [
+        { id: 'pending', label: 'Pedido Recebido', icon: <i className="fas fa-receipt"></i> },
+        { 
+            id: 'accepted', 
+            label: 'Em Preparo', 
+            icon: <i className="fas fa-utensils"></i>
+        },
         { 
             id: 'ready', 
             label: order.customer.orderType === 'delivery' ? 'Saiu p/ Entrega' : 'Pronto p/ Retirada', 
-            icon: order.customer.orderType === 'delivery' ? 'fas fa-motorcycle' : 'fas fa-box-open'
+            icon: order.customer.orderType === 'delivery' 
+                ? <i className="fas fa-motorcycle"></i> 
+                : <i className="fas fa-pizza-slice"></i>
         },
-        { id: 'completed', label: 'Finalizado', icon: 'fas fa-flag-checkered' }
+        { id: 'completed', label: 'Finalizado', icon: <i className="fas fa-check"></i> }
     ];
 
     const statusOrder: OrderStatus[] = ['pending', 'accepted', 'ready', 'completed'];
-    
     let currentStatusIndex = statusOrder.indexOf(order.status);
-    if (order.status === 'awaiting-payment') currentStatusIndex = -1; // Before 'pending'
-    if (order.status === 'completed') currentStatusIndex = 3;
-
+    
+    if (order.status === 'awaiting-payment') {
+        currentStatusIndex = 0;
+    }
+    
     if (order.status === 'cancelled') {
         return (
             <div className="bg-red-50 border-l-4 border-red-400 text-red-800 p-3 my-4 rounded-r-lg">
@@ -63,43 +79,60 @@ export const OrderStatusTracker: React.FC<{ order: Order }> = ({ order }) => {
             </div>
         );
    }
-   
-    if (order.status === 'awaiting-payment') {
-        return (
-            <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-3 my-4 rounded-r-lg">
-                <p className="font-bold text-sm"><i className="fas fa-clock mr-2"></i>Aguardando Pagamento</p>
-                 <p className="text-xs mt-1">Seu pedido entrará em preparo assim que o pagamento for confirmado.</p>
-            </div>
-        );
-   }
 
+    if (currentStatusIndex < 0 && order.status !== 'completed') {
+        return null; 
+    }
+
+    if(order.status === 'completed') {
+      currentStatusIndex = 3;
+    }
+
+    const progressPercent = currentStatusIndex < 0 ? 0 : (currentStatusIndex / (steps.length - 1)) * 100;
 
     return (
         <div className="w-full py-4">
-            <div className="flex justify-between">
-                {steps.map((step, index) => {
-                    const isCompleted = currentStatusIndex >= index;
-                    const isActive = currentStatusIndex === index;
+            <div className="relative h-20">
+                {/* Lines Container */}
+                <div className="absolute top-5 left-5 right-5 h-1">
+                    {/* Gray Line */}
+                    <div className="w-full h-full bg-gray-200 rounded-full" />
+                    {/* Green Line */}
+                    <div
+                        className="absolute top-0 left-0 h-full bg-green-500 rounded-full transition-all duration-500 ease-in-out"
+                        style={{ width: `${progressPercent}%` }}
+                    />
+                </div>
 
-                    return (
-                        <div key={step.id} className="flex-1 flex flex-col items-center relative">
-                            {/* Line */}
-                            {index > 0 && (
-                                <div className={`absolute w-full h-1 top-[14px] right-1/2 ${isCompleted ? 'bg-green-500' : 'bg-gray-200'}`}></div>
-                            )}
-                            
-                            {/* Circle & Icon */}
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white z-10 transition-colors duration-300 ${isCompleted ? 'bg-green-500' : 'bg-gray-300'}`}>
-                                {isActive ? <i className={`${step.icon} fa-beat`}></i> : <i className={step.icon}></i>}
+                {/* Icons & Labels Container */}
+                <div className="absolute top-0 left-0 w-full h-full flex justify-between items-start">
+                    {steps.map((step, index) => {
+                        const isCompleted = currentStatusIndex >= index;
+                        const isActive = currentStatusIndex === index;
+
+                        let circleClass = 'bg-white border-2 border-gray-300 text-gray-400';
+                        let textClass = 'text-gray-500';
+
+                        if (isActive) {
+                            circleClass = 'bg-green-500 text-white scale-110 shadow-lg border-2 border-green-600';
+                            textClass = 'font-bold text-green-600';
+                        } else if (isCompleted) {
+                            circleClass = 'bg-green-500 text-white border-2 border-green-600';
+                            textClass = 'text-green-600';
+                        }
+
+                        return (
+                            <div key={step.id} className="z-10 flex flex-col items-center text-center">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all duration-300 ${circleClass}`}>
+                                    {step.icon}
+                                </div>
+                                <p className={`mt-2 text-xs font-semibold leading-tight w-20 ${textClass} transition-colors duration-300`}>
+                                    {steps[index].label}
+                                </p>
                             </div>
-                            
-                            {/* Label */}
-                            <p className={`mt-2 text-xs font-semibold text-center leading-tight w-20 transition-colors duration-300 ${isCompleted ? 'text-green-600' : 'text-gray-500'}`}>
-                                {step.label}
-                            </p>
-                        </div>
-                    );
-                })}
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );
