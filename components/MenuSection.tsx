@@ -29,27 +29,31 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
 }) => {
     const categoryRefs = useRef<Map<string, HTMLElement | null>>(new Map());
     const tabRefs = useRef<Map<string, HTMLAnchorElement | null>>(new Map());
+    // Ref para evitar que o scroll automático da aba aconteça durante o scroll manual da página.
+    const isClickNavigating = useRef(false);
+
 
     const sortedActiveCategories = useMemo(() => 
         [...categories].filter(c => c.active).sort((a, b) => a.order - b.order),
         [categories]
     );
 
-    // Effect for the main scroll-spy functionality (updates active tab based on page scroll)
+    // Efeito para a funcionalidade de scroll-spy (atualiza a aba ativa com base na rolagem da página)
     useEffect(() => {
-        const bannerHeight = !isStoreOnline ? 40 : 0; // Approximate banner height in pixels (p-2 + text)
-        const topMargin = 120 + bannerHeight; // 120 is approx. for main header (80) + sticky menu (40)
+        const bannerHeight = !isStoreOnline ? 40 : 0;
+        const topMargin = 120 + bannerHeight;
 
         const observer = new IntersectionObserver(
             (entries) => {
                 entries.forEach((entry) => {
-                    if (entry.isIntersecting) {
+                    // Atualiza a categoria ativa apenas se a página estiver sendo rolada pelo usuário (não por um clique)
+                    if (entry.isIntersecting && !isClickNavigating.current) {
                         setActiveCategoryId(entry.target.id.replace('category-section-', ''));
                     }
                 });
             },
             {
-                rootMargin: `-${topMargin}px 0px -50% 0px`, // Use dynamic offset
+                rootMargin: `-${topMargin}px 0px -50% 0px`,
                 threshold: 0,
             }
         );
@@ -67,18 +71,26 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
         };
     }, [sortedActiveCategories, setActiveCategoryId, isStoreOnline]);
 
-    const handleTabClick = (e: React.MouseEvent<HTMLAnchorElement>, categoryId: string) => {
-        e.preventDefault();
-
-        // Scroll the clicked tab into the center of the tab bar
-        const activeTab = tabRefs.current.get(categoryId);
-        if (activeTab) {
-            activeTab.scrollIntoView({
+    // Efeito para rolar a aba ativa para o centro da tela
+    useEffect(() => {
+        const activeTabElement = tabRefs.current.get(activeCategoryId);
+        if (activeTabElement) {
+            activeTabElement.scrollIntoView({
                 behavior: 'smooth',
                 block: 'nearest',
                 inline: 'center'
             });
         }
+    }, [activeCategoryId]);
+
+    const handleTabClick = (e: React.MouseEvent<HTMLAnchorElement>, categoryId: string) => {
+        e.preventDefault();
+
+        // Define o estado para indicar que a navegação foi iniciada por um clique
+        isClickNavigating.current = true;
+        
+        // Atualiza imediatamente a categoria ativa para que a aba correta seja destacada
+        setActiveCategoryId(categoryId);
         
         const element = document.getElementById(`category-section-${categoryId}`);
         const stickyHeader = document.getElementById('sticky-menu-header');
@@ -86,7 +98,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
         
         if (element && stickyHeader) {
             const bannerHeight = statusBanner ? statusBanner.offsetHeight : 0;
-            const headerOffset = stickyHeader.offsetHeight + 80 + bannerHeight; // Main header + sticky menu header + status banner
+            const headerOffset = stickyHeader.offsetHeight + 80 + bannerHeight;
             const elementPosition = element.getBoundingClientRect().top;
             const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
 
@@ -94,6 +106,14 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                 top: offsetPosition,
                 behavior: 'smooth'
             });
+
+            // Após um tempo, reseta o estado de clique. Isso previne que o IntersectionObserver
+            // altere a aba ativa durante a animação de rolagem da página.
+            setTimeout(() => {
+                isClickNavigating.current = false;
+            }, 800); // Um tempo seguro para a animação de rolagem terminar.
+        } else {
+             isClickNavigating.current = false;
         }
     };
 
@@ -114,9 +134,6 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                             {sortedActiveCategories.map(category => (
                                 <a 
                                     key={category.id} 
-                                    // FIX: The ref callback was incorrectly returning a Map object.
-                                    // It has been wrapped in a block body `{}` to ensure it returns `void`,
-                                    // which is the expected return type for a ref callback.
                                     ref={(el) => { tabRefs.current.set(category.id, el); }}
                                     href={`#category-section-${category.id}`}
                                     onClick={(e) => handleTabClick(e, category.id)}
