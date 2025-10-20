@@ -72,7 +72,11 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
         const activeTab = tabRefs.current.get(activeCategoryId);
         if (activeTab && window.scrollY > 0) {
             activeTab.scrollIntoView({
-                behavior: 'smooth',
+                // FIX: Changed behavior to 'auto' to prevent scroll animation conflicts.
+                // The smooth scrolling of the tab bar, triggered by the IntersectionObserver during
+                // manual page scrolling, was causing the main scroll to feel jerky or to stop.
+                // An instant scroll ('auto') resolves this conflict.
+                behavior: 'auto',
                 block: 'nearest',
                 inline: 'center'
             });
