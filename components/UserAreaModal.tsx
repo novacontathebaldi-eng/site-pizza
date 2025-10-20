@@ -468,7 +468,7 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
         const paymentStatusInfo = {
             'pending': { text: 'Pendente', color: 'text-yellow-600' },
             'paid': { text: 'Pago', color: 'text-green-600' },
-            'paid_online': { text: 'Pago Pelo Site', color: 'text-green-600' },
+            'paid_online': { text: 'Pago Pelo Site', color: 'text-green-600 font-bold' },
             'refunded': { text: 'Estornado', color: 'text-orange-500' }
         }[order.paymentStatus] || { text: 'Pendente', color: 'text-yellow-600' };
 
@@ -795,7 +795,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
         <>
             <div
                 className="fixed inset-0 bg-cover bg-center z-50 animate-fade-in-up"
-                style={{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${userAreaBackground})` }}
+                style={{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url(${userAreaBackground})` }}
             >
                 <div className="w-full h-full flex flex-col">
                     <header className="sticky top-0 bg-brand-green-700/90 backdrop-blur-sm z-10 flex-shrink-0 shadow-md">
@@ -812,7 +812,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                     </header>
 
                     <div className="flex-grow overflow-y-auto">
-                        <div className="max-w-4xl mx-auto p-4 sm:p-6 my-4 sm:my-6 bg-brand-ivory-50/90 backdrop-blur-sm rounded-xl shadow-lg">
+                        <div className="max-w-4xl mx-auto p-4 sm:p-6 my-4 sm:my-6 bg-brand-ivory-50/80 backdrop-blur-md rounded-xl shadow-lg">
                             <div className="border-b mb-6">
                                 <nav className="flex -mb-px space-x-4">
                                     <button onClick={() => setActiveTab('profile')} className={`py-2 px-3 font-semibold text-sm transition-colors ${activeTab === 'profile' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-800'}`}>Perfil</button>
