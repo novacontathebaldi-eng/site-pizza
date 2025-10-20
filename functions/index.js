@@ -1,6 +1,7 @@
 /* eslint-disable max-len */
 const {onCall, onRequest} = require("firebase-functions/v2/https");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
+const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago");
@@ -15,11 +16,8 @@ const storage = admin.storage();
 // Define os secrets que as funções irão usar.
 const secrets = ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET", "GEMINI_API_KEY", "GOOGLE_CLIENT_ID"];
 
-// --- Scheduled Function for Automatic Store Status ---
-exports.updateStoreStatusBySchedule = onSchedule({
-  schedule: "every 5 minutes",
-  timeZone: "America/Sao_Paulo",
-}, async (event) => {
+// --- Reusable function to check and set store status based on schedule ---
+const runStoreStatusCheck = async () => {
   logger.info("Executando verificação de horário da loja...");
 
   const settingsRef = db.doc("store_config/site_settings");
@@ -34,13 +32,31 @@ exports.updateStoreStatusBySchedule = onSchedule({
 
     const settings = settingsDoc.data();
     if (!settings.automaticSchedulingEnabled || !settings.operatingHours) {
-      logger.info("Agendamento automático desativado. Nenhuma ação tomada.");
+      logger.info("Agendamento automático desativado. Nenhuma ação tomada pela verificação.");
       return;
     }
 
     const now = new Date();
-    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ...
-    const currentTime = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Sao_Paulo",
+      weekday: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+
+    const parts = formatter.formatToParts(now);
+    const getPart = (type) => parts.find((p) => p.type === type)?.value;
+
+    let hour = getPart("hour");
+    if (hour === "24") {
+      hour = "00";
+    }
+    const currentTime = `${hour}:${getPart("minute")}`;
+
+    const dayName = getPart("weekday");
+    const dayOfWeekMap = {Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6};
+    const dayOfWeek = dayOfWeekMap[dayName];
 
     const todaySchedule = settings.operatingHours.find((d) => d.dayOfWeek === dayOfWeek);
 
@@ -58,12 +74,37 @@ exports.updateStoreStatusBySchedule = onSchedule({
       await statusRef.set({isOpen: shouldBeOpen});
       logger.info(`Status da loja atualizado para: ${shouldBeOpen ? "ABERTA" : "FECHADA"}`);
     } else {
-      logger.info("Status da loja já está correto. Nenhuma atualização necessária.");
+      logger.info(`Status da loja já está correto. Nenhuma atualização necessária. Atualmente: ${currentStatus ? "ABERTA" : "FECHADA"}`);
     }
   } catch (error) {
-    logger.error("Erro ao atualizar status da loja por agendamento:", error);
+    logger.error("Erro ao executar a verificação de status da loja:", error);
+  }
+};
+
+
+// --- Scheduled Function for Automatic Store Status ---
+exports.updateStoreStatusBySchedule = onSchedule({
+  schedule: "every 5 minutes",
+  timeZone: "America/Sao_Paulo",
+}, async (event) => {
+  await runStoreStatusCheck();
+});
+
+// --- Firestore Trigger to run status check when automatic scheduling is enabled ---
+exports.onSettingsChange = onDocumentUpdated("store_config/site_settings", async (event) => {
+  const beforeData = event.data.before.data();
+  const afterData = event.data.after.data();
+
+  const wasEnabled = beforeData.automaticSchedulingEnabled === true;
+  const isEnabled = afterData.automaticSchedulingEnabled === true;
+
+  // Trigger the check only when the feature is toggled from OFF to ON.
+  if (!wasEnabled && isEnabled) {
+    logger.info("Agendamento automático foi ativado. Acionando verificação de status imediata.");
+    await runStoreStatusCheck();
   }
 });
+
 
 // --- Chatbot Santo ---
 let ai; // Mantém a instância da IA no escopo global para ser reutilizada após a primeira chamada.
@@ -212,7 +253,7 @@ Diacríticos do português: á → %C3%A1, à → %C3%A0, â → %C3%A2, ã → 
 
 Não adicione parâmetros extras; use apenas ?text= e coloque toda a mensagem codificada após text=.​
 
-Nunca faça double-encoding; se já estiver codificada, não reencode.​
+Nunca faça double-encoding; se já estiver codificado, não reencode.​
 
 Algoritmo determinístico.​
 
