@@ -234,6 +234,12 @@ const App: React.FC = () => {
     ]);
     const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
     
+    const handleTrackOrderFromConfirmation = (orderId: string) => {
+        setConfirmedOrderData(null);
+        setConfirmedReservationData(null);
+        setTrackingOrderId(orderId);
+    };
+
     // FIX: Replaced direct state for the tracking order object with a memoized selector.
     // This ensures that when the main `orders` array updates from Firestore, the `trackingOrder`
     // variable is automatically recalculated, providing the live data to the OrderDetailsModal.
@@ -438,12 +444,6 @@ const App: React.FC = () => {
             setIsUserAreaModalOpen(true);
         }
     }, [postRegisterAction, currentUser]);
-
-    const handleTrackOrder = useCallback((orderId: string) => {
-        setConfirmedOrderData(null);
-        setConfirmedReservationData(null);
-        setTrackingOrderId(orderId);
-    }, []);
 
 
     // Other existing handlers...
@@ -1176,8 +1176,8 @@ const App: React.FC = () => {
             />
             <PixPaymentModal key={pixRetryKey} order={payingOrder} onClose={handleClosePixModal} onPaymentSuccess={handlePixPaymentSuccess} isProcessing={isProcessingOrder}/>
             <PaymentFailureModal isOpen={showPaymentFailureModal} onClose={() => { setShowPaymentFailureModal(false); setPayingOrder(null); }} onTryAgain={handleTryAgainPix} onPayLater={handlePayLaterFromFailure}/>
-            <OrderConfirmationModal order={confirmedOrderData} onClose={() => setConfirmedOrderData(null)} onSendWhatsApp={handleSendOrderToWhatsApp} onTrackOrder={handleTrackOrder}/>
-            <ReservationConfirmationModal reservation={confirmedReservationData} onClose={() => setConfirmedReservationData(null)} onSendWhatsApp={handleSendReservationToWhatsApp} onTrackReservation={handleTrackOrder} />
+            <OrderConfirmationModal order={confirmedOrderData} onClose={() => setConfirmedOrderData(null)} onSendWhatsApp={handleSendOrderToWhatsApp} onTrackOrder={handleTrackOrderFromConfirmation} />
+            <ReservationConfirmationModal reservation={confirmedReservationData} onClose={() => setConfirmedReservationData(null)} onSendWhatsApp={handleSendReservationToWhatsApp} onTrackOrder={handleTrackOrderFromConfirmation} />
             <Chatbot isOpen={isChatbotOpen} onClose={() => setIsChatbotOpen(false)} messages={chatMessages} onSendMessage={handleSendMessageToBot} isSending={isBotReplying}/>
             <OrderDetailsModal order={trackingOrder} onClose={() => setTrackingOrderId(null)} title={orderDetailsModalTitle} />
             

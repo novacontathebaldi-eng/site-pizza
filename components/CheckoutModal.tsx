@@ -27,7 +27,7 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
                     </h2>
                     <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
                 </div>
-                <div className="p-6 text-center space-y-4">
+                <div className="p-6 text-center space-y-5">
                     <p className="text-gray-600 text-base">
                         Seu pedido já foi registrado em nosso sistema!
                     </p>
@@ -43,19 +43,20 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
                     <p className="text-gray-600 text-sm px-2">
                         Já estamos preparando tudo! Se precisar, você pode nos contatar pelo WhatsApp sobre este pedido.
                     </p>
-
-                    <button
-                        onClick={() => onSendWhatsApp(order)}
-                        className="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-green-600 transition-all flex items-center justify-center min-h-[52px]"
-                    >
-                        <i className="fab fa-whatsapp mr-2"></i> Enviar WhatsApp
-                    </button>
-                    <button
-                        onClick={() => onTrackOrder(order.id)}
-                        className="w-full bg-slate-700 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-slate-800 transition-all flex items-center justify-center min-h-[52px]"
-                    >
-                        <i className="fas fa-receipt mr-2"></i> Acompanhar pedido
-                    </button>
+                    <div className="space-y-3">
+                        <button
+                            onClick={() => onSendWhatsApp(order)}
+                            className="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-green-600 transition-all flex items-center justify-center min-h-[52px]"
+                        >
+                            <i className="fab fa-whatsapp mr-2"></i> Enviar WhatsApp
+                        </button>
+                        <button
+                            onClick={() => onTrackOrder(order.id)}
+                            className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all flex items-center justify-center min-h-[52px]"
+                        >
+                            <i className="fas fa-receipt mr-2"></i> Acompanhar pedido
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -68,7 +69,7 @@ interface ReservationConfirmationModalProps {
     reservation: Order | null;
     onClose: () => void;
     onSendWhatsApp: (reservation: Order) => void;
-    onTrackReservation: (reservationId: string) => void;
+    onTrackOrder: (orderId: string) => void;
 }
 
 const formatDateForDisplay = (dateString?: string): string => {
@@ -84,7 +85,7 @@ const formatDateForDisplay = (dateString?: string): string => {
     }).format(date);
 };
 
-export const ReservationConfirmationModal: React.FC<ReservationConfirmationModalProps> = ({ reservation, onClose, onSendWhatsApp, onTrackReservation }) => {
+export const ReservationConfirmationModal: React.FC<ReservationConfirmationModalProps> = ({ reservation, onClose, onSendWhatsApp, onTrackOrder }) => {
     if (!reservation) return null;
 
     return (
@@ -97,7 +98,7 @@ export const ReservationConfirmationModal: React.FC<ReservationConfirmationModal
                     </h2>
                     <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
                 </div>
-                <div className="p-6 text-center space-y-4">
+                <div className="p-6 text-center space-y-5">
                     <p className="text-gray-600 text-base">
                         Sua solicitação de reserva foi enviada! Em breve, nossa equipe entrará em contato pelo WhatsApp informado para confirmar todos os detalhes.
                     </p>
@@ -119,19 +120,20 @@ export const ReservationConfirmationModal: React.FC<ReservationConfirmationModal
                     <p className="text-gray-600 text-sm px-2">
                         Agradecemos a sua preferência! Se precisar, você pode nos contatar pelo WhatsApp sobre esta reserva.
                     </p>
-
-                    <button
-                        onClick={() => onSendWhatsApp(reservation)}
-                        className="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-green-600 transition-all flex items-center justify-center min-h-[52px]"
-                    >
-                        <i className="fab fa-whatsapp mr-2"></i> Enviar WhatsApp
-                    </button>
-                     <button
-                        onClick={() => onTrackReservation(reservation.id)}
-                        className="w-full bg-slate-700 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-slate-800 transition-all flex items-center justify-center min-h-[52px]"
-                    >
-                        <i className="fas fa-calendar-alt mr-2"></i> Acompanhar reserva
-                    </button>
+                    <div className="space-y-3">
+                        <button
+                            onClick={() => onSendWhatsApp(reservation)}
+                            className="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-green-600 transition-all flex items-center justify-center min-h-[52px]"
+                        >
+                            <i className="fab fa-whatsapp mr-2"></i> Enviar WhatsApp
+                        </button>
+                        <button
+                            onClick={() => onTrackOrder(reservation.id)}
+                            className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all flex items-center justify-center min-h-[52px]"
+                        >
+                            <i className="fas fa-calendar-alt mr-2"></i> Acompanhar reserva
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
