@@ -1045,6 +1045,17 @@ const App: React.FC = () => {
         return statusIconMap[order.status] || <i className="fas fa-receipt" />;
     };
 
+    // This effect provides a definitive fix for the page automatically scrolling
+    // down after the menu content loads.
+    useEffect(() => {
+        // When isLoading becomes false, it means the main data has loaded.
+        if (!isLoading) {
+            // Force the scroll position to the top of the page.
+            // Using 'instant' behavior ensures there's no visible scroll animation.
+            window.scrollTo({ top: 0, behavior: 'instant' });
+        }
+    }, [isLoading]);
+
     return (
         <div className="flex flex-col min-h-screen">
             <Header 
@@ -1055,7 +1066,6 @@ const App: React.FC = () => {
                 settings={siteSettings} 
                 user={currentUser}
                 onUserIconClick={handleUserIconClick}
-                isAuthLoading={isAuthLoading}
             />
             
             <div id="status-banner" className={`sticky top-20 z-40 bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>

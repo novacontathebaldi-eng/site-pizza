@@ -11,10 +11,9 @@ interface HeaderProps {
     settings: SiteSettings;
     user: firebase.User | null;
     onUserIconClick: () => void;
-    isAuthLoading: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOpenChatbot, activeSection, settings, user, onUserIconClick, isAuthLoading }) => {
+export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOpenChatbot, activeSection, settings, user, onUserIconClick }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
 
@@ -66,15 +65,8 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOp
                     </nav>
 
                     <div className="flex items-center gap-2 sm:gap-3">
-                        <button 
-                            onClick={onUserIconClick} 
-                            className="relative w-12 h-12 flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors disabled:opacity-50 disabled:cursor-wait" 
-                            aria-label="Minha Conta"
-                            disabled={isAuthLoading}
-                        >
-                            {isAuthLoading ? (
-                                <i className="fas fa-spinner fa-spin text-2xl"></i>
-                            ) : user ? (
+                        <button onClick={onUserIconClick} className="relative w-12 h-12 flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors" aria-label="Minha Conta">
+                            {user ? (
                                 <img src={user.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-full h-full rounded-lg object-cover" />
                             ) : (
                                 <i className="fas fa-user-circle text-2xl"></i>
