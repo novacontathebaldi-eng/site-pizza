@@ -1055,7 +1055,6 @@ const App: React.FC = () => {
                 settings={siteSettings} 
                 user={currentUser}
                 onUserIconClick={handleUserIconClick}
-                isAuthLoading={isAuthLoading}
             />
             
             <div id="status-banner" className={`sticky top-20 z-40 bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
@@ -1201,8 +1200,24 @@ const App: React.FC = () => {
             />
             <PixPaymentModal key={pixRetryKey} order={payingOrder} onClose={handleClosePixModal} onPaymentSuccess={handlePixPaymentSuccess} isProcessing={isProcessingOrder}/>
             <PaymentFailureModal isOpen={showPaymentFailureModal} onClose={() => { setShowPaymentFailureModal(false); setPayingOrder(null); }} onTryAgain={handleTryAgainPix} onPayLater={handlePayLaterFromFailure}/>
-            <OrderConfirmationModal order={confirmedOrderData} onClose={() => setConfirmedOrderData(null)} onSendWhatsApp={handleSendOrderToWhatsApp}/>
-            <ReservationConfirmationModal reservation={confirmedReservationData} onClose={() => setConfirmedReservationData(null)} onSendWhatsApp={handleSendReservationToWhatsApp}/>
+            <OrderConfirmationModal
+                order={confirmedOrderData}
+                onClose={() => setConfirmedOrderData(null)}
+                onSendWhatsApp={handleSendOrderToWhatsApp}
+                onTrackOrder={(orderId) => {
+                    setConfirmedOrderData(null);
+                    setTrackingOrderId(orderId);
+                }}
+            />
+            <ReservationConfirmationModal
+                reservation={confirmedReservationData}
+                onClose={() => setConfirmedReservationData(null)}
+                onSendWhatsApp={handleSendReservationToWhatsApp}
+                onTrackOrder={(orderId) => {
+                    setConfirmedReservationData(null);
+                    setTrackingOrderId(orderId);
+                }}
+            />
             <Chatbot isOpen={isChatbotOpen} onClose={() => setIsChatbotOpen(false)} messages={chatMessages} onSendMessage={handleSendMessageToBot} isSending={isBotReplying}/>
             <OrderDetailsModal order={trackingOrder} onClose={() => setTrackingOrderId(null)} title={orderDetailsModalTitle} />
             
