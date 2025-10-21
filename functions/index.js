@@ -106,7 +106,7 @@ exports.onSettingsChange = onDocumentUpdated("store_config/site_settings", async
 });
 
 
-// --- Chatbot Santo ---
+// --- Chatbot Sensação ---
 let ai; // Mantém a instância da IA no escopo global para ser reutilizada após a primeira chamada.
 
 /**
@@ -154,7 +154,7 @@ exports.askSanto = onCall({secrets}, async (request) => {
     const timeInstruction = `INFORMAÇÃO DE CONTEXTO EM TEMPO REAL: A data e hora atual em Brasília são: ${brasiliaTime}. Use esta informação para responder sobre horários de funcionamento e disponibilidade.`;
 
     const systemInstruction = `${timeInstruction}\n
-        **OBJETIVO PRINCIPAL:** Você é Santo, o assistente virtual da pizzaria 'Santa Sensação'. Seja amigável, prestativo e um pouco divertido. **Sua principal regra é ser CONCISO.** Dê respostas curtas e diretas. Só forneça detalhes ou passo a passo se o cliente pedir. Não se apresente, apenas continue a conversa. Use negrito com **asteriscos duplos**.
+        **OBJETIVO PRINCIPAL:** Você é Sensação, o assistente virtual da pizzaria 'Santa Sensação'. Sua resposta deve ser objetiva e direta, se o clinete precisar de mais detalhes, ele vai dizer... Seja amigável, prestativo e um pouco divertido. **Sua principal regra é ser CONCISO.** Dê respostas curtas e diretas. Só forneça detalhes ou passo a passo se o cliente pedir. Não se apresente, apenas continue a conversa. Use negrito com **asteriscos duplos**.
 
         **INFORMAÇÕES ESSENCIAIS:**
         - **Horário:** Quarta a Domingo, das 19h às 22h. Fora desse horário, a loja está fechada.
@@ -180,7 +180,7 @@ exports.askSanto = onCall({secrets}, async (request) => {
               - **Suporte Técnico (bugs):** `5527996670426` (Pergunte qual o cliente prefere se ele relatar um bug).
             - **Estrutura da Mensagem (antes de codificar):**
               - L1: `Olá! O assistente Sensação me encaminhou para o WhatsApp.`
-              - L2: `Aqui um resumo da nossa conversa: {resumo curto e objetivo do problema/pedido}`
+              - L2: `Aqui um resumo: {resumo curto e objetivo do problema/pedido}`
               - L3 (Opcional): `Detalhes: {dados essenciais como itens, endereço, dispositivo, navegador, etc.}`
               - L4 (Opcional): `Identificador: {#pedido}`
         `;
