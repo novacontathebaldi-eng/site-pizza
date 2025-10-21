@@ -1055,6 +1055,7 @@ const App: React.FC = () => {
                 settings={siteSettings} 
                 user={currentUser}
                 onUserIconClick={handleUserIconClick}
+                isAuthLoading={isAuthLoading}
             />
             
             <div id="status-banner" className={`sticky top-20 z-40 bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
