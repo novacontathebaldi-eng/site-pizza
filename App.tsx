@@ -517,8 +517,17 @@ const App: React.FC = () => {
         const unsubOrders = db.collection('orders').orderBy('createdAt', 'desc').onSnapshot(snapshot => setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order))), err => handleConnectionError(err, "orders"));
         return () => { unsubSettings(); unsubStatus(); unsubCategories(); unsubProducts(); unsubOrders(); };
     }, []);
+    
+    useEffect(() => {
+        if (categories.length > 0 && !activeMenuCategory) {
+            const firstActiveCategory = categories.find(c => c.active);
+            if (firstActiveCategory) {
+                // We are not setting the active category automatically anymore to prevent scrolling.
+                // setActiveMenuCategory(firstActiveCategory.id);
+            }
+        }
+    }, [categories]);
 
-    useEffect(() => { if (categories.length > 0 && !activeMenuCategory) { const firstActiveCategory = categories.find(c => c.active); if (firstActiveCategory) setActiveMenuCategory(firstActiveCategory.id); } }, [categories, activeMenuCategory]);
     useEffect(() => { localStorage.setItem('santaSensacaoCart', JSON.stringify(cart)); }, [cart]);
 
 
