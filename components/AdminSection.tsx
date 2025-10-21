@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus } from '../types';
+// FIX: The 'Partial' type is a built-in TypeScript utility and does not need to be imported.
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, DaySchedule } from '../types';
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
 import { SiteCustomizationTab } from './SiteCustomizationTab';
@@ -30,13 +32,19 @@ interface AdminSectionProps {
     onReorderCategories: (categoriesToUpdate: { id: string; order: number }[]) => Promise<void>;
     onSeedDatabase: () => Promise<void>;
     onSaveSiteSettings: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
+    onUpdateSiteSettingsField: (updates: Partial<SiteSettings>) => Promise<void>;
     onUpdateOrderStatus: (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => Promise<void>;
     onUpdateOrderPaymentStatus: (orderId: string, paymentStatus: PaymentStatus) => Promise<void>;
     onUpdateOrderReservationTime: (orderId: string, reservationTime: string) => Promise<void>;
     onDeleteOrder: (orderId: string) => Promise<void>;
     onPermanentDeleteOrder: (orderId: string) => Promise<void>;
+    onPermanentDeleteMultipleOrders: (orderIds: string[]) => Promise<void>;
     onRefundOrder: (orderId: string) => Promise<void>;
     refundingOrderId: string | null;
+    onBulkDeleteProducts: (productIds: string[]) => Promise<void>;
+    onRestoreProduct: (productId: string) => Promise<void>;
+    onPermanentDeleteProduct: (productId: string) => Promise<void>;
+    onBulkPermanentDeleteProducts: (productIds: string[]) => Promise<void>;
 }
 
 interface SortableProductItemProps {
@@ -46,9 +54,12 @@ interface SortableProductItemProps {
     onDelete: (productId: string) => void;
     onStatusChange: (productId: string, active: boolean) => void;
     onStockStatusChange: (productId: string, stockStatus: 'available' | 'out_of_stock') => void;
+    isDeleteMode: boolean;
+    isSelected: boolean;
+    onSelect: (productId: string) => void;
 }
 
-const SortableProductItem: React.FC<SortableProductItemProps> = ({ product, isCategoryActive, onEdit, onDelete, onStatusChange, onStockStatusChange }) => {
+const SortableProductItem: React.FC<SortableProductItemProps> = ({ product, isCategoryActive, onEdit, onDelete, onStatusChange, onStockStatusChange, isDeleteMode, isSelected, onSelect }) => {
     const {
         attributes,
         listeners,
@@ -56,7 +67,7 @@ const SortableProductItem: React.FC<SortableProductItemProps> = ({ product, isCa
         transform,
         transition,
         isDragging,
-    } = useSortable({ id: product.id });
+    } = useSortable({ id: product.id, disabled: isDeleteMode });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -71,27 +82,39 @@ const SortableProductItem: React.FC<SortableProductItemProps> = ({ product, isCa
     return (
         <div ref={setNodeRef} style={style} className={`bg-gray-50 p-3 rounded-lg flex justify-between items-center transition-opacity ${itemOpacityClass}`}>
             <div className="flex items-center gap-4">
-                <button {...attributes} {...listeners} className="cursor-grab touch-none p-2" aria-label="Mover produto">
-                    <i className="fas fa-grip-vertical text-gray-500 hover:text-gray-800"></i>
-                </button>
+                {isDeleteMode ? (
+                     <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => onSelect(product.id)}
+                        className="h-5 w-5 rounded border-gray-400 text-accent focus:ring-accent cursor-pointer"
+                        aria-label={`Selecionar ${product.name}`}
+                    />
+                ) : (
+                    <button {...attributes} {...listeners} className="cursor-grab touch-none p-2" aria-label="Mover produto">
+                        <i className="fas fa-grip-vertical text-gray-500 hover:text-gray-800"></i>
+                    </button>
+                )}
                 <p className={`font-bold ${!isAvailable ? 'line-through text-gray-400' : ''}`}>{product.name}</p>
             </div>
-            <div className="flex items-center gap-2 sm:gap-4">
-                <button 
-                    onClick={() => onStockStatusChange(product.id, isAvailable ? 'out_of_stock' : 'available')} 
-                    className={`text-white w-8 h-8 rounded-md flex items-center justify-center transition-colors ${isAvailable ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'}`}
-                    aria-label={isAvailable ? 'Marcar como esgotado' : 'Marcar como disponível'}
-                    title={isAvailable ? 'Disponível (clique para esgotar)' : 'Esgotado (clique para disponibilizar)'}
-                >
-                    <i className={`fas ${isAvailable ? 'fa-box-open' : 'fa-box'}`}></i>
-                </button>
-                <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" checked={product.active} onChange={e => onStatusChange(product.id, e.target.checked)} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                </label>
-                <button onClick={() => onEdit(product)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${product.name}`}><i className="fas fa-edit"></i></button>
-                <button onClick={() => window.confirm('Tem certeza que deseja excluir este produto?') && onDelete(product.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${product.name}`}><i className="fas fa-trash"></i></button>
-            </div>
+            {!isDeleteMode && (
+                <div className="flex items-center gap-2 sm:gap-4">
+                    <button 
+                        onClick={() => onStockStatusChange(product.id, isAvailable ? 'out_of_stock' : 'available')} 
+                        className={`text-white w-8 h-8 rounded-md flex items-center justify-center transition-colors ${isAvailable ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500'}`}
+                        aria-label={isAvailable ? 'Marcar como esgotado' : 'Marcar como disponível'}
+                        title={isAvailable ? 'Disponível (clique para esgotar)' : 'Esgotado (clique para disponibilizar)'}
+                    >
+                        <i className={`fas ${isAvailable ? 'fa-box-open' : 'fa-box'}`}></i>
+                    </button>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" checked={product.active} onChange={e => onStatusChange(product.id, e.target.checked)} className="sr-only peer" />
+                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                    </label>
+                    <button onClick={() => onEdit(product)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${product.name}`}><i className="fas fa-edit"></i></button>
+                    <button onClick={() => window.confirm('Tem certeza que deseja mover este produto para a lixeira?') && onDelete(product.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${product.name}`}><i className="fas fa-trash"></i></button>
+                </div>
+            )}
         </div>
     );
 };
@@ -101,9 +124,10 @@ interface SortableCategoryItemProps {
     onEdit: (category: Category) => void;
     onDelete: (categoryId: string) => void;
     onStatusChange: (categoryId: string, active: boolean) => void;
+    isCategoryDisabled: boolean;
 }
 
-const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, onEdit, onDelete, onStatusChange }) => {
+const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, onEdit, onDelete, onStatusChange, isCategoryDisabled }) => {
     const {
         attributes,
         listeners,
@@ -120,8 +144,17 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
         boxShadow: isDragging ? '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' : 'none',
     };
 
+    const handleToggleClick = (e: React.MouseEvent) => {
+        if (isCategoryDisabled) {
+            e.preventDefault();
+            alert("Esta categoria não pode ser ativada pois não contém produtos ou todos os seus produtos estão inativos.");
+        }
+    };
+    
+    const isEffectivelyActive = !isCategoryDisabled && category.active;
+
     return (
-        <div ref={setNodeRef} style={style} className={`bg-gray-50 p-3 rounded-lg flex justify-between items-center transition-opacity ${!category.active ? 'opacity-50' : ''}`}>
+        <div ref={setNodeRef} style={style} className={`bg-gray-50 p-3 rounded-lg flex justify-between items-center transition-opacity ${!isEffectivelyActive ? 'opacity-50' : ''}`}>
             <div className="flex items-center gap-4">
                 <button {...attributes} {...listeners} className="cursor-grab touch-none p-2" aria-label="Mover categoria">
                     <i className="fas fa-grip-vertical text-gray-500 hover:text-gray-800"></i>
@@ -129,9 +162,19 @@ const SortableCategoryItem: React.FC<SortableCategoryItemProps> = ({ category, o
                 <p className="font-bold">{category.name}</p>
             </div>
             <div className="flex items-center gap-4">
-                 <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" checked={category.active} onChange={e => onStatusChange(category.id, e.target.checked)} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                 <label 
+                    onClick={handleToggleClick}
+                    className={`relative inline-flex items-center ${isCategoryDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    title={isCategoryDisabled ? "Adicione ou ative um produto nesta categoria para poder ativá-la." : (category.active ? 'Desativar categoria' : 'Ativar categoria')}
+                >
+                    <input 
+                        type="checkbox" 
+                        checked={isEffectivelyActive} 
+                        onChange={e => onStatusChange(category.id, e.target.checked)} 
+                        className="sr-only peer"
+                        disabled={isCategoryDisabled}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600 peer-disabled:bg-gray-300"></div>
                 </label>
                 <button onClick={() => onEdit(category)} className="bg-blue-500 text-white w-8 h-8 rounded-md hover:bg-blue-600" aria-label={`Editar ${category.name}`}><i className="fas fa-edit"></i></button>
                 <button onClick={() => window.confirm(`Tem certeza que deseja excluir a categoria "${category.name}"?`) && onDelete(category.id)} className="bg-red-500 text-white w-8 h-8 rounded-md hover:bg-red-600" aria-label={`Deletar ${category.name}`}><i className="fas fa-trash"></i></button>
@@ -149,8 +192,9 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         allProducts, allCategories, isStoreOnline, siteSettings, orders,
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
-        onSeedDatabase, onSaveSiteSettings, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
-        onDeleteOrder, onPermanentDeleteOrder, onRefundOrder, refundingOrderId
+        onSeedDatabase, onSaveSiteSettings, onUpdateSiteSettingsField, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
+        onDeleteOrder, onPermanentDeleteOrder, onPermanentDeleteMultipleOrders, onRefundOrder, refundingOrderId,
+        onBulkDeleteProducts, onRestoreProduct, onPermanentDeleteProduct, onBulkPermanentDeleteProducts
     } = props;
     
     const [user, setUser] = useState<firebase.User | null>(null);
@@ -178,6 +222,20 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const [showFilters, setShowFilters] = useState(false);
     const [activeOrdersTab, setActiveOrdersTab] = useState<OrderTabKey>('accepted');
     const [isTrashVisible, setIsTrashVisible] = useState(false);
+    const [selectedOrderIds, setSelectedOrderIds] = useState(new Set<string>());
+
+    // State for product management
+    const [isProductDeleteMode, setIsProductDeleteMode] = useState(false);
+    const [selectedProductIds, setSelectedProductIds] = useState(new Set<string>());
+    const [isProductTrashVisible, setIsProductTrashVisible] = useState(false);
+
+
+    // State for Status Tab
+    const [localSettings, setLocalSettings] = useState<SiteSettings>(siteSettings);
+    const [hasSettingsChanged, setHasSettingsChanged] = useState(false);
+    const [isSavingStatus, setIsSavingStatus] = useState(false);
+    const [isSavingAutoSchedule, setIsSavingAutoSchedule] = useState(false);
+
 
     // State for sound notification
     const [isSoundEnabled, setIsSoundEnabled] = useState(() => {
@@ -186,6 +244,20 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     });
     const prevPendingOrdersCount = useRef(0);
     const audioRef = useRef<HTMLAudioElement>(null);
+
+    // Sync Status tab settings with props, but don't overwrite local changes
+    useEffect(() => {
+        // This effect runs when siteSettings prop changes from Firestore listener
+        // We want to update our local state with the new values, but without
+        // destroying unsaved changes in operatingHours.
+        setLocalSettings(currentLocalSettings => ({
+            ...currentLocalSettings, // Keep current local values (like dirty operatingHours)
+            ...siteSettings, // Overwrite with fresh data from Firestore
+            operatingHours: hasSettingsChanged // If operatingHours are dirty...
+                ? currentLocalSettings.operatingHours // ...keep the dirty version
+                : siteSettings.operatingHours, // ...otherwise, take the fresh version.
+        }));
+    }, [siteSettings]);
 
 
     useEffect(() => setLocalProducts(allProducts), [allProducts]);
@@ -206,6 +278,16 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         window.addEventListener('hashchange', handleHashChange, false);
         return () => window.removeEventListener('hashchange', handleHashChange, false);
     }, []);
+    
+    // Clear selection when leaving trash view
+    useEffect(() => {
+        if (!isTrashVisible) {
+            setSelectedOrderIds(new Set());
+        }
+        if (!isProductTrashVisible) {
+            setSelectedProductIds(new Set());
+        }
+    }, [isTrashVisible, isProductTrashVisible]);
 
     // Scroll main admin tabs into view
     useEffect(() => {
@@ -283,20 +365,24 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
         const sortedProducts = [...localProducts].sort((a, b) => a.orderIndex - b.orderIndex);
-        const oldIndex = sortedProducts.findIndex(p => p.id === active.id);
-        const newIndex = sortedProducts.findIndex(p => p.id === over.id);
+        // FIX: Explicitly typed the 'p' parameter in findIndex callbacks to 'Product' to resolve an 'unknown' type error.
+        const oldIndex = sortedProducts.findIndex((p: Product) => p.id === active.id);
+        const newIndex = sortedProducts.findIndex((p: Product) => p.id === over.id);
         if (oldIndex === -1 || newIndex === -1) return;
         const reordered = arrayMove(sortedProducts, oldIndex, newIndex);
-        onReorderProducts(reordered.map((p, index) => ({ id: p.id, orderIndex: index })));
+        // FIX: Explicitly typed 'p' as Product to resolve the 'unknown' type error during mapping.
+        onReorderProducts(reordered.map((p: Product, index) => ({ id: p.id, orderIndex: index })));
     };
 
     const handleCategoryDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
-        const oldIndex = localCategories.findIndex(c => c.id === active.id);
-        const newIndex = localCategories.findIndex(c => c.id === over.id);
+        // FIX: Explicitly typed the 'c' parameter in findIndex callbacks to 'Category' to resolve an 'unknown' type error.
+        const oldIndex = localCategories.findIndex((c: Category) => c.id === active.id);
+        const newIndex = localCategories.findIndex((c: Category) => c.id === over.id);
         const reordered = arrayMove(localCategories, oldIndex, newIndex);
-        onReorderCategories(reordered.map((c, index) => ({ id: c.id, order: index })));
+        // FIX: Explicitly typed 'c' as Category to resolve the 'unknown' type error during mapping.
+        onReorderCategories(reordered.map((c: Category, index) => ({ id: c.id, order: index })));
     };
     
     const handleLogin = async (e: React.FormEvent) => {
@@ -390,6 +476,33 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         }
     }, [filteredOrders, activeOrdersTab]);
     
+     // --- Handlers for Bulk Selection in Trash ---
+    const handleSelectOrder = (orderId: string) => {
+        setSelectedOrderIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(orderId)) {
+                newSet.delete(orderId);
+            } else {
+                newSet.add(orderId);
+            }
+            return newSet;
+        });
+    };
+
+    const handleSelectAll = () => {
+        if (selectedOrderIds.size === deletedOrders.length) {
+            setSelectedOrderIds(new Set());
+        } else {
+            setSelectedOrderIds(new Set(deletedOrders.map(o => o.id)));
+        }
+    };
+
+    const handleDeleteSelected = async () => {
+        if (selectedOrderIds.size === 0) return;
+        await onPermanentDeleteMultipleOrders(Array.from(selectedOrderIds));
+        setSelectedOrderIds(new Set());
+    };
+
     const scrollToContent = (elementId: string) => {
         const element = document.getElementById(elementId);
         if (!element) return;
@@ -426,6 +539,113 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const handleOrderSubTabClick = (tabKey: OrderTabKey) => {
         setActiveOrdersTab(tabKey);
         setTimeout(() => scrollToContent('order-list-container'), 50);
+    };
+
+    // --- Handlers for Status Tab ---
+    const handleAutomaticSchedulingChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const isEnabled = e.target.checked;
+        setIsSavingAutoSchedule(true);
+        try {
+            await onUpdateSiteSettingsField({ automaticSchedulingEnabled: isEnabled });
+        } catch (error) {
+            // Error toast is shown by the parent App component.
+        } finally {
+            setIsSavingAutoSchedule(false);
+        }
+    };
+
+    const handleOperatingHoursChange = (dayOfWeek: number, field: keyof DaySchedule, value: any) => {
+        const newHours = (localSettings.operatingHours || []).map(schedule => {
+            if (schedule.dayOfWeek === dayOfWeek) {
+                const updatedSchedule = { ...schedule };
+                (updatedSchedule as any)[field] = value;
+                return updatedSchedule;
+            }
+            return schedule;
+        });
+
+        setLocalSettings(prev => ({
+            ...prev,
+            operatingHours: newHours,
+        }));
+        setHasSettingsChanged(true);
+    };
+
+    const handleSaveStatusSettings = async () => {
+        setIsSavingStatus(true);
+        try {
+            // Merge the latest siteSettings (which has the correct auto-schedule value)
+            // with the local changes (which has the correct operating hours).
+            const settingsToSave = {
+                ...siteSettings, // Start with the most up-to-date settings from props
+                operatingHours: localSettings.operatingHours, // Overwrite with only the locally managed field
+            };
+            await onSaveSiteSettings(settingsToSave, {});
+            setHasSettingsChanged(false);
+        } catch (e) {
+            console.error("Failed to save status settings", e);
+        } finally {
+            setIsSavingStatus(false);
+        }
+    };
+    
+    // --- Product Deletion Mode Handlers ---
+    const activeProducts = useMemo(() => localProducts.filter(p => !p.deleted), [localProducts]);
+    const deletedProducts = useMemo(() => localProducts.filter(p => p.deleted), [localProducts]);
+    
+    const handleSelectProduct = (productId: string) => {
+        setSelectedProductIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(productId)) newSet.delete(productId);
+            else newSet.add(productId);
+            return newSet;
+        });
+    };
+
+    const handleSelectAllProductsInCategory = (categoryId: string, isSelecting: boolean) => {
+        const productIdsInCategory = activeProducts.filter(p => p.categoryId === categoryId).map(p => p.id);
+        setSelectedProductIds(prev => {
+            const newSet = new Set(prev);
+            if (isSelecting) {
+                productIdsInCategory.forEach(id => newSet.add(id));
+            } else {
+                productIdsInCategory.forEach(id => newSet.delete(id));
+            }
+            return newSet;
+        });
+    };
+
+    const handleSelectAllActiveProducts = () => {
+        if (selectedProductIds.size === activeProducts.length) {
+            setSelectedProductIds(new Set());
+        } else {
+            setSelectedProductIds(new Set(activeProducts.map(p => p.id)));
+        }
+    };
+
+    const handleDeleteSelectedProducts = async () => {
+        if (selectedProductIds.size === 0) return;
+        if (window.confirm(`Tem certeza que deseja mover ${selectedProductIds.size} produto(s) para a lixeira?`)) {
+            await onBulkDeleteProducts(Array.from(selectedProductIds));
+            setSelectedProductIds(new Set());
+            setIsProductDeleteMode(false);
+        }
+    };
+    
+    const handleSelectAllDeletedProducts = () => {
+        if(selectedProductIds.size === deletedProducts.length) {
+            setSelectedProductIds(new Set());
+        } else {
+            setSelectedProductIds(new Set(deletedProducts.map(p => p.id)));
+        }
+    };
+    
+    const handlePermanentDeleteSelectedProducts = async () => {
+        if (selectedProductIds.size === 0) return;
+        if (window.confirm(`Apagar PERMANENTEMENTE ${selectedProductIds.size} produto(s)? Esta ação não pode ser desfeita.`)) {
+            await onBulkPermanentDeleteProducts(Array.from(selectedProductIds));
+            setSelectedProductIds(new Set());
+        }
     };
 
 
@@ -474,7 +694,103 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                             </div>
                         </div>
 
-                        <div id="admin-content-status"> {activeTab === 'status' && ( <div> <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3> <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg"> <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer"> <input type="checkbox" id="store-status-toggle" className="sr-only peer" checked={isStoreOnline} onChange={e => onStoreStatusChange(e.target.checked)} /> <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600"></div> </label> <span className={`font-semibold text-lg ${isStoreOnline ? 'text-green-600' : 'text-red-600'}`}>{isStoreOnline ? 'Aberta' : 'Fechada'}</span> </div> </div> )} </div>
+                        <div id="admin-content-status">
+                            {activeTab === 'status' && (
+                                <div>
+                                    <h3 className="text-xl font-bold mb-4">Status da Pizzaria</h3>
+                                    <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-lg border">
+                                        <label htmlFor="store-status-toggle" className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                id="store-status-toggle"
+                                                className="sr-only peer"
+                                                checked={isStoreOnline}
+                                                onChange={e => onStoreStatusChange(e.target.checked)}
+                                                disabled={siteSettings.automaticSchedulingEnabled}
+                                            />
+                                            <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600 peer-disabled:bg-gray-300 peer-disabled:cursor-not-allowed"></div>
+                                        </label>
+                                        <div>
+                                            <span className={`font-semibold text-lg ${siteSettings.automaticSchedulingEnabled ? 'text-gray-500' : (isStoreOnline ? 'text-green-600' : 'text-red-600')}`}>
+                                                {isStoreOnline ? 'Aberta' : 'Fechada'}
+                                            </span>
+                                            {siteSettings.automaticSchedulingEnabled && <span className="text-sm text-gray-500 ml-2">(Gerenciado automaticamente)</span>}
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
+                                        <div className="flex items-center gap-4">
+                                            <label htmlFor="automatic-scheduling-toggle" className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    id="automatic-scheduling-toggle"
+                                                    className="sr-only peer"
+                                                    checked={siteSettings.automaticSchedulingEnabled ?? false}
+                                                    onChange={handleAutomaticSchedulingChange}
+                                                    disabled={isSavingAutoSchedule}
+                                                />
+                                                <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 peer-checked:bg-green-600 peer-disabled:opacity-50 peer-disabled:cursor-wait"></div>
+                                            </label>
+                                            <span className="font-semibold text-gray-800">Gerir horário automaticamente.</span>
+                                            {isSavingAutoSchedule && <i className="fas fa-spinner fa-spin text-accent ml-2"></i>}
+                                        </div>
+                                        <p className="text-sm text-gray-500 mt-2 pl-14">Quando ativado, o status da loja mudará para "Aberta" ou "Fechada" conforme o horário de funcionamento definido abaixo, mesmo com o painel fechado.</p>
+                                    </div>
+
+                                    <div className="mt-8">
+                                        <h3 className="text-xl font-bold mb-4">Editar Horário de Funcionamento</h3>
+                                        <div className="space-y-3 bg-white p-4 rounded-lg border">
+                                            {(localSettings.operatingHours || []).map((schedule) => (
+                                                <div key={schedule.dayOfWeek} className="grid grid-cols-1 md:grid-cols-[120px_1fr_2fr] items-center gap-4 p-3 rounded-md border bg-gray-50/50">
+                                                    <div className="font-semibold">{schedule.dayName}</div>
+                                                    <div className="flex items-center gap-3">
+                                                        <label className="relative inline-flex items-center cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="sr-only peer"
+                                                                checked={schedule.isOpen}
+                                                                onChange={e => handleOperatingHoursChange(schedule.dayOfWeek, 'isOpen', e.target.checked)}
+                                                            />
+                                                            <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                                                        </label>
+                                                        <span className={`font-medium ${schedule.isOpen ? 'text-green-600' : 'text-gray-500'}`}>{schedule.isOpen ? 'Aberto' : 'Fechado'}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="time"
+                                                            value={schedule.openTime}
+                                                            onChange={e => handleOperatingHoursChange(schedule.dayOfWeek, 'openTime', e.target.value)}
+                                                            disabled={!schedule.isOpen}
+                                                            className="w-full px-2 py-1 border rounded-md bg-white disabled:bg-gray-200 disabled:cursor-not-allowed"
+                                                        />
+                                                        <span>às</span>
+                                                        <input
+                                                            type="time"
+                                                            value={schedule.closeTime}
+                                                            onChange={e => handleOperatingHoursChange(schedule.dayOfWeek, 'closeTime', e.target.value)}
+                                                            disabled={!schedule.isOpen}
+                                                            className="w-full px-2 py-1 border rounded-md bg-white disabled:bg-gray-200 disabled:cursor-not-allowed"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {hasSettingsChanged && (
+                                        <div className="mt-6 pt-6 border-t flex justify-end">
+                                            <button
+                                                onClick={handleSaveStatusSettings}
+                                                disabled={isSavingStatus}
+                                                className="bg-accent text-white font-semibold py-2 px-6 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[200px] disabled:bg-opacity-70"
+                                            >
+                                                {isSavingStatus ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-2"></i> Salvar Alterações</>}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                         
                         <div id="admin-content-orders"> {activeTab === 'orders' && (
                              <div>
@@ -544,7 +860,44 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
                                     <div id="order-list-container" className="mt-4 space-y-4">
                                         {isTrashVisible ? (
-                                            deletedOrders.length > 0 ? deletedOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} onRefund={onRefundOrder} isRefunding={refundingOrderId === order.id} />) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>
+                                            <>
+                                                {deletedOrders.length > 0 && (
+                                                    <div className="bg-gray-100 p-2 rounded-lg mb-4 flex items-center gap-4 border sticky top-[12.5rem] z-20">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="h-5 w-5 rounded border-gray-400 text-accent focus:ring-accent cursor-pointer"
+                                                            checked={selectedOrderIds.size > 0 && selectedOrderIds.size === deletedOrders.length}
+                                                            onChange={handleSelectAll}
+                                                            aria-label="Selecionar todos os pedidos na lixeira"
+                                                        />
+                                                        <span className="font-semibold text-sm text-gray-700">{selectedOrderIds.size} selecionado(s)</span>
+                                                        <button
+                                                            onClick={handleDeleteSelected}
+                                                            disabled={selectedOrderIds.size === 0}
+                                                            className="ml-auto bg-red-500 text-white font-semibold py-1 px-3 rounded-md text-sm hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                                        >
+                                                            <i className="fas fa-trash-alt mr-2"></i>
+                                                            Apagar Selecionados
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                {deletedOrders.length > 0 ? deletedOrders.map(order => 
+                                                    <OrderCard 
+                                                        key={order.id} 
+                                                        order={order} 
+                                                        onUpdateStatus={onUpdateOrderStatus} 
+                                                        onUpdatePaymentStatus={onUpdateOrderPaymentStatus} 
+                                                        onUpdateReservationTime={onUpdateOrderReservationTime} 
+                                                        onDelete={onDeleteOrder} 
+                                                        onPermanentDelete={onPermanentDeleteOrder} 
+                                                        onRefund={onRefundOrder} 
+                                                        isRefunding={refundingOrderId === order.id}
+                                                        isSelectable={true}
+                                                        isSelected={selectedOrderIds.has(order.id)}
+                                                        onSelect={handleSelectOrder}
+                                                    />
+                                                ) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>}
+                                            </>
                                         ) : (
                                             tabOrders.length > 0 ? tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} onRefund={onRefundOrder} isRefunding={refundingOrderId === order.id} />) : <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>
                                         )}
@@ -561,8 +914,128 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                         )} </div>
                         
                         <div id="admin-content-customization"> {activeTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> )} </div>
-                        <div id="admin-content-products"> {activeTab === 'products' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Produtos</h3> <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Produto</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}> <div className="space-y-6"> {localCategories.map(category => { const categoryProducts = localProducts.filter(p => p.categoryId === category.id).sort((a, b) => a.orderIndex - b.orderIndex); return ( <div key={category.id}> <h4 className={`text-lg font-semibold mb-2 text-brand-olive-600 pb-1 border-b-2 border-brand-green-300 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4> <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3 min-h-[50px]"> {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} />)} </div> </SortableContext> </div> ) })} </div> </DndContext> </div> )} </div>
-                        <div id="admin-content-categories"> {activeTab === 'categories' && ( <div> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold">Gerenciar Categorias</h3> <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Nova Categoria</button> </div> <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}> <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}> <div className="space-y-3"> {localCategories.map(cat => <SortableCategoryItem key={cat.id} category={cat} onEdit={handleEditCategory} onDelete={onDeleteCategory} onStatusChange={onCategoryStatusChange} />)} </div> </SortableContext> </DndContext> </div> )} </div>
+                        <div id="admin-content-products">
+                            {activeTab === 'products' && (
+                                isProductTrashVisible ? (
+                                    <div>
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="text-xl font-bold">Lixeira de Produtos</h3>
+                                            <button onClick={() => { setIsProductTrashVisible(false); setSelectedProductIds(new Set()); }} className="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">
+                                                <i className="fas fa-arrow-left mr-2"></i>Voltar aos Produtos
+                                            </button>
+                                        </div>
+                                        {deletedProducts.length > 0 ? (
+                                             <div className="space-y-3">
+                                                <div className="bg-gray-100 p-2 rounded-lg mb-4 flex items-center gap-4 border sticky top-20 z-20">
+                                                    <input type="checkbox" onChange={handleSelectAllDeletedProducts} checked={selectedProductIds.size > 0 && selectedProductIds.size === deletedProducts.length} className="h-5 w-5 rounded border-gray-400 text-accent focus:ring-accent cursor-pointer" />
+                                                    <span className="font-semibold text-sm text-gray-700">{selectedProductIds.size} selecionado(s)</span>
+                                                    <button onClick={handlePermanentDeleteSelectedProducts} disabled={selectedProductIds.size === 0} className="ml-auto bg-red-500 text-white font-semibold py-1 px-3 rounded-md text-sm hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed">
+                                                        <i className="fas fa-trash-alt mr-2"></i>Apagar Selecionados
+                                                    </button>
+                                                </div>
+                                                {deletedProducts.map(product => (
+                                                    <div key={product.id} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
+                                                        <div className="flex items-center gap-4">
+                                                            <input type="checkbox" checked={selectedProductIds.has(product.id)} onChange={() => handleSelectProduct(product.id)} className="h-5 w-5 rounded border-gray-400 text-accent focus:ring-accent cursor-pointer" />
+                                                            <p className="font-bold text-gray-500 line-through">{product.name}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <button onClick={() => onRestoreProduct(product.id)} className="bg-blue-500 text-white font-semibold py-1 px-3 rounded-md text-sm hover:bg-blue-600"><i className="fas fa-undo mr-2"></i>Restaurar</button>
+                                                            <button onClick={() => onPermanentDeleteProduct(product.id)} className="bg-red-500 text-white font-semibold py-1 px-3 rounded-md text-sm hover:bg-red-600"><i className="fas fa-trash-alt mr-2"></i>Apagar Perm.</button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                             </div>
+                                        ) : (
+                                            <div className="text-center py-12"><p className="text-gray-500">Lixeira de produtos vazia.</p></div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div> 
+                                        <div className="flex justify-between items-center mb-4"> 
+                                            <h3 className="text-xl font-bold">Gerenciar Produtos</h3> 
+                                            {!isProductDeleteMode && <button onClick={handleAddNewProduct} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-plus mr-2"></i>Novo Produto</button>}
+                                        </div>
+                                        {isProductDeleteMode && (
+                                            <div className="bg-blue-50 p-2 rounded-lg mb-4 flex items-center gap-4 border border-blue-200 sticky top-20 z-20">
+                                                <input type="checkbox" onChange={handleSelectAllActiveProducts} checked={selectedProductIds.size > 0 && selectedProductIds.size === activeProducts.length} className="h-5 w-5 rounded border-gray-400 text-accent focus:ring-accent cursor-pointer" />
+                                                <span className="font-semibold text-sm text-blue-800">{selectedProductIds.size} selecionado(s)</span>
+                                                <button onClick={handleDeleteSelectedProducts} disabled={selectedProductIds.size === 0} className="ml-auto bg-red-500 text-white font-semibold py-1 px-3 rounded-md text-sm hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed">
+                                                    <i className="fas fa-trash-alt mr-2"></i>Mover para Lixeira
+                                                </button>
+                                                <button onClick={() => { setIsProductDeleteMode(false); setSelectedProductIds(new Set()); }} className="bg-gray-200 text-gray-800 font-semibold py-1 px-3 rounded-md text-sm hover:bg-gray-300">Cancelar</button>
+                                            </div>
+                                        )}
+                                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}> 
+                                            <div className="space-y-6"> 
+                                                {localCategories.map(category => { 
+                                                    const categoryProducts = activeProducts.filter(p => p.categoryId === category.id).sort((a, b) => a.orderIndex - b.orderIndex); 
+                                                    const areAllInCategorySelected = categoryProducts.length > 0 && categoryProducts.every(p => selectedProductIds.has(p.id));
+                                                    return ( 
+                                                        <div key={category.id}> 
+                                                            <div className="flex items-center gap-3 mb-2 pb-1 border-b-2 border-brand-green-300">
+                                                                {isProductDeleteMode && categoryProducts.length > 0 && (
+                                                                    // FIX: Corrected function call from handleSelectAllInCategory to handleSelectAllProductsInCategory
+                                                                    <input type="checkbox" checked={areAllInCategorySelected} onChange={e => handleSelectAllProductsInCategory(category.id, e.target.checked)} className="h-5 w-5 rounded border-gray-400 text-accent focus:ring-accent cursor-pointer" />
+                                                                )}
+                                                                <h4 className={`text-lg font-semibold text-brand-olive-600 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4>
+                                                            </div>
+                                                            {/* FIX: Removed the wrapper div from inside SortableContext.
+                                                            The component expects an array of sortable elements as direct children, and the extra div caused a 'children' prop type error. */}
+                                                            <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> 
+                                                                {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} isDeleteMode={isProductDeleteMode} isSelected={selectedProductIds.has(product.id)} onSelect={handleSelectProduct} />)} 
+                                                            </SortableContext> 
+                                                        </div> 
+                                                    ) 
+                                                })} 
+                                            </div> 
+                                        </DndContext>
+                                        <div className="mt-6 pt-6 border-t flex justify-end items-center gap-4">
+                                            <button onClick={() => setIsProductTrashVisible(true)} className="font-semibold text-gray-600 hover:text-gray-900 text-sm py-2 px-4 rounded-lg hover:bg-gray-100">
+                                                <i className="fas fa-trash-alt mr-2"></i>Ver Lixeira
+                                            </button>
+                                            {!isProductDeleteMode && (
+                                                <button onClick={() => setIsProductDeleteMode(true)} className="w-10 h-10 bg-red-50 text-red-600 rounded-full flex items-center justify-center hover:bg-red-100" title="Excluir múltiplos produtos">
+                                                    <i className="fas fa-trash"></i>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            )}
+                        </div>
+                        <div id="admin-content-categories">
+                            {activeTab === 'categories' && (
+                                <div>
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-xl font-bold">Gerenciar Categorias</h3>
+                                        <button onClick={handleAddNewCategory} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
+                                            <i className="fas fa-plus mr-2"></i>Nova Categoria
+                                        </button>
+                                    </div>
+                                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
+                                        {/* FIX: Removed the wrapper div from inside SortableContext.
+                                        The component expects an array of sortable elements as direct children, and the extra div caused a 'children' prop type error. */}
+                                        <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                                            {localCategories.map(cat => {
+                                                const productsInCategory = allProducts.filter(p => p.categoryId === cat.id && !p.deleted);
+                                                const isCategoryDisabled = productsInCategory.length === 0 || productsInCategory.every(p => !p.active);
+                                                return (
+                                                    <SortableCategoryItem
+                                                        key={cat.id}
+                                                        category={cat}
+                                                        onEdit={handleEditCategory}
+                                                        onDelete={onDeleteCategory}
+                                                        onStatusChange={onCategoryStatusChange}
+                                                        isCategoryDisabled={isCategoryDisabled}
+                                                    />
+                                                );
+                                            })}
+                                        </SortableContext>
+                                    </DndContext>
+                                </div>
+                            )}
+                        </div>
                         <div id="admin-content-data"> {activeTab === 'data' && ( <div> <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus dados.</p> <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados iniciais. Use apenas uma vez.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> )} </div>
                     </div>
                 </div>

@@ -92,7 +92,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
     return (
         <div 
             aria-hidden={!isOpen}
-            className={`fixed bottom-4 right-4 left-4 sm:left-auto sm:w-full sm:max-w-sm top-[25vh] sm:top-auto sm:h-[70vh] max-h-[600px] bg-white rounded-2xl shadow-2xl z-50 flex flex-col transform transition-all duration-300 ease-in-out ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-16 opacity-0 pointer-events-none'}`}
+            className={`fixed bottom-4 right-4 left-4 sm:left-auto sm:w-full sm:max-w-sm h-[70vh] max-h-[600px] bg-white rounded-2xl shadow-2xl z-50 flex flex-col transform transition-all duration-300 ease-in-out ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-16 opacity-0 pointer-events-none'}`}
         >
             <header className="flex justify-between items-center p-4 bg-brand-green-700 text-text-on-dark rounded-t-2xl flex-shrink-0">
                 <h2 className="text-lg font-bold flex items-center gap-2">

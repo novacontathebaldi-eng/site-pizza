@@ -1,5 +1,8 @@
 import firebase from 'firebase/compat/app';
 
+// FIX: The type `Partial` is a built-in TypeScript utility type and does not need to be imported or exported.
+// The incorrect export from 'react' has been removed.
+
 export interface Address {
     id: string;
     label: string; // 'Casa', 'Trabalho', etc.
@@ -24,6 +27,7 @@ export interface UserProfile {
     phone?: string;
     cpf?: string;
     addresses?: Address[];
+    allergies?: string;
 }
 
 export interface Product {
@@ -37,6 +41,9 @@ export interface Product {
     active: boolean;
     orderIndex: number;
     stockStatus?: 'available' | 'out_of_stock';
+    deleted?: boolean;
+    isPromotion?: boolean;
+    promotionalPrice?: number;
 }
 
 export interface Category {
@@ -136,6 +143,13 @@ export interface Order {
     };
 }
 
+export interface DaySchedule {
+    dayOfWeek: number; // 0 = Sunday, 6 = Saturday
+    dayName: string;
+    isOpen: boolean;
+    openTime: string; // HH:mm
+    closeTime: string; // HH:mm
+}
 
 export interface ContentSectionListItem {
     id: string;
@@ -172,6 +186,8 @@ export interface SiteSettings {
     heroBgUrl: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
+    automaticSchedulingEnabled?: boolean;
+    operatingHours?: DaySchedule[];
 }
 
 export interface ChatMessage {
