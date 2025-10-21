@@ -271,6 +271,14 @@ const App: React.FC = () => {
             });
         }
     }, []);
+
+    useEffect(() => {
+        // Prevent the browser from automatically restoring scroll position on page load.
+        // This fixes the issue of the page scrolling down to the menu automatically.
+        if ('scrollRestoration' in window.history) {
+            window.history.scrollRestoration = 'manual';
+        }
+    }, []);
     
     // Logic to determine if any modal is visible
     const isModalVisible = useMemo(() => {
