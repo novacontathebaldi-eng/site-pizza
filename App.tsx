@@ -207,14 +207,11 @@ const App: React.FC = () => {
     // Auth State
     const [currentUser, setCurrentUser] = useState<firebase.User | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-    const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
     const [isUserAreaModalOpen, setIsUserAreaModalOpen] = useState<boolean>(false);
     const [isGapiReady, setIsGapiReady] = useState(false);
     const [postRegisterAction, setPostRegisterAction] = useState<string | null>(null);
     const prevUser = useRef<firebase.User | null>(null);
-    // FIX: Added state to handle the password reset code from URL parameters.
-    const [passwordResetCode, setPasswordResetCode] = useState<string | null>(null);
 
 
     // Order/Payment Flow State
@@ -333,24 +330,6 @@ const App: React.FC = () => {
         }
     }, []);
 
-    // FIX: Added an effect to parse URL parameters for Firebase email action links (e.g., password reset).
-    // This allows the app to open the LoginModal in the correct state when a user clicks a password reset link.
-    useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const mode = urlParams.get('mode');
-        const oobCode = urlParams.get('oobCode');
-
-        if (mode === 'resetPassword' && oobCode) {
-            setPasswordResetCode(oobCode);
-            setIsLoginModalOpen(true);
-            // Clean up the URL to remove the query parameters
-            const url = new URL(window.location.href);
-            url.searchParams.delete('mode');
-            url.searchParams.delete('oobCode');
-            window.history.replaceState({}, document.title, url.toString());
-        }
-    }, []);
-
     const handleAcceptCookies = () => {
         localStorage.setItem('santaSensacaoCookieConsent', 'true');
         setShowCookieBanner(false);
@@ -394,10 +373,7 @@ const App: React.FC = () => {
 
     // Effect for Firebase Auth state changes
     useEffect(() => {
-        if (!auth) {
-            setIsAuthLoading(false);
-            return;
-        }
+        if (!auth) return;
         const unsubscribe = auth.onAuthStateChanged(async (user) => {
             setCurrentUser(user);
             if (user) {
@@ -410,7 +386,6 @@ const App: React.FC = () => {
                 setName('');
                 setPhone('');
             }
-            setIsAuthLoading(false);
         });
         return () => unsubscribe();
     }, []);
@@ -463,6 +438,12 @@ const App: React.FC = () => {
             setIsUserAreaModalOpen(true);
         }
     }, [postRegisterAction, currentUser]);
+
+    const handleTrackOrder = useCallback((orderId: string) => {
+        setConfirmedOrderData(null);
+        setConfirmedReservationData(null);
+        setTrackingOrderId(orderId);
+    }, []);
 
 
     // Other existing handlers...
@@ -667,19 +648,14 @@ const App: React.FC = () => {
         const total = subtotal + (details.deliveryFee || 0);
         try {
             const { orderId, orderNumber, pixData } = await firebaseService.createOrder(details, cart, total, pixOption);
-    
+
             if (!currentUser) {
                 const guestOrders = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
                 guestOrders.push(orderId);
                 localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
             }
-    
+
             if (!pixData || !pixData.qrCodeBase64) throw new Error("A resposta do servidor não incluiu os dados do PIX.");
-            
-            // Limpa o carrinho e fecha a sidebar antes de mostrar o modal do PIX
-            setCart([]);
-            setIsCartOpen(false);
-    
             const newOrder: Order = {
                 id: orderId, orderNumber: orderNumber,
                 customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.address, cpf: details.cpf },
@@ -1055,7 +1031,6 @@ const App: React.FC = () => {
                 settings={siteSettings} 
                 user={currentUser}
                 onUserIconClick={handleUserIconClick}
-                isAuthLoading={isAuthLoading}
             />
             
             <div id="status-banner" className={`sticky top-20 z-40 bg-red-600 text-white text-center p-2 font-semibold ${isStoreOnline ? 'hidden' : ''}`}>
@@ -1201,23 +1176,19 @@ const App: React.FC = () => {
             />
             <PixPaymentModal key={pixRetryKey} order={payingOrder} onClose={handleClosePixModal} onPaymentSuccess={handlePixPaymentSuccess} isProcessing={isProcessingOrder}/>
             <PaymentFailureModal isOpen={showPaymentFailureModal} onClose={() => { setShowPaymentFailureModal(false); setPayingOrder(null); }} onTryAgain={handleTryAgainPix} onPayLater={handlePayLaterFromFailure}/>
-            <OrderConfirmationModal order={confirmedOrderData} onClose={() => setConfirmedOrderData(null)} onSendWhatsApp={handleSendOrderToWhatsApp}/>
-            <ReservationConfirmationModal reservation={confirmedReservationData} onClose={() => setConfirmedReservationData(null)} onSendWhatsApp={handleSendReservationToWhatsApp}/>
+            <OrderConfirmationModal order={confirmedOrderData} onClose={() => setConfirmedOrderData(null)} onSendWhatsApp={handleSendOrderToWhatsApp} onTrackOrder={handleTrackOrder}/>
+            <ReservationConfirmationModal reservation={confirmedReservationData} onClose={() => setConfirmedReservationData(null)} onSendWhatsApp={handleSendReservationToWhatsApp} onTrackReservation={handleTrackOrder} />
             <Chatbot isOpen={isChatbotOpen} onClose={() => setIsChatbotOpen(false)} messages={chatMessages} onSendMessage={handleSendMessageToBot} isSending={isBotReplying}/>
             <OrderDetailsModal order={trackingOrder} onClose={() => setTrackingOrderId(null)} title={orderDetailsModalTitle} />
             
             <LoginModal 
                 isOpen={isLoginModalOpen} 
-                onClose={() => {
-                    setIsLoginModalOpen(false);
-                    setPasswordResetCode(null);
-                }} 
+                onClose={() => setIsLoginModalOpen(false)} 
                 onGoogleSignIn={handleGoogleSignIn} 
                 addToast={addToast} 
                 onRegisterSuccess={handleRegisterSuccess}
                 onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
                 onOpenTermsOfService={() => setIsTermsModalOpen(true)}
-                passwordResetCode={passwordResetCode}
             />
             <UserAreaModal 
                 isOpen={isUserAreaModalOpen} 
