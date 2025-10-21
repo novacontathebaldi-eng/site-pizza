@@ -29,7 +29,7 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
                 </div>
                 <div className="p-6 text-center space-y-4">
                     <p className="text-gray-600 text-base">
-                        Seu pedido já foi registrado em nosso sistema!
+                        Seu pedido já foi registrado em nosso sistema! Você pode acompanhar o status do pedido clicando no botão abaixo.
                     </p>
                     
                     <div className="text-left bg-gray-50 p-4 rounded-lg border text-gray-800 space-y-2 text-sm">
@@ -41,7 +41,7 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
                     </div>
 
                     <p className="text-gray-600 text-sm px-2">
-                        Já estamos preparando tudo! Se precisar, você pode nos contatar pelo WhatsApp sobre este pedido.
+                        Já estamos preparando tudo! Se precisar, você pode nos contatar pelo WhatsApp.
                     </p>
 
                     <button
@@ -54,7 +54,7 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
                         onClick={() => onTrackOrder(order.id)}
                         className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all flex items-center justify-center min-h-[52px]"
                     >
-                        <i className="fas fa-eye mr-2"></i> Acompanhar pedido
+                        <i className="fas fa-clock mr-2"></i> Acompanhar pedido
                     </button>
                 </div>
             </div>
@@ -99,7 +99,7 @@ export const ReservationConfirmationModal: React.FC<ReservationConfirmationModal
                 </div>
                 <div className="p-6 text-center space-y-4">
                     <p className="text-gray-600 text-base">
-                        Sua solicitação de reserva foi enviada! Em breve, nossa equipe entrará em contato pelo WhatsApp informado para confirmar todos os detalhes.
+                        Sua solicitação de reserva foi enviada! Porém ainda não foi confirmada. Em breve, nossa equipe entrará em contato pelo WhatsApp informado para confirmar todos os detalhes.
                     </p>
                     
                     <div className="text-left bg-gray-50 p-4 rounded-lg border text-gray-800 space-y-2 text-sm">
@@ -117,7 +117,7 @@ export const ReservationConfirmationModal: React.FC<ReservationConfirmationModal
                     </div>
 
                     <p className="text-gray-600 text-sm px-2">
-                        Agradecemos a sua preferência! Se precisar, você pode nos contatar pelo WhatsApp sobre esta reserva.
+                        Agradecemos a sua preferência! Se precisar, você pode nos contatar pelo WhatsApp.
                     </p>
 
                     <button
@@ -130,7 +130,7 @@ export const ReservationConfirmationModal: React.FC<ReservationConfirmationModal
                         onClick={() => onTrackOrder(reservation.id)}
                         className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all flex items-center justify-center min-h-[52px]"
                     >
-                        <i className="fas fa-eye mr-2"></i> Acompanhar reserva
+                        <i className="fas fa-calendar-alt mr-2"></i> Acompanhar reserva
                     </button>
                 </div>
             </div>
