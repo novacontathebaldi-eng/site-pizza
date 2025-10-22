@@ -1,11 +1,9 @@
 /* eslint-disable max-len */
-const {onCall, onRequest} = require("firebase-functions/v2/https");
+const {onCall, onRequest, HttpsError} = require("firebase-functions/v2/https");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
-const {MercadoPagoConfig, Payment, PaymentRefund} = require("mercadopago");
-const crypto = require("crypto");
 const {GoogleGenAI} = require("@google/genai");
 const {OAuth2Client} = require("google-auth-library");
 
@@ -14,7 +12,7 @@ const db = admin.firestore();
 const storage = admin.storage();
 
 // Define os secrets que as funções irão usar.
-const secrets = ["MERCADO_PAGO_ACCESS_TOKEN", "MERCADO_PAGO_WEBHOOK_SECRET", "GEMINI_API_KEY", "GOOGLE_CLIENT_ID"];
+const secrets = ["GEMINI_API_KEY", "GOOGLE_CLIENT_ID"];
 
 // --- Reusable function to check and set store status based on schedule ---
 const runStoreStatusCheck = async () => {
@@ -119,7 +117,7 @@ exports.askSanto = onCall({secrets}, async (request) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       logger.error("GEMINI_API_KEY not set. Cannot initialize Gemini AI.");
-      throw new Error("Internal server error: Assistant is not configured.");
+      throw new HttpsError("internal", "Internal server error: Assistant is not configured.");
     }
     ai = new GoogleGenAI({apiKey});
     logger.info("Gemini AI client initialized on first call.");
@@ -128,7 +126,7 @@ exports.askSanto = onCall({secrets}, async (request) => {
   // 1. Recebemos o histórico da conversa (que veio do frontend)
   const conversationHistory = request.data.history;
   if (!conversationHistory || conversationHistory.length === 0) {
-    throw new Error("No conversation history provided.");
+    throw new HttpsError("invalid-argument", "No conversation history provided.");
   }
 
   // 2. Formatamos o histórico para o formato que a API do Gemini espera.
@@ -197,7 +195,7 @@ exports.askSanto = onCall({secrets}, async (request) => {
     return {reply: response.text};
   } catch (error) {
     logger.error("Error calling Gemini API:", error);
-    throw new Error("Failed to get a response from the assistant.");
+    throw new HttpsError("internal", "Failed to get a response from the assistant.");
   }
 });
 
@@ -211,11 +209,11 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
 
   if (!idToken) {
-    throw new onCall.HttpsError("invalid-argument", "The function must be called with an idToken.");
+    throw new HttpsError("invalid-argument", "The function must be called with an idToken.");
   }
   if (!clientId) {
     logger.error("GOOGLE_CLIENT_ID not set.");
-    throw new onCall.HttpsError("internal", "Authentication is not configured correctly.");
+    throw new HttpsError("internal", "Authentication is not configured correctly.");
   }
 
   const client = new OAuth2Client(clientId);
@@ -228,7 +226,7 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
     const payload = ticket.getPayload();
 
     if (!payload) {
-      throw new onCall.HttpsError("unauthenticated", "Invalid ID token.");
+      throw new HttpsError("unauthenticated", "Invalid ID token.");
     }
 
     const {sub: googleUid, email, name, picture} = payload;
@@ -276,28 +274,21 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
     return {customToken};
   } catch (error) {
     logger.error("Error verifying Google token:", error);
-    throw new onCall.HttpsError("unauthenticated", "Token verification failed.", error.message);
+    throw new HttpsError("unauthenticated", "Token verification failed.", error.message);
   }
 });
 
 
 /**
- * Creates an order in Firestore and optionally initiates a PIX payment.
+ * Creates an order in Firestore.
  */
 exports.createOrder = onCall({secrets}, async (request) => {
-  const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
-  if (!accessToken) {
-    logger.error("MERCADO_PAGO_ACCESS_TOKEN não está configurado.");
-    throw new Error("Erro de configuração interna do servidor.");
-  }
-  const client = new MercadoPagoConfig({accessToken});
-
-  const {details, cart, total, pixOption} = request.data;
+  const {details, cart, total} = request.data;
   const userId = request.auth?.uid || null;
 
   // 1. Validate input
   if (!details || !cart || !total) {
-    throw new Error("Dados do pedido incompletos.");
+    throw new HttpsError("invalid-argument", "Dados do pedido incompletos.");
   }
 
   // 2. Generate a sequential order number atomically
@@ -316,14 +307,11 @@ exports.createOrder = onCall({secrets}, async (request) => {
     });
   } catch (error) {
     logger.error("Falha ao gerar o número do pedido:", error);
-    throw new Error("Não foi possível gerar o número do pedido.");
+    throw new HttpsError("internal", "Não foi possível gerar o número do pedido.");
   }
 
 
   // 3. Prepare order data for Firestore
-  const isPixPayNow = details.paymentMethod === "pix" && pixOption === "payNow";
-  const orderStatus = isPixPayNow ? "awaiting-payment" : "pending";
-
   const orderData = {
     userId, // Associate order with user if logged in
     orderNumber,
@@ -345,10 +333,9 @@ exports.createOrder = onCall({secrets}, async (request) => {
     changeNeeded: details.changeNeeded || false,
     changeAmount: details.changeAmount || "",
     notes: details.notes || "",
-    status: orderStatus,
+    status: "pending",
     paymentStatus: "pending",
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    mercadoPagoDetails: {}, // Initialize the object
   };
 
   // 4. Create the order document
@@ -356,77 +343,11 @@ exports.createOrder = onCall({secrets}, async (request) => {
   const orderId = orderRef.id;
   logger.info(`Pedido #${orderNumber} (ID: ${orderId}) criado no Firestore.`);
 
-  // 5. If it's a PIX payment, create it in Mercado Pago
-  if (isPixPayNow) {
-    if (!details.cpf) {
-      throw new Error("CPF é obrigatório para pagamento com PIX.");
-    }
-
-    // FIX: Use process.env.FUNCTION_REGION which is a standard populated env var for v2 functions.
-    const region = process.env.FUNCTION_REGION || "us-central1";
-    const notificationUrl = `https://${region}-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/mercadoPagoWebhook`;
-    logger.info(`Usando a URL de notificação: ${notificationUrl}`);
-
-    const paymentData = {
-      transaction_amount: total,
-      description: `Pedido #${orderNumber} - ${details.name}`,
-      payment_method_id: "pix",
-      payer: {
-        email: `cliente_${orderId}@santasensacao.me`, // MP requires an email
-        first_name: details.name.split(" ")[0],
-        last_name: details.name.split(" ").slice(1).join(" ") || "Cliente",
-        identification: {
-          type: "CPF",
-          number: details.cpf.replace(/\D/g, ""), // Ensure only digits are sent
-        },
-      },
-      notification_url: notificationUrl,
-      external_reference: orderId,
-    };
-
-    try {
-      const payment = new Payment(client);
-      const idempotencyKey = crypto.randomUUID();
-      const result = await payment.create({
-        body: paymentData,
-        requestOptions: {idempotencyKey},
-      });
-
-      const paymentId = result.id?.toString();
-      const qrCodeBase64 = result.point_of_interaction?.transaction_data?.qr_code_base64;
-      const copyPaste = result.point_of_interaction?.transaction_data?.qr_code;
-
-      if (!paymentId || !qrCodeBase64 || !copyPaste) {
-        throw new Error("Dados PIX não retornados pelo Mercado Pago.");
-      }
-
-      // Save payment details to our order
-      await orderRef.update({
-        "mercadoPagoDetails.paymentId": paymentId,
-        "mercadoPagoDetails.qrCodeBase64": qrCodeBase64,
-        "mercadoPagoDetails.qrCode": copyPaste,
-      });
-
-      logger.info(`Pagamento PIX criado para o pedido #${orderNumber}, ID MP: ${paymentId}`);
-
-      return {
-        orderId,
-        orderNumber,
-        pixData: {qrCodeBase64, copyPaste},
-      };
-    } catch (error) {
-      logger.error(`Erro ao criar pagamento MP para o pedido #${orderNumber}:`, error.cause || error);
-      throw new Error("Falha ao criar cobrança PIX.");
-    }
-  }
-
-  // 6. Return order info for non-PIX or "Pay Later" orders
+  // 5. Return order info
   return {orderId, orderNumber};
 });
 
-// FIX: Added the missing `createReservation` Cloud Function.
-// This function handles the creation of reservations, which are stored as a special type of order.
-// It generates an atomic order number and saves the reservation details to Firestore.
+
 /**
  * Creates a reservation (as an order) in Firestore.
  */
@@ -436,7 +357,7 @@ exports.createReservation = onCall({secrets}, async (request) => {
 
   // 1. Validate input
   if (!details || !details.name || !details.phone || !details.reservationDate || !details.reservationTime || !details.numberOfPeople) {
-    throw new Error("Dados da reserva incompletos.");
+    throw new HttpsError("invalid-argument", "Dados da reserva incompletos.");
   }
 
   // 2. Generate a sequential order number atomically
@@ -455,7 +376,7 @@ exports.createReservation = onCall({secrets}, async (request) => {
     });
   } catch (error) {
     logger.error("Falha ao gerar o número do pedido:", error);
-    throw new Error("Não foi possível gerar o número do pedido.");
+    throw new HttpsError("internal", "Não foi possível gerar o número do pedido.");
   }
 
   // 3. Prepare reservation data for Firestore (as an Order)
@@ -487,160 +408,12 @@ exports.createReservation = onCall({secrets}, async (request) => {
 
 
 /**
- * Webhook to receive payment status updates from Mercado Pago.
- */
-exports.mercadoPagoWebhook = onRequest({ secrets, invoker: "public" }, async (request, response) => {
-  const webhookSecret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
-  const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
-
-  if (!webhookSecret || !accessToken) {
-    logger.error("Secrets do Mercado Pago não estão configurados no ambiente da função.");
-    return response.status(500).send("Internal Server Error: Missing configuration.");
-  }
-  const client = new MercadoPagoConfig({accessToken});
-
-  if (request.method !== "POST") {
-    return response.status(405).send("Method Not Allowed");
-  }
-
-  try {
-    // 1. Validate Signature for security
-    const signature = request.headers["x-signature"];
-    const requestId = request.headers["x-request-id"];
-    const receivedTopic = request.body.type;
-
-    // The 'data.id' for signature validation comes from the query parameters
-    const paymentIdFromQuery = request.query["data.id"];
-
-    if (!signature || !requestId || !paymentIdFromQuery || receivedTopic !== "payment") {
-      logger.warn("Webhook ignorado: Faltando headers, data.id no query, ou tópico inválido.", {
-        headers: request.headers,
-        query: request.query,
-        body: request.body,
-      });
-      return response.status(200).send("OK"); // Respond OK to prevent retries
-    }
-
-    const [ts, hash] = signature.split(",").map((part) => part.split("=")[1]);
-
-    // The manifest MUST be built from query params as per Mercado Pago docs.
-    const manifest = `id:${paymentIdFromQuery};request-id:${requestId};ts:${ts};`;
-
-    const hmac = crypto.createHmac("sha256", webhookSecret);
-    hmac.update(manifest);
-    const expectedHash = hmac.digest("hex");
-
-    if (crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expectedHash)) === false) {
-      logger.error("Falha na validação da assinatura do Webhook.");
-      return response.status(401).send("Invalid Signature");
-    }
-
-    // 2. Process the payment update
-    const paymentId = request.body.data.id;
-    logger.info(`Webhook validado recebido para o pagamento: ${paymentId}`);
-
-    const payment = new Payment(client);
-    const paymentInfo = await payment.get({id: paymentId});
-
-    if (!paymentInfo || !paymentInfo.external_reference) {
-      throw new Error(`Pagamento ${paymentId} não encontrado ou sem external_reference.`);
-    }
-
-    const orderId = paymentInfo.external_reference;
-    const orderRef = db.collection("orders").doc(orderId);
-
-    // 3. Update Firestore based on payment status
-    const updateData = {
-      "mercadoPagoDetails.status": paymentInfo.status,
-      "mercadoPagoDetails.statusDetail": paymentInfo.status_detail,
-    };
-
-    if (paymentInfo.status === "approved") {
-      updateData.paymentStatus = "paid_online";
-      updateData.status = "pending"; // Move from 'awaiting-payment' to 'pending' for the kitchen
-      updateData["mercadoPagoDetails.transactionId"] = paymentInfo.transaction_details?.transaction_id || null;
-      await orderRef.update(updateData);
-      logger.info(`Pedido ${orderId} atualizado para PAGO via webhook.`);
-    } else if (["cancelled", "rejected"].includes(paymentInfo.status)) {
-      updateData.status = "cancelled";
-      await orderRef.update(updateData);
-      logger.info(`Pedido ${orderId} atualizado para CANCELADO/REJEITADO via webhook.`);
-    } else {
-      await orderRef.update(updateData);
-      logger.info(`Status do pedido ${orderId} atualizado para '${paymentInfo.status}'.`);
-    }
-
-    return response.status(200).send("OK");
-  } catch (error) {
-    logger.error("Erro ao processar webhook do Mercado Pago:", error);
-    return response.status(500).send("Internal Server Error");
-  }
-});
-
-/**
- * Processes a full refund for a given order.
- */
-exports.refundPayment = onCall({secrets}, async (request) => {
-  const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
-  if (!accessToken) {
-    logger.error("MERCADO_PAGO_ACCESS_TOKEN não está configurado.");
-    throw new Error("Erro de configuração interna do servidor.");
-  }
-  const client = new MercadoPagoConfig({accessToken});
-
-  const {orderId} = request.data;
-  if (!orderId) {
-    throw new Error("O ID do pedido é obrigatório para o estorno.");
-  }
-
-  try {
-    const orderDoc = await db.collection("orders").doc(orderId).get();
-    if (!orderDoc.exists) {
-      throw new Error("Pedido não encontrado.");
-    }
-
-    const orderData = orderDoc.data();
-    const paymentId = orderData.mercadoPagoDetails?.paymentId;
-
-    if (!paymentId) {
-      throw new Error("Este pedido não possui um ID de pagamento do Mercado Pago para estornar.");
-    }
-    if (orderData.paymentStatus === "refunded") {
-      throw new Error("Este pagamento já foi estornado.");
-    }
-
-    logger.info(`Iniciando estorno para o pedido ${orderId}, Pagamento MP: ${paymentId}`);
-
-    const refund = new PaymentRefund(client);
-    await refund.create({payment_id: paymentId});
-
-    // For confirmation, fetch the payment again from Mercado Pago
-    const payment = new Payment(client);
-    const updatedPaymentInfo = await payment.get({id: paymentId});
-
-    await db.collection("orders").doc(orderId).update({
-      paymentStatus: "refunded",
-      status: "cancelled",
-      "mercadoPagoDetails.status": updatedPaymentInfo.status,
-      "mercadoPagoDetails.refunds": updatedPaymentInfo.refunds || [],
-    });
-
-    logger.info(`Estorno concluído e pedido ${orderId} atualizado.`);
-    return {success: true, message: "Pagamento estornado com sucesso!"};
-  } catch (error) {
-    logger.error(`Falha ao estornar o pedido ${orderId}:`, error.cause || error);
-    const errorMessage = error.cause?.error?.message || error.cause?.message || "Erro ao processar o estorno.";
-    throw new Error(errorMessage);
-  }
-});
-
-/**
  * Manages user profile picture upload and removal securely.
  */
 exports.manageProfilePicture = onCall({secrets}, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) {
-    throw new onCall.HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
+    throw new HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
   }
 
   const {imageBase64} = request.data;
@@ -658,7 +431,7 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
       return {success: true, photoURL: null};
     } catch (error) {
       logger.error(`Falha ao remover a foto de perfil para ${uid}:`, error);
-      throw new onCall.HttpsError("internal", "Não foi possível remover a foto de perfil.");
+      throw new HttpsError("internal", "Não foi possível remover a foto de perfil.");
     }
   }
 
@@ -667,7 +440,7 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
     try {
       const matches = imageBase64.match(/^data:(image\/[a-z]+);base64,(.+)$/);
       if (!matches || matches.length !== 3) {
-        throw new onCall.HttpsError("invalid-argument", "Formato de imagem base64 inválido.");
+        throw new HttpsError("invalid-argument", "Formato de imagem base64 inválido.");
       }
       const mimeType = matches[1];
       const base64Data = matches[2];
@@ -692,9 +465,9 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
       return {success: true, photoURL};
     } catch (error) {
       logger.error(`Falha ao atualizar a foto de perfil para ${uid}:`, error);
-      throw new onCall.HttpsError("internal", "Não foi possível salvar a nova foto de perfil.");
+      throw new HttpsError("internal", "Não foi possível salvar a nova foto de perfil.");
     }
   }
 
-  throw new onCall.HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
+  throw new HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
 });
