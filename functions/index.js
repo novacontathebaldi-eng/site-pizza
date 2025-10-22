@@ -1,5 +1,8 @@
 /* eslint-disable max-len */
-const functions = require("firebase-functions");
+const {onSchedule} = require("firebase-functions/v2/scheduler");
+const {onDocumentUpdated, onDocumentWritten} = require("firebase-functions/v2/firestore");
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
+const functions = require("firebase-functions"); // Necessário para functions.config()
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const {GoogleGenAI} = require("@google/genai");
@@ -75,51 +78,55 @@ const runStoreStatusCheck = async () => {
 };
 
 
-// --- Scheduled Function for Automatic Store Status ---
-exports.updateStoreStatusBySchedule = functions.pubsub.schedule("every 5 minutes")
-    .timeZone("America/Sao_Paulo")
-    .onRun(async (context) => {
+// --- Scheduled Function for Automatic Store Status (v2) ---
+exports.updateStoreStatusBySchedule = onSchedule(
+    {
+      schedule: "every 5 minutes",
+      timeZone: "America/Sao_Paulo",
+      region: "southamerica-east1",
+    },
+    async (event) => {
       await runStoreStatusCheck();
-    });
+    },
+);
 
-// --- Firestore Trigger to run status check when automatic scheduling is enabled ---
-exports.onSettingsChange = functions.firestore.document("store_config/site_settings")
-    .onUpdate(async (change, context) => {
-      const beforeData = change.before.data();
-      const afterData = change.after.data();
+// --- Firestore Trigger to run status check when automatic scheduling is enabled (v2) ---
+exports.onSettingsChange = onDocumentUpdated(
+    {
+      document: "store_config/site_settings",
+      region: "southamerica-east1",
+    },
+    async (event) => {
+      const beforeData = event.data.before.data();
+      const afterData = event.data.after.data();
 
       const wasEnabled = beforeData.automaticSchedulingEnabled === true;
       const isEnabled = afterData.automaticSchedulingEnabled === true;
 
-      // Trigger the check only when the feature is toggled from OFF to ON.
       if (!wasEnabled && isEnabled) {
         logger.info("Agendamento automático foi ativado. Acionando verificação de status imediata.");
         await runStoreStatusCheck();
       }
-    });
+    },
+);
 
+// --- Chatbot Sensação (v2) ---
+let ai;
 
-// --- Chatbot Sensação ---
-let ai; // Mantém a instância da IA no escopo global para ser reutilizada após a primeira chamada.
-
-/**
- * Chatbot Cloud Function to interact with Gemini API.
- */
-exports.askSanto = functions.https.onCall(async (data, context) => {
-  // "Lazy Initialization": Inicializa a IA somente na primeira vez que a função é chamada.
+exports.askSanto = onCall({region: "southamerica-east1"}, async (request) => {
   if (!ai) {
     const apiKey = functions.config().gemini?.api_key || process.env.GEMINI_API_KEY;
     if (!apiKey) {
       logger.error("GEMINI_API_KEY not set. Cannot initialize Gemini AI.");
-      throw new functions.https.HttpsError("internal", "Internal server error: Assistant is not configured.");
+      throw new HttpsError("internal", "Internal server error: Assistant is not configured.");
     }
     ai = new GoogleGenAI({apiKey});
     logger.info("Gemini AI client initialized on first call.");
   }
 
-  const conversationHistory = data.history;
+  const conversationHistory = request.data.history;
   if (!conversationHistory || conversationHistory.length === 0) {
-    throw new functions.https.HttpsError("invalid-argument", "No conversation history provided.");
+    throw new HttpsError("invalid-argument", "No conversation history provided.");
   }
 
   const contents = conversationHistory.map((message) => ({
@@ -184,25 +191,21 @@ exports.askSanto = functions.https.onCall(async (data, context) => {
     return {reply: response.text};
   } catch (error) {
     logger.error("Error calling Gemini API:", error);
-    throw new functions.https.HttpsError("internal", "Failed to get a response from the assistant.");
+    throw new HttpsError("internal", "Failed to get a response from the assistant.");
   }
 });
 
-
-/**
- * Verifies a Google ID token, creates or updates a Firebase user,
- * and returns a custom token for session authentication.
- */
-exports.verifyGoogleToken = functions.https.onCall(async (data, context) => {
-  const {idToken} = data;
+// --- Callable Function (v2) ---
+exports.verifyGoogleToken = onCall({region: "southamerica-east1"}, async (request) => {
+  const {idToken} = request.data;
   const clientId = functions.config().google?.client_id || process.env.GOOGLE_CLIENT_ID;
 
   if (!idToken) {
-    throw new functions.https.HttpsError("invalid-argument", "The function must be called with an idToken.");
+    throw new HttpsError("invalid-argument", "The function must be called with an idToken.");
   }
   if (!clientId) {
     logger.error("GOOGLE_CLIENT_ID not set.");
-    throw new functions.https.HttpsError("internal", "Authentication is not configured correctly.");
+    throw new HttpsError("internal", "Authentication is not configured correctly.");
   }
 
   const client = new OAuth2Client(clientId);
@@ -215,7 +218,7 @@ exports.verifyGoogleToken = functions.https.onCall(async (data, context) => {
     const payload = ticket.getPayload();
 
     if (!payload) {
-      throw new functions.https.HttpsError("unauthenticated", "Invalid ID token.");
+      throw new HttpsError("unauthenticated", "Invalid ID token.");
     }
 
     const {sub: googleUid, email, name, picture} = payload;
@@ -258,20 +261,17 @@ exports.verifyGoogleToken = functions.https.onCall(async (data, context) => {
     return {customToken};
   } catch (error) {
     logger.error("Error verifying Google token:", error);
-    throw new functions.https.HttpsError("unauthenticated", "Token verification failed.", error.message);
+    throw new HttpsError("unauthenticated", "Token verification failed.", error.message);
   }
 });
 
-
-/**
- * Creates an order in Firestore.
- */
-exports.createOrder = functions.https.onCall(async (data, context) => {
-  const {details, cart, total} = data;
-  const userId = context.auth?.uid || null;
+// --- Callable Function (v2) ---
+exports.createOrder = onCall({region: "southamerica-east1"}, async (request) => {
+  const {details, cart, total} = request.data;
+  const userId = request.auth?.uid || null;
 
   if (!details || !cart || !total) {
-    throw new functions.https.HttpsError("invalid-argument", "Dados do pedido incompletos.");
+    throw new HttpsError("invalid-argument", "Dados do pedido incompletos.");
   }
 
   const counterRef = db.doc("_internal/counters");
@@ -289,7 +289,7 @@ exports.createOrder = functions.https.onCall(async (data, context) => {
     });
   } catch (error) {
     logger.error("Falha ao gerar o número do pedido:", error);
-    throw new functions.https.HttpsError("internal", "Não foi possível gerar o número do pedido.");
+    throw new HttpsError("internal", "Não foi possível gerar o número do pedido.");
   }
 
   const orderStatus = "pending";
@@ -326,15 +326,13 @@ exports.createOrder = functions.https.onCall(async (data, context) => {
   return {orderId, orderNumber};
 });
 
-/**
- * Creates a reservation (as an order) in Firestore.
- */
-exports.createReservation = functions.https.onCall(async (data, context) => {
-  const {details} = data;
-  const userId = context.auth?.uid || null;
+// --- Callable Function (v2) ---
+exports.createReservation = onCall({region: "southamerica-east1"}, async (request) => {
+  const {details} = request.data;
+  const userId = request.auth?.uid || null;
 
   if (!details || !details.name || !details.phone || !details.reservationDate || !details.reservationTime || !details.numberOfPeople) {
-    throw new functions.https.HttpsError("invalid-argument", "Dados da reserva incompletos.");
+    throw new HttpsError("invalid-argument", "Dados da reserva incompletos.");
   }
 
   const counterRef = db.doc("_internal/counters");
@@ -352,7 +350,7 @@ exports.createReservation = functions.https.onCall(async (data, context) => {
     });
   } catch (error) {
     logger.error("Falha ao gerar o número do pedido:", error);
-    throw new functions.https.HttpsError("internal", "Não foi possível gerar o número do pedido.");
+    throw new HttpsError("internal", "Não foi possível gerar o número do pedido.");
   }
 
   const orderData = {
@@ -379,17 +377,14 @@ exports.createReservation = functions.https.onCall(async (data, context) => {
   return {orderId, orderNumber};
 });
 
-
-/**
- * Manages user profile picture upload and removal securely.
- */
-exports.manageProfilePicture = functions.https.onCall(async (data, context) => {
-  const uid = context.auth?.uid;
+// --- Callable Function (v2) ---
+exports.manageProfilePicture = onCall({region: "southamerica-east1"}, async (request) => {
+  const uid = request.auth?.uid;
   if (!uid) {
-    throw new functions.https.HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
+    throw new HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
   }
 
-  const {imageBase64} = data;
+  const {imageBase64} = request.data;
   const bucket = storage.bucket();
   const filePath = `user-profiles/${uid}/profile.jpg`;
   const file = bucket.file(filePath);
@@ -403,7 +398,7 @@ exports.manageProfilePicture = functions.https.onCall(async (data, context) => {
       return {success: true, photoURL: null};
     } catch (error) {
       logger.error(`Falha ao remover a foto de perfil para ${uid}:`, error);
-      throw new functions.https.HttpsError("internal", "Não foi possível remover a foto de perfil.");
+      throw new HttpsError("internal", "Não foi possível remover a foto de perfil.");
     }
   }
 
@@ -411,7 +406,7 @@ exports.manageProfilePicture = functions.https.onCall(async (data, context) => {
     try {
       const matches = imageBase64.match(/^data:(image\/[a-z]+);base64,(.+)$/);
       if (!matches || matches.length !== 3) {
-        throw new functions.https.HttpsError("invalid-argument", "Formato de imagem base64 inválido.");
+        throw new HttpsError("invalid-argument", "Formato de imagem base64 inválido.");
       }
       const mimeType = matches[1];
       const base64Data = matches[2];
@@ -432,25 +427,23 @@ exports.manageProfilePicture = functions.https.onCall(async (data, context) => {
       return {success: true, photoURL};
     } catch (error) {
       logger.error(`Falha ao atualizar a foto de perfil para ${uid}:`, error);
-      throw new functions.https.HttpsError("internal", "Não foi possível salvar a nova foto de perfil.");
+      throw new HttpsError("internal", "Não foi possível salvar a nova foto de perfil.");
     }
   }
 
-  throw new functions.https.HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
+  throw new HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
 });
 
-/**
- * Associates guest orders with a newly logged-in user.
- */
-exports.syncGuestOrders = functions.https.onCall(async (data, context) => {
-  const uid = context.auth?.uid;
+// --- Callable Function (v2) ---
+exports.syncGuestOrders = onCall({region: "southamerica-east1"}, async (request) => {
+  const uid = request.auth?.uid;
   if (!uid) {
-    throw new functions.https.HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
+    throw new HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
   }
 
-  const {orderIds} = data;
+  const {orderIds} = request.data;
   if (!Array.isArray(orderIds) || orderIds.length === 0) {
-    throw new functions.https.HttpsError("invalid-argument", "A função deve ser chamada com um array de 'orderIds'.");
+    throw new HttpsError("invalid-argument", "A função deve ser chamada com um array de 'orderIds'.");
   }
 
   logger.info(`Associando ${orderIds.length} pedido(s) ao usuário ${uid}...`);
@@ -469,32 +462,34 @@ exports.syncGuestOrders = functions.https.onCall(async (data, context) => {
     return {success: true};
   } catch (error) {
     logger.error(`Falha ao associar pedidos para o usuário ${uid}:`, error);
-    throw new functions.https.HttpsError("internal", "Não foi possível associar os pedidos.");
+    throw new HttpsError("internal", "Não foi possível associar os pedidos.");
   }
 });
 
-/**
- * Triggered when a document in the 'roles' collection is created or updated.
- * It sets a custom 'admin' claim on the corresponding user's authentication token.
- */
-exports.setAdminClaim = functions.firestore.document("roles/{userId}")
-    .onWrite(async (change, context) => {
-        const userId = context.params.userId;
-        const afterData = change.after.data();
+// --- Firestore Trigger (v2) ---
+exports.setAdminClaim = onDocumentWritten(
+    {
+      document: "roles/{userId}",
+      region: "southamerica-east1",
+    },
+    async (event) => {
+      const userId = event.params.userId;
+      const afterData = event.data?.after.data();
 
-        const isAdmin = afterData ? afterData.admin === true : false;
+      const isAdmin = afterData ? afterData.admin === true : false;
 
-        try {
-            const user = await admin.auth().getUser(userId);
-            const existingClaims = user.customClaims || {};
+      try {
+        const user = await admin.auth().getUser(userId);
+        const existingClaims = user.customClaims || {};
 
-            if (existingClaims.admin !== isAdmin) {
-                await admin.auth().setCustomUserClaims(userId, { ...existingClaims, admin: isAdmin });
-                logger.info(`Claim de 'admin' para o usuário ${userId} foi atualizado para: ${isAdmin}`);
-            } else {
-                logger.info(`Claim de 'admin' para o usuário ${userId} já está correto (${isAdmin}). Nenhuma ação tomada.`);
-            }
-        } catch (error) {
-            logger.error(`Erro ao definir custom claim para o usuário ${userId}:`, error);
+        if (existingClaims.admin !== isAdmin) {
+          await admin.auth().setCustomUserClaims(userId, {...existingClaims, admin: isAdmin});
+          logger.info(`Claim de 'admin' para o usuário ${userId} foi atualizado para: ${isAdmin}`);
+        } else {
+          logger.info(`Claim de 'admin' para o usuário ${userId} já está correto (${isAdmin}). Nenhuma ação tomada.`);
         }
-    });
+      } catch (error) {
+        logger.error(`Erro ao definir custom claim para o usuário ${userId}:`, error);
+      }
+    },
+);
