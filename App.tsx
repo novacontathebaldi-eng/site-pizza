@@ -207,6 +207,7 @@ const App: React.FC = () => {
     const [currentUser, setCurrentUser] = useState<firebase.User | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+    const [isAdmin, setIsAdmin] = useState<boolean>(false);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
     const [isUserAreaModalOpen, setIsUserAreaModalOpen] = useState<boolean>(false);
     const [isGapiReady, setIsGapiReady] = useState(false);
@@ -400,8 +401,16 @@ const App: React.FC = () => {
                 setUserProfile(profile);
                 if (profile?.name) setName(profile.name);
                 if (profile?.phone) setPhone(profile.phone);
+
+                // Check for admin custom claim
+                user.getIdTokenResult().then((idTokenResult) => {
+                    const isAdminClaim = !!idTokenResult.claims.admin;
+                    setIsAdmin(isAdminClaim);
+                });
+
             } else {
                 setUserProfile(null);
+                setIsAdmin(false); // Reset admin status on logout
                 setName('');
                 setPhone('');
             }
@@ -1067,7 +1076,8 @@ const App: React.FC = () => {
                 {isLoading ? <div className="text-center py-20"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p></div> : !error && <MenuSection categories={categories} products={products.filter(p => !p.deleted)} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} activeCategoryId={activeMenuCategory} setActiveCategoryId={setActiveMenuCategory} cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} cartItems={cart} onSelectHalfAndHalf={handleSelectHalfAndHalf} />}
                 <div id="sobre">{siteSettings.contentSections?.filter(section => section.isVisible).sort((a, b) => a.order - b.order).map((section, index) => <DynamicContentSection key={section.id} section={section} order={index} />)}</div>
                 <ContactSection settings={siteSettings} />
-                <AdminSection 
+                <AdminSection
+                    isAdmin={isAdmin}
                     allProducts={products} 
                     allCategories={categories} 
                     isStoreOnline={isStoreOnline} 
