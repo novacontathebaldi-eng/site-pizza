@@ -979,7 +979,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                                 )}
                                                                 <h4 className={`text-lg font-semibold text-brand-olive-600 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4>
                                                             </div>
-                                                            {/* FIX: Corrected a 'children' prop type error in SortableContext by wrapping the mapped items in a div that handles spacing. */}
+                                                            {/* FIX: Corrected a 'children' prop type error in SortableContext by wrapping the mapped items in a div. This ensures SortableContext receives a single valid child element. */}
                                                             <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}>
                                                                 <div className="space-y-2">
                                                                     {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} isDeleteMode={isProductDeleteMode} isSelected={selectedProductIds.has(product.id)} onSelect={handleSelectProduct} />)}
@@ -1014,7 +1014,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                         </button>
                                     </div>
                                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
-                                        {/* FIX: Corrected a 'children' prop type error in SortableContext by wrapping the mapped items in a div that handles spacing. */}
+                                        {/* FIX: Corrected a 'children' prop type error in SortableContext by wrapping the mapped items in a div. This ensures SortableContext receives a single valid child element. */}
                                         <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}>
                                             <div className="space-y-2">
                                                 {localCategories.map(cat => {

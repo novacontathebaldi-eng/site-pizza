@@ -68,11 +68,11 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOp
 
                     <div className="flex items-center gap-2 sm:gap-3">
                         {/* FIX: The user icon button now displays a loading spinner when isAuthLoading is true. */}
-                        <button onClick={onUserIconClick} className="relative w-12 h-12 flex items-center justify-center rounded-lg bg-brand-olive-600 hover:bg-opacity-80 transition-colors" aria-label="Minha Conta" disabled={isAuthLoading}>
+                        <button onClick={onUserIconClick} className="relative w-12 h-12 flex items-center justify-center rounded-full bg-brand-olive-600 hover:bg-opacity-80 transition-colors" aria-label="Minha Conta" disabled={isAuthLoading}>
                             {isAuthLoading ? (
                                 <i className="fas fa-spinner fa-spin text-2xl"></i>
                             ) : user ? (
-                                <img src={user.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-full h-full rounded-full object-cover" />
+                                <img src={user.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-full h-full rounded-full object-cover border-2 border-brand-gold-600" />
                             ) : (
                                 <i className="fas fa-user-circle text-2xl"></i>
                             )}
