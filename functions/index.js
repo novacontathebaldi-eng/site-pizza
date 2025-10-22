@@ -326,7 +326,6 @@ exports.createOrder = onCall({secrets}, async (request) => {
       street: details.street || "",
       number: details.number || "",
       complement: details.complement || "",
-      cpf: details.cpf || "",
     },
     items: cart,
     total,

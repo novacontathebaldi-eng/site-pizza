@@ -25,7 +25,6 @@ export interface UserProfile {
     photoURL: string;
     // User-provided info
     phone?: string;
-    cpf?: string;
     addresses?: Address[];
     allergies?: string;
 }
@@ -79,7 +78,6 @@ export interface OrderDetails {
     changeAmount?: string;
     notes: string;
     allergies?: string;
-    cpf?: string;
     deliveryFee?: number;
     reservationTime?: string;
 }
@@ -105,7 +103,6 @@ export interface OrderCustomerDetails {
     address?: string;
     reservationDate?: string;
     reservationTime?: string;
-    cpf?: string;
     // Detalhes do endereço
     neighborhood?: string;
     street?: string;

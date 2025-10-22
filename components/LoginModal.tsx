@@ -17,30 +17,12 @@ interface LoginModalProps {
 type View = 'login' | 'register' | 'forgotPassword' | 'resetPassword';
 type ResetStatus = 'idle' | 'verifying' | 'form' | 'success' | 'error';
 
-function validarCPF(cpf: string): boolean {
-  cpf = cpf.replace(/[^\d]+/g, '');
-  if (cpf.length !== 11) return false;
-  if (/^(\d)\1+$/.test(cpf)) return false;
-  let soma = 0;
-  for (let i = 0; i < 9; i++) soma += parseInt(cpf.charAt(i)) * (10 - i);
-  let resto = 11 - (soma % 11);
-  if (resto === 10 || resto === 11) resto = 0;
-  if (resto !== parseInt(cpf.charAt(9))) return false;
-  soma = 0;
-  for (let i = 0; i < 10; i++) soma += parseInt(cpf.charAt(i)) * (11 - i);
-  resto = 11 - (soma % 11);
-  if (resto === 10 || resto === 11) resto = 0;
-  if (resto !== parseInt(cpf.charAt(10))) return false;
-  return true;
-}
-
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogleSignIn, addToast, onRegisterSuccess, onOpenPrivacyPolicy, onOpenTermsOfService, passwordResetCode }) => {
     const [view, setView] = useState<View>('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
-    const [cpf, setCpf] = useState('');
     const [acceptedTerms, setAcceptedTerms] = useState(false);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -56,7 +38,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
         setPassword('');
         setName('');
         setPhone('');
-        setCpf('');
         setAcceptedTerms(false);
         setError('');
         setFeedback({ message: '', type: 'info' });
@@ -96,13 +77,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
 
             if (view === 'register') {
                 if (name.trim().length < 2) throw { code: 'auth/invalid-name' };
-                if (cpf.trim() && !validarCPF(cpf)) throw { code: 'auth/invalid-cpf' };
                 
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                 const user = userCredential.user;
                 if (user) {
                     await user.updateProfile({ displayName: name });
-                    await firebaseService.createUserProfile(user, name, phone, cpf);
+                    await firebaseService.createUserProfile(user, name, phone);
                     await user.sendEmailVerification();
                     addToast('Conta criada! Um e-mail de verificação foi enviado.', 'success');
                     onRegisterSuccess();
@@ -247,11 +227,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
                             )}
                              {view === 'register' && (
                                 <>
-                                    <div>
-                                        <label className="block text-sm font-semibold mb-1" htmlFor="cpf">CPF (opcional)</label>
-                                        <input id="cpf" type="text" value={cpf} onChange={e => setCpf(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="000.000.000-00" />
-                                        <p className="text-xs text-gray-500 mt-1">Ajuda a agilizar pagamentos com PIX.</p>
-                                    </div>
+                                    
                                     <div className="pt-2">
                                         <label className="flex items-start gap-2 text-sm text-gray-600">
                                             <input type="checkbox" checked={acceptedTerms} onChange={e => setAcceptedTerms(e.target.checked)} className="mt-1 h-4 w-4 rounded border-gray-400 text-accent focus:ring-accent" />

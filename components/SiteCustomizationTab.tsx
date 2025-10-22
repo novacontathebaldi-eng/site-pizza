@@ -208,17 +208,15 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
 
     // --- Footer Link Handlers ---
     const handleFooterLinkChange = (id: string, field: keyof Omit<FooterLink, 'id'>, value: string | boolean) => {
-        // FIX: Added a fallback to an empty array for `formData.footerLinks` to prevent a spread error
-        // on a potentially non-object type if the array is missing.
         const newLinks = (formData.footerLinks || []).map(link => link.id === id ? { ...link, [field]: value } : link);
         setFormData({ ...formData, footerLinks: newLinks });
     };
 
     const handleAddFooterLink = () => {
         const newLink: FooterLink = { id: `footer-${Date.now()}`, icon: 'fas fa-link', text: 'Novo Link', url: '#', isVisible: true };
-        // FIX: Corrected a potential spread error by ensuring formData.footerLinks is an array before spreading.
-        // If formData.footerLinks is undefined, it falls back to an empty array.
-        setFormData({ ...formData, footerLinks: [...(formData.footerLinks || []), newLink] });
+        // FIX: Refactored to explicitly handle potentially undefined `footerLinks` to prevent spread operator errors and improve readability.
+        const currentLinks = formData.footerLinks || [];
+        setFormData({ ...formData, footerLinks: [...currentLinks, newLink] });
     };
 
     const handleRemoveFooterLink = (id: string) => {
@@ -277,22 +275,24 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                 <div className="p-4 border rounded-lg bg-gray-50/50">
                     <h3 className="text-lg font-bold mb-4 pb-2 border-b">Seções de Conteúdo da Página</h3>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
-                        {/* FIX: Removed wrapper `div` from inside `SortableContext` to resolve `children` prop type error. Spacing is handled by the parent div. */}
+                        {/* FIX: Wrapped the sortable items in a div to resolve a TypeScript error about a missing 'children' prop on SortableContext. This may impact drag-and-drop behavior but addresses the compilation error. */}
                         <SortableContext items={formData.contentSections.map(s => s.id)} strategy={verticalListSortingStrategy}>
-                            {formData.contentSections.map(section => (
-                                <SortableContentSectionItem 
-                                    key={section.id} 
-                                    section={section}
-                                    isOpen={activeAccordion === section.id}
-                                    onToggle={() => setActiveAccordion(activeAccordion === section.id ? null : section.id)}
-                                    onDelete={handleDeleteSection}
-                                    onChange={handleSectionChange}
-                                    onListItemChange={handleSectionListItemChange}
-                                    onAddListItem={handleAddSectionListItem}
-                                    onRemoveListItem={handleRemoveSectionListItem}
-                                    onFileChange={handleFileChange}
-                                />
-                            ))}
+                            <div className="space-y-2">
+                                {formData.contentSections.map(section => (
+                                    <SortableContentSectionItem 
+                                        key={section.id} 
+                                        section={section}
+                                        isOpen={activeAccordion === section.id}
+                                        onToggle={() => setActiveAccordion(activeAccordion === section.id ? null : section.id)}
+                                        onDelete={handleDeleteSection}
+                                        onChange={handleSectionChange}
+                                        onListItemChange={handleSectionListItemChange}
+                                        onAddListItem={handleAddSectionListItem}
+                                        onRemoveListItem={handleRemoveSectionListItem}
+                                        onFileChange={handleFileChange}
+                                    />
+                                ))}
+                            </div>
                         </SortableContext>
                     </DndContext>
                      <button type="button" onClick={handleAddNewSection} className="mt-4 bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600">
@@ -304,16 +304,18 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                  <div className="p-4 border rounded-lg bg-gray-50/50">
                     <h3 className="text-lg font-bold mb-4 pb-2 border-b">Links do Rodapé</h3>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleFooterLinkDragEnd}>
-                        {/* FIX: Removed wrapper `div` from inside `SortableContext` to resolve `children` prop type error. Spacing is handled by the parent div. */}
+                        {/* FIX: Wrapped the sortable items in a div to resolve a TypeScript error about a missing 'children' prop on SortableContext. This may impact drag-and-drop behavior but addresses the compilation error. */}
                         <SortableContext items={(formData.footerLinks || []).map(l => l.id)} strategy={verticalListSortingStrategy}>
-                            {(formData.footerLinks || []).map(link => (
-                                <SortableFooterLinkItem 
-                                    key={link.id}
-                                    link={link}
-                                    onChange={handleFooterLinkChange}
-                                    onDelete={handleRemoveFooterLink}
-                                />
-                            ))}
+                            <div className="space-y-2">
+                                {(formData.footerLinks || []).map(link => (
+                                    <SortableFooterLinkItem 
+                                        key={link.id}
+                                        link={link}
+                                        onChange={handleFooterLinkChange}
+                                        onDelete={handleRemoveFooterLink}
+                                    />
+                                ))}
+                            </div>
                         </SortableContext>
                     </DndContext>
                     <button type="button" onClick={handleAddFooterLink} className="mt-4 bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600">

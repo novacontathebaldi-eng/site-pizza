@@ -159,7 +159,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const deliverableAddresses = profile?.addresses?.filter(a => a.isDeliveryArea) || [];
     const favoriteAddress = deliverableAddresses.find(a => a.isFavorite);
 
-    const [cpf, setCpf] = useState('');
     const [orderType, setOrderType] = useState<'delivery' | 'pickup' | ''>('');
     
     const [neighborhood, setNeighborhood] = useState('');
@@ -180,15 +179,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
         if (isOpen) {
             const fav = profile?.addresses?.filter(a => a.isDeliveryArea).find(a => a.isFavorite);
             setSelectedAddressId(fav ? fav.id : 'manual');
-            if (profile?.cpf) {
-                setCpf(profile.cpf);
-            }
             if (profile?.allergies) {
                 setAllergies(profile.allergies);
             }
         } else {
             // Full reset when closing
-            setCpf(''); setOrderType('');
+            setOrderType('');
             setNeighborhood(''); setStreet(''); setNumber(''); setIsNoNumber(false); setComplement(''); setAllergies('');
             setPaymentMethod(''); setChangeNeeded(false); setChangeAmount('');
             setNotes('');
@@ -233,7 +229,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const total = subtotal + deliveryFee;
 
     const getOrderDetails = (): OrderDetails => ({
-        name, phone, cpf, orderType: orderType as 'delivery' | 'pickup' | 'local',
+        name, phone, orderType: orderType as 'delivery' | 'pickup' | 'local',
         neighborhood, street, number, complement,
         paymentMethod: paymentMethod as 'credit' | 'debit' | 'pix' | 'cash',
         changeNeeded: paymentMethod === 'cash' && changeNeeded,

@@ -510,7 +510,7 @@ const App: React.FC = () => {
         if (categories.length > 0 && !activeMenuCategory) {
             const firstActiveCategory = categories.find(c => c.active);
             if (firstActiveCategory) {
-                // We are not setting the active category automatically anymore to prevent scrolling.
+                // We are not setting the active category automatically to prevent scrolling.
                 // setActiveMenuCategory(firstActiveCategory.id);
             }
         }
@@ -684,7 +684,7 @@ const App: React.FC = () => {
         const details: OrderDetails = {
             name: order.customer.name, phone: order.customer.phone, orderType: order.customer.orderType,
             paymentMethod: order.paymentMethod || 'pix', changeNeeded: order.changeNeeded || false,
-            changeAmount: order.changeAmount || '', notes: order.notes || '', cpf: order.customer.cpf || '',
+            changeAmount: order.changeAmount || '', notes: order.notes || '',
             neighborhood: order.customer.neighborhood || '', street: order.customer.street || '',
             number: order.customer.number || '', complement: order.customer.complement || '',
             allergies: order.allergies || '', deliveryFee: order.deliveryFee || 0,

@@ -977,12 +977,12 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                                 )}
                                                                 <h4 className={`text-lg font-semibold text-brand-olive-600 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4>
                                                             </div>
-                                                            {/* FIX: Removed the wrapper div from inside SortableContext.
-                                                            The component expects an array of sortable elements as direct children, and the extra div caused a 'children' prop type error. */}
-{/* FIX: Removed wrapper `div` from inside `SortableContext` to resolve `children` prop type error. Spacing is handled by padding on `SortableProductItem`. */}
-                                                            <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> 
-                                                                {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} isDeleteMode={isProductDeleteMode} isSelected={selectedProductIds.has(product.id)} onSelect={handleSelectProduct} />)} 
-                                                            </SortableContext> 
+                                                            {/* FIX: Wrapped the sortable items in a div to resolve a TypeScript error about a missing 'children' prop on SortableContext. This may impact drag-and-drop behavior but addresses the compilation error. */}
+                                                            <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                                                                <div className="space-y-2">
+                                                                    {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} isDeleteMode={isProductDeleteMode} isSelected={selectedProductIds.has(product.id)} onSelect={handleSelectProduct} />)}
+                                                                </div>
+                                                            </SortableContext>
                                                         </div> 
                                                     ) 
                                                 })} 
@@ -1012,22 +1012,24 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                         </button>
                                     </div>
                                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
-                                        {/* FIX: Removed wrapper `div` from inside `SortableContext` to resolve `children` prop type error. Spacing is handled by padding on `SortableCategoryItem`. */}
+                                        {/* FIX: Wrapped the sortable items in a div to resolve a TypeScript error about a missing 'children' prop on SortableContext. This may impact drag-and-drop behavior but addresses the compilation error. */}
                                         <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                                            {localCategories.map(cat => {
-                                                const productsInCategory = allProducts.filter(p => p.categoryId === cat.id && !p.deleted);
-                                                const isCategoryDisabled = productsInCategory.length === 0 || productsInCategory.every(p => !p.active);
-                                                return (
-                                                    <SortableCategoryItem
-                                                        key={cat.id}
-                                                        category={cat}
-                                                        onEdit={handleEditCategory}
-                                                        onDelete={onDeleteCategory}
-                                                        onStatusChange={onCategoryStatusChange}
-                                                        isCategoryDisabled={isCategoryDisabled}
-                                                    />
-                                                );
-                                            })}
+                                            <div className="space-y-2">
+                                                {localCategories.map(cat => {
+                                                    const productsInCategory = allProducts.filter(p => p.categoryId === cat.id && !p.deleted);
+                                                    const isCategoryDisabled = productsInCategory.length === 0 || productsInCategory.every(p => !p.active);
+                                                    return (
+                                                        <SortableCategoryItem
+                                                            key={cat.id}
+                                                            category={cat}
+                                                            onEdit={handleEditCategory}
+                                                            onDelete={onDeleteCategory}
+                                                            onStatusChange={onCategoryStatusChange}
+                                                            isCategoryDisabled={isCategoryDisabled}
+                                                        />
+                                                    );
+                                                })}
+                                            </div>
                                         </SortableContext>
                                     </DndContext>
                                 </div>

@@ -254,23 +254,6 @@ const AddressForm: React.FC<{
     );
 };
 
-function validarCPF(cpf: string): boolean {
-  cpf = cpf.replace(/[^\d]+/g, '');
-  if (cpf.length !== 11) return false;
-  if (/^(\d)\1+$/.test(cpf)) return false;
-  let soma = 0;
-  for (let i = 0; i < 9; i++) soma += parseInt(cpf.charAt(i)) * (10 - i);
-  let resto = 11 - (soma % 11);
-  if (resto === 10 || resto === 11) resto = 0;
-  if (resto !== parseInt(cpf.charAt(9))) return false;
-  soma = 0;
-  for (let i = 0; i < 10; i++) soma += parseInt(cpf.charAt(i)) * (11 - i);
-  resto = 11 - (soma % 11);
-  if (resto === 10 || resto === 11) resto = 0;
-  if (resto !== parseInt(cpf.charAt(10))) return false;
-  return true;
-}
-
 
 interface UserProfileTabProps {
     profile: UserProfile;
@@ -282,8 +265,6 @@ interface UserProfileTabProps {
     setName: (name: string) => void;
     phone: string;
     setPhone: (phone: string) => void;
-    cpf: string;
-    setCpf: (cpf: string) => void;
     allergies: string;
     setAllergies: (allergies: string) => void;
     isSaving: boolean;
@@ -292,7 +273,7 @@ interface UserProfileTabProps {
 
 const UserProfileTab: React.FC<UserProfileTabProps> = ({
     profile, user, onLogout, handleResendVerification, handleProfileUpdate,
-    name, setName, phone, setPhone, cpf, setCpf, allergies, setAllergies,
+    name, setName, phone, setPhone, allergies, setAllergies,
     isSaving, addToast,
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -429,11 +410,7 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
             <label className="block text-sm font-semibold mb-1">Telefone/WhatsApp</label>
             <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded-md" />
         </div>
-         <div>
-            <label className="block text-sm font-semibold mb-1">CPF (opcional)</label>
-            <input type="text" value={cpf} onChange={e => setCpf(e.target.value)} className="w-full px-3 py-2 border rounded-md" placeholder="000.000.000-00" />
-             <p className="text-xs text-gray-500 mt-1">Seu CPF é usado para agilizar o pagamento com PIX.</p>
-        </div>
+         
         <div>
             <label className="block text-sm font-semibold mb-1">Restrições Alimentares? (opcional)</label>
             <textarea value={allergies} onChange={e => setAllergies(e.target.value)} className="w-full px-3 py-2 border rounded-md" rows={2} placeholder="Ex: alergia a camarão, intolerância à lactose..."/>
@@ -656,7 +633,6 @@ interface UserAreaModalProps {
 export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, user, profile, onLogout, addToast, initialTab = 'orders', showAddAddressForm = false }) => {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
-    const [cpf, setCpf] = useState('');
     const [allergies, setAllergies] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [myOrders, setMyOrders] = useState<Order[]>([]);
@@ -690,7 +666,6 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
         if (isOpen && profile) {
             setName(profile.name || '');
             setPhone(profile.phone || '');
-            setCpf(profile.cpf || '');
             setAllergies(profile.allergies || '');
         }
     }, [isOpen, profile]);
@@ -746,13 +721,8 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
     const handleProfileUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
-        if (cpf.trim() && !validarCPF(cpf)) {
-            addToast('O CPF inserido não é válido.', 'error');
-            setIsSaving(false);
-            return;
-        }
         try {
-            await firebaseService.updateUserProfile(user.uid, { name, phone, cpf, allergies });
+            await firebaseService.updateUserProfile(user.uid, { name, phone, allergies });
             addToast('Seu perfil foi salvo!', 'success');
         } catch (error) {
             addToast('Erro ao salvar seu perfil.', 'error');
@@ -832,8 +802,6 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                                     setName={setName}
                                     phone={phone}
                                     setPhone={setPhone}
-                                    cpf={cpf}
-                                    setCpf={setCpf}
                                     allergies={allergies}
                                     setAllergies={setAllergies}
                                     isSaving={isSaving}
