@@ -12,7 +12,8 @@ interface OrderConfirmationModalProps {
 export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ order, onClose, onSendWhatsApp, onTrackOrder }) => {
     if (!order) return null;
 
-    const isPaidOnline = order.paymentStatus === 'paid_online';
+    // FIX: The type 'PaymentStatus' does not include 'paid_online'. The correct check is for 'paid', which now represents a completed payment.
+    const isPaidOnline = order.paymentStatus === 'paid';
     const title = isPaidOnline ? "Pagamento Aprovado!" : "Pedido Registrado!";
     const titleIcon = isPaidOnline ? "fa-check-circle text-green-500" : "fa-receipt text-green-500";
     const totalLabel = isPaidOnline ? "Total Pago:" : "Total do Pedido:";

@@ -25,16 +25,32 @@ export const HalfAndHalfModal: React.FC<HalfAndHalfModalProps> = ({ isOpen, onCl
         }
     }, [isOpen]);
 
+    // Limpa a seleção da segunda metade se o tamanho mudar e a tornar incompatível.
+    useEffect(() => {
+        if (secondHalf && selectedSize && secondHalf.prices?.[selectedSize] === undefined) {
+            setSecondHalf(null);
+        }
+    }, [selectedSize, secondHalf]);
+
+    const availableSizes = useMemo(() => {
+        if (!firstHalf?.prices) return []; // Guarda de segurança contra 'prices' ausente
+        return sizeOrder.filter(size => firstHalf.prices[size] !== undefined);
+    }, [firstHalf]);
+    
     const secondHalfOptions = useMemo(() => {
-        if (!firstHalf) return [];
+        if (!firstHalf || !selectedSize) return []; // A lista só aparece após escolher o tamanho
         return pizzas
-            .filter(p => p.id !== firstHalf.id && p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    }, [pizzas, firstHalf, searchTerm]);
+            .filter(p => 
+                p.id !== firstHalf.id && 
+                p.prices?.[selectedSize] !== undefined && // Filtra para apenas pizzas com o tamanho selecionado
+                p.name.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+    }, [pizzas, firstHalf, selectedSize, searchTerm]);
 
     const finalPrice = useMemo(() => {
         if (!firstHalf || !secondHalf || !selectedSize) return 0;
-        const price1 = firstHalf.prices[selectedSize] || 0;
-        const price2 = secondHalf.prices[selectedSize] || 0;
+        const price1 = firstHalf.prices?.[selectedSize] || 0;
+        const price2 = secondHalf.prices?.[selectedSize] || 0;
         return Math.max(price1, price2);
     }, [firstHalf, secondHalf, selectedSize]);
 
@@ -46,10 +62,6 @@ export const HalfAndHalfModal: React.FC<HalfAndHalfModalProps> = ({ isOpen, onCl
         }
     };
 
-    const availableSizes = useMemo(() => 
-        sizeOrder.filter(size => firstHalf.prices[size] !== undefined), 
-    [firstHalf]);
-    
     const formatPrice = (price: number) => price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
     return (
@@ -88,7 +100,7 @@ export const HalfAndHalfModal: React.FC<HalfAndHalfModalProps> = ({ isOpen, onCl
                                 <img src={firstHalf.imageUrl} alt={firstHalf.name} className="w-full h-40 object-cover rounded-lg mb-3" />
                                 <h4 className="font-bold text-lg">{firstHalf.name}</h4>
                                 <p className="text-gray-600 text-sm mb-2">{firstHalf.description}</p>
-                                <p className="font-bold text-accent text-lg">{selectedSize ? formatPrice(firstHalf.prices[selectedSize]) : '-'}</p>
+                                <p className="font-bold text-accent text-lg">{selectedSize ? formatPrice(firstHalf.prices?.[selectedSize] ?? 0) : '-'}</p>
                             </div>
                         </div>
 
@@ -120,9 +132,9 @@ export const HalfAndHalfModal: React.FC<HalfAndHalfModalProps> = ({ isOpen, onCl
                                             <p className="font-bold">{pizza.name}</p>
                                             <p className="text-xs text-gray-500 line-clamp-1">{pizza.description}</p>
                                         </div>
-                                        <p className="font-semibold text-accent text-sm flex-shrink-0 ml-2">{selectedSize ? formatPrice(pizza.prices[selectedSize]) : '-'}</p>
+                                        <p className="font-semibold text-accent text-sm flex-shrink-0 ml-2">{selectedSize ? formatPrice(pizza.prices?.[selectedSize] ?? 0) : '-'}</p>
                                     </button>
-                               )) : <p className="text-center text-gray-500 p-4">Nenhum sabor encontrado.</p>}
+                               )) : <p className="text-center text-gray-500 p-4">{selectedSize ? 'Nenhum sabor compatível encontrado.' : 'Escolha um tamanho para ver as opções.'}</p>}
                             </div>
                         </div>
                     </div>

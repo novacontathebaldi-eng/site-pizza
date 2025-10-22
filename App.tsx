@@ -646,7 +646,7 @@ const App: React.FC = () => {
             pizzaCategoryIds.includes(p.categoryId) && 
             p.active && 
             !p.deleted && 
-            Object.keys(p.prices).length > 0 && 
+            p.prices && Object.keys(p.prices).length > 0 && 
             !p.isPromotion
         );
     }, [categories, products]);
