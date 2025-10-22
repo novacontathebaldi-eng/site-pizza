@@ -421,11 +421,11 @@ const App: React.FC = () => {
     
     // Effect to sync guest orders on login
     useEffect(() => {
-        const syncGuestOrders = async (user: firebase.User) => {
+        const syncGuestOrders = async () => {
             const guestOrderIds: string[] = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
             if (guestOrderIds.length > 0) {
                 try {
-                    await firebaseService.syncGuestOrders(user.uid, guestOrderIds);
+                    await firebaseService.syncGuestOrders(guestOrderIds);
                     localStorage.removeItem('santaSensacaoGuestOrders');
                     addToast('Seus pedidos anteriores foram associados à sua conta!', 'success');
                 } catch (error) {
@@ -437,7 +437,7 @@ const App: React.FC = () => {
 
         // Check if user has just logged in (was null, is now not null)
         if (currentUser && !prevUser.current) {
-            syncGuestOrders(currentUser);
+            syncGuestOrders();
         }
 
         // Update the ref for the next render

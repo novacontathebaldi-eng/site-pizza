@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-const {onCall, onRequest} = require("firebase-functions/v2/https");
+const {onCall, onRequest} = require("firebase-functions/v2/h");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
@@ -475,30 +475,37 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
 
   throw new onCall.HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
 });
-/**
- * Gatilho do Firestore que é acionado quando um documento na coleção 'roles' é criado ou atualizado.
- * Ele define um custom claim 'admin' no token de autenticação do usuário correspondente.
- */
-exports.onRoleChange = onDocumentUpdated("roles/{userId}", async (event) => {
-  const userId = event.params.userId;
-  const data = event.data.after.data();
 
-  // Verifica se o campo 'admin' existe e é booleano
-  const isAdmin = data && data.admin === true;
+/**
+ * Associates guest orders with a newly logged-in user.
+ */
+exports.syncGuestOrders = onCall({secrets}, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) {
+    throw new onCall.HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
+  }
+
+  const {orderIds} = request.data;
+  if (!Array.isArray(orderIds) || orderIds.length === 0) {
+    throw new onCall.HttpsError("invalid-argument", "A função deve ser chamada com um array de 'orderIds'.");
+  }
+
+  logger.info(`Associando ${orderIds.length} pedido(s) ao usuário ${uid}...`);
 
   try {
-    // Busca o usuário no Firebase Authentication
-    const user = await admin.auth().getUser(userId);
+    const batch = db.batch();
+    const ordersCollection = db.collection("orders");
 
-    // Pega os claims existentes para não sobrescrevê-los
-    const existingClaims = user.customClaims || {};
+    orderIds.forEach((orderId) => {
+      const orderRef = ordersCollection.doc(orderId);
+      batch.update(orderRef, {userId: uid});
+    });
 
-    // Se o status de admin mudou, atualiza o claim
-    if (existingClaims.admin !== isAdmin) {
-      await admin.auth().setCustomUserClaims(userId, { ...existingClaims, admin: isAdmin });
-      logger.info(`Claim de admin para o usuário ${userId} atualizado para: ${isAdmin}`);
-    }
+    await batch.commit();
+    logger.info(`Pedidos associados com sucesso ao usuário ${uid}.`);
+    return {success: true};
   } catch (error) {
-    logger.error(`Erro ao definir custom claim para o usuário ${userId}:`, error);
+    logger.error(`Falha ao associar pedidos para o usuário ${uid}:`, error);
+    throw new onCall.HttpsError("internal", "Não foi possível associar os pedidos.");
   }
 });
