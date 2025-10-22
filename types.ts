@@ -96,7 +96,7 @@ export interface ReservationDetails {
 
 // New Types for Order Management
 export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted' | 'awaiting-payment';
-export type PaymentStatus = 'pending' | 'paid' | 'paid_online' | 'refunded';
+export type PaymentStatus = 'pending' | 'paid' | 'refunded';
 
 export interface OrderCustomerDetails {
     name: string;
@@ -132,15 +132,6 @@ export interface Order {
     createdAt: firebase.firestore.Timestamp | any; // Firestore Timestamp
     pickupTimeEstimate?: string;
     numberOfPeople?: number;
-    mercadoPagoDetails?: {
-        paymentId: string;
-        status?: string;
-        statusDetail?: string;
-        qrCodeBase64?: string;
-        qrCode?: string;
-        transactionId?: string | null;
-        refunds?: any[]; // Armazena informações de estorno
-    };
 }
 
 export interface DaySchedule {

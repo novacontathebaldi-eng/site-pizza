@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { SiteSettings, ContentSection, FooterLink } from '../types';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
@@ -276,7 +277,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                 <div className="p-4 border rounded-lg bg-gray-50/50">
                     <h3 className="text-lg font-bold mb-4 pb-2 border-b">Seções de Conteúdo da Página</h3>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
-                        {/* FIX: Removed the wrapper div around the mapped items. The SortableContext component expects an array of elements as direct children, which resolves the 'children' prop type error. */}
+                        {/* FIX: Removed wrapper `div` from inside `SortableContext` to resolve `children` prop type error. Spacing is handled by the parent div. */}
                         <SortableContext items={formData.contentSections.map(s => s.id)} strategy={verticalListSortingStrategy}>
                             {formData.contentSections.map(section => (
                                 <SortableContentSectionItem 
@@ -303,7 +304,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                  <div className="p-4 border rounded-lg bg-gray-50/50">
                     <h3 className="text-lg font-bold mb-4 pb-2 border-b">Links do Rodapé</h3>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleFooterLinkDragEnd}>
-                        {/* FIX: Removed the wrapper div around the mapped items. The SortableContext component expects an array of elements as direct children, which resolves the 'children' prop type error. */}
+                        {/* FIX: Removed wrapper `div` from inside `SortableContext` to resolve `children` prop type error. Spacing is handled by the parent div. */}
                         <SortableContext items={(formData.footerLinks || []).map(l => l.id)} strategy={verticalListSortingStrategy}>
                             {(formData.footerLinks || []).map(link => (
                                 <SortableFooterLinkItem 

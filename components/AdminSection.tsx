@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 // FIX: The 'Partial' type is a built-in TypeScript utility and does not need to be imported.
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, DaySchedule } from '../types';
@@ -39,8 +40,6 @@ interface AdminSectionProps {
     onDeleteOrder: (orderId: string) => Promise<void>;
     onPermanentDeleteOrder: (orderId: string) => Promise<void>;
     onPermanentDeleteMultipleOrders: (orderIds: string[]) => Promise<void>;
-    onRefundOrder: (orderId: string) => Promise<void>;
-    refundingOrderId: string | null;
     onBulkDeleteProducts: (productIds: string[]) => Promise<void>;
     onRestoreProduct: (productId: string) => Promise<void>;
     onPermanentDeleteProduct: (productId: string) => Promise<void>;
@@ -193,7 +192,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
         onSeedDatabase, onSaveSiteSettings, onUpdateSiteSettingsField, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
-        onDeleteOrder, onPermanentDeleteOrder, onPermanentDeleteMultipleOrders, onRefundOrder, refundingOrderId,
+        onDeleteOrder, onPermanentDeleteOrder, onPermanentDeleteMultipleOrders,
         onBulkDeleteProducts, onRestoreProduct, onPermanentDeleteProduct, onBulkPermanentDeleteProducts
     } = props;
     
@@ -829,7 +828,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                     <div className="mb-6">
                                         <h4 className="font-bold text-lg mb-2 text-yellow-600">Pendentes</h4>
                                         <div className="space-y-4">
-                                            {filteredOrders.filter(o => o.status === 'pending').map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} onRefund={onRefundOrder} isRefunding={refundingOrderId === order.id} />)}
+                                            {filteredOrders.filter(o => o.status === 'pending').map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />)}
                                         </div>
                                     </div>
                                 )}
@@ -890,8 +889,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                         onUpdateReservationTime={onUpdateOrderReservationTime} 
                                                         onDelete={onDeleteOrder} 
                                                         onPermanentDelete={onPermanentDeleteOrder} 
-                                                        onRefund={onRefundOrder} 
-                                                        isRefunding={refundingOrderId === order.id}
                                                         isSelectable={true}
                                                         isSelected={selectedOrderIds.has(order.id)}
                                                         onSelect={handleSelectOrder}
@@ -899,7 +896,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                 ) : <div className="text-center py-12"><p className="text-gray-500">Lixeira vazia.</p></div>}
                                             </>
                                         ) : (
-                                            tabOrders.length > 0 ? tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} onRefund={onRefundOrder} isRefunding={refundingOrderId === order.id} />) : <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>
+                                            tabOrders.length > 0 ? tabOrders.map(order => <OrderCard key={order.id} order={order} onUpdateStatus={onUpdateOrderStatus} onUpdatePaymentStatus={onUpdateOrderPaymentStatus} onUpdateReservationTime={onUpdateOrderReservationTime} onDelete={onDeleteOrder} onPermanentDelete={onPermanentDeleteOrder} />) : <div className="text-center py-12"><p className="text-gray-500">Nenhum pedido nesta aba.</p></div>
                                         )}
                                     </div>
                                     
@@ -982,6 +979,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                             </div>
                                                             {/* FIX: Removed the wrapper div from inside SortableContext.
                                                             The component expects an array of sortable elements as direct children, and the extra div caused a 'children' prop type error. */}
+{/* FIX: Removed wrapper `div` from inside `SortableContext` to resolve `children` prop type error. Spacing is handled by padding on `SortableProductItem`. */}
                                                             <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}> 
                                                                 {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} isDeleteMode={isProductDeleteMode} isSelected={selectedProductIds.has(product.id)} onSelect={handleSelectProduct} />)} 
                                                             </SortableContext> 
@@ -1014,8 +1012,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                         </button>
                                     </div>
                                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
-                                        {/* FIX: Removed the wrapper div from inside SortableContext.
-                                        The component expects an array of sortable elements as direct children, and the extra div caused a 'children' prop type error. */}
+                                        {/* FIX: Removed wrapper `div` from inside `SortableContext` to resolve `children` prop type error. Spacing is handled by padding on `SortableCategoryItem`. */}
                                         <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}>
                                             {localCategories.map(cat => {
                                                 const productsInCategory = allProducts.filter(p => p.categoryId === cat.id && !p.deleted);

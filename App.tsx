@@ -678,7 +678,9 @@ const App: React.FC = () => {
     };
 
     const handleSendOrderToWhatsApp = (order: Order) => {
-        const isPaid = order.paymentStatus === 'paid_online';
+        // FIX: The 'paid_online' status was removed from the PaymentStatus type as part of the PIX payment removal.
+        // This logic is now obsolete, so `isPaid` is hardcoded to false.
+        const isPaid = false;
         const details: OrderDetails = {
             name: order.customer.name, phone: order.customer.phone, orderType: order.customer.orderType,
             paymentMethod: order.paymentMethod || 'pix', changeNeeded: order.changeNeeded || false,
@@ -1023,8 +1025,6 @@ const App: React.FC = () => {
                     onDeleteOrder={handleDeleteOrder} 
                     onPermanentDeleteOrder={handlePermanentDeleteOrder} 
                     onPermanentDeleteMultipleOrders={handlePermanentDeleteMultipleOrders} 
-                    onRefundOrder={async () => {}} 
-                    refundingOrderId={null}
                     onBulkDeleteProducts={handleBulkDeleteProducts}
                     onRestoreProduct={handleRestoreProduct}
                     onPermanentDeleteProduct={handlePermanentDeleteProduct}
@@ -1109,7 +1109,6 @@ const App: React.FC = () => {
                 onClose={() => setIsCheckoutModalOpen(false)}
                 cartItems={cart}
                 onConfirmCheckout={handleCheckout}
-                onInitiatePixPayment={() => {}}
                 isProcessing={isProcessingOrder}
                 name={name} setName={setName}
                 phone={phone} setPhone={setPhone}

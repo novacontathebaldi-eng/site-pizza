@@ -9,8 +9,6 @@ interface OrderCardProps {
     onUpdateReservationTime: (orderId: string, reservationTime: string) => void;
     onDelete: (orderId: string) => void;
     onPermanentDelete: (orderId: string) => void;
-    onRefund: (orderId: string) => void;
-    isRefunding?: boolean;
     isSelectable?: boolean;
     isSelected?: boolean;
     onSelect?: (orderId: string) => void;
@@ -61,8 +59,6 @@ const getPaymentStatusInfo = (order: Order): { text: string; isPaid: boolean; is
         return { text: 'Estornado', isPaid: false, isRefunded: true };
     }
     switch (order.paymentStatus) {
-        case 'paid_online':
-            return { text: 'Pago pelo SITE', isPaid: true, isRefunded: false };
         case 'paid':
             return { text: 'Pago', isPaid: true, isRefunded: false };
         case 'pending':
@@ -72,8 +68,8 @@ const getPaymentStatusInfo = (order: Order): { text: string; isPaid: boolean; is
 };
 
 
-export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete, onRefund, isRefunding, isSelectable, isSelected, onSelect }) => {
-    const { id, orderNumber, customer, items, total, paymentMethod, changeNeeded, changeAmount, notes, status, paymentStatus, createdAt, pickupTimeEstimate, mercadoPagoDetails, numberOfPeople, deliveryFee, allergies } = order;
+export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onUpdatePaymentStatus, onUpdateReservationTime, onDelete, onPermanentDelete, isSelectable, isSelected, onSelect }) => {
+    const { id, orderNumber, customer, items, total, paymentMethod, changeNeeded, changeAmount, notes, status, paymentStatus, createdAt, pickupTimeEstimate, numberOfPeople, deliveryFee, allergies } = order;
     const isReservation = customer.orderType === 'local';
     const config = getStatusConfig(order);
     const { text: paymentStatusText, isPaid, isRefunded } = getPaymentStatusInfo(order);
@@ -111,10 +107,6 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
     };
 
     const handleRefuse = () => {
-        if (paymentStatus === 'paid_online') {
-            alert("Este pedido já foi pago via PIX pelo site. Só é permitido recusar pedidos pagos após efetuar o reembolso.");
-            return;
-        }
         onUpdateStatus(id, 'cancelled');
     };
     
@@ -178,8 +170,6 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
         return statusOptionsMap[status] || status; // Fallback to the default map
     };
 
-    const canRefund = paymentStatus === 'paid_online' && !isRefunded;
-
     const statusChanger = (
         <div className="flex items-center gap-2">
             <label htmlFor={`status-select-${order.id}`} className="text-sm font-semibold text-gray-700 whitespace-nowrap">Alterar status:</label>
@@ -198,7 +188,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
         </div>
     );
     
-    const paymentStatusChanger = !isArchived && !isRefunded && order.paymentStatus !== 'paid_online' && !isReservation && (
+    const paymentStatusChanger = !isArchived && !isRefunded && !isReservation && (
         <div className="flex items-center gap-2">
             <label htmlFor={`payment-status-select-${order.id}`} className="text-sm font-semibold text-gray-700 whitespace-nowrap">Pgto:</label>
             <select
@@ -257,11 +247,6 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                         <i className="fab fa-whatsapp text-2xl"></i>
                                     </button>
                                 </div>
-                                {isPaid && paymentStatus === 'paid_online' && (
-                                    <div className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full animate-pulse border border-green-200 inline-flex items-center justify-center whitespace-nowrap">
-                                        <i className="fas fa-check-circle mr-1"></i> PAGO PELO SITE
-                                    </div>
-                                )}
                                 {isRefunded && (
                                     <div className="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded-full border border-yellow-200">
                                        <i className="fas fa-undo-alt mr-1"></i> ESTORNADO
@@ -319,22 +304,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                     {deliveryFee > 0 && (<p><strong>Taxa de Entrega:</strong> {deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>)}
                                 </div>
 
-                                 {mercadoPagoDetails?.paymentId && (
-                                    <div className="mt-2 pt-2 border-t border-gray-200 space-y-2">
-                                        <div className="text-xs space-y-1">
-                                             <p><strong>ID Pagamento:</strong> {mercadoPagoDetails.paymentId}</p>
-                                        </div>
-                                        <a 
-                                            href={`https://www.mercadopago.com.br/money-out/transfer/api/receipt/pix_pdf/${mercadoPagoDetails.paymentId}/pix_account/pix_payment.pdf`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-2 text-sm bg-blue-100 text-blue-700 font-semibold py-1 px-2 rounded-md hover:bg-blue-200"
-                                        >
-                                            <i className="fas fa-receipt"></i>
-                                            <span>Ver Comprovante</span>
-                                        </a>
-                                    </div>
-                                )}
+                                 
                             </div>
                             )}
                         </div>
@@ -358,15 +328,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                                 </>
                             ) : status === 'pending' ? (
                                 <div className="flex items-center gap-2 w-full">
-                                    {canRefund && (
-                                         <button 
-                                            onClick={() => onRefund(id)} 
-                                            disabled={isRefunding}
-                                            className="bg-yellow-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-yellow-600 disabled:bg-yellow-300 disabled:cursor-not-allowed flex items-center justify-center min-w-[110px]"
-                                         >
-                                            {isRefunding ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-undo-alt mr-2"></i>Estornar</>}
-                                         </button>
-                                    )}
+                                    
                                     <div className="flex-grow"></div>
                                     <button onClick={handleAccept} className="bg-green-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-green-600"><i className="fas fa-check mr-2"></i>Aceitar</button>
                                     <button onClick={handleRefuse} className="bg-gray-400 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-500"><i className="fas fa-ban mr-2"></i>Recusar</button>
@@ -374,15 +336,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onU
                             ) : (
                                  <div className="flex flex-wrap items-center justify-end gap-3 w-full">
                                     {paymentStatusChanger}
-                                    {canRefund && (
-                                         <button 
-                                            onClick={() => onRefund(id)} 
-                                            disabled={isRefunding}
-                                            className="bg-yellow-500 text-white font-semibold py-2 px-3 rounded-lg text-sm hover:bg-yellow-600 disabled:bg-yellow-300 disabled:cursor-not-allowed flex items-center justify-center min-w-[110px]"
-                                         >
-                                            {isRefunding ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-undo-alt mr-2"></i>Estornar</>}
-                                         </button>
-                                    )}
+                                    
                                     <div className="flex-grow"></div>
                                     
                                     {/* Next-step buttons */}

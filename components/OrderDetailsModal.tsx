@@ -19,7 +19,6 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onC
      const paymentStatusInfo = {
         'pending': { text: 'Pendente', color: 'text-yellow-600' },
         'paid': { text: 'Pago', color: 'text-green-600' },
-        'paid_online': { text: 'Pago Pelo Site', color: 'text-green-600 font-bold' },
         'refunded': { text: 'Estornado', color: 'text-orange-500' }
     }[order.paymentStatus] || { text: 'Pendente', color: 'text-yellow-600' };
 
