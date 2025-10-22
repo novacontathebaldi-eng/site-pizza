@@ -467,7 +467,7 @@ exports.syncGuestOrders = onCall({region: "southamerica-east1"}, async (request)
 });
 
 // --- Firestore Trigger (v2) ---
-exports.setAdminClaim = onDocumentWritten(
+exports.onRoleChange = onDocumentWritten(
     {
       document: "roles/{userId}",
       region: "southamerica-east1",
