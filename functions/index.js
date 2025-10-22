@@ -509,3 +509,33 @@ exports.syncGuestOrders = onCall({secrets}, async (request) => {
     throw new onCall.HttpsError("internal", "Não foi possível associar os pedidos.");
   }
 });
+
+/**
+ * Triggered when a document in the 'roles' collection is created, updated, or deleted.
+ * It sets a custom 'admin' claim on the corresponding user's authentication token.
+ */
+exports.setAdminClaim = onDocumentUpdated("roles/{userId}", async (event) => {
+  const userId = event.params.userId;
+  const afterData = event.data.after.data();
+
+  // If the document is deleted, 'afterData' will be undefined.
+  // We treat document deletion as removing the admin role for security.
+  const isAdmin = afterData ? afterData.admin === true : false;
+
+  try {
+    // Fetch the user from Firebase Authentication
+    const user = await admin.auth().getUser(userId);
+    const existingClaims = user.customClaims || {};
+
+    // Only set claims if the admin status has actually changed.
+    // This prevents unnecessary token refreshes on the client.
+    if (existingClaims.admin !== isAdmin) {
+      await admin.auth().setCustomUserClaims(userId, { ...existingClaims, admin: isAdmin });
+      logger.info(`Claim de 'admin' para o usuário ${userId} foi atualizado para: ${isAdmin}`);
+    } else {
+      logger.info(`Claim de 'admin' para o usuário ${userId} já está correto (${isAdmin}). Nenhuma ação tomada.`);
+    }
+  } catch (error) {
+    logger.error(`Erro ao definir custom claim para o usuário ${userId}:`, error);
+  }
+});

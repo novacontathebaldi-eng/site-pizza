@@ -395,29 +395,37 @@ const App: React.FC = () => {
             return;
         }
         const unsubscribe = auth.onAuthStateChanged(async (user) => {
+            setIsAuthLoading(true);
             setCurrentUser(user);
             if (user) {
-                const profile = await firebaseService.getUserProfile(user.uid);
-                setUserProfile(profile);
-                if (profile?.name) setName(profile.name);
-                if (profile?.phone) setPhone(profile.phone);
-
-                // Check for admin custom claim
-                user.getIdTokenResult().then((idTokenResult) => {
+                try {
+                    const profilePromise = firebaseService.getUserProfile(user.uid);
+                    const tokenPromise = user.getIdTokenResult(true); // Force refresh token
+    
+                    const [profile, idTokenResult] = await Promise.all([profilePromise, tokenPromise]);
+    
+                    setUserProfile(profile);
+                    if (profile?.name) setName(profile.name);
+                    if (profile?.phone) setPhone(profile.phone);
+    
                     const isAdminClaim = !!idTokenResult.claims.admin;
                     setIsAdmin(isAdminClaim);
-                });
-
+                } catch (error) {
+                    console.error("Error fetching user profile or claims:", error);
+                    setUserProfile(null);
+                    setIsAdmin(false);
+                    addToast('Erro ao carregar dados do usuário.', 'error');
+                }
             } else {
                 setUserProfile(null);
-                setIsAdmin(false); // Reset admin status on logout
+                setIsAdmin(false);
                 setName('');
                 setPhone('');
             }
             setIsAuthLoading(false);
         });
         return () => unsubscribe();
-    }, []);
+    }, [addToast]);
     
     // Effect to sync guest orders on login
     useEffect(() => {
@@ -428,9 +436,9 @@ const App: React.FC = () => {
                     await firebaseService.syncGuestOrders(guestOrderIds);
                     localStorage.removeItem('santaSensacaoGuestOrders');
                     addToast('Seus pedidos anteriores foram associados à sua conta!', 'success');
-                } catch (error) {
+                } catch (error: any) {
                     console.error('Failed to sync guest orders:', error);
-                    addToast('Não foi possível associar seus pedidos anteriores.', 'error');
+                    addToast(error.message || 'Não foi possível associar seus pedidos anteriores.', 'error');
                 }
             }
         };
