@@ -91,7 +91,7 @@ exports.updateStoreStatusBySchedule = onSchedule(
 );
 
 // --- Firestore Trigger to run status check when automatic scheduling is enabled (v2) ---
-exports.onSettingsChange = onDocumentUpdated(
+exports.onSettingsUpdate = onDocumentUpdated(
     {
       document: "store_config/site_settings",
       region: "southamerica-east1",
