@@ -99,7 +99,8 @@ export interface ReservationDetails {
 
 // New Types for Order Management
 export type OrderStatus = 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled' | 'reserved' | 'deleted' | 'awaiting-payment';
-export type PaymentStatus = 'pending' | 'paid' | 'refunded';
+// FIX: Added 'paid_online' to the PaymentStatus type to accommodate online PIX payments and resolve the type mismatch error in CheckoutModal.tsx.
+export type PaymentStatus = 'pending' | 'paid' | 'paid_online' | 'refunded';
 
 export interface OrderCustomerDetails {
     name: string;
@@ -134,6 +135,11 @@ export interface Order {
     createdAt: firebase.firestore.Timestamp | any; // Firestore Timestamp
     pickupTimeEstimate?: string;
     numberOfPeople?: number;
+    // FIX: Added the optional 'mercadoPagoDetails' property to the Order interface. This resolves errors in PixPaymentModal.tsx where this property was being accessed but was not defined on the type.
+    mercadoPagoDetails?: {
+        qrCodeBase64: string;
+        qrCode: string;
+    };
 }
 
 export interface DaySchedule {
