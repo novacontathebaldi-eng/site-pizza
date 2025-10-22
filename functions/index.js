@@ -475,3 +475,30 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
 
   throw new onCall.HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
 });
+/**
+ * Gatilho do Firestore que é acionado quando um documento na coleção 'roles' é criado ou atualizado.
+ * Ele define um custom claim 'admin' no token de autenticação do usuário correspondente.
+ */
+exports.onRoleChange = onDocumentUpdated("roles/{userId}", async (event) => {
+  const userId = event.params.userId;
+  const data = event.data.after.data();
+
+  // Verifica se o campo 'admin' existe e é booleano
+  const isAdmin = data && data.admin === true;
+
+  try {
+    // Busca o usuário no Firebase Authentication
+    const user = await admin.auth().getUser(userId);
+
+    // Pega os claims existentes para não sobrescrevê-los
+    const existingClaims = user.customClaims || {};
+
+    // Se o status de admin mudou, atualiza o claim
+    if (existingClaims.admin !== isAdmin) {
+      await admin.auth().setCustomUserClaims(userId, { ...existingClaims, admin: isAdmin });
+      logger.info(`Claim de admin para o usuário ${userId} atualizado para: ${isAdmin}`);
+    }
+  } catch (error) {
+    logger.error(`Erro ao definir custom claim para o usuário ${userId}:`, error);
+  }
+});
