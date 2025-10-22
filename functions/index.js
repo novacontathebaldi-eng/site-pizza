@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-const {onCall, onRequest} = require("firebase-functions/v2/h");
+const {onCall, onRequest} = require("firebase-functions/v2/https");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
