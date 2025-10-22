@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { SiteSettings, ContentSection, FooterLink } from '../types';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
@@ -278,9 +279,9 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                 <div className="p-4 border rounded-lg bg-gray-50/50">
                     <h3 className="text-lg font-bold mb-4 pb-2 border-b">Seções de Conteúdo da Página</h3>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
-                        {/* FIX: Moved the div with spacing outside SortableContext to resolve a 'children' prop type error. The context provider now directly wraps the items to be sorted. */}
-                        <div className="space-y-2">
-                            <SortableContext items={formData.contentSections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                        {/* FIX: Corrected a 'children' prop type error in SortableContext by wrapping the mapped items in a div that handles spacing. */}
+                        <SortableContext items={formData.contentSections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                            <div className="space-y-2">
                                 {formData.contentSections.map(section => (
                                     <SortableContentSectionItem 
                                         key={section.id} 
@@ -295,8 +296,8 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                                         onFileChange={handleFileChange}
                                     />
                                 ))}
-                            </SortableContext>
-                        </div>
+                            </div>
+                        </SortableContext>
                     </DndContext>
                      <button type="button" onClick={handleAddNewSection} className="mt-4 bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600">
                         <i className="fas fa-plus mr-2"></i>Adicionar Nova Seção
@@ -307,9 +308,9 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                  <div className="p-4 border rounded-lg bg-gray-50/50">
                     <h3 className="text-lg font-bold mb-4 pb-2 border-b">Links do Rodapé</h3>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleFooterLinkDragEnd}>
-                        {/* FIX: Moved the div with spacing outside SortableContext to resolve a 'children' prop type error. The context provider now directly wraps the items to be sorted. */}
-                        <div className="space-y-2">
-                            <SortableContext items={(formData.footerLinks || []).map(l => l.id)} strategy={verticalListSortingStrategy}>
+                        {/* FIX: Corrected a 'children' prop type error in SortableContext by wrapping the mapped items in a div that handles spacing. */}
+                        <SortableContext items={(formData.footerLinks || []).map(l => l.id)} strategy={verticalListSortingStrategy}>
+                            <div className="space-y-2">
                                 {(formData.footerLinks || []).map(link => (
                                     <SortableFooterLinkItem 
                                         key={link.id}
@@ -318,8 +319,8 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                                         onDelete={handleRemoveFooterLink}
                                     />
                                 ))}
-                            </SortableContext>
-                        </div>
+                            </div>
+                        </SortableContext>
                     </DndContext>
                     <button type="button" onClick={handleAddFooterLink} className="mt-4 bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600">
                         <i className="fas fa-plus mr-2"></i>Adicionar Link

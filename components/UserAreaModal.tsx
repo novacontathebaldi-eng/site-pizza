@@ -7,6 +7,7 @@ import defaultProfilePic from '../assets/perfil.png';
 import userAreaBackground from '../assets/fundocliente.png';
 import { OrderStatusTracker } from './OrderStatusTracker';
 import { OrderDetailsModal } from './OrderDetailsModal';
+import { ImageCropperModal } from './ImageCropperModal';
 
 const LOCALIDADES = ['Centro', 'Olaria', 'Vila Nova', 'Moxafongo', 'Cocal', 'Funil'];
 
@@ -278,52 +279,14 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+    const [isCropperOpen, setIsCropperOpen] = useState(false);
+    const [imageToCrop, setImageToCrop] = useState<string | null>(null);
 
     const handleUploadClick = () => {
         fileInputRef.current?.click();
     };
 
-    const resizeImage = (file: File): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = (event) => {
-                const img = new Image();
-                img.src = event.target?.result as string;
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 256;
-                    const MAX_HEIGHT = 256;
-                    let width = img.width;
-                    let height = img.height;
-
-                    if (width > height) {
-                        if (width > MAX_WIDTH) {
-                            height *= MAX_WIDTH / width;
-                            width = MAX_WIDTH;
-                        }
-                    } else {
-                        if (height > MAX_HEIGHT) {
-                            width *= MAX_HEIGHT / height;
-                            height = MAX_HEIGHT;
-                        }
-                    }
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    if (!ctx) {
-                        return reject(new Error('Não foi possível obter o contexto do canvas.'));
-                    }
-                    ctx.drawImage(img, 0, 0, width, height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.9));
-                };
-                img.onerror = error => reject(error);
-            };
-            reader.onerror = error => reject(error);
-        });
-    };
-
-    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) {
             return;
         }
@@ -333,21 +296,33 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
             return;
         }
 
+        const reader = new FileReader();
+        reader.onload = () => {
+            setImageToCrop(reader.result as string);
+            setIsCropperOpen(true);
+        };
+        reader.readAsDataURL(file);
+
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    };
+    
+    const handleCropComplete = async (croppedImageBase64: string) => {
+        setIsCropperOpen(false);
+        setImageToCrop(null);
         setIsPhotoUploading(true);
         try {
-            const resizedImageBase64 = await resizeImage(file);
-            await firebaseService.manageProfilePicture(resizedImageBase64);
+            await firebaseService.manageProfilePicture(croppedImageBase64);
             addToast('Foto de perfil atualizada!', 'success');
         } catch (error) {
             console.error(error);
             addToast('Erro ao atualizar a foto.', 'error');
         } finally {
             setIsPhotoUploading(false);
-            if(fileInputRef.current) {
-                fileInputRef.current.value = "";
-            }
         }
     };
+
 
     const handleRemovePhoto = async () => {
         if (!window.confirm('Tem certeza que deseja remover sua foto de perfil?')) {
@@ -420,6 +395,17 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
                 {isSaving ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-2"></i><span>Salvar Perfil</span></>}
             </button>
         </div>
+        {imageToCrop && (
+            <ImageCropperModal 
+                isOpen={isCropperOpen}
+                onClose={() => {
+                    setIsCropperOpen(false);
+                    setImageToCrop(null);
+                }}
+                imageSrc={imageToCrop}
+                onCropComplete={handleCropComplete}
+            />
+        )}
     </form>
 )};
 

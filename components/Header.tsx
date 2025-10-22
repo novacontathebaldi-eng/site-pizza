@@ -72,7 +72,7 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOp
                             {isAuthLoading ? (
                                 <i className="fas fa-spinner fa-spin text-2xl"></i>
                             ) : user ? (
-                                <img src={user.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-full h-full rounded-lg object-cover" />
+                                <img src={user.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-full h-full rounded-full object-cover" />
                             ) : (
                                 <i className="fas fa-user-circle text-2xl"></i>
                             )}
