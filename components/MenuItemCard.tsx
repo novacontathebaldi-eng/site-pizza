@@ -3,6 +3,7 @@ import { Product } from '../types';
 
 interface MenuItemCardProps {
     product: Product;
+    categoryName: string;
     onAddToCart: (product: Product, size: string, price: number) => void;
     isStoreOnline: boolean;
     isInCart: boolean;
@@ -10,11 +11,12 @@ interface MenuItemCardProps {
 
 const sizeOrder = ['P', 'M', 'G', 'Única'];
 
-export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart, isStoreOnline, isInCart }) => {
+export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, categoryName, onAddToCart, isStoreOnline, isInCart }) => {
     const prices = product.prices ?? {};
     const hasPrices = Object.keys(prices).length > 0;
     const isOutOfStock = product.stockStatus === 'out_of_stock';
     const isPromo = product.isPromotion && product.promotionalPrice != null && product.promotionalPrice > 0;
+    const isPizza = categoryName.toLowerCase().includes('pizza');
 
 
     const sortedSizes = useMemo(() => {
@@ -104,6 +106,19 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
         priceToDisplay = 'Indisponível';
     }
 
+    const sliceInfo = useMemo(() => {
+        if (!isPizza || !selectedSize) {
+            return null;
+        }
+        if (selectedSize === 'M') {
+            return '6 fatias';
+        }
+        if (selectedSize === 'G') {
+            return '8 fatias';
+        }
+        return null;
+    }, [isPizza, selectedSize]);
+
     return (
         <div className={`bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 flex flex-col overflow-hidden border border-gray-200`}>
             <div className="relative">
@@ -161,12 +176,19 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
 
                 <div className="mt-auto pt-2 flex justify-between items-center">
                      <div className="flex flex-col items-start">
+                        <div className="h-4 mb-1 flex items-end">
+                            {sliceInfo && (
+                                <span className="text-xs font-semibold text-brand-olive-600">
+                                    {sliceInfo}
+                                </span>
+                            )}
+                        </div>
                         {originalPriceStriked && (
                             <span className="text-xs text-gray-500 line-through">
                                 {originalPriceStriked}
                             </span>
                         )}
-                        <span className={`${isPromo ? 'text-2xl leading-none' : 'text-xl'} font-bold text-accent`}>
+                        <span className={`${isPromo ? 'text-2xl leading-tight' : 'text-xl'} font-bold text-accent -mt-1`}>
                             {priceToDisplay}
                         </span>
                     </div>
