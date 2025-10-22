@@ -112,7 +112,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ settings, isLoading, o
                     </button>
                 </div>
 
-                <div className="mt-8 flex flex-wrap justify-center gap-3">
+                <div className="mt-8 flex justify-center gap-3">
                     <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 text-brand-ivory-50/90">
                         <i className="fas fa-motorcycle text-brand-gold-600"></i>
                         <span className="font-semibold text-sm">Delivery</span>

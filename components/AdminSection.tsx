@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 // FIX: The 'Partial' type is a built-in TypeScript utility and does not need to be imported.
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, DaySchedule } from '../types';
@@ -977,12 +978,12 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                                 )}
                                                                 <h4 className={`text-lg font-semibold text-brand-olive-600 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4>
                                                             </div>
-                                                            {/* FIX: Wrapped the sortable items in a div to resolve a TypeScript error about a missing 'children' prop on SortableContext. This may impact drag-and-drop behavior but addresses the compilation error. */}
-                                                            <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}>
-                                                                <div className="space-y-2">
+                                                            {/* FIX: Moved the div with spacing outside SortableContext to resolve a 'children' prop type error. The context provider now directly wraps the items to be sorted. */}
+                                                            <div className="space-y-2">
+                                                                <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}>
                                                                     {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} isDeleteMode={isProductDeleteMode} isSelected={selectedProductIds.has(product.id)} onSelect={handleSelectProduct} />)}
-                                                                </div>
-                                                            </SortableContext>
+                                                                </SortableContext>
+                                                            </div>
                                                         </div> 
                                                     ) 
                                                 })} 
@@ -1012,9 +1013,9 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                         </button>
                                     </div>
                                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
-                                        {/* FIX: Wrapped the sortable items in a div to resolve a TypeScript error about a missing 'children' prop on SortableContext. This may impact drag-and-drop behavior but addresses the compilation error. */}
-                                        <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                                            <div className="space-y-2">
+                                        {/* FIX: Moved the div with spacing outside SortableContext to resolve a 'children' prop type error. The context provider now directly wraps the items to be sorted. */}
+                                        <div className="space-y-2">
+                                            <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}>
                                                 {localCategories.map(cat => {
                                                     const productsInCategory = allProducts.filter(p => p.categoryId === cat.id && !p.deleted);
                                                     const isCategoryDisabled = productsInCategory.length === 0 || productsInCategory.every(p => !p.active);
@@ -1029,8 +1030,8 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                         />
                                                     );
                                                 })}
-                                            </div>
-                                        </SortableContext>
+                                            </SortableContext>
+                                        </div>
                                     </DndContext>
                                 </div>
                             )}
