@@ -1,19 +1,13 @@
 /* eslint-disable max-len */
-const {onCall, onRequest} = require("firebase-functions/v2/https");
-const {onSchedule} = require("firebase-functions/v2/scheduler");
-const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
+const functions = require("firebase-functions");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
-const crypto = require("crypto");
 const {GoogleGenAI} = require("@google/genai");
 const {OAuth2Client} = require("google-auth-library");
 
 admin.initializeApp();
 const db = admin.firestore();
 const storage = admin.storage();
-
-// Define os secrets que as funções irão usar.
-const secrets = ["GEMINI_API_KEY", "GOOGLE_CLIENT_ID"];
 
 // --- Reusable function to check and set store status based on schedule ---
 const runStoreStatusCheck = async () => {
@@ -82,27 +76,27 @@ const runStoreStatusCheck = async () => {
 
 
 // --- Scheduled Function for Automatic Store Status ---
-exports.updateStoreStatusBySchedule = onSchedule({
-  schedule: "every 5 minutes",
-  timeZone: "America/Sao_Paulo",
-}, async (event) => {
-  await runStoreStatusCheck();
-});
+exports.updateStoreStatusBySchedule = functions.pubsub.schedule("every 5 minutes")
+    .timeZone("America/Sao_Paulo")
+    .onRun(async (context) => {
+      await runStoreStatusCheck();
+    });
 
 // --- Firestore Trigger to run status check when automatic scheduling is enabled ---
-exports.onSettingsChange = onDocumentUpdated("store_config/site_settings", async (event) => {
-  const beforeData = event.data.before.data();
-  const afterData = event.data.after.data();
+exports.onSettingsChange = functions.firestore.document("store_config/site_settings")
+    .onUpdate(async (change, context) => {
+      const beforeData = change.before.data();
+      const afterData = change.after.data();
 
-  const wasEnabled = beforeData.automaticSchedulingEnabled === true;
-  const isEnabled = afterData.automaticSchedulingEnabled === true;
+      const wasEnabled = beforeData.automaticSchedulingEnabled === true;
+      const isEnabled = afterData.automaticSchedulingEnabled === true;
 
-  // Trigger the check only when the feature is toggled from OFF to ON.
-  if (!wasEnabled && isEnabled) {
-    logger.info("Agendamento automático foi ativado. Acionando verificação de status imediata.");
-    await runStoreStatusCheck();
-  }
-});
+      // Trigger the check only when the feature is toggled from OFF to ON.
+      if (!wasEnabled && isEnabled) {
+        logger.info("Agendamento automático foi ativado. Acionando verificação de status imediata.");
+        await runStoreStatusCheck();
+      }
+    });
 
 
 // --- Chatbot Sensação ---
@@ -111,28 +105,23 @@ let ai; // Mantém a instância da IA no escopo global para ser reutilizada apó
 /**
  * Chatbot Cloud Function to interact with Gemini API.
  */
-exports.askSanto = onCall({secrets}, async (request) => {
+exports.askSanto = functions.https.onCall(async (data, context) => {
   // "Lazy Initialization": Inicializa a IA somente na primeira vez que a função é chamada.
-  // Isso evita timeouts durante o deploy.
   if (!ai) {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = functions.config().gemini?.api_key || process.env.GEMINI_API_KEY;
     if (!apiKey) {
       logger.error("GEMINI_API_KEY not set. Cannot initialize Gemini AI.");
-      throw new Error("Internal server error: Assistant is not configured.");
+      throw new functions.https.HttpsError("internal", "Internal server error: Assistant is not configured.");
     }
     ai = new GoogleGenAI({apiKey});
     logger.info("Gemini AI client initialized on first call.");
   }
 
-  // 1. Recebemos o histórico da conversa (que veio do frontend)
-  const conversationHistory = request.data.history;
+  const conversationHistory = data.history;
   if (!conversationHistory || conversationHistory.length === 0) {
-    throw new Error("No conversation history provided.");
+    throw new functions.https.HttpsError("invalid-argument", "No conversation history provided.");
   }
 
-  // 2. Formatamos o histórico para o formato que a API do Gemini espera.
-  // A API espera um array de objetos { role: 'user'|'model', parts: [{ text: '...' }] }
-  // O papel do nosso bot ('bot') é traduzido para 'model' para a API.
   const contents = conversationHistory.map((message) => ({
     role: message.role === "bot" ? "model" : "user",
     parts: [{text: message.content}],
@@ -186,7 +175,6 @@ exports.askSanto = onCall({secrets}, async (request) => {
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      // 3. Enviamos o histórico completo para a API
       contents: contents,
       config: {
         systemInstruction: systemInstruction,
@@ -196,7 +184,7 @@ exports.askSanto = onCall({secrets}, async (request) => {
     return {reply: response.text};
   } catch (error) {
     logger.error("Error calling Gemini API:", error);
-    throw new Error("Failed to get a response from the assistant.");
+    throw new functions.https.HttpsError("internal", "Failed to get a response from the assistant.");
   }
 });
 
@@ -205,16 +193,16 @@ exports.askSanto = onCall({secrets}, async (request) => {
  * Verifies a Google ID token, creates or updates a Firebase user,
  * and returns a custom token for session authentication.
  */
-exports.verifyGoogleToken = onCall({secrets}, async (request) => {
-  const {idToken} = request.data;
-  const clientId = process.env.GOOGLE_CLIENT_ID;
+exports.verifyGoogleToken = functions.https.onCall(async (data, context) => {
+  const {idToken} = data;
+  const clientId = functions.config().google?.client_id || process.env.GOOGLE_CLIENT_ID;
 
   if (!idToken) {
-    throw new onCall.HttpsError("invalid-argument", "The function must be called with an idToken.");
+    throw new functions.https.HttpsError("invalid-argument", "The function must be called with an idToken.");
   }
   if (!clientId) {
     logger.error("GOOGLE_CLIENT_ID not set.");
-    throw new onCall.HttpsError("internal", "Authentication is not configured correctly.");
+    throw new functions.https.HttpsError("internal", "Authentication is not configured correctly.");
   }
 
   const client = new OAuth2Client(clientId);
@@ -227,15 +215,13 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
     const payload = ticket.getPayload();
 
     if (!payload) {
-      throw new onCall.HttpsError("unauthenticated", "Invalid ID token.");
+      throw new functions.https.HttpsError("unauthenticated", "Invalid ID token.");
     }
 
     const {sub: googleUid, email, name, picture} = payload;
-    // We create a unique UID for Firebase Auth based on the Google UID
     const uid = `google:${googleUid}`;
     let isNewUser = false;
 
-    // Update or create user in Firebase Auth
     try {
       await admin.auth().updateUser(uid, {
         email: email,
@@ -252,30 +238,27 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
           photoURL: picture,
         });
       } else {
-        throw error; // Re-throw other errors
+        throw error;
       }
     }
 
-    // Create or update user profile in Firestore 'users' collection
     const userRef = db.collection("users").doc(uid);
     const userDoc = await userRef.get();
 
-    // Create profile in Firestore only if it doesn't exist
     if (isNewUser || !userDoc.exists) {
       await userRef.set({
         name,
         email,
         photoURL: picture,
-        addresses: [], // Initialize with empty addresses
+        addresses: [],
       }, {merge: true});
     }
 
-    // Create a custom token for the Firebase user
     const customToken = await admin.auth().createCustomToken(uid);
     return {customToken};
   } catch (error) {
     logger.error("Error verifying Google token:", error);
-    throw new onCall.HttpsError("unauthenticated", "Token verification failed.", error.message);
+    throw new functions.https.HttpsError("unauthenticated", "Token verification failed.", error.message);
   }
 });
 
@@ -283,16 +266,14 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
 /**
  * Creates an order in Firestore.
  */
-exports.createOrder = onCall({secrets}, async (request) => {
-  const {details, cart, total} = request.data;
-  const userId = request.auth?.uid || null;
+exports.createOrder = functions.https.onCall(async (data, context) => {
+  const {details, cart, total} = data;
+  const userId = context.auth?.uid || null;
 
-  // 1. Validate input
   if (!details || !cart || !total) {
-    throw new Error("Dados do pedido incompletos.");
+    throw new functions.https.HttpsError("invalid-argument", "Dados do pedido incompletos.");
   }
 
-  // 2. Generate a sequential order number atomically
   const counterRef = db.doc("_internal/counters");
   let orderNumber;
   try {
@@ -308,15 +289,13 @@ exports.createOrder = onCall({secrets}, async (request) => {
     });
   } catch (error) {
     logger.error("Falha ao gerar o número do pedido:", error);
-    throw new Error("Não foi possível gerar o número do pedido.");
+    throw new functions.https.HttpsError("internal", "Não foi possível gerar o número do pedido.");
   }
 
-
-  // 3. Prepare order data for Firestore
   const orderStatus = "pending";
 
   const orderData = {
-    userId, // Associate order with user if logged in
+    userId,
     orderNumber,
     customer: {
       name: details.name,
@@ -340,31 +319,24 @@ exports.createOrder = onCall({secrets}, async (request) => {
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 
-  // 4. Create the order document
   const orderRef = await db.collection("orders").add(orderData);
   const orderId = orderRef.id;
   logger.info(`Pedido #${orderNumber} (ID: ${orderId}) criado no Firestore.`);
 
-  // 5. Return order info
   return {orderId, orderNumber};
 });
 
-// FIX: Added the missing `createReservation` Cloud Function.
-// This function handles the creation of reservations, which are stored as a special type of order.
-// It generates an atomic order number and saves the reservation details to Firestore.
 /**
  * Creates a reservation (as an order) in Firestore.
  */
-exports.createReservation = onCall({secrets}, async (request) => {
-  const {details} = request.data;
-  const userId = request.auth?.uid || null;
+exports.createReservation = functions.https.onCall(async (data, context) => {
+  const {details} = data;
+  const userId = context.auth?.uid || null;
 
-  // 1. Validate input
   if (!details || !details.name || !details.phone || !details.reservationDate || !details.reservationTime || !details.numberOfPeople) {
-    throw new Error("Dados da reserva incompletos.");
+    throw new functions.https.HttpsError("invalid-argument", "Dados da reserva incompletos.");
   }
 
-  // 2. Generate a sequential order number atomically
   const counterRef = db.doc("_internal/counters");
   let orderNumber;
   try {
@@ -380,10 +352,9 @@ exports.createReservation = onCall({secrets}, async (request) => {
     });
   } catch (error) {
     logger.error("Falha ao gerar o número do pedido:", error);
-    throw new Error("Não foi possível gerar o número do pedido.");
+    throw new functions.https.HttpsError("internal", "Não foi possível gerar o número do pedido.");
   }
 
-  // 3. Prepare reservation data for Firestore (as an Order)
   const orderData = {
     userId,
     orderNumber,
@@ -401,12 +372,10 @@ exports.createReservation = onCall({secrets}, async (request) => {
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 
-  // 4. Create the order document
   const orderRef = await db.collection("orders").add(orderData);
   const orderId = orderRef.id;
   logger.info(`Reserva #${orderNumber} (ID: ${orderId}) criada no Firestore.`);
 
-  // 5. Return order info
   return {orderId, orderNumber};
 });
 
@@ -414,18 +383,17 @@ exports.createReservation = onCall({secrets}, async (request) => {
 /**
  * Manages user profile picture upload and removal securely.
  */
-exports.manageProfilePicture = onCall({secrets}, async (request) => {
-  const uid = request.auth?.uid;
+exports.manageProfilePicture = functions.https.onCall(async (data, context) => {
+  const uid = context.auth?.uid;
   if (!uid) {
-    throw new onCall.HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
+    throw new functions.https.HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
   }
 
-  const {imageBase64} = request.data;
+  const {imageBase64} = data;
   const bucket = storage.bucket();
   const filePath = `user-profiles/${uid}/profile.jpg`;
   const file = bucket.file(filePath);
 
-  // Case 1: Remove photo (imageBase64 is null)
   if (imageBase64 === null) {
     try {
       await file.delete({ignoreNotFound: true});
@@ -435,33 +403,28 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
       return {success: true, photoURL: null};
     } catch (error) {
       logger.error(`Falha ao remover a foto de perfil para ${uid}:`, error);
-      throw new onCall.HttpsError("internal", "Não foi possível remover a foto de perfil.");
+      throw new functions.https.HttpsError("internal", "Não foi possível remover a foto de perfil.");
     }
   }
 
-  // Case 2: Upload/update photo (imageBase64 is a string)
   if (typeof imageBase64 === "string") {
     try {
       const matches = imageBase64.match(/^data:(image\/[a-z]+);base64,(.+)$/);
       if (!matches || matches.length !== 3) {
-        throw new onCall.HttpsError("invalid-argument", "Formato de imagem base64 inválido.");
+        throw new functions.https.HttpsError("invalid-argument", "Formato de imagem base64 inválido.");
       }
       const mimeType = matches[1];
       const base64Data = matches[2];
       const buffer = Buffer.from(base64Data, "base64");
 
-      // Upload the file and make it public
       await file.save(buffer, {
         metadata: {contentType: mimeType},
         public: true,
       });
 
       const publicUrl = file.publicUrl();
-      // Appending a timestamp as a query parameter to act as a cache buster.
-      // This ensures the browser always fetches the latest version of the profile picture.
       const photoURL = `${publicUrl}?t=${new Date().getTime()}`;
 
-      // Update Firebase Auth and Firestore user records
       await admin.auth().updateUser(uid, {photoURL});
       await db.collection("users").doc(uid).update({photoURL});
 
@@ -469,25 +432,25 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
       return {success: true, photoURL};
     } catch (error) {
       logger.error(`Falha ao atualizar a foto de perfil para ${uid}:`, error);
-      throw new onCall.HttpsError("internal", "Não foi possível salvar a nova foto de perfil.");
+      throw new functions.https.HttpsError("internal", "Não foi possível salvar a nova foto de perfil.");
     }
   }
 
-  throw new onCall.HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
+  throw new functions.https.HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
 });
 
 /**
  * Associates guest orders with a newly logged-in user.
  */
-exports.syncGuestOrders = onCall({secrets}, async (request) => {
-  const uid = request.auth?.uid;
+exports.syncGuestOrders = functions.https.onCall(async (data, context) => {
+  const uid = context.auth?.uid;
   if (!uid) {
-    throw new onCall.HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
+    throw new functions.https.HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
   }
 
-  const {orderIds} = request.data;
+  const {orderIds} = data;
   if (!Array.isArray(orderIds) || orderIds.length === 0) {
-    throw new onCall.HttpsError("invalid-argument", "A função deve ser chamada com um array de 'orderIds'.");
+    throw new functions.https.HttpsError("invalid-argument", "A função deve ser chamada com um array de 'orderIds'.");
   }
 
   logger.info(`Associando ${orderIds.length} pedido(s) ao usuário ${uid}...`);
@@ -506,36 +469,32 @@ exports.syncGuestOrders = onCall({secrets}, async (request) => {
     return {success: true};
   } catch (error) {
     logger.error(`Falha ao associar pedidos para o usuário ${uid}:`, error);
-    throw new onCall.HttpsError("internal", "Não foi possível associar os pedidos.");
+    throw new functions.https.HttpsError("internal", "Não foi possível associar os pedidos.");
   }
 });
 
 /**
- * Triggered when a document in the 'roles' collection is created, updated, or deleted.
+ * Triggered when a document in the 'roles' collection is created or updated.
  * It sets a custom 'admin' claim on the corresponding user's authentication token.
  */
-exports.setAdminClaim = onDocumentUpdated("roles/{userId}", async (event) => {
-  const userId = event.params.userId;
-  const afterData = event.data.after.data();
+exports.setAdminClaim = functions.firestore.document("roles/{userId}")
+    .onWrite(async (change, context) => {
+        const userId = context.params.userId;
+        const afterData = change.after.data();
 
-  // If the document is deleted, 'afterData' will be undefined.
-  // We treat document deletion as removing the admin role for security.
-  const isAdmin = afterData ? afterData.admin === true : false;
+        const isAdmin = afterData ? afterData.admin === true : false;
 
-  try {
-    // Fetch the user from Firebase Authentication
-    const user = await admin.auth().getUser(userId);
-    const existingClaims = user.customClaims || {};
+        try {
+            const user = await admin.auth().getUser(userId);
+            const existingClaims = user.customClaims || {};
 
-    // Only set claims if the admin status has actually changed.
-    // This prevents unnecessary token refreshes on the client.
-    if (existingClaims.admin !== isAdmin) {
-      await admin.auth().setCustomUserClaims(userId, { ...existingClaims, admin: isAdmin });
-      logger.info(`Claim de 'admin' para o usuário ${userId} foi atualizado para: ${isAdmin}`);
-    } else {
-      logger.info(`Claim de 'admin' para o usuário ${userId} já está correto (${isAdmin}). Nenhuma ação tomada.`);
-    }
-  } catch (error) {
-    logger.error(`Erro ao definir custom claim para o usuário ${userId}:`, error);
-  }
-});
+            if (existingClaims.admin !== isAdmin) {
+                await admin.auth().setCustomUserClaims(userId, { ...existingClaims, admin: isAdmin });
+                logger.info(`Claim de 'admin' para o usuário ${userId} foi atualizado para: ${isAdmin}`);
+            } else {
+                logger.info(`Claim de 'admin' para o usuário ${userId} já está correto (${isAdmin}). Nenhuma ação tomada.`);
+            }
+        } catch (error) {
+            logger.error(`Erro ao definir custom claim para o usuário ${userId}:`, error);
+        }
+    });
