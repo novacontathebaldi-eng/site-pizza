@@ -351,20 +351,19 @@ export const syncGuestOrders = async (userId: string, orderIds: string[]): Promi
 // --- Order Management Functions (Calling Cloud Functions) ---
 
 /**
- * Creates an order document in Firestore and, if it's a PIX payment,
- * initiates the payment with Mercado Pago.
+ * Creates an order document in Firestore.
  * @param details The customer and order details from the checkout form.
  * @param cart The items in the shopping cart.
  * @param total The total amount of the order.
- * @returns An object containing the new order's ID, its number, and PIX data if applicable.
+ * @returns An object containing the new order's ID and its number.
  */
-export const createOrder = async (details: OrderDetails, cart: CartItem[], total: number, pixOption?: 'payNow' | 'payLater'): Promise<{ orderId: string, orderNumber: number, pixData?: any }> => {
+export const createOrder = async (details: OrderDetails, cart: CartItem[], total: number): Promise<{ orderId: string, orderNumber: number }> => {
     if (!functions) {
         throw new Error("Firebase Functions is not initialized.");
     }
     const createOrderFunction = functions.httpsCallable('createOrder');
     try {
-        const result = await createOrderFunction({ details, cart, total, pixOption });
+        const result = await createOrderFunction({ details, cart, total });
         return result.data;
     } catch (error) {
         console.error("Error calling createOrder function:", error);
@@ -416,26 +415,5 @@ export const permanentDeleteMultipleOrders = async (orderIds: string[]): Promise
             batch.delete(orderRef);
         });
         await batch.commit();
-    }
-};
-
-
-/**
- * Calls a cloud function to process a full refund for a given order via Mercado Pago.
- * @param orderId The ID of the order to be refunded.
- * @returns The result from the cloud function, typically a success message.
- */
-export const refundPayment = async (orderId: string): Promise<any> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    const refundPaymentFunction = functions.httpsCallable('refundPayment');
-    try {
-        const result = await refundPaymentFunction({ orderId });
-        return result.data;
-    } catch (error: any) {
-        console.error("Error calling refundPayment function:", error);
-        // The error from the cloud function is more user-friendly
-        throw error;
     }
 };

@@ -11,8 +11,6 @@ import { Footer } from './components/Footer';
 import { CartSidebar } from './components/CartSidebar';
 import { CheckoutModal, OrderConfirmationModal, ReservationConfirmationModal } from './components/CheckoutModal';
 import { ReservationModal } from './components/ReservationModal';
-import { PixPaymentModal } from './components/PixPaymentModal';
-import { PaymentFailureModal } from './components/PaymentFailureModal';
 import { Chatbot } from '@/components/Chatbot';
 import { LoginModal } from '@/components/LoginModal';
 import { UserAreaModal } from '@/components/UserAreaModal';
@@ -219,17 +217,11 @@ const App: React.FC = () => {
 
     // Order/Payment Flow State
     const [cart, setCart] = useState<CartItem[]>([]);
-    const [payingOrder, setPayingOrder] = useState<Order | null>(null);
-    const [showPaymentFailureModal, setShowPaymentFailureModal] = useState<boolean>(false);
-    const [pixRetryKey, setPixRetryKey] = useState<number>(0);
     const [isProcessingOrder, setIsProcessingOrder] = useState<boolean>(false);
     const [confirmedOrderData, setConfirmedOrderData] = useState<Order | null>(null);
     const [confirmedReservationData, setConfirmedReservationData] = useState<Order | null>(null);
     const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
     const [isOrderTrackerExpanded, setIsOrderTrackerExpanded] = useState<boolean>(false);
-
-    // Admin State
-    const [refundingOrderId, setRefundingOrderId] = useState<string | null>(null);
     
     // Chatbot State
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -280,8 +272,6 @@ const App: React.FC = () => {
                isChatbotOpen || 
                isLoginModalOpen || 
                isUserAreaModalOpen || 
-               !!payingOrder || 
-               showPaymentFailureModal || 
                !!confirmedOrderData || 
                !!confirmedReservationData ||
                !!trackingOrder ||
@@ -294,8 +284,6 @@ const App: React.FC = () => {
         isChatbotOpen, 
         isLoginModalOpen, 
         isUserAreaModalOpen, 
-        payingOrder, 
-        showPaymentFailureModal, 
         confirmedOrderData, 
         confirmedReservationData,
         trackingOrder,
@@ -643,7 +631,7 @@ const App: React.FC = () => {
         const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         const total = subtotal + (details.deliveryFee || 0);
         try {
-            const { orderId, orderNumber } = await firebaseService.createOrder(details, cart, total, 'payLater');
+            const { orderId, orderNumber } = await firebaseService.createOrder(details, cart, total);
             
             if (!currentUser) {
                 const guestOrders = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
@@ -669,44 +657,6 @@ const App: React.FC = () => {
         }
     };
 
-    const handleInitiatePixPayment = async (details: OrderDetails, pixOption: 'payNow' | 'payLater') => {
-        setIsProcessingOrder(true);
-        setIsCheckoutModalOpen(false);
-        const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        const total = subtotal + (details.deliveryFee || 0);
-        try {
-            const { orderId, orderNumber, pixData } = await firebaseService.createOrder(details, cart, total, pixOption);
-    
-            if (!currentUser) {
-                const guestOrders = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
-                guestOrders.push(orderId);
-                localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
-            }
-    
-            if (!pixData || !pixData.qrCodeBase64) throw new Error("A resposta do servidor não incluiu os dados do PIX.");
-            
-            // Limpa o carrinho e fecha a sidebar antes de mostrar o modal do PIX
-            setCart([]);
-            setIsCartOpen(false);
-    
-            const newOrder: Order = {
-                id: orderId, orderNumber: orderNumber,
-                customer: { name: details.name, phone: details.phone, orderType: details.orderType, address: details.address, cpf: details.cpf },
-                items: cart, total, paymentMethod: 'pix', status: 'awaiting-payment', paymentStatus: 'pending',
-                deliveryFee: details.deliveryFee, allergies: details.allergies, createdAt: new Date(),
-                mercadoPagoDetails: { paymentId: '', qrCodeBase64: pixData.qrCodeBase64, qrCode: pixData.copyPaste }
-            };
-            setPayingOrder(newOrder);
-            setPixRetryKey(k => k + 1);
-        } catch (error: any) {
-            console.error("Failed to initiate PIX payment:", error);
-            addToast(error.message || "Erro ao iniciar pagamento PIX.", 'error');
-            setPayingOrder(null);
-        } finally {
-            setIsProcessingOrder(false);
-        }
-    };
-
     const handleConfirmReservation = async (details: ReservationDetails) => {
         setIsProcessingOrder(true);
         setIsReservationModalOpen(false);
@@ -726,15 +676,6 @@ const App: React.FC = () => {
             setIsProcessingOrder(false);
         }
     };
-
-    const handlePixPaymentSuccess = useCallback((paidOrder: Order) => {
-       if (!paidOrder || !paidOrder.id) { addToast("Erro crítico ao processar pagamento.", 'error'); return; }
-       addToast("Pagamento confirmado! Seu pedido foi registrado.", 'success');
-       setPayingOrder(null);
-       setConfirmedOrderData(paidOrder);
-       setCart([]);
-       setIsCartOpen(false);
-    }, [addToast]);
 
     const handleSendOrderToWhatsApp = (order: Order) => {
         const isPaid = order.paymentStatus === 'paid_online';
@@ -760,30 +701,6 @@ const App: React.FC = () => {
         const whatsappUrl = generateReservationWhatsAppMessage(details, reservation.orderNumber);
         window.open(whatsappUrl, '_blank');
         setConfirmedReservationData(null);
-    };
-
-    const handleClosePixModal = () => { if (payingOrder) setShowPaymentFailureModal(true); else setPayingOrder(null); };
-    const handleTryAgainPix = () => { setShowPaymentFailureModal(false); setPixRetryKey(k => k + 1); };
-    const handlePayLaterFromFailure = async () => {
-        if (!payingOrder) return;
-        const orderToUpdateId = payingOrder.id;
-        setShowPaymentFailureModal(false);
-        setPayingOrder(null);
-        setIsProcessingOrder(true);
-        try {
-            await firebaseService.updateOrderStatus(orderToUpdateId, 'pending');
-            const orderSnapshot = await db.collection('orders').doc(orderToUpdateId).get();
-            const finalOrderData = { id: orderSnapshot.id, ...orderSnapshot.data() } as Order;
-            addToast("Pedido enviado! O pagamento será feito na entrega/retirada.", 'success');
-            setConfirmedOrderData(finalOrderData);
-            setCart([]);
-            setIsCartOpen(false);
-        } catch (error) {
-            console.error("Failed to update order to pending:", error);
-            addToast("Erro ao processar o pedido. Tente novamente.", 'error');
-        } finally {
-            setIsProcessingOrder(false);
-        }
     };
 
     const handleSaveProduct = useCallback(async (product: Product) => {
@@ -898,8 +815,6 @@ const App: React.FC = () => {
             }
         }
     }, [addToast]);
-
-    const handleRefundOrder = useCallback(async (orderId: string) => { if (window.confirm("Estornar o valor total deste pagamento? Esta ação não pode ser desfeita.")) { const orderToRefund = orders.find(o => o.id === orderId); const paymentId = orderToRefund?.mercadoPagoDetails?.paymentId; if (!paymentId) { addToast("ID do pagamento não encontrado.", 'error'); return; } setRefundingOrderId(orderId); addToast("Processando estorno...", 'success'); try { await firebaseService.refundPayment(orderId); addToast(`Estorno solicitado com sucesso!`, 'success'); } catch (error: any) { console.error("Failed to refund order:", error); addToast(error.message || "Erro ao solicitar estorno.", 'error'); } finally { setRefundingOrderId(null); } } }, [addToast, orders]);
 
     const handleBulkDeleteProducts = useCallback(async (productIds: string[]) => {
         try {
@@ -1108,8 +1023,8 @@ const App: React.FC = () => {
                     onDeleteOrder={handleDeleteOrder} 
                     onPermanentDeleteOrder={handlePermanentDeleteOrder} 
                     onPermanentDeleteMultipleOrders={handlePermanentDeleteMultipleOrders} 
-                    onRefundOrder={handleRefundOrder} 
-                    refundingOrderId={refundingOrderId}
+                    onRefundOrder={async () => {}} 
+                    refundingOrderId={null}
                     onBulkDeleteProducts={handleBulkDeleteProducts}
                     onRestoreProduct={handleRestoreProduct}
                     onPermanentDeleteProduct={handlePermanentDeleteProduct}
@@ -1194,7 +1109,7 @@ const App: React.FC = () => {
                 onClose={() => setIsCheckoutModalOpen(false)}
                 cartItems={cart}
                 onConfirmCheckout={handleCheckout}
-                onInitiatePixPayment={handleInitiatePixPayment}
+                onInitiatePixPayment={() => {}}
                 isProcessing={isProcessingOrder}
                 name={name} setName={setName}
                 phone={phone} setPhone={setPhone}
@@ -1208,8 +1123,6 @@ const App: React.FC = () => {
                 name={name}
                 phone={phone}
             />
-            <PixPaymentModal key={pixRetryKey} order={payingOrder} onClose={handleClosePixModal} onPaymentSuccess={handlePixPaymentSuccess} isProcessing={isProcessingOrder}/>
-            <PaymentFailureModal isOpen={showPaymentFailureModal} onClose={() => { setShowPaymentFailureModal(false); setPayingOrder(null); }} onTryAgain={handleTryAgainPix} onPayLater={handlePayLaterFromFailure}/>
             <OrderConfirmationModal
                 order={confirmedOrderData}
                 onClose={() => setConfirmedOrderData(null)}
