@@ -29,7 +29,10 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
 }) => {
     const categoryRefs = useRef<Map<string, HTMLElement | null>>(new Map());
     const tabRefs = useRef<Map<string, HTMLAnchorElement | null>>(new Map());
+// Ref para evitar que o scroll automático da aba aconteça durante o scroll manual da página.
+    const isClickNavigating = useRef(false);
 
+    
     const sortedActiveCategories = useMemo(() => 
         [...categories].filter(c => c.active).sort((a, b) => a.order - b.order),
         [categories]
@@ -43,7 +46,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
         const observer = new IntersectionObserver(
             (entries) => {
                 entries.forEach((entry) => {
-                    if (entry.isIntersecting) {
+                    if (entry.isIntersecting && !isClickNavigating.current) {
                         setActiveCategoryId(entry.target.id.replace('category-section-', ''));
                     }
                 });
@@ -67,18 +70,26 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
         };
     }, [sortedActiveCategories, setActiveCategoryId, isStoreOnline]);
 
-    const handleTabClick = (e: React.MouseEvent<HTMLAnchorElement>, categoryId: string) => {
-        e.preventDefault();
-
-        // Scroll the clicked tab into the center of the tab bar
-        const activeTab = tabRefs.current.get(categoryId);
-        if (activeTab) {
-            activeTab.scrollIntoView({
+    // Efeito para rolar a aba ativa para o centro da tela
+    useEffect(() => {
+        const activeTabElement = tabRefs.current.get(activeCategoryId);
+        if (activeTabElement) {
+            activeTabElement.scrollIntoView({
                 behavior: 'smooth',
                 block: 'nearest',
                 inline: 'center'
             });
         }
+    }, [activeCategoryId]);
+
+    const handleTabClick = (e: React.MouseEvent<HTMLAnchorElement>, categoryId: string) => {
+        e.preventDefault();
+
+        // Define o estado para indicar que a navegação foi iniciada por um clique
+        isClickNavigating.current = true;
+        
+        // Atualiza imediatamente a categoria ativa para que a aba correta seja destacada
+        setActiveCategoryId(categoryId);
         
         const element = document.getElementById(`category-section-${categoryId}`);
         const stickyHeader = document.getElementById('sticky-menu-header');
