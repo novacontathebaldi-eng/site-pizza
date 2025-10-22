@@ -25,6 +25,7 @@ import { OrderDetailsModal } from './components/OrderDetailsModal';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { CookieConsentBanner } from './components/CookieConsentBanner';
 import { TermsOfServiceModal } from './components/TermsOfServiceModal';
+import { HalfAndHalfModal } from './components/HalfAndHalfModal';
 
 // Type declarations for Google GAPI library to avoid TypeScript errors
 declare global {
@@ -223,6 +224,10 @@ const App: React.FC = () => {
     const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
     const [isOrderTrackerExpanded, setIsOrderTrackerExpanded] = useState<boolean>(false);
     
+    // Half-and-Half Pizza State
+    const [isHalfAndHalfModalOpen, setIsHalfAndHalfModalOpen] = useState(false);
+    const [firstHalfForModal, setFirstHalfForModal] = useState<Product | null>(null);
+    
     // Chatbot State
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
         { role: 'bot', content: `🍕 Olá! Bem-vindo(a) à Pizzaria Santa Sensação!\n\nEu sou o Sensação, seu assistente virtual. Estou aqui para te ajudar a fazer pedidos, tirar dúvidas sobre nosso cardápio, acompanhar entregas e muito mais.\n\nComo posso te ajudar hoje?` }
@@ -276,7 +281,8 @@ const App: React.FC = () => {
                !!confirmedReservationData ||
                !!trackingOrder ||
                isPrivacyPolicyOpen ||
-               isTermsModalOpen;
+               isTermsModalOpen ||
+               isHalfAndHalfModalOpen;
     }, [
         isCartOpen, 
         isCheckoutModalOpen, 
@@ -288,7 +294,8 @@ const App: React.FC = () => {
         confirmedReservationData,
         trackingOrder,
         isPrivacyPolicyOpen,
-        isTermsModalOpen
+        isTermsModalOpen,
+        isHalfAndHalfModalOpen
     ]);
 
     // Effect to lock body scroll when a modal is open
@@ -583,6 +590,66 @@ const App: React.FC = () => {
             setPostRegisterAction(null);
         }
     };
+
+    const handleSelectHalfAndHalf = (product: Product) => {
+        setFirstHalfForModal(product);
+        setIsHalfAndHalfModalOpen(true);
+    };
+
+    const handleAddHalfAndHalfToCart = useCallback((product1: Product, product2: Product, size: string) => {
+        const price1 = product1.prices[size] || 0;
+        const price2 = product2.prices[size] || 0;
+        const finalPrice = Math.max(price1, price2);
+
+        // Sort by name to create a consistent ID and name
+        const halves = [product1, product2].sort((a, b) => a.name.localeCompare(b.name));
+        const [half1, half2] = halves;
+        
+        const compositeId = `half-${half1.id}-${half2.id}-${size}`;
+        const compositeName = `Meio a Meio: ${half1.name} / ${half2.name}`;
+
+        setCart(prevCart => {
+            const existingItemIndex = prevCart.findIndex(item => item.id === compositeId);
+            if (existingItemIndex > -1) {
+                const updatedCart = [...prevCart];
+                updatedCart[existingItemIndex].quantity += 1;
+                return updatedCart;
+            } else {
+                const newItem: CartItem = {
+                    id: compositeId,
+                    productId: half1.id, // Use first sorted half as primary
+                    name: compositeName,
+                    size,
+                    price: finalPrice,
+                    quantity: 1,
+                    imageUrl: half1.imageUrl, // Use first sorted half's image
+                    isHalfAndHalf: true,
+                    secondHalf: {
+                        productId: half2.id,
+                        name: half2.name
+                    }
+                };
+                return [...prevCart, newItem];
+            }
+        });
+
+        addToast("Pizza Meio a Meio adicionada!", 'success');
+        setIsHalfAndHalfModalOpen(false);
+    }, [addToast]);
+
+    const pizzaProducts = useMemo(() => {
+        const pizzaCategoryIds = categories
+            .filter(c => c.name.toLowerCase().includes('pizza'))
+            .map(c => c.id);
+        
+        return products.filter(p => 
+            pizzaCategoryIds.includes(p.categoryId) && 
+            p.active && 
+            !p.deleted && 
+            Object.keys(p.prices).length > 0 && 
+            !p.isPromotion
+        );
+    }, [categories, products]);
 
 
     // Other existing handlers...
@@ -997,7 +1064,7 @@ const App: React.FC = () => {
                 />
                 
                 {error && <div className="container mx-auto px-4 py-8"><div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-6 rounded-lg shadow-md" role="alert"><p className="font-bold text-lg mb-2">Falha na Conexão</p><p className="mb-4">{error}</p></div></div>}
-                {isLoading ? <div className="text-center py-20"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p></div> : !error && <MenuSection categories={categories} products={products.filter(p => !p.deleted)} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} activeCategoryId={activeMenuCategory} setActiveCategoryId={setActiveMenuCategory} cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} cartItems={cart}/>}
+                {isLoading ? <div className="text-center py-20"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p></div> : !error && <MenuSection categories={categories} products={products.filter(p => !p.deleted)} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} activeCategoryId={activeMenuCategory} setActiveCategoryId={setActiveMenuCategory} cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} cartItems={cart} onSelectHalfAndHalf={handleSelectHalfAndHalf} />}
                 <div id="sobre">{siteSettings.contentSections?.filter(section => section.isVisible).sort((a, b) => a.order - b.order).map((section, index) => <DynamicContentSection key={section.id} section={section} order={index} />)}</div>
                 <ContactSection settings={siteSettings} />
                 <AdminSection 
@@ -1169,6 +1236,13 @@ const App: React.FC = () => {
             <PrivacyPolicyModal isOpen={isPrivacyPolicyOpen} onClose={() => setIsPrivacyPolicyOpen(false)} />
             <TermsOfServiceModal isOpen={isTermsModalOpen} onClose={() => setIsTermsModalOpen(false)} />
             {showCookieBanner && <CookieConsentBanner onAccept={handleAcceptCookies} />}
+            <HalfAndHalfModal
+                isOpen={isHalfAndHalfModalOpen}
+                onClose={() => setIsHalfAndHalfModalOpen(false)}
+                pizzas={pizzaProducts}
+                firstHalf={firstHalfForModal}
+                onAddToCart={handleAddHalfAndHalfToCart}
+            />
 
             {(isProcessingOrder) && <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-6 font-semibold text-lg text-gray-700">Processando seu pedido...</p><p className="mt-2 text-sm text-gray-500">Por favor, aguarde um instante.</p></div></div>}
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]"><div className="w-full flex flex-col items-center space-y-4 sm:items-end">{toasts.map((toast) => (<div key={toast.id} className="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden animate-fade-in-up"><div className="p-4"><div className="flex items-start"><div className="flex-shrink-0">{toast.type === 'success' ? <i className="fas fa-check-circle h-6 w-6 text-green-500"></i> : <i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>}</div><div className="ml-3 w-0 flex-1 pt-0.5"><p className="text-sm font-medium text-gray-900">{toast.message}</p></div></div></div></div>))}</div></div>

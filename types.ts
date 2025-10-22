@@ -60,6 +60,11 @@ export interface CartItem {
     price: number;
     quantity: number;
     imageUrl: string;
+    isHalfAndHalf?: boolean;
+    secondHalf?: {
+        productId: string;
+        name: string;
+    };
 }
 
 export interface OrderDetails {

@@ -12,6 +12,7 @@ interface MenuSectionProps {
     cartItemCount: number;
     onCartClick: () => void;
     cartItems: CartItem[];
+    onSelectHalfAndHalf: (product: Product) => void;
 }
 
 const categoryIcons: { [key: string]: string } = {
@@ -25,7 +26,7 @@ const categoryIcons: { [key: string]: string } = {
 export const MenuSection: React.FC<MenuSectionProps> = ({ 
     categories, products, onAddToCart, isStoreOnline, 
     activeCategoryId, setActiveCategoryId, 
-    cartItemCount, onCartClick, cartItems
+    cartItemCount, onCartClick, cartItems, onSelectHalfAndHalf
 }) => {
     const categoryRefs = useRef<Map<string, HTMLElement | null>>(new Map());
     const tabRefs = useRef<Map<string, HTMLAnchorElement | null>>(new Map());
@@ -166,6 +167,7 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                                             onAddToCart={onAddToCart}
                                             isStoreOnline={isStoreOnline}
                                             isInCart={cartItems.some(item => item.productId === product.id)}
+                                            onSelectHalfAndHalf={onSelectHalfAndHalf}
                                         />
                                     ))}
                                 </div>

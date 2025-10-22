@@ -7,11 +7,12 @@ interface MenuItemCardProps {
     onAddToCart: (product: Product, size: string, price: number) => void;
     isStoreOnline: boolean;
     isInCart: boolean;
+    onSelectHalfAndHalf: (product: Product) => void;
 }
 
 const sizeOrder = ['P', 'M', 'G', 'Única'];
 
-export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, categoryName, onAddToCart, isStoreOnline, isInCart }) => {
+export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, categoryName, onAddToCart, isStoreOnline, isInCart, onSelectHalfAndHalf }) => {
     const prices = product.prices ?? {};
     const hasPrices = Object.keys(prices).length > 0;
     const isOutOfStock = product.stockStatus === 'out_of_stock';
@@ -192,25 +193,37 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, categoryNam
                             {priceToDisplay}
                         </span>
                     </div>
-                    <button 
-                        onClick={handleAddToCart}
-                        disabled={!isStoreOnline || wasAdded || (!hasPrices && !isPromo) || isOutOfStock}
-                        className={buttonClass}
-                    >
-                        {isOutOfStock ? (
-                            'Esgotado'
-                        ) : wasAdded ? (
-                            <>
-                                <i className="fas fa-check mr-1"></i>
-                                Adicionado!
-                            </>
-                        ) : (
-                            <>
-                                <i className="fas fa-plus mr-1"></i>
-                                Adicionar
-                            </>
+                    <div className="flex flex-col items-end gap-2">
+                        <button 
+                            onClick={handleAddToCart}
+                            disabled={!isStoreOnline || wasAdded || (!hasPrices && !isPromo) || isOutOfStock}
+                            className={buttonClass}
+                        >
+                            {isOutOfStock ? (
+                                'Esgotado'
+                            ) : wasAdded ? (
+                                <>
+                                    <i className="fas fa-check mr-1"></i>
+                                    Adicionado!
+                                </>
+                            ) : (
+                                <>
+                                    <i className="fas fa-plus mr-1"></i>
+                                    Adicionar
+                                </>
+                            )}
+                        </button>
+                        {isPizza && hasPrices && !isPromo && (
+                             <button
+                                onClick={() => onSelectHalfAndHalf(product)}
+                                disabled={!isStoreOnline || isOutOfStock}
+                                className="text-xs h-6 font-semibold text-accent hover:text-brand-olive-600 disabled:text-gray-400 disabled:cursor-not-allowed"
+                                title="Montar pizza com dois sabores"
+                            >
+                                🍕 Montar Meio a Meio
+                            </button>
                         )}
-                    </button>
+                    </div>
                 </div>
             </div>
         </div>
