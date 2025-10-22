@@ -115,9 +115,9 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, onAddToCart
                 
                 {/* Selo Inteligente: Mostra "Adicionado" com prioridade, ou o selo de destaque se não estiver no carrinho. */}
                 {isInCart ? (
-                    <div className="absolute top-2 right-2 bg-green-600 text-white text-xs font-bold rounded-full flex items-center justify-center gap-1.5 z-10 shadow-md h-7 w-7 sm:w-auto sm:px-2.5">
+                    <div className="absolute top-2 right-2 bg-green-600 text-white text-xs font-bold rounded-full flex items-center justify-center gap-1.5 z-10 shadow-md h-7 px-2.5">
                         <i className="fas fa-check"></i>
-                        <span className="hidden sm:inline">Adicionado</span>
+                        <span>Adicionado</span>
                     </div>
                 ) : product.badge ? (
                     <span className="absolute top-2 right-2 bg-accent text-white px-2 py-0.5 text-xs font-bold rounded-full">
