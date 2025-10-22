@@ -1,9 +1,10 @@
 /* eslint-disable max-len */
-const {onCall, onRequest, HttpsError} = require("firebase-functions/v2/https");
+const {onCall, onRequest} = require("firebase-functions/v2/https");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
+const crypto = require("crypto");
 const {GoogleGenAI} = require("@google/genai");
 const {OAuth2Client} = require("google-auth-library");
 
@@ -117,7 +118,7 @@ exports.askSanto = onCall({secrets}, async (request) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       logger.error("GEMINI_API_KEY not set. Cannot initialize Gemini AI.");
-      throw new HttpsError("internal", "Internal server error: Assistant is not configured.");
+      throw new Error("Internal server error: Assistant is not configured.");
     }
     ai = new GoogleGenAI({apiKey});
     logger.info("Gemini AI client initialized on first call.");
@@ -126,7 +127,7 @@ exports.askSanto = onCall({secrets}, async (request) => {
   // 1. Recebemos o histórico da conversa (que veio do frontend)
   const conversationHistory = request.data.history;
   if (!conversationHistory || conversationHistory.length === 0) {
-    throw new HttpsError("invalid-argument", "No conversation history provided.");
+    throw new Error("No conversation history provided.");
   }
 
   // 2. Formatamos o histórico para o formato que a API do Gemini espera.
@@ -195,7 +196,7 @@ exports.askSanto = onCall({secrets}, async (request) => {
     return {reply: response.text};
   } catch (error) {
     logger.error("Error calling Gemini API:", error);
-    throw new HttpsError("internal", "Failed to get a response from the assistant.");
+    throw new Error("Failed to get a response from the assistant.");
   }
 });
 
@@ -209,11 +210,11 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
 
   if (!idToken) {
-    throw new HttpsError("invalid-argument", "The function must be called with an idToken.");
+    throw new onCall.HttpsError("invalid-argument", "The function must be called with an idToken.");
   }
   if (!clientId) {
     logger.error("GOOGLE_CLIENT_ID not set.");
-    throw new HttpsError("internal", "Authentication is not configured correctly.");
+    throw new onCall.HttpsError("internal", "Authentication is not configured correctly.");
   }
 
   const client = new OAuth2Client(clientId);
@@ -226,7 +227,7 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
     const payload = ticket.getPayload();
 
     if (!payload) {
-      throw new HttpsError("unauthenticated", "Invalid ID token.");
+      throw new onCall.HttpsError("unauthenticated", "Invalid ID token.");
     }
 
     const {sub: googleUid, email, name, picture} = payload;
@@ -274,7 +275,7 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
     return {customToken};
   } catch (error) {
     logger.error("Error verifying Google token:", error);
-    throw new HttpsError("unauthenticated", "Token verification failed.", error.message);
+    throw new onCall.HttpsError("unauthenticated", "Token verification failed.", error.message);
   }
 });
 
@@ -288,7 +289,7 @@ exports.createOrder = onCall({secrets}, async (request) => {
 
   // 1. Validate input
   if (!details || !cart || !total) {
-    throw new HttpsError("invalid-argument", "Dados do pedido incompletos.");
+    throw new Error("Dados do pedido incompletos.");
   }
 
   // 2. Generate a sequential order number atomically
@@ -307,11 +308,13 @@ exports.createOrder = onCall({secrets}, async (request) => {
     });
   } catch (error) {
     logger.error("Falha ao gerar o número do pedido:", error);
-    throw new HttpsError("internal", "Não foi possível gerar o número do pedido.");
+    throw new Error("Não foi possível gerar o número do pedido.");
   }
 
 
   // 3. Prepare order data for Firestore
+  const orderStatus = "pending";
+
   const orderData = {
     userId, // Associate order with user if logged in
     orderNumber,
@@ -333,7 +336,7 @@ exports.createOrder = onCall({secrets}, async (request) => {
     changeNeeded: details.changeNeeded || false,
     changeAmount: details.changeAmount || "",
     notes: details.notes || "",
-    status: "pending",
+    status: orderStatus,
     paymentStatus: "pending",
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   };
@@ -347,7 +350,9 @@ exports.createOrder = onCall({secrets}, async (request) => {
   return {orderId, orderNumber};
 });
 
-
+// FIX: Added the missing `createReservation` Cloud Function.
+// This function handles the creation of reservations, which are stored as a special type of order.
+// It generates an atomic order number and saves the reservation details to Firestore.
 /**
  * Creates a reservation (as an order) in Firestore.
  */
@@ -357,7 +362,7 @@ exports.createReservation = onCall({secrets}, async (request) => {
 
   // 1. Validate input
   if (!details || !details.name || !details.phone || !details.reservationDate || !details.reservationTime || !details.numberOfPeople) {
-    throw new HttpsError("invalid-argument", "Dados da reserva incompletos.");
+    throw new Error("Dados da reserva incompletos.");
   }
 
   // 2. Generate a sequential order number atomically
@@ -376,7 +381,7 @@ exports.createReservation = onCall({secrets}, async (request) => {
     });
   } catch (error) {
     logger.error("Falha ao gerar o número do pedido:", error);
-    throw new HttpsError("internal", "Não foi possível gerar o número do pedido.");
+    throw new Error("Não foi possível gerar o número do pedido.");
   }
 
   // 3. Prepare reservation data for Firestore (as an Order)
@@ -413,7 +418,7 @@ exports.createReservation = onCall({secrets}, async (request) => {
 exports.manageProfilePicture = onCall({secrets}, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) {
-    throw new HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
+    throw new onCall.HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
   }
 
   const {imageBase64} = request.data;
@@ -431,7 +436,7 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
       return {success: true, photoURL: null};
     } catch (error) {
       logger.error(`Falha ao remover a foto de perfil para ${uid}:`, error);
-      throw new HttpsError("internal", "Não foi possível remover a foto de perfil.");
+      throw new onCall.HttpsError("internal", "Não foi possível remover a foto de perfil.");
     }
   }
 
@@ -440,7 +445,7 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
     try {
       const matches = imageBase64.match(/^data:(image\/[a-z]+);base64,(.+)$/);
       if (!matches || matches.length !== 3) {
-        throw new HttpsError("invalid-argument", "Formato de imagem base64 inválido.");
+        throw new onCall.HttpsError("invalid-argument", "Formato de imagem base64 inválido.");
       }
       const mimeType = matches[1];
       const base64Data = matches[2];
@@ -465,9 +470,9 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
       return {success: true, photoURL};
     } catch (error) {
       logger.error(`Falha ao atualizar a foto de perfil para ${uid}:`, error);
-      throw new HttpsError("internal", "Não foi possível salvar a nova foto de perfil.");
+      throw new onCall.HttpsError("internal", "Não foi possível salvar a nova foto de perfil.");
     }
   }
 
-  throw new HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
+  throw new onCall.HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
 });
