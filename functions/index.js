@@ -330,7 +330,6 @@ exports.createOrder = onCall({secrets}, async (request) => {
     items: cart,
     total,
     deliveryFee: details.deliveryFee || 0,
-    allergies: details.allergies || "",
     paymentMethod: details.paymentMethod,
     changeNeeded: details.changeNeeded || false,
     changeAmount: details.changeAmount || "",

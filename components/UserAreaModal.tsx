@@ -5,7 +5,6 @@ import { db } from '../services/firebase';
 import * as firebaseService from '../services/firebaseService';
 import defaultProfilePic from '../assets/perfil.png';
 import userAreaBackground from '../assets/fundocliente.png';
-import { OrderStatusTracker } from './OrderStatusTracker';
 import { OrderDetailsModal } from './OrderDetailsModal';
 import { ImageCropperModal } from './ImageCropperModal';
 
@@ -266,15 +265,13 @@ interface UserProfileTabProps {
     setName: (name: string) => void;
     phone: string;
     setPhone: (phone: string) => void;
-    allergies: string;
-    setAllergies: (allergies: string) => void;
     isSaving: boolean;
     addToast: (message: string, type: 'success' | 'error') => void;
 }
 
 const UserProfileTab: React.FC<UserProfileTabProps> = ({
     profile, user, onLogout, handleResendVerification, handleProfileUpdate,
-    name, setName, phone, setPhone, allergies, setAllergies,
+    name, setName, phone, setPhone,
     isSaving, addToast,
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -386,10 +383,6 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
             <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded-md" />
         </div>
          
-        <div>
-            <label className="block text-sm font-semibold mb-1">Restrições Alimentares? (opcional)</label>
-            <textarea value={allergies} onChange={e => setAllergies(e.target.value)} className="w-full px-3 py-2 border rounded-md" rows={2} placeholder="Ex: alergia a camarão, intolerância à lactose..."/>
-        </div>
         <div className="text-right pt-2">
              <button type="submit" disabled={isSaving || isPhotoUploading} className="bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90 flex items-center justify-center min-w-[120px] disabled:bg-opacity-70">
                 {isSaving ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save mr-2"></i><span>Salvar Perfil</span></>}
@@ -425,15 +418,9 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
         ['completed', 'cancelled', 'deleted'].includes(order.status)
     );
 
-    const renderOrderSummaryCard = (order: Order, isOngoing: boolean) => {
+    const renderOrderSummaryCard = (order: Order) => {
         const isReservation = order.customer.orderType === 'local';
         const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo no Local' };
-        const paymentStatusInfo = {
-            'pending': { text: 'Pendente', color: 'text-yellow-600' },
-            'paid': { text: 'Pago', color: 'text-green-600' },
-            'paid_online': { text: 'Pago Pelo Site', color: 'text-green-600' },
-            'refunded': { text: 'Estornado', color: 'text-orange-500' }
-        }[order.paymentStatus] || { text: 'Pendente', color: 'text-yellow-600' };
 
         const CompletedStatusBanner = () => {
             if (order.status !== 'completed') return null;
@@ -489,24 +476,17 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
                 <div className="text-sm space-y-1 mb-4">
                      <p><strong>Cliente:</strong> {order.customer.name}</p>
                      <p><strong>Tipo:</strong> {orderTypeMap[order.customer.orderType]}</p>
-                     {!isReservation && (
-                        <p><strong>Pagamento:</strong> <span className={`font-semibold ${paymentStatusInfo.color}`}>{paymentStatusInfo.text}</span></p>
-                     )}
                 </div>
                 
-                {isOngoing && <OrderStatusTracker order={order} />}
-
-                {!isOngoing && (
-                    <div className="mt-2 mb-4">
-                        <CompletedStatusBanner />
-                        {order.status === 'cancelled' && (
-                            <div className="bg-red-50 border border-red-200 text-red-800 text-sm font-semibold p-3 rounded-lg flex items-center gap-3">
-                                <i className="fas fa-ban"></i>
-                                <span>Pedido Cancelado</span>
-                            </div>
-                        )}
-                    </div>
-                )}
+                <div className="mt-2 mb-4">
+                    <CompletedStatusBanner />
+                    {order.status === 'cancelled' && (
+                        <div className="bg-red-50 border border-red-200 text-red-800 text-sm font-semibold p-3 rounded-lg flex items-center gap-3">
+                            <i className="fas fa-ban"></i>
+                            <span>Pedido Cancelado</span>
+                        </div>
+                    )}
+                </div>
 
                  <button onClick={() => onViewDetails(order.id)} className="mt-auto w-full bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-90">
                     <i className="fas fa-receipt mr-2"></i>Ver Detalhes do Pedido
@@ -526,7 +506,7 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
                         <p className="text-center text-gray-500 py-8 px-4 bg-gray-50 rounded-lg">Você não tem pedidos em andamento.</p>
                     ) : (
                         <div className="space-y-3">
-                            {currentOrders.map(order => renderOrderSummaryCard(order, true))}
+                            {currentOrders.map(order => renderOrderSummaryCard(order))}
                         </div>
                     )}
 
@@ -545,7 +525,7 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
                                 {archivedOrders.length === 0 ? (
                                     <p className="text-center text-gray-500 py-8 px-4">Seu histórico de pedidos está vazio.</p>
                                 ) : (
-                                     archivedOrders.map(order => renderOrderSummaryCard(order, false))
+                                     archivedOrders.map(order => renderOrderSummaryCard(order))
                                 )}
                             </div>
                         )}
@@ -619,7 +599,6 @@ interface UserAreaModalProps {
 export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, user, profile, onLogout, addToast, initialTab = 'orders', showAddAddressForm = false }) => {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
-    const [allergies, setAllergies] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [myOrders, setMyOrders] = useState<Order[]>([]);
     const [isLoadingOrders, setIsLoadingOrders] = useState(true);
@@ -652,7 +631,6 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
         if (isOpen && profile) {
             setName(profile.name || '');
             setPhone(profile.phone || '');
-            setAllergies(profile.allergies || '');
         }
     }, [isOpen, profile]);
 
@@ -708,7 +686,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
         e.preventDefault();
         setIsSaving(true);
         try {
-            await firebaseService.updateUserProfile(user.uid, { name, phone, allergies });
+            await firebaseService.updateUserProfile(user.uid, { name, phone });
             addToast('Seu perfil foi salvo!', 'success');
         } catch (error) {
             addToast('Erro ao salvar seu perfil.', 'error');
@@ -788,8 +766,6 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
                                     setName={setName}
                                     phone={phone}
                                     setPhone={setPhone}
-                                    allergies={allergies}
-                                    setAllergies={setAllergies}
                                     isSaving={isSaving}
                                 />
                             )}

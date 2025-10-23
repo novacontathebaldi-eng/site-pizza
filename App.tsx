@@ -124,10 +124,6 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
         }
     }
     
-    if (details.allergies) {
-        message += `\n*⚠️ ALERGIAS/RESTRIÇÕES:*\n${details.allergies}\n`;
-    }
-
     message += `\n*🛒 ITENS DO PEDIDO:*\n`;
     currentCart.forEach(item => {
         message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2).replace('.', ',')}\n`;
@@ -222,7 +218,6 @@ const App: React.FC = () => {
     const [confirmedOrderData, setConfirmedOrderData] = useState<Order | null>(null);
     const [confirmedReservationData, setConfirmedReservationData] = useState<Order | null>(null);
     const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
-    const [isOrderTrackerExpanded, setIsOrderTrackerExpanded] = useState<boolean>(false);
     
     // Half-and-Half Pizza State
     const [isHalfAndHalfModalOpen, setIsHalfAndHalfModalOpen] = useState(false);
@@ -246,7 +241,7 @@ const App: React.FC = () => {
         if (trackingOrder?.customer.orderType === 'local') {
             return "Acompanhar Reserva";
         }
-        return "Acompanhar Pedido";
+        return "Detalhes do Pedido";
     }, [trackingOrder]);
 
 
@@ -711,7 +706,7 @@ const App: React.FC = () => {
                 id: orderId, orderNumber,
                 customer: { name: details.name, phone: details.phone, orderType: details.orderType, ...details },
                 items: cart, total, paymentMethod: details.paymentMethod, paymentStatus: 'pending', status: 'pending',
-                createdAt: new Date(), notes: details.notes, allergies: details.allergies, deliveryFee: details.deliveryFee,
+                createdAt: new Date(), notes: details.notes, deliveryFee: details.deliveryFee,
             };
             setConfirmedOrderData(confirmedOrder);
             setCart([]);
@@ -754,7 +749,7 @@ const App: React.FC = () => {
             changeAmount: order.changeAmount || '', notes: order.notes || '',
             neighborhood: order.customer.neighborhood || '', street: order.customer.street || '',
             number: order.customer.number || '', complement: order.customer.complement || '',
-            allergies: order.allergies || '', deliveryFee: order.deliveryFee || 0,
+            deliveryFee: order.deliveryFee || 0,
         };
         const whatsappUrl = generateWhatsAppMessage(details, order.items || cart, order.total || 0, order.orderNumber, isPaid);
         window.open(whatsappUrl, '_blank');
@@ -978,64 +973,17 @@ const App: React.FC = () => {
         }
     };
     
-    const activeOrders = useMemo(() => {
-        const activeStatuses: OrderStatus[] = ['pending', 'accepted', 'reserved', 'ready', 'awaiting-payment'];
-    
-        if (currentUser) {
-            // User is logged in, filter by their UID
-            return orders.filter(order =>
-                order.userId === currentUser.uid && activeStatuses.includes(order.status)
-            );
-        } else {
-            // User is a guest, filter by IDs in localStorage
-            const guestOrderIds: string[] = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
-            if (guestOrderIds.length === 0) {
-                return [];
-            }
-            const guestOrdersSet = new Set(guestOrderIds);
-            return orders.filter(order =>
-                guestOrdersSet.has(order.id) && activeStatuses.includes(order.status)
-            );
+    const handleProfileUpdate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsProcessingOrder(true);
+        try {
+            await firebaseService.updateUserProfile(currentUser!.uid, { name, phone });
+            addToast('Seu perfil foi salvo!', 'success');
+        } catch (error) {
+            addToast('Erro ao salvar seu perfil.', 'error');
+        } finally {
+            setIsProcessingOrder(false);
         }
-    }, [orders, currentUser]);
-
-    const statusIconMap: { [key in OrderStatus]?: React.ReactNode } = {
-        pending: <i className="fas fa-hourglass-start" />,
-        accepted: (
-            <span className="relative inline-block leading-none">
-                <i className="fa-solid fa-fire-burner fa-lg" aria-hidden="true"></i>
-                <span className="absolute flex items-center justify-center w-5 h-5 text-white border- border-white rounded-full" style={{ top: '-8px', right: '-8px' }}>
-                    <i className="fa-solid fa-hourglass-start text-[13px]"></i>
-                </span>
-            </span>
-        ),
-        reserved: (
-            <span className="relative inline-block leading-none">
-                <i className="fa-solid fa-chair fa-lg" aria-hidden="true"></i>
-                <span className="absolute flex items-center justify-center w-5 h-5 bg-green-500 text-white border-2 border-white rounded-full" style={{ top: '-8px', right: '-8px' }}>
-                    <i className="fa-solid fa-check text-[10px]"></i>
-                </span>
-            </span>
-        ),
-        'awaiting-payment': <i className="fas fa-clock" />,
-    };
-
-    const getStatusIcon = (order: Order): React.ReactNode => {
-        if (order.status === 'ready') {
-            if (order.customer.orderType === 'delivery') {
-                return <i className="fas fa-motorcycle" />;
-            }
-            // Ready for pickup
-            return (
-                <span className="relative inline-block leading-none">
-                    <i className="fa-solid fa-pizza-slice fa-lg" aria-hidden="true"></i>
-                    <span className="absolute flex items-center justify-center w-5 h-5 bg-green-500 text-white border-2 border-white rounded-full" style={{ top: '-8px', right: '-8px' }}>
-                        <i className="fa-solid fa-check text-[10px]"></i>
-                    </span>
-                </span>
-            );
-        }
-        return statusIconMap[order.status] || <i className="fas fa-receipt" />;
     };
 
     return (
@@ -1121,51 +1069,6 @@ const App: React.FC = () => {
                         <i className="fas fa-utensils text-xl"></i>
                     </button>
                 ) : null}
-            </div>
-
-            <div className="fixed bottom-[5.5rem] left-5 z-40 flex flex-col-reverse items-center gap-3">
-                {activeOrders.length > 1 && isOrderTrackerExpanded && (
-                    <div className="flex flex-col-reverse gap-3 animate-fade-in-up">
-                        {activeOrders.map(order => (
-                            <button
-                                key={order.id}
-                                onClick={() => { setTrackingOrderId(order.id); setIsOrderTrackerExpanded(false); }}
-                                className="w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110"
-                                aria-label={`Acompanhar pedido #${order.orderNumber}`}
-                            >
-                                <span className="text-2xl">{getStatusIcon(order)}</span>
-                            </button>
-                        ))}
-                    </div>
-                )}
-                {activeOrders.length > 0 && (
-                    <button
-                        onClick={() => {
-                            if (activeOrders.length === 1) {
-                                setTrackingOrderId(activeOrders[0].id);
-                            } else {
-                                setIsOrderTrackerExpanded(prev => !prev);
-                            }
-                        }}
-                        className="w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110"
-                        aria-label={activeOrders.length === 1 ? `Acompanhar pedido #${activeOrders[0].orderNumber}` : isOrderTrackerExpanded ? 'Recolher pedidos' : `${activeOrders.length} pedidos ativos`}
-                    >
-                        {activeOrders.length === 1 ? (
-                            <span className="text-2xl">{getStatusIcon(activeOrders[0])}</span>
-                        ) : isOrderTrackerExpanded ? (
-                            <i className="fas fa-chevron-down text-2xl"></i>
-                        ) : (
-                            <span className="relative">
-                                <i className="fas fa-chevron-up text-2xl"></i>
-                                <span
-                                    className="absolute -top-4 -right-3 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center"
-                                >
-                                    {activeOrders.length}
-                                </span>
-                            </span>
-                        )}
-                    </button>
-                )}
             </div>
 
             <button onClick={() => setIsChatbotOpen(true)} className="fixed bottom-5 left-5 z-40 w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110" aria-label="Abrir assistente virtual"><i className="fas fa-headset text-2xl"></i></button>

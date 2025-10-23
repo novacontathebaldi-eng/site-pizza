@@ -1,6 +1,5 @@
 import React from 'react';
 import { Order } from '../types';
-import { OrderStatusTracker, formatTimestamp } from './OrderStatusTracker';
 
 interface OrderDetailsModalProps {
     order: Order | null;
@@ -12,16 +11,9 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onC
     if (!order) return null;
 
     const isReservation = order.customer.orderType === 'local';
-    const isOngoing = ['pending', 'accepted', 'ready', 'awaiting-payment', 'reserved'].includes(order.status);
     const paymentMethodMap = { credit: 'Crédito', debit: 'Débito', pix: 'PIX', cash: 'Dinheiro' };
     const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada', local: 'Consumo no Local' };
     
-     const paymentStatusInfo = {
-        'pending': { text: 'Pendente', color: 'text-yellow-600' },
-        'paid': { text: 'Pago', color: 'text-green-600' },
-        'refunded': { text: 'Estornado', color: 'text-orange-500' }
-    }[order.paymentStatus] || { text: 'Pendente', color: 'text-yellow-600' };
-
     const fullAddress = order.customer.orderType === 'delivery' ? `${order.customer.street || ''}, ${order.customer.number || ''} - ${order.customer.neighborhood || ''}` : null;
 
     const CompletedStatusBanner = () => {
@@ -75,19 +67,16 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onC
                     <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
                 </div>
                  <div className="overflow-y-auto p-4 sm:p-6 space-y-4">
-                    {isOngoing && <OrderStatusTracker order={order} />}
                     
-                    {!isOngoing && (
-                        <div className="mb-4">
-                            <CompletedStatusBanner />
-                            {order.status === 'cancelled' && (
-                                <div className="bg-red-50 border border-red-200 text-red-800 text-sm font-semibold p-3 rounded-lg flex items-center gap-3">
-                                    <i className="fas fa-ban"></i>
-                                    <span>Pedido Cancelado</span>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    <div className="mb-4">
+                        <CompletedStatusBanner />
+                        {order.status === 'cancelled' && (
+                            <div className="bg-red-50 border border-red-200 text-red-800 text-sm font-semibold p-3 rounded-lg flex items-center gap-3">
+                                <i className="fas fa-ban"></i>
+                                <span>Pedido Cancelado</span>
+                            </div>
+                        )}
+                    </div>
 
                     <div className={`grid grid-cols-1 ${!isReservation ? 'md:grid-cols-2' : ''} gap-4 text-sm`}>
                         <div className="bg-gray-50 p-3 rounded-md border">
@@ -107,8 +96,6 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onC
                             <div className="bg-gray-50 p-3 rounded-md border">
                                 <h4 className="font-bold mb-2 text-base"><i className="fas fa-credit-card mr-2 text-gray-400"></i>Pagamento</h4>
                                 <p><strong>Método:</strong> {order.paymentMethod ? paymentMethodMap[order.paymentMethod] : 'N/A'}</p>
-                                <p><strong>Status:</strong> <span className={`font-semibold ${paymentStatusInfo.color}`}>{paymentStatusInfo.text}</span></p>
-                                {order.paymentMethod === 'cash' && ( <p><strong>Troco:</strong> {order.changeNeeded ? `para R$ ${order.changeAmount}` : 'Não precisa'}</p> )}
                                 {order.deliveryFee > 0 && (<p><strong>Taxa de Entrega:</strong> {order.deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>)}
                                 <p className="mt-2 pt-2 border-t font-bold"><strong>Total:</strong> {order.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                             </div>
@@ -123,7 +110,6 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, onC
                             </ul>
                         </div>
                     )}
-                     {order.allergies && <p className="text-sm mt-3 p-2 bg-red-50 rounded-md border border-red-200"><strong>Alergias/Restrições:</strong> {order.allergies}</p>}
                      {order.notes && <p className="text-sm mt-3 p-2 bg-yellow-50 rounded-md border border-yellow-200"><strong>Obs:</strong> {order.notes}</p>}
                  </div>
             </div>

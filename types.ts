@@ -26,7 +26,6 @@ export interface UserProfile {
     // User-provided info
     phone?: string;
     addresses?: Address[];
-    allergies?: string;
 }
 
 export interface Product {
@@ -82,7 +81,6 @@ export interface OrderDetails {
     changeNeeded: boolean;
     changeAmount?: string;
     notes: string;
-    allergies?: string;
     deliveryFee?: number;
     reservationTime?: string;
 }
@@ -124,7 +122,6 @@ export interface Order {
     items?: CartItem[];
     total?: number;
     deliveryFee?: number;
-    allergies?: string;
     paymentMethod?: 'credit' | 'debit' | 'pix' | 'cash';
     changeNeeded?: boolean;
     changeAmount?: string;
@@ -139,6 +136,8 @@ export interface Order {
         qrCodeBase64: string;
         qrCode: string;
     };
+    // FIX: Added the optional `allergies` property to match its usage in OrderCard.tsx.
+    allergies?: string;
 }
 
 export interface DaySchedule {

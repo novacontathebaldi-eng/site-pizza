@@ -6,6 +6,7 @@ interface OrderConfirmationModalProps {
     order: Order | null;
     onClose: () => void;
     onSendWhatsApp: (order: Order) => void;
+    // FIX: Added onTrackOrder prop to handle tracking functionality.
     onTrackOrder: (orderId: string) => void;
 }
 
@@ -30,7 +31,7 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
                 </div>
                 <div className="p-6 text-center space-y-4">
                     <p className="text-gray-600 text-base">
-                        Seu pedido já foi registrado em nosso sistema! Você pode acompanhar o status do pedido clicando no botão abaixo.
+                        Seu pedido foi registrado em nosso sistema! Para finalizá-lo, é necessário enviá-lo para nossa cozinha via WhatsApp. Se você já fez isso, ótimo! Agora é só aguardar.
                     </p>
                     
                     <div className="text-left bg-gray-50 p-4 rounded-lg border text-gray-800 space-y-2 text-sm">
@@ -51,11 +52,12 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
                     >
                         <i className="fab fa-whatsapp mr-2"></i> Enviar WhatsApp
                     </button>
+                    {/* FIX: Added button to track the order. */}
                     <button
                         onClick={() => onTrackOrder(order.id)}
-                        className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all flex items-center justify-center min-h-[52px]"
+                        className="w-full bg-blue-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-blue-600 transition-all flex items-center justify-center min-h-[52px]"
                     >
-                        <i className="fas fa-clock mr-2"></i> Acompanhar pedido
+                        <i className="fas fa-receipt mr-2"></i> Acompanhar Pedido
                     </button>
                 </div>
             </div>
@@ -69,7 +71,8 @@ interface ReservationConfirmationModalProps {
     reservation: Order | null;
     onClose: () => void;
     onSendWhatsApp: (reservation: Order) => void;
-    onTrackOrder: (reservationId: string) => void;
+    // FIX: Added onTrackOrder prop to handle tracking functionality.
+    onTrackOrder: (orderId: string) => void;
 }
 
 const formatDateForDisplay = (dateString?: string): string => {
@@ -127,11 +130,12 @@ export const ReservationConfirmationModal: React.FC<ReservationConfirmationModal
                     >
                         <i className="fab fa-whatsapp mr-2"></i> Enviar WhatsApp
                     </button>
+                    {/* FIX: Added button to track the reservation. */}
                     <button
                         onClick={() => onTrackOrder(reservation.id)}
-                        className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all flex items-center justify-center min-h-[52px]"
+                        className="w-full bg-blue-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-blue-600 transition-all flex items-center justify-center min-h-[52px]"
                     >
-                        <i className="fas fa-calendar-alt mr-2"></i> Acompanhar reserva
+                        <i className="fas fa-eye mr-2"></i> Acompanhar Reserva
                     </button>
                 </div>
             </div>
@@ -167,7 +171,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const [number, setNumber] = useState('');
     const [isNoNumber, setIsNoNumber] = useState(false);
     const [complement, setComplement] = useState('');
-    const [allergies, setAllergies] = useState('');
 
     const [paymentMethod, setPaymentMethod] = useState<'credit' | 'debit' | 'pix' | 'cash' | ''>('');
     const [changeNeeded, setChangeNeeded] = useState(false);
@@ -180,13 +183,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
         if (isOpen) {
             const fav = profile?.addresses?.filter(a => a.isDeliveryArea).find(a => a.isFavorite);
             setSelectedAddressId(fav ? fav.id : 'manual');
-            if (profile?.allergies) {
-                setAllergies(profile.allergies);
-            }
         } else {
             // Full reset when closing
             setOrderType('');
-            setNeighborhood(''); setStreet(''); setNumber(''); setIsNoNumber(false); setComplement(''); setAllergies('');
+            setNeighborhood(''); setStreet(''); setNumber(''); setIsNoNumber(false); setComplement('');
             setPaymentMethod(''); setChangeNeeded(false); setChangeAmount('');
             setNotes('');
             setSelectedAddressId(favoriteAddress ? favoriteAddress.id : 'manual');
@@ -234,7 +234,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
         neighborhood, street, number, complement,
         paymentMethod: paymentMethod as 'credit' | 'debit' | 'pix' | 'cash',
         changeNeeded: paymentMethod === 'cash' && changeNeeded,
-        changeAmount, allergies, notes, deliveryFee
+        changeAmount, notes, deliveryFee
     });
     
     const handleSubmit = (e: React.FormEvent) => {
@@ -328,11 +328,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                             </div>
                         )}
                         
-                        <div>
-                             <label className="block text-sm font-semibold mb-1">Possui alguma alergia ou restrição alimentar? (opcional)</label>
-                            <textarea value={allergies} onChange={e => setAllergies(e.target.value)} className="w-full px-3 py-2 border rounded-md" rows={2} placeholder="Ex: alergia a camarão, intolerância à lactose..."/>
-                        </div>
-
                         <div>
                             <label className="block text-sm font-semibold mb-1">Método de Pagamento *</label>
                             <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as any)} className="w-full px-3 py-2 border rounded-md bg-white" required>
