@@ -1,12 +1,15 @@
 /* eslint-disable max-len */
-const {onSchedule} = require("firebase-functions/v2/scheduler");
+const {onSchedule, defineSecret} = require("firebase-functions/v2/scheduler");
 const {onDocumentUpdated, onDocumentWritten} = require("firebase-functions/v2/firestore");
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const functions = require("firebase-functions"); // Necessário para functions.config()
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const {GoogleGenAI} = require("@google/genai");
 const {OAuth2Client} = require("google-auth-library");
+
+// Define secrets that will be used in the functions
+defineSecret("GEMINI_API_KEY");
+defineSecret("GOOGLE_CLIENT_ID");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -113,9 +116,9 @@ exports.onSettingsUpdate = onDocumentUpdated(
 // --- Chatbot Sensação (v2) ---
 let ai;
 
-exports.askSanto = onCall({region: "southamerica-east1"}, async (request) => {
+exports.askSanto = onCall({region: "southamerica-east1", secrets: ["GEMINI_API_KEY"]}, async (request) => {
   if (!ai) {
-    const apiKey = functions.config().gemini?.api_key || process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       logger.error("GEMINI_API_KEY not set. Cannot initialize Gemini AI.");
       throw new HttpsError("internal", "Internal server error: Assistant is not configured.");
@@ -196,9 +199,9 @@ exports.askSanto = onCall({region: "southamerica-east1"}, async (request) => {
 });
 
 // --- Callable Function (v2) ---
-exports.verifyGoogleToken = onCall({region: "southamerica-east1"}, async (request) => {
+exports.verifyGoogleToken = onCall({region: "southamerica-east1", secrets: ["GOOGLE_CLIENT_ID"]}, async (request) => {
   const {idToken} = request.data;
-  const clientId = functions.config().google?.client_id || process.env.GOOGLE_CLIENT_ID;
+  const clientId = process.env.GOOGLE_CLIENT_ID;
 
   if (!idToken) {
     throw new HttpsError("invalid-argument", "The function must be called with an idToken.");
@@ -493,30 +496,3 @@ exports.onRoleChange = onDocumentWritten(
       }
     },
 );
-/**
- * Gatilho do Firestore que é acionado quando um documento na coleção 'roles' é criado ou atualizado.
- * Ele define um custom claim 'admin' no token de autenticação do usuário correspondente.
- */
-exports.onRoleChange = onDocumentUpdated("roles/{userId}", async (event) => {
-  const userId = event.params.userId;
-  const data = event.data.after.data();
-
-  // Verifica se o campo 'admin' existe e é booleano
-  const isAdmin = data && data.admin === true;
-
-  try {
-    // Busca o usuário no Firebase Authentication
-    const user = await admin.auth().getUser(userId);
-
-    // Pega os claims existentes para não sobrescrevê-los
-    const existingClaims = user.customClaims || {};
-
-    // Se o status de admin mudou, atualiza o claim
-    if (existingClaims.admin !== isAdmin) {
-      await admin.auth().setCustomUserClaims(userId, { ...existingClaims, admin: isAdmin });
-      logger.info(`Claim de admin para o usuário ${userId} atualizado para: ${isAdmin}`);
-    }
-  } catch (error) {
-    logger.error(`Erro ao definir custom claim para o usuário ${userId}:`, error);
-  }
-});
