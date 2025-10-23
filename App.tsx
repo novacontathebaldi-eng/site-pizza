@@ -21,7 +21,6 @@ import defaultLogo from './assets/logo.png';
 import defaultHeroBg from './assets/ambiente-pizzaria.webp';
 import defaultAboutImg from './assets/sobre-imagem.webp';
 import firebase from 'firebase/compat/app';
-import { OrderDetailsModal } from './components/OrderDetailsModal';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { CookieConsentBanner } from './components/CookieConsentBanner';
 import { TermsOfServiceModal } from './components/TermsOfServiceModal';
@@ -217,7 +216,6 @@ const App: React.FC = () => {
     const [isProcessingOrder, setIsProcessingOrder] = useState<boolean>(false);
     const [confirmedOrderData, setConfirmedOrderData] = useState<Order | null>(null);
     const [confirmedReservationData, setConfirmedReservationData] = useState<Order | null>(null);
-    const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
     
     // Half-and-Half Pizza State
     const [isHalfAndHalfModalOpen, setIsHalfAndHalfModalOpen] = useState(false);
@@ -229,21 +227,6 @@ const App: React.FC = () => {
     ]);
     const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
     
-    // FIX: Replaced direct state for the tracking order object with a memoized selector.
-    // This ensures that when the main `orders` array updates from Firestore, the `trackingOrder`
-    // variable is automatically recalculated, providing the live data to the OrderDetailsModal.
-    const trackingOrder = useMemo(() => {
-        if (!trackingOrderId) return null;
-        return orders.find(o => o.id === trackingOrderId) || null;
-    }, [orders, trackingOrderId]);
-
-    const orderDetailsModalTitle = useMemo(() => {
-        if (trackingOrder?.customer.orderType === 'local') {
-            return "Acompanhar Reserva";
-        }
-        return "Detalhes do Pedido";
-    }, [trackingOrder]);
-
 
     const scrollToTop = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -274,7 +257,6 @@ const App: React.FC = () => {
                isUserAreaModalOpen || 
                !!confirmedOrderData || 
                !!confirmedReservationData ||
-               !!trackingOrder ||
                isPrivacyPolicyOpen ||
                isTermsModalOpen ||
                isHalfAndHalfModalOpen;
@@ -287,7 +269,6 @@ const App: React.FC = () => {
         isUserAreaModalOpen, 
         confirmedOrderData, 
         confirmedReservationData,
-        trackingOrder,
         isPrivacyPolicyOpen,
         isTermsModalOpen,
         isHalfAndHalfModalOpen
@@ -1101,22 +1082,13 @@ const App: React.FC = () => {
                 order={confirmedOrderData}
                 onClose={() => setConfirmedOrderData(null)}
                 onSendWhatsApp={handleSendOrderToWhatsApp}
-                onTrackOrder={(orderId) => {
-                    setConfirmedOrderData(null);
-                    setTrackingOrderId(orderId);
-                }}
             />
             <ReservationConfirmationModal
                 reservation={confirmedReservationData}
                 onClose={() => setConfirmedReservationData(null)}
                 onSendWhatsApp={handleSendReservationToWhatsApp}
-                onTrackOrder={(orderId) => {
-                    setConfirmedReservationData(null);
-                    setTrackingOrderId(orderId);
-                }}
             />
             <Chatbot isOpen={isChatbotOpen} onClose={() => setIsChatbotOpen(false)} messages={chatMessages} onSendMessage={handleSendMessageToBot} isSending={isBotReplying}/>
-            <OrderDetailsModal order={trackingOrder} onClose={() => setTrackingOrderId(null)} title={orderDetailsModalTitle} />
             
             <LoginModal 
                 isOpen={isLoginModalOpen} 

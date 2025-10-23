@@ -6,11 +6,9 @@ interface OrderConfirmationModalProps {
     order: Order | null;
     onClose: () => void;
     onSendWhatsApp: (order: Order) => void;
-    // FIX: Added onTrackOrder prop to handle tracking functionality.
-    onTrackOrder: (orderId: string) => void;
 }
 
-export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ order, onClose, onSendWhatsApp, onTrackOrder }) => {
+export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ order, onClose, onSendWhatsApp }) => {
     if (!order) return null;
 
     // FIX: The type 'PaymentStatus' does not include 'paid_online'. The correct check is for 'paid', which now represents a completed payment.
@@ -52,13 +50,6 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
                     >
                         <i className="fab fa-whatsapp mr-2"></i> Enviar WhatsApp
                     </button>
-                    {/* FIX: Added button to track the order. */}
-                    <button
-                        onClick={() => onTrackOrder(order.id)}
-                        className="w-full bg-blue-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-blue-600 transition-all flex items-center justify-center min-h-[52px]"
-                    >
-                        <i className="fas fa-receipt mr-2"></i> Acompanhar Pedido
-                    </button>
                 </div>
             </div>
         </div>
@@ -71,8 +62,6 @@ interface ReservationConfirmationModalProps {
     reservation: Order | null;
     onClose: () => void;
     onSendWhatsApp: (reservation: Order) => void;
-    // FIX: Added onTrackOrder prop to handle tracking functionality.
-    onTrackOrder: (orderId: string) => void;
 }
 
 const formatDateForDisplay = (dateString?: string): string => {
@@ -88,7 +77,7 @@ const formatDateForDisplay = (dateString?: string): string => {
     }).format(date);
 };
 
-export const ReservationConfirmationModal: React.FC<ReservationConfirmationModalProps> = ({ reservation, onClose, onSendWhatsApp, onTrackOrder }) => {
+export const ReservationConfirmationModal: React.FC<ReservationConfirmationModalProps> = ({ reservation, onClose, onSendWhatsApp }) => {
     if (!reservation) return null;
 
     return (
@@ -129,13 +118,6 @@ export const ReservationConfirmationModal: React.FC<ReservationConfirmationModal
                         className="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-green-600 transition-all flex items-center justify-center min-h-[52px]"
                     >
                         <i className="fab fa-whatsapp mr-2"></i> Enviar WhatsApp
-                    </button>
-                    {/* FIX: Added button to track the reservation. */}
-                    <button
-                        onClick={() => onTrackOrder(reservation.id)}
-                        className="w-full bg-blue-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-blue-600 transition-all flex items-center justify-center min-h-[52px]"
-                    >
-                        <i className="fas fa-eye mr-2"></i> Acompanhar Reserva
                     </button>
                 </div>
             </div>
