@@ -209,8 +209,8 @@ const App: React.FC = () => {
     const [isGapiReady, setIsGapiReady] = useState(false);
     const [postRegisterAction, setPostRegisterAction] = useState<string | null>(null);
     const prevUser = useRef<firebase.User | null>(null);
-    // FIX: Added state to handle the password reset code from URL parameters.
     const [passwordResetCode, setPasswordResetCode] = useState<string | null>(null);
+    const [isCurrentUserAdmin, setIsCurrentUserAdmin] = useState<boolean>(false);
 
 
     // Order/Payment Flow State
@@ -378,10 +378,14 @@ const App: React.FC = () => {
                 setUserProfile(profile);
                 if (profile?.name) setName(profile.name);
                 if (profile?.phone) setPhone(profile.phone);
+                 // Check for admin custom claim
+                const idTokenResult = await user.getIdTokenResult(true);
+                setIsCurrentUserAdmin(idTokenResult.claims.admin === true);
             } else {
                 setUserProfile(null);
                 setName('');
                 setPhone('');
+                setIsCurrentUserAdmin(false);
             }
             setIsAuthLoading(false);
         });
@@ -1008,6 +1012,7 @@ const App: React.FC = () => {
                 <div id="sobre">{siteSettings.contentSections?.filter(section => section.isVisible).sort((a, b) => a.order - b.order).map((section, index) => <DynamicContentSection key={section.id} section={section} order={index} />)}</div>
                 <ContactSection settings={siteSettings} />
                 <AdminSection 
+                    isCurrentUserAdmin={isCurrentUserAdmin}
                     allProducts={products} 
                     allCategories={categories} 
                     isStoreOnline={isStoreOnline} 
