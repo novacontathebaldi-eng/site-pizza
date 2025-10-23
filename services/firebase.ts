@@ -34,14 +34,16 @@ try {
   db = firebase.firestore();
   storage = firebase.storage();
   auth = firebase.auth();
-  functions = firebase.functions();
+  // CORREÇÃO: Especifica a região das Cloud Functions para 'southamerica-east1' (São Paulo).
+  // Isso garante que o frontend chame as funções no mesmo local onde elas foram publicadas.
+  functions = firebase.app().functions('southamerica-east1');
   
   // Keep db settings
   db.settings({
     experimentalForceLongPolling: true,
   });
   
-  console.log("Firebase inicializado com sucesso. Conectando ao Firestore, Storage, Auth e Functions...");
+  console.log("Firebase inicializado com sucesso. Conectando ao Firestore, Storage, Auth e Functions na região southamerica-east1...");
 } catch (error) {
   console.error('Falha ao inicializar o Firebase. Verifique seu objeto firebaseConfig em `services/firebase.ts`.', error);
 }
