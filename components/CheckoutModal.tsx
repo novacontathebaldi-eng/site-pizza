@@ -5,10 +5,9 @@ import { CartItem, OrderDetails, Order, UserProfile } from '../types';
 interface OrderConfirmationModalProps {
     order: Order | null;
     onClose: () => void;
-    onSendWhatsApp: (order: Order) => void;
 }
 
-export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ order, onClose, onSendWhatsApp }) => {
+export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ order, onClose }) => {
     if (!order) return null;
 
     // FIX: The type 'PaymentStatus' does not include 'paid_online'. The correct check is for 'paid', which now represents a completed payment.
@@ -43,13 +42,6 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
                     <p className="text-gray-600 text-sm px-2">
                         Já estamos preparando tudo! Se precisar, você pode nos contatar pelo WhatsApp.
                     </p>
-
-                    <button
-                        onClick={() => onSendWhatsApp(order)}
-                        className="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-green-600 transition-all flex items-center justify-center min-h-[52px]"
-                    >
-                        <i className="fab fa-whatsapp mr-2"></i> Enviar WhatsApp
-                    </button>
                 </div>
             </div>
         </div>
@@ -61,7 +53,6 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
 interface ReservationConfirmationModalProps {
     reservation: Order | null;
     onClose: () => void;
-    onSendWhatsApp: (reservation: Order) => void;
 }
 
 const formatDateForDisplay = (dateString?: string): string => {
@@ -77,7 +68,7 @@ const formatDateForDisplay = (dateString?: string): string => {
     }).format(date);
 };
 
-export const ReservationConfirmationModal: React.FC<ReservationConfirmationModalProps> = ({ reservation, onClose, onSendWhatsApp }) => {
+export const ReservationConfirmationModal: React.FC<ReservationConfirmationModalProps> = ({ reservation, onClose }) => {
     if (!reservation) return null;
 
     return (
@@ -112,13 +103,6 @@ export const ReservationConfirmationModal: React.FC<ReservationConfirmationModal
                     <p className="text-gray-600 text-sm px-2">
                         Agradecemos a sua preferência! Se precisar, você pode nos contatar pelo WhatsApp.
                     </p>
-
-                    <button
-                        onClick={() => onSendWhatsApp(reservation)}
-                        className="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-green-600 transition-all flex items-center justify-center min-h-[52px]"
-                    >
-                        <i className="fab fa-whatsapp mr-2"></i> Enviar WhatsApp
-                    </button>
                 </div>
             </div>
         </div>
