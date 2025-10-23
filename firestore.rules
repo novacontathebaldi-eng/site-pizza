@@ -1,23 +1,38 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --- FUNÇÕES HELPER ---
-    // Função para verificar se o usuário é um admin.
+  
+    // Função para verificar se o usuário é um administrador via custom claims.
     function isAdmin() {
-      return request.auth != null && request.auth.token.admin == true;
+      return request.auth.token.admin == true;
     }
-    // Função para verificar se o usuário está autenticado.
-    function isSignedIn() {
-      return request.auth != null;
+    
+    // Usuários: Cada usuário só pode ler e escrever seus próprios dados.
+    match /users/{userId} {
+      allow read, write: if request.auth.uid == userId;
     }
-    // Função para verificar se o usuário é o dono do documento.
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+    
+    // Pedidos: Admins podem tudo. Usuários podem ler seus pedidos e "reivindicar" pedidos de convidado.
+    match /orders/{orderId} {
+      allow read: if isAdmin() || (request.auth.uid != null && resource.data.userId == request.auth.uid);
+      allow create: if true; // A validação é feita na Cloud Function
+      
+      // Permite que um admin atualize qualquer campo.
+      // Permite que um usuário autenticado atualize um pedido SOMENTE SE:
+      // 1. O pedido ainda não tiver um 'userId' (era um pedido de convidado).
+      // 2. O novo 'userId' for o UID do próprio usuário.
+      // 3. A ÚNICA alteração sendo feita é a adição do 'userId'.
+      allow update: if isAdmin() || 
+                     (request.auth.uid != null && 
+                      resource.data.userId == null && 
+                      request.resource.data.userId == request.auth.uid &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId']));
+                      
+      allow delete: if isAdmin();
     }
-
-    // --- REGRAS PÚBLICAS (LEITURA PARA TODOS, ESCRITA PARA ADMINS) ---
-    // Produtos, Categorias e Configurações do Site
+    
+    // Produtos e Categorias: Todos podem ler, mas apenas admins podem modificar.
     match /products/{productId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -26,39 +41,16 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+    
+    // Configurações da Loja: Todos podem ler, apenas admins podem modificar.
     match /store_config/{docId} {
-      allow read: if true;
-      allow write: if isAdmin();
+       allow read: if true;
+       allow write: if isAdmin();
     }
 
-    // --- REGRAS DE USUÁRIOS ---
-    // Cada usuário pode ler e escrever seu próprio perfil. Admins podem ler qualquer perfil.
-    match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId);
-    }
-
-    // --- REGRAS DE PEDIDOS ---
-    // Qualquer usuário (mesmo não autenticado) pode criar um pedido.
-    // Um usuário autenticado pode ler seus próprios pedidos.
-    // Apenas admins podem ler todos os pedidos e atualizar qualquer pedido.
-    match /orders/{orderId} {
-      allow create: if true;
-      allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
-      allow update, delete: if isAdmin();
-    }
-
-    // --- REGRAS INTERNAS ---
-
-    // CORREÇÃO: Permite que qualquer um acesse o contador de pedidos.
-    // Isso é seguro porque a lógica de incremento é controlada pela Cloud Function.
-    match /_internal/counters {
-      allow read, write: if true;
-    }
-
-    // A coleção de 'roles' continua protegida e só pode ser acessada por admins.
-    match /roles/{userId} {
-      allow read, write: if isAdmin();
+    // Contadores internos: Acesso bloqueado para clientes, apenas backend (Cloud Functions) pode acessar.
+    match /_internal/{docId} {
+      allow read, write: if false;
     }
   }
 }
