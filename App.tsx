@@ -144,13 +144,13 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
         if (details.changeNeeded) {
             message += `*Precisa de troco para:* R$ ${details.changeAmount}\n`;
         } else {
-            message += `*Não precisa de troco.*\n`;
+            message += `*Não preciso de troco.*\n`;
         }
     }
     if (details.notes) {
         message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
     }
-    message += `\n_Pedido gerado pelo nosso site._`;
+    message += `\nEste *pedido* foi gerado pelo nosso site: *santasensacao.me*`;
     return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
 };
 
@@ -170,7 +170,7 @@ const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNu
     if (details.notes) {
         message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
     }
-    message += `\n_Reserva gerada pelo nosso site._`;
+    message += `\n*Reserva* gerado pelo nosso site: *santasensacao.me*`;
     return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
 };
 
