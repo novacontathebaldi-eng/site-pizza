@@ -68,7 +68,7 @@ export const HalfAndHalfModal: React.FC<HalfAndHalfModalProps> = ({ isOpen, onCl
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
                 <div className="flex justify-between items-center p-5 border-b border-gray-200">
-                    <h2 className="text-2xl font-bold text-text-on-light"><i className="fas fa-pizza-slice mr-2"></i>Monte sua Pizza Meio a Meio</h2>
+                    <h2 className="text-2xl font-bold text-text-on-light"><i className="fas fa-pizza-slice mr-2"></i>Pizza Meio a Meio</h2>
                     <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
                 </div>
                 <div className="flex-grow overflow-y-auto p-6">
@@ -141,24 +141,32 @@ export const HalfAndHalfModal: React.FC<HalfAndHalfModalProps> = ({ isOpen, onCl
                 </div>
 
                 {/* Rodapé com Resumo e Botão */}
-                 <div className="p-5 border-t border-gray-200 bg-brand-ivory-50">
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                        <div className="text-center md:text-left">
-                             <h4 className="font-bold text-xl text-text-on-light">Sua Pizza Meio a Meio:</h4>
-                            <p className="text-gray-600">{secondHalf ? `${firstHalf.name} / ${secondHalf.name}` : 'Selecione a 2ª metade'}</p>
+                 <div className="p-4 md:p-5 border-t border-gray-200 bg-brand-ivory-50">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-3">
+                        {/* On mobile, this wrapper creates a compact row. On desktop, it disappears, promoting its children. */}
+                        <div className="w-full flex justify-between items-center md:contents">
+                            <div className="text-left md:text-center">
+                                <h4 className="font-bold text-base md:text-xl text-text-on-light">Sua Pizza Meio a Meio:</h4>
+                                <p className="text-sm text-gray-600">{secondHalf ? `${firstHalf.name} / ${secondHalf.name}` : 'Selecione a 2ª metade'}</p>
+                            </div>
+
+                            <div className="text-right md:text-center pl-4">
+                                <p className="text-xs md:text-sm text-gray-500">Valor Final</p>
+                                <p className="font-bold text-2xl md:text-3xl text-accent">{formatPrice(finalPrice)}</p>
+                                <p className="text-xs text-brand-olive-600 hidden md:block">(Cobrado o valor da metade mais cara)</p>
+                            </div>
                         </div>
-                        <div className="text-center">
-                            <p className="text-sm text-gray-500">Valor Final</p>
-                            <p className="font-bold text-3xl text-accent">{formatPrice(finalPrice)}</p>
-                            <p className="text-xs text-brand-olive-600">(Cobrado o valor da metade mais cara)</p>
+
+                        <div className="w-full md:w-auto text-center">
+                            <p className="text-xs text-brand-olive-600 text-center md:hidden mb-2">(Cobrado o valor da metade mais cara)</p>
+                            <button
+                                onClick={handleAddToCart}
+                                disabled={!selectedSize || !secondHalf}
+                                className="w-full md:w-auto bg-accent text-white font-bold py-3 px-6 md:px-8 rounded-lg text-base md:text-lg hover:bg-opacity-90 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            >
+                                <i className="fas fa-plus mr-2"></i>Adicionar
+                            </button>
                         </div>
-                        <button
-                            onClick={handleAddToCart}
-                            disabled={!selectedSize || !secondHalf}
-                            className="w-full md:w-auto bg-accent text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-opacity-90 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        >
-                            <i className="fas fa-plus mr-2"></i>Adicionar
-                        </button>
                     </div>
                 </div>
             </div>
