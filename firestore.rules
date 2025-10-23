@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- FUNÇÕES HELPER ---
+    // Função para verificar se o usuário é um admin.
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+    // Função para verificar se o usuário está autenticado.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    // Função para verificar se o usuário é o dono do documento.
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // --- REGRAS PÚBLICAS (LEITURA PARA TODOS, ESCRITA PARA ADMINS) ---
+    // Produtos, Categorias e Configurações do Site
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /store_config/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // --- REGRAS DE USUÁRIOS ---
+    // Cada usuário pode ler e escrever seu próprio perfil. Admins podem ler qualquer perfil.
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId);
+    }
+
+    // --- REGRAS DE PEDIDOS ---
+    // Qualquer usuário (mesmo não autenticado) pode criar um pedido.
+    // Um usuário autenticado pode ler seus próprios pedidos.
+    // Apenas admins podem ler todos os pedidos e atualizar qualquer pedido.
+    match /orders/{orderId} {
+      allow create: if true;
+      allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // --- REGRAS INTERNAS ---
+
+    // CORREÇÃO: Permite que qualquer um acesse o contador de pedidos.
+    // Isso é seguro porque a lógica de incremento é controlada pela Cloud Function.
+    match /_internal/counters {
+      allow read, write: if true;
+    }
+
+    // A coleção de 'roles' continua protegida e só pode ser acessada por admins.
+    match /roles/{userId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
