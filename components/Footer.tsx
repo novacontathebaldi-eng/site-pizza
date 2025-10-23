@@ -5,6 +5,7 @@ interface FooterProps {
     settings: SiteSettings;
     onOpenChatbot: () => void;
     onOpenPrivacyPolicy: () => void;
+    onUserAreaClick: () => void;
 }
 
 // Helper function to process operating hours into structured groups
@@ -93,11 +94,11 @@ const formatOperatingHours = (operatingHours?: DaySchedule[]): string[] => {
 };
 
 
-export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot, onOpenPrivacyPolicy }) => {
+export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot, onOpenPrivacyPolicy, onUserAreaClick }) => {
     
     const visibleLinks = settings.footerLinks?.filter(link => link.isVisible !== false) ?? [];
     const socialLinks = visibleLinks.filter(link => link.icon.startsWith('fab'));
-    const otherLinks = visibleLinks.filter(link => !link.icon.startsWith('fab'));
+    const otherLinks = visibleLinks.filter(link => !link.icon.startsWith('fab') && link.url !== '#admin');
     const operatingHoursParts = formatOperatingHours(settings.operatingHours);
 
     return (
@@ -143,7 +144,7 @@ export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot, onOpenP
                         </ul>
                     </div>
                      <div>
-                        <h4 className="font-bold text-lg mb-4">Acesso</h4>
+                        <h4 className="font-bold text-lg mb-4">Cliente</h4>
                          <ul className="space-y-2 text-brand-green-300">
                             {otherLinks.map(link => (
                                 <li key={link.id}>
@@ -153,6 +154,12 @@ export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot, onOpenP
                                     </a>
                                 </li>
                             ))}
+                            <li>
+                                <button onClick={onUserAreaClick} className="inline-flex items-center gap-2 hover:text-white transition-colors">
+                                    <i className="fas fa-user-circle mr-1 text-accent"></i>
+                                    <span>Área do Cliente</span>
+                                </button>
+                            </li>
                             <li>
                                 <button onClick={onOpenChatbot} className="inline-flex items-center gap-2 hover:text-white transition-colors">
                                     <i className="fas fa-headset mr-1 text-accent"></i>

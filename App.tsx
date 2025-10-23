@@ -1048,7 +1048,12 @@ const App: React.FC = () => {
             </main>
             
             <div id="footer-section">
-                <Footer settings={siteSettings} onOpenChatbot={() => setIsChatbotOpen(true)} onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)} />
+                <Footer 
+                    settings={siteSettings} 
+                    onOpenChatbot={() => setIsChatbotOpen(true)} 
+                    onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)} 
+                    onUserAreaClick={handleUserIconClick}
+                />
             </div>
             
             <div className="fixed bottom-5 right-5 z-40 flex flex-col-reverse items-end gap-3">
