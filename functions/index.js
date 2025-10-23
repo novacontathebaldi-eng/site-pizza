@@ -1,20 +1,19 @@
 /* eslint-disable max-len */
+const {onCall, onRequest} = require("firebase-functions/v2/https");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
-const {defineSecret} = require("firebase-functions/params");
-const {onDocumentUpdated, onDocumentWritten} = require("firebase-functions/v2/firestore");
-const {onCall, HttpsError} = require("firebase-functions/v2/https");
+const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
+const crypto = require("crypto");
 const {GoogleGenAI} = require("@google/genai");
 const {OAuth2Client} = require("google-auth-library");
-
-// Define secrets that will be used in the functions
-defineSecret("GEMINI_API_KEY");
-defineSecret("GOOGLE_CLIENT_ID");
 
 admin.initializeApp();
 const db = admin.firestore();
 const storage = admin.storage();
+
+// Define os secrets que as funções irão usar.
+const secrets = ["GEMINI_API_KEY", "GOOGLE_CLIENT_ID"];
 
 // --- Reusable function to check and set store status based on schedule ---
 const runStoreStatusCheck = async () => {
@@ -82,57 +81,58 @@ const runStoreStatusCheck = async () => {
 };
 
 
-// --- Scheduled Function for Automatic Store Status (v2) ---
-exports.updateStoreStatusBySchedule = onSchedule(
-    {
-      schedule: "every 5 minutes",
-      timeZone: "America/Sao_Paulo",
-      region: "southamerica-east1",
-    },
-    async (event) => {
-      await runStoreStatusCheck();
-    },
-);
+// --- Scheduled Function for Automatic Store Status ---
+exports.updateStoreStatusBySchedule = onSchedule({
+  schedule: "every 5 minutes",
+  timeZone: "America/Sao_Paulo",
+}, async (event) => {
+  await runStoreStatusCheck();
+});
 
-// --- Firestore Trigger to run status check when automatic scheduling is enabled (v2) ---
-exports.onSettingsUpdate = onDocumentUpdated(
-    {
-      document: "store_config/site_settings",
-      region: "southamerica-east1",
-    },
-    async (event) => {
-      const beforeData = event.data.before.data();
-      const afterData = event.data.after.data();
+// --- Firestore Trigger to run status check when automatic scheduling is enabled ---
+exports.onSettingsChange = onDocumentUpdated("store_config/site_settings", async (event) => {
+  const beforeData = event.data.before.data();
+  const afterData = event.data.after.data();
 
-      const wasEnabled = beforeData.automaticSchedulingEnabled === true;
-      const isEnabled = afterData.automaticSchedulingEnabled === true;
+  const wasEnabled = beforeData.automaticSchedulingEnabled === true;
+  const isEnabled = afterData.automaticSchedulingEnabled === true;
 
-      if (!wasEnabled && isEnabled) {
-        logger.info("Agendamento automático foi ativado. Acionando verificação de status imediata.");
-        await runStoreStatusCheck();
-      }
-    },
-);
+  // Trigger the check only when the feature is toggled from OFF to ON.
+  if (!wasEnabled && isEnabled) {
+    logger.info("Agendamento automático foi ativado. Acionando verificação de status imediata.");
+    await runStoreStatusCheck();
+  }
+});
 
-// --- Chatbot Sensação (v2) ---
-let ai;
 
-exports.askSanto = onCall({region: "southamerica-east1", secrets: ["GEMINI_API_KEY"]}, async (request) => {
+// --- Chatbot Sensação ---
+let ai; // Mantém a instância da IA no escopo global para ser reutilizada após a primeira chamada.
+
+/**
+ * Chatbot Cloud Function to interact with Gemini API.
+ */
+exports.askSanto = onCall({secrets}, async (request) => {
+  // "Lazy Initialization": Inicializa a IA somente na primeira vez que a função é chamada.
+  // Isso evita timeouts durante o deploy.
   if (!ai) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       logger.error("GEMINI_API_KEY not set. Cannot initialize Gemini AI.");
-      throw new HttpsError("internal", "Internal server error: Assistant is not configured.");
+      throw new Error("Internal server error: Assistant is not configured.");
     }
     ai = new GoogleGenAI({apiKey});
     logger.info("Gemini AI client initialized on first call.");
   }
 
+  // 1. Recebemos o histórico da conversa (que veio do frontend)
   const conversationHistory = request.data.history;
   if (!conversationHistory || conversationHistory.length === 0) {
-    throw new HttpsError("invalid-argument", "No conversation history provided.");
+    throw new Error("No conversation history provided.");
   }
 
+  // 2. Formatamos o histórico para o formato que a API do Gemini espera.
+  // A API espera um array de objetos { role: 'user'|'model', parts: [{ text: '...' }] }
+  // O papel do nosso bot ('bot') é traduzido para 'model' para a API.
   const contents = conversationHistory.map((message) => ({
     role: message.role === "bot" ? "model" : "user",
     parts: [{text: message.content}],
@@ -186,6 +186,7 @@ exports.askSanto = onCall({region: "southamerica-east1", secrets: ["GEMINI_API_K
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
+      // 3. Enviamos o histórico completo para a API
       contents: contents,
       config: {
         systemInstruction: systemInstruction,
@@ -195,21 +196,25 @@ exports.askSanto = onCall({region: "southamerica-east1", secrets: ["GEMINI_API_K
     return {reply: response.text};
   } catch (error) {
     logger.error("Error calling Gemini API:", error);
-    throw new HttpsError("internal", "Failed to get a response from the assistant.");
+    throw new Error("Failed to get a response from the assistant.");
   }
 });
 
-// --- Callable Function (v2) ---
-exports.verifyGoogleToken = onCall({region: "southamerica-east1", secrets: ["GOOGLE_CLIENT_ID"]}, async (request) => {
+
+/**
+ * Verifies a Google ID token, creates or updates a Firebase user,
+ * and returns a custom token for session authentication.
+ */
+exports.verifyGoogleToken = onCall({secrets}, async (request) => {
   const {idToken} = request.data;
   const clientId = process.env.GOOGLE_CLIENT_ID;
 
   if (!idToken) {
-    throw new HttpsError("invalid-argument", "The function must be called with an idToken.");
+    throw new onCall.HttpsError("invalid-argument", "The function must be called with an idToken.");
   }
   if (!clientId) {
     logger.error("GOOGLE_CLIENT_ID not set.");
-    throw new HttpsError("internal", "Authentication is not configured correctly.");
+    throw new onCall.HttpsError("internal", "Authentication is not configured correctly.");
   }
 
   const client = new OAuth2Client(clientId);
@@ -222,13 +227,15 @@ exports.verifyGoogleToken = onCall({region: "southamerica-east1", secrets: ["GOO
     const payload = ticket.getPayload();
 
     if (!payload) {
-      throw new HttpsError("unauthenticated", "Invalid ID token.");
+      throw new onCall.HttpsError("unauthenticated", "Invalid ID token.");
     }
 
     const {sub: googleUid, email, name, picture} = payload;
+    // We create a unique UID for Firebase Auth based on the Google UID
     const uid = `google:${googleUid}`;
     let isNewUser = false;
 
+    // Update or create user in Firebase Auth
     try {
       await admin.auth().updateUser(uid, {
         email: email,
@@ -245,39 +252,47 @@ exports.verifyGoogleToken = onCall({region: "southamerica-east1", secrets: ["GOO
           photoURL: picture,
         });
       } else {
-        throw error;
+        throw error; // Re-throw other errors
       }
     }
 
+    // Create or update user profile in Firestore 'users' collection
     const userRef = db.collection("users").doc(uid);
     const userDoc = await userRef.get();
 
+    // Create profile in Firestore only if it doesn't exist
     if (isNewUser || !userDoc.exists) {
       await userRef.set({
         name,
         email,
         photoURL: picture,
-        addresses: [],
+        addresses: [], // Initialize with empty addresses
       }, {merge: true});
     }
 
+    // Create a custom token for the Firebase user
     const customToken = await admin.auth().createCustomToken(uid);
     return {customToken};
   } catch (error) {
     logger.error("Error verifying Google token:", error);
-    throw new HttpsError("unauthenticated", "Token verification failed.", error.message);
+    throw new onCall.HttpsError("unauthenticated", "Token verification failed.", error.message);
   }
 });
 
-// --- Callable Function (v2) ---
-exports.createOrder = onCall({region: "southamerica-east1"}, async (request) => {
+
+/**
+ * Creates an order in Firestore.
+ */
+exports.createOrder = onCall({secrets}, async (request) => {
   const {details, cart, total} = request.data;
   const userId = request.auth?.uid || null;
 
+  // 1. Validate input
   if (!details || !cart || !total) {
-    throw new HttpsError("invalid-argument", "Dados do pedido incompletos.");
+    throw new Error("Dados do pedido incompletos.");
   }
 
+  // 2. Generate a sequential order number atomically
   const counterRef = db.doc("_internal/counters");
   let orderNumber;
   try {
@@ -293,13 +308,15 @@ exports.createOrder = onCall({region: "southamerica-east1"}, async (request) => 
     });
   } catch (error) {
     logger.error("Falha ao gerar o número do pedido:", error);
-    throw new HttpsError("internal", "Não foi possível gerar o número do pedido.");
+    throw new Error("Não foi possível gerar o número do pedido.");
   }
 
+
+  // 3. Prepare order data for Firestore
   const orderStatus = "pending";
 
   const orderData = {
-    userId,
+    userId, // Associate order with user if logged in
     orderNumber,
     customer: {
       name: details.name,
@@ -323,22 +340,31 @@ exports.createOrder = onCall({region: "southamerica-east1"}, async (request) => 
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 
+  // 4. Create the order document
   const orderRef = await db.collection("orders").add(orderData);
   const orderId = orderRef.id;
   logger.info(`Pedido #${orderNumber} (ID: ${orderId}) criado no Firestore.`);
 
+  // 5. Return order info
   return {orderId, orderNumber};
 });
 
-// --- Callable Function (v2) ---
-exports.createReservation = onCall({region: "southamerica-east1"}, async (request) => {
+// FIX: Added the missing `createReservation` Cloud Function.
+// This function handles the creation of reservations, which are stored as a special type of order.
+// It generates an atomic order number and saves the reservation details to Firestore.
+/**
+ * Creates a reservation (as an order) in Firestore.
+ */
+exports.createReservation = onCall({secrets}, async (request) => {
   const {details} = request.data;
   const userId = request.auth?.uid || null;
 
+  // 1. Validate input
   if (!details || !details.name || !details.phone || !details.reservationDate || !details.reservationTime || !details.numberOfPeople) {
-    throw new HttpsError("invalid-argument", "Dados da reserva incompletos.");
+    throw new Error("Dados da reserva incompletos.");
   }
 
+  // 2. Generate a sequential order number atomically
   const counterRef = db.doc("_internal/counters");
   let orderNumber;
   try {
@@ -354,9 +380,10 @@ exports.createReservation = onCall({region: "southamerica-east1"}, async (reques
     });
   } catch (error) {
     logger.error("Falha ao gerar o número do pedido:", error);
-    throw new HttpsError("internal", "Não foi possível gerar o número do pedido.");
+    throw new Error("Não foi possível gerar o número do pedido.");
   }
 
+  // 3. Prepare reservation data for Firestore (as an Order)
   const orderData = {
     userId,
     orderNumber,
@@ -374,18 +401,23 @@ exports.createReservation = onCall({region: "southamerica-east1"}, async (reques
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 
+  // 4. Create the order document
   const orderRef = await db.collection("orders").add(orderData);
   const orderId = orderRef.id;
   logger.info(`Reserva #${orderNumber} (ID: ${orderId}) criada no Firestore.`);
 
+  // 5. Return order info
   return {orderId, orderNumber};
 });
 
-// --- Callable Function (v2) ---
-exports.manageProfilePicture = onCall({region: "southamerica-east1"}, async (request) => {
+
+/**
+ * Manages user profile picture upload and removal securely.
+ */
+exports.manageProfilePicture = onCall({secrets}, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) {
-    throw new HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
+    throw new onCall.HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
   }
 
   const {imageBase64} = request.data;
@@ -393,6 +425,7 @@ exports.manageProfilePicture = onCall({region: "southamerica-east1"}, async (req
   const filePath = `user-profiles/${uid}/profile.jpg`;
   const file = bucket.file(filePath);
 
+  // Case 1: Remove photo (imageBase64 is null)
   if (imageBase64 === null) {
     try {
       await file.delete({ignoreNotFound: true});
@@ -402,28 +435,33 @@ exports.manageProfilePicture = onCall({region: "southamerica-east1"}, async (req
       return {success: true, photoURL: null};
     } catch (error) {
       logger.error(`Falha ao remover a foto de perfil para ${uid}:`, error);
-      throw new HttpsError("internal", "Não foi possível remover a foto de perfil.");
+      throw new onCall.HttpsError("internal", "Não foi possível remover a foto de perfil.");
     }
   }
 
+  // Case 2: Upload/update photo (imageBase64 is a string)
   if (typeof imageBase64 === "string") {
     try {
       const matches = imageBase64.match(/^data:(image\/[a-z]+);base64,(.+)$/);
       if (!matches || matches.length !== 3) {
-        throw new HttpsError("invalid-argument", "Formato de imagem base64 inválido.");
+        throw new onCall.HttpsError("invalid-argument", "Formato de imagem base64 inválido.");
       }
       const mimeType = matches[1];
       const base64Data = matches[2];
       const buffer = Buffer.from(base64Data, "base64");
 
+      // Upload the file and make it public
       await file.save(buffer, {
         metadata: {contentType: mimeType},
         public: true,
       });
 
       const publicUrl = file.publicUrl();
+      // Appending a timestamp as a query parameter to act as a cache buster.
+      // This ensures the browser always fetches the latest version of the profile picture.
       const photoURL = `${publicUrl}?t=${new Date().getTime()}`;
 
+      // Update Firebase Auth and Firestore user records
       await admin.auth().updateUser(uid, {photoURL});
       await db.collection("users").doc(uid).update({photoURL});
 
@@ -431,69 +469,9 @@ exports.manageProfilePicture = onCall({region: "southamerica-east1"}, async (req
       return {success: true, photoURL};
     } catch (error) {
       logger.error(`Falha ao atualizar a foto de perfil para ${uid}:`, error);
-      throw new HttpsError("internal", "Não foi possível salvar a nova foto de perfil.");
+      throw new onCall.HttpsError("internal", "Não foi possível salvar a nova foto de perfil.");
     }
   }
 
-  throw new HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
+  throw new onCall.HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
 });
-
-// --- Callable Function (v2) ---
-exports.syncGuestOrders = onCall({region: "southamerica-east1"}, async (request) => {
-  const uid = request.auth?.uid;
-  if (!uid) {
-    throw new HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
-  }
-
-  const {orderIds} = request.data;
-  if (!Array.isArray(orderIds) || orderIds.length === 0) {
-    throw new HttpsError("invalid-argument", "A função deve ser chamada com um array de 'orderIds'.");
-  }
-
-  logger.info(`Associando ${orderIds.length} pedido(s) ao usuário ${uid}...`);
-
-  try {
-    const batch = db.batch();
-    const ordersCollection = db.collection("orders");
-
-    orderIds.forEach((orderId) => {
-      const orderRef = ordersCollection.doc(orderId);
-      batch.update(orderRef, {userId: uid});
-    });
-
-    await batch.commit();
-    logger.info(`Pedidos associados com sucesso ao usuário ${uid}.`);
-    return {success: true};
-  } catch (error) {
-    logger.error(`Falha ao associar pedidos para o usuário ${uid}:`, error);
-    throw new HttpsError("internal", "Não foi possível associar os pedidos.");
-  }
-});
-
-// --- Firestore Trigger (v2) ---
-exports.onRoleChange = onDocumentWritten(
-    {
-      document: "roles/{userId}",
-      region: "southamerica-east1",
-    },
-    async (event) => {
-      const userId = event.params.userId;
-      const afterData = event.data?.after.data();
-
-      const isAdmin = afterData ? afterData.admin === true : false;
-
-      try {
-        const user = await admin.auth().getUser(userId);
-        const existingClaims = user.customClaims || {};
-
-        if (existingClaims.admin !== isAdmin) {
-          await admin.auth().setCustomUserClaims(userId, {...existingClaims, admin: isAdmin});
-          logger.info(`Claim de 'admin' para o usuário ${userId} foi atualizado para: ${isAdmin}`);
-        } else {
-          logger.info(`Claim de 'admin' para o usuário ${userId} já está correto (${isAdmin}). Nenhuma ação tomada.`);
-        }
-      } catch (error) {
-        logger.error(`Erro ao definir custom claim para o usuário ${userId}:`, error);
-      }
-    },
-);

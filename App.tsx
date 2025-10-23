@@ -207,7 +207,6 @@ const App: React.FC = () => {
     const [currentUser, setCurrentUser] = useState<firebase.User | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
-    const [isAdmin, setIsAdmin] = useState<boolean>(false);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
     const [isUserAreaModalOpen, setIsUserAreaModalOpen] = useState<boolean>(false);
     const [isGapiReady, setIsGapiReady] = useState(false);
@@ -395,57 +394,41 @@ const App: React.FC = () => {
             return;
         }
         const unsubscribe = auth.onAuthStateChanged(async (user) => {
-            setIsAuthLoading(true);
             setCurrentUser(user);
             if (user) {
-                try {
-                    const profilePromise = firebaseService.getUserProfile(user.uid);
-                    const tokenPromise = user.getIdTokenResult(true); // Force refresh token
-    
-                    const [profile, idTokenResult] = await Promise.all([profilePromise, tokenPromise]);
-    
-                    setUserProfile(profile);
-                    if (profile?.name) setName(profile.name);
-                    if (profile?.phone) setPhone(profile.phone);
-    
-                    const isAdminClaim = !!idTokenResult.claims.admin;
-                    setIsAdmin(isAdminClaim);
-                } catch (error) {
-                    console.error("Error fetching user profile or claims:", error);
-                    setUserProfile(null);
-                    setIsAdmin(false);
-                    addToast('Erro ao carregar dados do usuário.', 'error');
-                }
+                const profile = await firebaseService.getUserProfile(user.uid);
+                setUserProfile(profile);
+                if (profile?.name) setName(profile.name);
+                if (profile?.phone) setPhone(profile.phone);
             } else {
                 setUserProfile(null);
-                setIsAdmin(false);
                 setName('');
                 setPhone('');
             }
             setIsAuthLoading(false);
         });
         return () => unsubscribe();
-    }, [addToast]);
+    }, []);
     
     // Effect to sync guest orders on login
     useEffect(() => {
-        const syncGuestOrders = async () => {
+        const syncGuestOrders = async (user: firebase.User) => {
             const guestOrderIds: string[] = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
             if (guestOrderIds.length > 0) {
                 try {
-                    await firebaseService.syncGuestOrders(guestOrderIds);
+                    await firebaseService.syncGuestOrders(user.uid, guestOrderIds);
                     localStorage.removeItem('santaSensacaoGuestOrders');
                     addToast('Seus pedidos anteriores foram associados à sua conta!', 'success');
-                } catch (error: any) {
+                } catch (error) {
                     console.error('Failed to sync guest orders:', error);
-                    addToast(error.message || 'Não foi possível associar seus pedidos anteriores.', 'error');
+                    addToast('Não foi possível associar seus pedidos anteriores.', 'error');
                 }
             }
         };
 
         // Check if user has just logged in (was null, is now not null)
         if (currentUser && !prevUser.current) {
-            syncGuestOrders();
+            syncGuestOrders(currentUser);
         }
 
         // Update the ref for the next render
@@ -1084,10 +1067,7 @@ const App: React.FC = () => {
                 {isLoading ? <div className="text-center py-20"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p></div> : !error && <MenuSection categories={categories} products={products.filter(p => !p.deleted)} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} activeCategoryId={activeMenuCategory} setActiveCategoryId={setActiveMenuCategory} cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} cartItems={cart} onSelectHalfAndHalf={handleSelectHalfAndHalf} />}
                 <div id="sobre">{siteSettings.contentSections?.filter(section => section.isVisible).sort((a, b) => a.order - b.order).map((section, index) => <DynamicContentSection key={section.id} section={section} order={index} />)}</div>
                 <ContactSection settings={siteSettings} />
-                <AdminSection
-                    isAdmin={isAdmin}
-                    user={currentUser}
-                    authLoading={isAuthLoading}
+                <AdminSection 
                     allProducts={products} 
                     allCategories={categories} 
                     isStoreOnline={isStoreOnline} 

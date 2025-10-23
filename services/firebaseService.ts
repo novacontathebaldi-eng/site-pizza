@@ -329,21 +329,21 @@ export const askChatbot = async (messages: ChatMessage[]): Promise<string> => {
 };
 
 /**
- * Associates guest orders stored in localStorage with a user ID upon login by calling a Cloud Function.
+ * Associates guest orders stored in localStorage with a user ID upon login.
+ * @param userId The UID of the user who has just logged in.
  * @param orderIds An array of order document IDs to update.
  */
-export const syncGuestOrders = async (orderIds: string[]): Promise<void> => {
-    if (!functions) throw new Error("Firebase Functions is not initialized.");
-    if (orderIds.length === 0) return;
+export const syncGuestOrders = async (userId: string, orderIds: string[]): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    if (!userId || orderIds.length === 0) return;
 
-    const syncFunction = functions.httpsCallable('syncGuestOrders');
-    try {
-        await syncFunction({ orderIds });
-    } catch (error) {
-        console.error("Error calling syncGuestOrders function:", error);
-        // Re-throw the error so the UI can catch it and display the message.
-        throw error;
-    }
+    const batch = db.batch();
+    orderIds.forEach(orderId => {
+        const orderRef = db.collection('orders').doc(orderId);
+        batch.update(orderRef, { userId: userId });
+    });
+
+    await batch.commit();
 };
 
 
