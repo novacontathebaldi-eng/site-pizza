@@ -100,11 +100,12 @@ const defaultSiteSettings: SiteSettings = {
     ]
 };
 
-const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, orderNumber: number, isPaid: boolean) => {
+const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, orderNumber: number | null, isPaid: boolean) => {
     const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumo no Local' };
     const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
+    const orderNumStr = orderNumber ? ` #${orderNumber}` : '';
 
-    let message = `*🍕 NOVO PEDIDO #${orderNumber} - SANTA SENSAÇÃO 🍕*\n\n`;
+    let message = `*🍕 NOVO PEDIDO${orderNumStr} - SANTA SENSAÇÃO 🍕*\n\n`;
     if (isPaid) {
         message += `*✅ JÁ PAGO VIA PIX PELO SITE*\n\n`;
     }
@@ -153,8 +154,9 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
 };
 
-const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNumber: number) => {
-    let message = `*📅 NOVA RESERVA #${orderNumber} - SANTA SENSAÇÃO 📅*\n\n`;
+const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNumber: number | null) => {
+    const orderNumStr = orderNumber ? ` #${orderNumber}` : '';
+    let message = `*📅 NOVA RESERVA${orderNumStr} - SANTA SENSAÇÃO 📅*\n\n`;
     message += `Uma nova reserva foi feita pelo site.\n\n`;
     message += `*👤 DADOS DO CLIENTE:*\n`;
     message += `*Nome:* ${details.name}\n`;
@@ -671,8 +673,14 @@ const App: React.FC = () => {
     const handleCheckout = async (details: OrderDetails) => {
         setIsProcessingOrder(true);
         setIsCheckoutModalOpen(false);
+    
         const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         const total = subtotal + (details.deliveryFee || 0);
+    
+        // Open WhatsApp window immediately to avoid pop-up blockers
+        const whatsappUrl = generateWhatsAppMessage(details, cart, total, null, false);
+        window.open(whatsappUrl, '_blank');
+    
         try {
             const { orderId, orderNumber } = await firebaseService.createOrder(details, cart, total);
             
@@ -681,7 +689,7 @@ const App: React.FC = () => {
                 guestOrders.push(orderId);
                 localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
             }
-
+    
             addToast(`Pedido #${orderNumber} criado!`, 'success');
             const confirmedOrder: Order = {
                 id: orderId, orderNumber,
@@ -689,11 +697,6 @@ const App: React.FC = () => {
                 items: cart, total, paymentMethod: details.paymentMethod, paymentStatus: 'pending', status: 'pending',
                 createdAt: new Date(), notes: details.notes, deliveryFee: details.deliveryFee,
             };
-
-            const isPaid = false;
-            const whatsappUrl = generateWhatsAppMessage(details, cart, total, orderNumber, isPaid);
-            window.open(whatsappUrl, '_blank');
-
             setConfirmedOrderData(confirmedOrder);
             setCart([]);
             setIsCartOpen(false);
@@ -708,19 +711,19 @@ const App: React.FC = () => {
     const handleConfirmReservation = async (details: ReservationDetails) => {
         setIsProcessingOrder(true);
         setIsReservationModalOpen(false);
+
+        // Open WhatsApp window immediately
+        const whatsappUrl = generateReservationWhatsAppMessage(details, null);
+        window.open(whatsappUrl, '_blank');
+
         try {
             const { orderId, orderNumber } = await firebaseService.createReservation(details);
             addToast(`Reserva #${orderNumber} registrada com sucesso!`, 'success');
-            
             const confirmedReservation: Order = {
                 id: orderId, orderNumber,
                 customer: { name: details.name, phone: details.phone, orderType: 'local', reservationDate: details.reservationDate, reservationTime: details.reservationTime },
                 numberOfPeople: details.numberOfPeople, notes: details.notes, status: 'pending', paymentStatus: 'pending', createdAt: new Date(),
             };
-            
-            const whatsappUrl = generateReservationWhatsAppMessage(details, orderNumber);
-            window.open(whatsappUrl, '_blank');
-
             setConfirmedReservationData(confirmedReservation);
         } catch (error: any) {
             console.error("Failed to create reservation:", error);
@@ -728,6 +731,32 @@ const App: React.FC = () => {
         } finally {
             setIsProcessingOrder(false);
         }
+    };
+
+    const handleSendOrderToWhatsApp = (order: Order) => {
+        const isPaid = false;
+        const details: OrderDetails = {
+            name: order.customer.name, phone: order.customer.phone, orderType: order.customer.orderType,
+            paymentMethod: order.paymentMethod || 'pix', changeNeeded: order.changeNeeded || false,
+            changeAmount: order.changeAmount || '', notes: order.notes || '',
+            neighborhood: order.customer.neighborhood || '', street: order.customer.street || '',
+            number: order.customer.number || '', complement: order.customer.complement || '',
+            deliveryFee: order.deliveryFee || 0,
+        };
+        const whatsappUrl = generateWhatsAppMessage(details, order.items || [], order.total || 0, order.orderNumber, isPaid);
+        window.open(whatsappUrl, '_blank');
+        setConfirmedOrderData(null);
+    };
+
+    const handleSendReservationToWhatsApp = (reservation: Order) => {
+        const details: ReservationDetails = {
+            name: reservation.customer.name, phone: reservation.customer.phone,
+            numberOfPeople: reservation.numberOfPeople || 2, reservationDate: reservation.customer.reservationDate || '',
+            reservationTime: reservation.customer.reservationTime || '', notes: reservation.notes || '',
+        };
+        const whatsappUrl = generateReservationWhatsAppMessage(details, reservation.orderNumber);
+        window.open(whatsappUrl, '_blank');
+        setConfirmedReservationData(null);
     };
 
     const handleSaveProduct = useCallback(async (product: Product) => {
@@ -1063,10 +1092,12 @@ const App: React.FC = () => {
             <OrderConfirmationModal
                 order={confirmedOrderData}
                 onClose={() => setConfirmedOrderData(null)}
+                onSendWhatsApp={handleSendOrderToWhatsApp}
             />
             <ReservationConfirmationModal
                 reservation={confirmedReservationData}
                 onClose={() => setConfirmedReservationData(null)}
+                onSendWhatsApp={handleSendReservationToWhatsApp}
             />
             <Chatbot isOpen={isChatbotOpen} onClose={() => setIsChatbotOpen(false)} messages={chatMessages} onSendMessage={handleSendMessageToBot} isSending={isBotReplying}/>
             
