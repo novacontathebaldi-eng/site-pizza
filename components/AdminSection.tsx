@@ -2,6 +2,7 @@
 
 
 
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 // FIX: The 'Partial' type is a built-in TypeScript utility and does not need to be imported.
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, DaySchedule } from '../types';
@@ -19,6 +20,8 @@ import notificationSound from '../assets/notf1.mp3';
 
 interface AdminSectionProps {
     isAdmin: boolean;
+    user: firebase.User | null;
+    authLoading: boolean;
     allProducts: Product[];
     allCategories: Category[];
     isStoreOnline: boolean;
@@ -191,7 +194,7 @@ type OrderTabKey = 'accepted' | 'reserved' | 'pronto' | 'emRota' | 'completed' |
 
 export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const { 
-        isAdmin, allProducts, allCategories, isStoreOnline, siteSettings, orders,
+        isAdmin, user, authLoading, allProducts, allCategories, isStoreOnline, siteSettings, orders,
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
         onSeedDatabase, onSaveSiteSettings, onUpdateSiteSettingsField, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
@@ -199,8 +202,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         onBulkDeleteProducts, onRestoreProduct, onPermanentDeleteProduct, onBulkPermanentDeleteProducts
     } = props;
     
-    const [user, setUser] = useState<firebase.User | null>(null);
-    const [authLoading, setAuthLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('status');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -264,16 +265,6 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
     useEffect(() => setLocalProducts(allProducts), [allProducts]);
     useEffect(() => setLocalCategories([...allCategories].sort((a, b) => a.order - b.order)), [allCategories]);
-
-    useEffect(() => {
-        if (!auth) {
-            setError("Falha na conexão com o serviço de autenticação.");
-            setAuthLoading(false);
-            return;
-        }
-        const unsubscribe = auth.onAuthStateChanged(user => { setUser(user); setAuthLoading(false); });
-        return () => unsubscribe();
-    }, []);
 
     useEffect(() => {
         const handleHashChange = () => setShowAdminPanel(window.location.hash === '#admin');

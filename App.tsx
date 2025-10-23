@@ -1086,6 +1086,8 @@ const App: React.FC = () => {
                 <ContactSection settings={siteSettings} />
                 <AdminSection
                     isAdmin={isAdmin}
+                    user={currentUser}
+                    authLoading={isAuthLoading}
                     allProducts={products} 
                     allCategories={categories} 
                     isStoreOnline={isStoreOnline} 
