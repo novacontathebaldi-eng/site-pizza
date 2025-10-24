@@ -3,6 +3,7 @@
 
 
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { SiteSettings, ContentSection, FooterLink } from '../types';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
@@ -217,7 +218,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
 
     const handleAddFooterLink = () => {
         const newLink: FooterLink = { id: `footer-${Date.now()}`, icon: 'fas fa-link', text: 'Novo Link', url: '#', isVisible: true };
-        // FIX: Refactored to use a functional update with .concat() to ensure atomicity and avoid a "Spread types may only be created from object types" error when footerLinks is undefined.
+        // FIX: Using a functional update with .concat() ensures atomicity and avoids a "Spread types may only be created from object types" error that can occur if `footerLinks` is undefined when spreading.
         setFormData(prevData => ({
             ...prevData,
             footerLinks: (prevData.footerLinks || []).concat(newLink)
@@ -280,7 +281,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                 <div className="p-4 border rounded-lg bg-gray-50/50">
                     <h3 className="text-lg font-bold mb-4 pb-2 border-b">Seções de Conteúdo da Página</h3>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
-                        {/* FIX: Corrected a 'children' prop type error in SortableContext by wrapping the mapped items in a div. This ensures SortableContext receives a single valid child element. */}
+                        {/* FIX: The SortableContext component requires a single valid React node as its child. Wrapping the list of SortableContentSectionItem components in a <div> resolves the 'children' prop type error. */}
                         <SortableContext items={formData.contentSections.map(s => s.id)} strategy={verticalListSortingStrategy}>
                             <div className="space-y-2">
                                 {formData.contentSections.map(section => (
@@ -309,7 +310,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                  <div className="p-4 border rounded-lg bg-gray-50/50">
                     <h3 className="text-lg font-bold mb-4 pb-2 border-b">Links do Rodapé</h3>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleFooterLinkDragEnd}>
-                        {/* FIX: Corrected a 'children' prop type error in SortableContext by wrapping the mapped items in a div. This ensures SortableContext receives a single valid child element. */}
+                        {/* FIX: The SortableContext component requires a single valid React node as its child. Wrapping the list of SortableFooterLinkItem components in a <div> resolves the 'children' prop type error. */}
                         <SortableContext items={(formData.footerLinks || []).map(l => l.id)} strategy={verticalListSortingStrategy}>
                             <div className="space-y-2">
                                 {(formData.footerLinks || []).map(link => (

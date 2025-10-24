@@ -613,9 +613,8 @@ const App: React.FC = () => {
         setIsHalfAndHalfModalOpen(true);
     };
 
-    // FIX: Corrected a "Expected 1 arguments, but got 2" error on the useCallback hook.
-    // Removing 'addToast' from the dependency array resolves a likely type-inference issue. This is safe
-    // because 'addToast' is stable (memoized with an empty dependency array).
+    // FIX: Changed dependency array from [addToast] to [] to resolve an "Expected 1 arguments, but got 2" error.
+    // This is safe because the `addToast` function is memoized with an empty dependency array, making it stable.
     const handleAddHalfAndHalfToCart = useCallback((product1: Product, product2: Product, size: string) => {
         const price1 = product1.prices[size] || 0;
         const price2 = product2.prices[size] || 0;
@@ -655,8 +654,6 @@ const App: React.FC = () => {
 
         addToast("Pizza Meio a Meio adicionada!", 'success');
         setIsHalfAndHalfModalOpen(false);
-    // FIX: Changed dependency array from [addToast] to [] to resolve a type inference error.
-    // The `addToast` function is memoized with an empty dependency array, making it stable and safe to omit here.
     }, []);
 
     const pizzaProducts = useMemo(() => {

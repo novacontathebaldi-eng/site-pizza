@@ -244,6 +244,10 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     const prevPendingOrdersCount = useRef(0);
     const audioRef = useRef<HTMLAudioElement>(null);
 
+    // Sticky header refs and state
+    const adminTabsContainerRef = useRef<HTMLDivElement>(null);
+    const [orderSubTabsTop, setOrderSubTabsTop] = useState('5rem'); // Default to 80px (top-20)
+
     // Sync Status tab settings with props, but don't overwrite local changes
     useEffect(() => {
         // This effect runs when siteSettings prop changes from Firestore listener
@@ -315,6 +319,15 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
             }
         }
     }, [activeOrdersTab]);
+
+    // Effect to calculate the correct 'top' position for the sticky order sub-tabs
+    useEffect(() => {
+        if (adminTabsContainerRef.current) {
+            const adminTabsHeight = adminTabsContainerRef.current.offsetHeight;
+            // The main header is 80px tall. We set the sub-tabs' sticky top below that plus the main admin tabs' height.
+            setOrderSubTabsTop(`${80 + adminTabsHeight}px`);
+        }
+    }, [activeTab, isCurrentUserAdmin]); // Rerunning on these changes covers visibility changes.
 
 
     const pendingOrdersCount = useMemo(() => orders.filter(o => o.status === 'pending').length, [orders]);
@@ -509,13 +522,20 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         const mainHeaderHeight = 80; // Height of the main sticky header
         let totalOffset = mainHeaderHeight;
     
+        const adminTabsHeader = document.getElementById('admin-main-tabs-container');
+        const adminTabsHeight = adminTabsHeader?.offsetHeight || 0;
+        if (adminTabsHeader) {
+            totalOffset += adminTabsHeight;
+        }
+    
         // Check if the sticky order tabs are visible and add their height
         if (activeTab === 'orders') {
             const orderTabsHeader = document.getElementById('sticky-order-tabs');
             if (orderTabsHeader) {
-                // Check if it's actually sticky (in the viewport)
+                const stickyThreshold = mainHeaderHeight + adminTabsHeight;
                 const rect = orderTabsHeader.getBoundingClientRect();
-                if (rect.top <= mainHeaderHeight) {
+                // Add a small tolerance (1px) for floating point inaccuracies
+                if (rect.top <= stickyThreshold + 1) {
                     totalOffset += orderTabsHeader.offsetHeight;
                 }
             }
@@ -675,23 +695,25 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                             </div>
                             <button onClick={handleLogout} className="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600"><i className="fas fa-sign-out-alt mr-2"></i>Sair</button>
                         </div>
-                        <div className="border-b mb-6">
-                            <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide -mx-4 px-2 sm:px-4">
-                                {['status', 'orders', 'products', 'categories', 'customization', 'data'].map(tab => {
-                                    const icons: { [key: string]: string } = { status: 'fa-store-alt', orders: 'fa-receipt', products: 'fa-pizza-slice', categories: 'fa-tags', customization: 'fa-paint-brush', data: 'fa-database' };
-                                    const labels: { [key: string]: string } = { status: 'Status', orders: 'Pedidos', products: 'Produtos', categories: 'Categorias', customization: 'Personalização', data: 'Dados' };
-                                    return (
-                                        <button 
-                                            key={tab} 
-                                            id={`admin-tab-${tab}`}
-                                            onClick={() => handleMainTabClick(tab)} 
-                                            className={`relative flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === tab ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}
-                                        >
-                                            <i className={`fas ${icons[tab]} w-5 text-center`}></i> <span>{labels[tab]}</span>
-                                            {tab === 'orders' && activeOrdersCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">{activeOrdersCount}</span>}
-                                        </button>
-                                    );
-                                })}
+                        <div ref={adminTabsContainerRef} id="admin-main-tabs-container" className="sticky top-20 bg-brand-ivory-50/95 backdrop-blur-sm z-40 -mx-8 shadow-sm">
+                            <div className="border-b">
+                                <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide px-8">
+                                    {['status', 'orders', 'products', 'categories', 'customization', 'data'].map(tab => {
+                                        const icons: { [key: string]: string } = { status: 'fa-store-alt', orders: 'fa-receipt', products: 'fa-pizza-slice', categories: 'fa-tags', customization: 'fa-paint-brush', data: 'fa-database' };
+                                        const labels: { [key: string]: string } = { status: 'Status', orders: 'Pedidos', products: 'Produtos', categories: 'Categorias', customization: 'Personalização', data: 'Dados' };
+                                        return (
+                                            <button 
+                                                key={tab} 
+                                                id={`admin-tab-${tab}`}
+                                                onClick={() => handleMainTabClick(tab)} 
+                                                className={`relative flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors ${activeTab === tab ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-700'}`}
+                                            >
+                                                <i className={`fas ${icons[tab]} w-5 text-center`}></i> <span>{labels[tab]}</span>
+                                                {tab === 'orders' && activeOrdersCount > 0 && <span className="absolute top-1 right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">{activeOrdersCount}</span>}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
 
@@ -836,7 +858,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                 )}
 
                                 <div className="border-t pt-4">
-                                    <div id="sticky-order-tabs" className="sticky top-20 bg-brand-ivory-50/95 backdrop-blur-sm z-30 shadow-sm -mx-8">
+                                    <div id="sticky-order-tabs" style={{ top: orderSubTabsTop }} className="sticky bg-brand-ivory-50/95 backdrop-blur-sm z-30 shadow-sm -mx-8">
                                         <div className="border-b">
                                             <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide px-8">
                                                 {!isTrashVisible && OrderStatusTabs.map(tabKey => {
@@ -979,7 +1001,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                                 )}
                                                                 <h4 className={`text-lg font-semibold text-brand-olive-600 transition-opacity ${!category.active ? 'opacity-40' : ''}`}>{category.name}</h4>
                                                             </div>
-                                                            {/* FIX: Corrected a 'children' prop type error in SortableContext by wrapping the mapped items in a div. This ensures SortableContext receives a single valid child element. */}
+                                                            {/* FIX: The SortableContext component requires a single valid React node as its child. Wrapping the list of SortableProductItem components in a <div> resolves the 'children' prop type error. */}
                                                             <SortableContext items={categoryProducts.map(p => p.id)} strategy={verticalListSortingStrategy}>
                                                                 <div className="space-y-2">
                                                                     {categoryProducts.map(product => <SortableProductItem key={product.id} product={product} isCategoryActive={category.active} onEdit={handleEditProduct} onDelete={onDeleteProduct} onStatusChange={onProductStatusChange} onStockStatusChange={onProductStockStatusChange} isDeleteMode={isProductDeleteMode} isSelected={selectedProductIds.has(product.id)} onSelect={handleSelectProduct} />)}
@@ -1014,7 +1036,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                         </button>
                                     </div>
                                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
-                                        {/* FIX: Corrected a 'children' prop type error in SortableContext by wrapping the mapped items in a div. This ensures SortableContext receives a single valid child element. */}
+                                        {/* FIX: The SortableContext component requires a single valid React node as its child. Wrapping the list of SortableCategoryItem components in a <div> resolves the 'children' prop type error. */}
                                         <SortableContext items={localCategories.map(c => c.id)} strategy={verticalListSortingStrategy}>
                                             <div className="space-y-2">
                                                 {localCategories.map(cat => {
