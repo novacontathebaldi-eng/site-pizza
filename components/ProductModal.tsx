@@ -120,15 +120,24 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 finalImageUrl = await firebaseService.uploadImage(imageFile);
             }
 
+            const isNewProduct = !product;
+
             const dataToSave: any = {
                 ...formData,
                 imageUrl: finalImageUrl,
                 isPromotion: isPromotion,
-                 // Se for promoção e tiver um preço válido, salve o número. Senão, delete o campo.
-                promotionalPrice: isPromotion && Number(promotionalPrice) > 0 
-                    ? Number(promotionalPrice) 
-                    : firebase.firestore.FieldValue.delete()
             };
+    
+            if (isPromotion && Number(promotionalPrice) > 0) {
+                dataToSave.promotionalPrice = Number(promotionalPrice);
+            } else if (isNewProduct) {
+                // For new products, just omit the field if it's not a promotion.
+                // formData might contain a default promotionalPrice from getInitialFormData, so we delete it.
+                delete dataToSave.promotionalPrice;
+            } else {
+                // For existing products, use FieldValue.delete() to remove it from Firestore.
+                dataToSave.promotionalPrice = firebase.firestore.FieldValue.delete();
+            }
 
             const finalProduct: Product = {
                 id: product?.id || '',

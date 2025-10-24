@@ -655,6 +655,8 @@ const App: React.FC = () => {
 
         addToast("Pizza Meio a Meio adicionada!", 'success');
         setIsHalfAndHalfModalOpen(false);
+    // FIX: Changed dependency array from [addToast] to [] to resolve a type inference error.
+    // The `addToast` function is memoized with an empty dependency array, making it stable and safe to omit here.
     }, []);
 
     const pizzaProducts = useMemo(() => {
