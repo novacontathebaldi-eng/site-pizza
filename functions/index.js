@@ -168,25 +168,25 @@ Você deve saber todos os produtos e seus preços de cor.
 
 **PIZZAS SALGADAS:**
 Tamanhos: M (6 fatias), G (8 fatias).
-- **Santa Sensação (lombinho):** M R$ 50,00 | G R$ 62,00.
-- **Rio Bonito (Margherita):** M R$ 42,00 | G R$ 54,00.
-- **Luxemburgo (Calabresa):** M R$ 45,00 | G R$ 57,00.
-- **Caioaba (Doritos):** M R$ 48,00 | G R$ 58,00.
-- **Barra de Mangarai (Portuguesa):** M R$ 50,00 | G R$ 62,00.
-- **Holanda (Frango/bacon):** M R$ 50,00 | G R$ 62,00.
-- **Meia Légua (mista 1):** M R$ 52,00 | G R$ 64,00.
-- **Colina verde (Catubresa) NOVA:** M R$ 57,00 | G R$ 69,00.
-- **Caramuru (Frango catupiry):** M R$ 60,00 | G R$ 72,00.
-- **Califórnia (4 queijos):** M R$ 60,00 | G R$ 72,00.
-- **Tirol (File mignon):** M R$ 65,00 | G R$ 77,00.
-- **Bragança (bacalhau):** M R$ 67,00 | G R$ 79,00.
-- **Encantado (costela de boi):** M R$ 69,00 | G R$ 80,00.
-- **Suiça (Camarão):** M R$ 70,00 | G R$ 82,00.
+- **Santa Sensação (lombinho):** M R$ 50,00 | G R$ 62,00. (Molho de tomate, muçarela, bacon, cebola, lombinho canadense, barbecue e orégano)
+- **Rio Bonito (Margherita):** M R$ 42,00 | G R$ 54,00. (Molho de tomate, muçarela, tomate, manjericão e orégano)
+- **Luxemburgo (Calabresa):** M R$ 45,00 | G R$ 57,00. (Molho de tomate, muçarela, calabresa, cebola e orégano)
+- **Caioaba (Doritos):** M R$ 48,00 | G R$ 58,00. (Molho de tomate, queijo muçarela, queijo cheddar, doritos)
+- **Barra de Mangarai (Portuguesa):** M R$ 50,00 | G R$ 62,00. (Molho de tomate, muçarela, presunto, calabresa, cebola, azeitona, palmito, ovo, orégano)
+- **Holanda (Frango/bacon):** M R$ 50,00 | G R$ 62,00. (Molho de tomate, muçarela, frango, bacon, cebola e orégano)
+- **Meia Légua (mista 1):** M R$ 52,00 | G R$ 64,00. (Molho de tomate, muçarela, presunto, calabresa, frango, milho, cebola, palmito, orégano)
+- **Colina verde (Catubresa) NOVA:** M R$ 57,00 | G R$ 69,00. (Molho de tomate, muçarela, calabresa, catupiry, cebola e orégano)
+- **Caramuru (Frango catupiry):** M R$ 60,00 | G R$ 72,00. (Molho de tomate, muçarela, frango, catupiry, azeitona, orégano)
+- **Califórnia (4 queijos):** M R$ 60,00 | G R$ 72,00. (Molho de tomate, muçarela, gorgonzola, catupiry, cheddar)
+- **Tirol (File mignon):** M R$ 65,00 | G R$ 77,00. (Molho de tomate, muçarela, filé mignon, gorgonzola, champignon, salsa, pimenta biquinho)
+- **Bragança (bacalhau):** M R$ 67,00 | G R$ 79,00. (Molho de tomate, muçarela, bacalhau, batata, catupiry e temperinho verde)
+- **Encantado (costela de boi):** M R$ 69,00 | G R$ 80,00. (Molho de tomate, muçarela, gorgonzola, costela de boi, tomate cereja, cebola e tempero verde)
+- **Suiça (Camarão):** M R$ 70,00 | G R$ 82,00. (Molho de tomate, muçarela, presunto, calabresa, camarão, milho, azeitona, palmito, orégano)
 
 **PIZZAS DOCES:**
 Tamanhos: M (6 fatias), G (8 fatias).
-- **Chaves (banana):** M R$ 40,00 | G R$ 50,00.
-- **Rio da Prata (Romeu e Julieta):** M R$ 45,00 | G R$ 55,00.
+- **Chaves (banana):** M R$ 40,00 | G R$ 50,00. (Muçarela, leite condensado, banana e canela)
+- **Rio da Prata (Romeu e Julieta):** M R$ 45,00 | G R$ 55,00. (Muçarela, leite condensado, catupiry, goiabada)
 
 **CALZONES:**
 - **Calzone Calabresa:** Único R$ 27,00.
