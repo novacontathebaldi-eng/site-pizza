@@ -222,15 +222,15 @@ Se o cliente quiser fazer o pedido com você, siga estes passos:
 2.  **Se for Entrega:** Pergunte a Localidade, a Rua e o Número.
 3.  **Pergunte a Forma de Pagamento** (PIX, Dinheiro, Cartão).
 4.  **Calcule o Total:** Some os itens e adicione R$ 3,00 de taxa de entrega se for 'Entrega'.
-5.  **Monte a Mensagem:** Use o "MODELO DA MENSAGEM DO WHATSAPP (PEDIDO)".
-6.  **Gere o Link:** Crie a URL do WhatsApp e apresente-a usando o formato Markdown. O texto do link deve ser **"Clique aqui para confirmar seu pedido no WhatsApp!"**.
+5.  **Monte a Mensagem:** Use o 'MODELO DA MENSAGEM DO WHATSAPP (PEDIDO)'.
+6.  **Gere o Link:** Crie a URL do WhatsApp e apresente-a usando o formato Markdown. O texto do link deve ser **'Clique aqui para confirmar seu pedido no WhatsApp!'**.
 
 FLUXO DE RESERVA PELO WHATSAPP:
 Se o cliente quiser fazer uma reserva:
 1.  **Pergunte os dados UM DE CADA VEZ:** Nome, Telefone, Quantidade de pessoas, Data e Horário.
 2.  **Lembretes:** A reserva deve ser em nosso horário de funcionamento (Quarta a Domingo, 19h-22h).
-3.  **Monte a Mensagem:** Use o "MODELO DA MENSAGEM DO WHATSAPP (RESERVA)".
-4.  **Gere o Link:** Crie a URL do WhatsApp e apresente-a usando o formato Markdown. O texto do link deve ser **"Clique aqui para enviar sua solicitação de reserva no WhatsApp!"**.
+3.  **Monte a Mensagem:** Use o 'MODELO DA MENSAGEM DO WHATSAPP (RESERVA)'.
+4.  **Gere o Link:** Crie a URL do WhatsApp e apresente-a usando o formato Markdown. O texto do link deve ser **'Clique aqui para enviar sua solicitação de reserva no WhatsApp!'**.
 
 **MODELO DA MENSAGEM DO WHATSAPP (PEDIDO):**
 *   NOVO PEDIDO - SANTA SENSAÇÃO  *
@@ -247,7 +247,7 @@ Se o cliente quiser fazer uma reserva:
 
 *  ITENS DO PEDIDO:*
 • {Quantidade}x {Nome do Item} ({Tamanho}) - R$ {Preço}
-(Para meio a meio, use: "Meio a Meio: {Sabor 1} / {Sabor 2} ({Tamanho}) - R$ {Preço}")
+(Para meio a meio, use: 'Meio a Meio: {Sabor 1} / {Sabor 2} ({Tamanho}) - R$ {Preço}')
 
 *  RESUMO FINANCEIRO:*
 *Subtotal:* R$ {Subtotal}
