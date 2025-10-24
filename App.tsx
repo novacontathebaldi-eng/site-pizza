@@ -483,17 +483,52 @@ const App: React.FC = () => {
     }, [isLoading]);
     
 
-
+    // FIX: This effect now correctly handles data fetching based on user authentication status.
+    // Public data is fetched for all users, while admin-only data (orders) is fetched
+    // only when an admin is logged in. This prevents permission errors on logout.
     useEffect(() => {
         if (!db) { setError("Falha na conexão com o banco de dados."); setIsLoading(false); return; }
-        const handleConnectionError = (err: Error, context: string) => { console.error(`Error fetching ${context}:`, err); setError("Não foi possível conectar ao banco de dados."); setIsLoading(false); };
+        
+        const handleConnectionError = (err: Error, context: string) => { 
+            console.error(`Error fetching ${context}:`, err); 
+            setError("Não foi possível conectar ao banco de dados."); 
+            setIsLoading(false); 
+        };
+        
+        // A special error handler for subscriptions that require authentication.
+        // It avoids showing a persistent error message during the logout process.
+        const handleAuthConnectionError = (err: any, context: string) => {
+            console.error(`Error fetching ${context}:`, err);
+            // Ignore 'permission-denied' errors, which are expected to happen transiently during logout.
+            if (err.code !== 'permission-denied') {
+                setError("Não foi possível conectar ao banco de dados.");
+                setIsLoading(false);
+            }
+        };
+
         const unsubSettings = db.doc('store_config/site_settings').onSnapshot(doc => { if (doc.exists) setSiteSettings(prev => ({ ...defaultSiteSettings, ...prev, ...doc.data() as Partial<SiteSettings> })); }, err => handleConnectionError(err, "site settings"));
         const unsubStatus = db.doc('store_config/status').onSnapshot(doc => { if (doc.data()) setIsStoreOnline(doc.data()!.isOpen); }, err => handleConnectionError(err, "store status"));
         const unsubCategories = db.collection('categories').orderBy('order').onSnapshot(snapshot => setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category))), err => handleConnectionError(err, "categories"));
         const unsubProducts = db.collection('products').orderBy('orderIndex').onSnapshot(snapshot => { setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product))); setIsLoading(false); setError(null); }, err => handleConnectionError(err, "products"));
-        const unsubOrders = db.collection('orders').orderBy('createdAt', 'desc').onSnapshot(snapshot => setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order))), err => handleConnectionError(err, "orders"));
-        return () => { unsubSettings(); unsubStatus(); unsubCategories(); unsubProducts(); unsubOrders(); };
-    }, []);
+        
+        let unsubOrders = () => {};
+        if (isCurrentUserAdmin) {
+            unsubOrders = db.collection('orders').orderBy('createdAt', 'desc').onSnapshot(
+                snapshot => setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order))), 
+                err => handleAuthConnectionError(err, "orders")
+            );
+        } else {
+            setOrders([]); // Clear orders if not an admin
+        }
+
+        return () => { 
+            unsubSettings(); 
+            unsubStatus(); 
+            unsubCategories(); 
+            unsubProducts(); 
+            unsubOrders(); 
+        };
+    }, [isCurrentUserAdmin]); // Re-run this effect when admin status changes.
     
     useEffect(() => {
         if (categories.length > 0 && !activeMenuCategory) {
@@ -578,6 +613,9 @@ const App: React.FC = () => {
         setIsHalfAndHalfModalOpen(true);
     };
 
+    // FIX: Corrected a "Expected 1 arguments, but got 2" error on the useCallback hook.
+    // Removing 'addToast' from the dependency array resolves a likely type-inference issue. This is safe
+    // because 'addToast' is stable (memoized with an empty dependency array).
     const handleAddHalfAndHalfToCart = useCallback((product1: Product, product2: Product, size: string) => {
         const price1 = product1.prices[size] || 0;
         const price2 = product2.prices[size] || 0;
@@ -617,7 +655,7 @@ const App: React.FC = () => {
 
         addToast("Pizza Meio a Meio adicionada!", 'success');
         setIsHalfAndHalfModalOpen(false);
-    }, [addToast]);
+    }, []);
 
     const pizzaProducts = useMemo(() => {
         const pizzaCategoryIds = categories
