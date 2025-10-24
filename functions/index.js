@@ -694,3 +694,52 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
 
   throw new onCall.HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
 });
+
+/**
+ * Associates guest orders with a user account after login.
+ */
+exports.syncGuestOrders = onCall({secrets}, async (request) => {
+  // 1. Check for authentication
+  const uid = request.auth?.uid;
+  if (!uid) {
+    logger.error("syncGuestOrders foi chamada sem autenticação.");
+    throw new onCall.HttpsError(
+        "unauthenticated",
+        "A função deve ser chamada por um usuário autenticado.",
+    );
+  }
+
+  // 2. Validate input
+  const {orderIds} = request.data;
+  if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+    logger.warn(`syncGuestOrders foi chamada com orderIds inválido para o usuário ${uid}.`);
+    throw new onCall.HttpsError(
+        "invalid-argument",
+        "A função deve ser chamada com um array de IDs de pedidos.",
+    );
+  }
+
+  // 3. Perform the update
+  try {
+    const batch = db.batch();
+    // A regra de segurança do Firestore irá garantir que um usuário só pode "reivindicar"
+    // um pedido que ainda não tem um 'userId'.
+    orderIds.forEach((orderId) => {
+      if (typeof orderId === "string" && orderId.length > 0) {
+        const orderRef = db.collection("orders").doc(orderId);
+        batch.update(orderRef, {userId: uid});
+      }
+    });
+
+    await batch.commit();
+    logger.info(`[Sucesso] ${orderIds.length} pedido(s) associado(s) ao usuário ${uid}.`);
+    return {success: true, message: "Pedidos associados com sucesso."};
+  } catch (error) {
+    logger.error(`[Falha] Erro ao associar pedidos para o usuário ${uid}:`, error);
+    throw new onCall.HttpsError(
+        "internal",
+        "Ocorreu um erro ao associar seus pedidos.",
+        error.message,
+    );
+  }
+});
