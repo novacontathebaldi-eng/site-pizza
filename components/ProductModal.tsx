@@ -24,7 +24,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         orderIndex: 0,
         stockStatus: 'available',
         isPromotion: false,
-        promotionalPrice: 0,
+        promotionalPrices: {},
     });
     
     const [formData, setFormData] = useState(getInitialFormData());
@@ -37,7 +37,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
     // Novos estados para a promoção
     const [isPromotion, setIsPromotion] = useState(false);
-    const [promotionalPrice, setPromotionalPrice] = useState<number | ''>('');
+    const [promotionalPrices, setPromotionalPrices] = useState<{ [key: string]: number | '' }>({});
 
 
     useEffect(() => {
@@ -53,18 +53,20 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     badge: product.badge || '',
                     orderIndex: product.orderIndex,
                     stockStatus: product.stockStatus || 'available',
+                    isPromotion: product.isPromotion,
+                    promotionalPrices: product.promotionalPrices,
                 });
                 setImagePreview(product.imageUrl);
                 // Define os estados da promoção ao editar
                 setIsPromotion(product.isPromotion || false);
-                setPromotionalPrice(product.promotionalPrice || '');
+                setPromotionalPrices(product.promotionalPrices || {});
 
             } else {
                 setFormData(getInitialFormData());
                 setImagePreview('');
                 // Reseta os estados da promoção para um novo produto
                 setIsPromotion(false);
-                setPromotionalPrice('');
+                setPromotionalPrices({});
             }
         }
     }, [product, isOpen, categories]);
@@ -98,6 +100,16 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         setFormData({ ...formData, prices: newPrices });
     };
 
+    const handlePromotionalPriceChange = (size: string, value: string) => {
+        const newPrices = { ...promotionalPrices };
+        if (value) {
+            newPrices[size] = parseFloat(value);
+        } else {
+            delete newPrices[size];
+        }
+        setPromotionalPrices(newPrices);
+    };
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setImageFile(e.target.files[0]);
@@ -119,32 +131,50 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
             if (imageFile) {
                 finalImageUrl = await firebaseService.uploadImage(imageFile);
             }
-
+    
             const isNewProduct = !product;
-
+    
             const dataToSave: any = {
                 ...formData,
                 imageUrl: finalImageUrl,
                 isPromotion: isPromotion,
             };
-    
-            if (isPromotion && Number(promotionalPrice) > 0) {
-                dataToSave.promotionalPrice = Number(promotionalPrice);
-            } else if (isNewProduct) {
-                // For new products, just omit the field if it's not a promotion.
-                // formData might contain a default promotionalPrice from getInitialFormData, so we delete it.
-                delete dataToSave.promotionalPrice;
-            } else {
-                // For existing products, use FieldValue.delete() to remove it from Firestore.
-                dataToSave.promotionalPrice = firebase.firestore.FieldValue.delete();
+            
+            // Lógica para salvar os preços promocionais
+            const finalPromotionalPrices: { [key: string]: number } = {};
+            if (isPromotion) {
+                Object.entries(promotionalPrices).forEach(([size, price]) => {
+                    const numPrice = Number(price);
+                    if (price !== '' && !isNaN(numPrice) && numPrice > 0) {
+                        finalPromotionalPrices[size] = numPrice;
+                    }
+                });
             }
-
+    
+            if (Object.keys(finalPromotionalPrices).length > 0) {
+                dataToSave.promotionalPrices = finalPromotionalPrices;
+            } else {
+                // Se não for promoção ou não houver preços, remove o campo
+                if (isNewProduct) {
+                    delete dataToSave.promotionalPrices;
+                } else {
+                    dataToSave.promotionalPrices = firebase.firestore.FieldValue.delete();
+                }
+            }
+            
+            // Garante a remoção do campo `promotionalPrice` antigo em atualizações
+            if (!isNewProduct) {
+                dataToSave.promotionalPrice = firebase.firestore.FieldValue.delete();
+            } else {
+                delete dataToSave.promotionalPrice;
+            }
+    
             const finalProduct: Product = {
                 id: product?.id || '',
                 active: product?.active ?? true,
                 ...dataToSave
             };
-
+    
             await onSave(finalProduct);
             onClose();
         } catch (error) {
@@ -245,18 +275,23 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
                                 {isPromotion && (
                                     <div className="pl-8 animate-fade-in-up">
-                                        <label className="block text-sm font-semibold mb-1" htmlFor="promotional-price">Preço Promocional (R$)</label>
-                                        <input 
-                                            id="promotional-price"
-                                            type="number" 
-                                            step="0.01" 
-                                            value={promotionalPrice} 
-                                            onChange={e => setPromotionalPrice(e.target.value === '' ? '' : parseFloat(e.target.value))} 
-                                            className="w-full px-3 py-2 border rounded-md" 
-                                            placeholder="Ex: 39.90"
-                                            required 
-                                        />
-                                        <p className="text-xs text-gray-600 mt-1">Este preço único será aplicado a todos os tamanhos enquanto a promoção estiver ativa.</p>
+                                        <label className="block text-sm font-semibold mb-1">Preços Promocionais (R$)</label>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-yellow-100/50 rounded-md border border-yellow-300">
+                                            {['P', 'M', 'G', 'Única'].map(size => (
+                                                <div key={size}>
+                                                    <label className="block text-xs font-medium mb-1">{size}</label>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={promotionalPrices[size] || ''}
+                                                        onChange={e => handlePromotionalPriceChange(size, e.target.value)}
+                                                        className="w-full px-2 py-1 border rounded-md"
+                                                        placeholder="0.00"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <p className="text-xs text-gray-600 mt-1">Defina um preço promocional para cada tamanho. O preço normal será riscado no cardápio.</p>
                                     </div>
                                 )}
                             </div>

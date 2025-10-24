@@ -41,7 +41,7 @@ export interface Product {
     stockStatus?: 'available' | 'out_of_stock';
     deleted?: boolean;
     isPromotion?: boolean;
-    promotionalPrice?: number;
+    promotionalPrices?: { [key: string]: number };
 }
 
 export interface Category {

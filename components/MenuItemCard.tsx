@@ -16,7 +16,8 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, categoryNam
     const prices = product.prices ?? {};
     const hasPrices = Object.keys(prices).length > 0;
     const isOutOfStock = product.stockStatus === 'out_of_stock';
-    const isPromo = product.isPromotion && product.promotionalPrice != null && product.promotionalPrice > 0;
+    // FIX: Added a type check to ensure the value 'p' from promotionalPrices is a number before comparison. This resolves an 'unknown' type error.
+    const isPromo = product.isPromotion && product.promotionalPrices && Object.values(product.promotionalPrices).some(p => typeof p === 'number' && p > 0);
     const isPizza = categoryName.toLowerCase().includes('pizza');
 
 
@@ -60,13 +61,16 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, categoryNam
             return;
         }
 
-        if (!isStoreOnline || wasAdded || (!hasPrices && !isPromo) || isOutOfStock) return;
+        if (!isStoreOnline || wasAdded || !hasPrices || isOutOfStock) return;
         
-        // Se for promoção, usa o preço promocional. Senão, busca o preço do tamanho selecionado.
-        const price = isPromo ? product.promotionalPrice! : prices[selectedSize];
-        
-        // Para promoções, o 'tamanho' ainda é relevante para o controle do carrinho, mesmo que o preço seja único.
-        const size = selectedSize || 'Única';
+        const size = selectedSize || sortedSizes[0] || 'Única';
+        const promoPriceForSize = isPromo ? product.promotionalPrices?.[size] : undefined;
+        const price = (promoPriceForSize && promoPriceForSize > 0) ? promoPriceForSize : prices[size];
+
+        if (price === undefined) {
+            console.error("Price not found for selected size");
+            return;
+        }
 
         onAddToCart(product, size, price);
         setWasAdded(true);
@@ -91,20 +95,31 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, categoryNam
     let priceToDisplay: string;
     let originalPriceStriked: string | null = null;
     
-    if (isPromo) {
-        priceToDisplay = formatPrice(product.promotionalPrice!);
-        // Only show striked price if a size is selected (or if there's only one size)
-        if (selectedSize && prices[selectedSize]) {
-            originalPriceStriked = formatPrice(prices[selectedSize]);
+    const promoPriceForSelectedSize = isPromo && selectedSize ? product.promotionalPrices?.[selectedSize] : undefined;
+    const regularPriceForSelectedSize = selectedSize ? prices[selectedSize] : undefined;
+    
+    if (promoPriceForSelectedSize) {
+        priceToDisplay = formatPrice(promoPriceForSelectedSize);
+        if (regularPriceForSelectedSize) {
+            originalPriceStriked = formatPrice(regularPriceForSelectedSize);
         }
-    } else if (hasPrices) {
-        if (selectedSize) {
-            priceToDisplay = formatPrice(prices[selectedSize]);
+    } else if (regularPriceForSelectedSize) {
+        priceToDisplay = formatPrice(regularPriceForSelectedSize);
+    } else if (hasPrices && sortedSizes.length > 1) {
+        priceToDisplay = 'Selecione';
+    } else { // Single size product (like drinks) or product without prices
+        const singleSizePrice = prices['Única'];
+        const singlePromoPrice = isPromo ? product.promotionalPrices?.['Única'] : undefined;
+        if (singlePromoPrice) {
+            priceToDisplay = formatPrice(singlePromoPrice);
+            if (singleSizePrice) {
+                originalPriceStriked = formatPrice(singleSizePrice);
+            }
+        } else if (singleSizePrice) {
+            priceToDisplay = formatPrice(singleSizePrice);
         } else {
-            priceToDisplay = 'Selecione';
+            priceToDisplay = 'Indisponível';
         }
-    } else {
-        priceToDisplay = 'Indisponível';
     }
 
     const sliceInfo = useMemo(() => {
@@ -189,7 +204,7 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ product, categoryNam
                                 {originalPriceStriked}
                             </span>
                         )}
-                        <span className={`${isPromo ? 'text-2xl leading-tight' : 'text-xl'} font-bold text-accent -mt-1`}>
+                        <span className={`${(isPromo && promoPriceForSelectedSize) ? 'text-2xl leading-tight' : 'text-xl'} font-bold text-accent -mt-1`}>
                             {priceToDisplay}
                         </span>
                     </div>
