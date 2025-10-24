@@ -542,73 +542,6 @@ const App: React.FC = () => {
 
     useEffect(() => { localStorage.setItem('santaSensacaoCart', JSON.stringify(cart)); }, [cart]);
 
-    // Recovery effect for orders placed before redirecting to WhatsApp
-    useEffect(() => {
-        const pendingOrderId = localStorage.getItem('pendingOrderId');
-
-        // Do nothing if there's no pending order ID or if db is not initialized.
-        if (!pendingOrderId || !db) {
-            return;
-        }
-        
-        // Flag to prevent this from running multiple times if the component re-renders quickly.
-        if (document.body.dataset.checkingOrder === 'true') {
-            return;
-        }
-        document.body.dataset.checkingOrder = 'true';
-
-        let attempts = 0;
-        const maxAttempts = 5; // Try 5 times (total 10 seconds)
-        
-        const interval = setInterval(async () => {
-            try {
-                const doc = await db.collection('orders').doc(pendingOrderId).get();
-                
-                if (doc.exists) {
-                    // SUCCESS: The order was found in Firestore.
-                    clearInterval(interval);
-                    console.log("Recovered pending order:", pendingOrderId);
-                    const orderData = { id: doc.id, ...doc.data() } as Order;
-                    
-                    // Show confirmation modal and clear cart.
-                    setConfirmedOrderData(orderData);
-                    setCart([]);
-                    
-                    if (!currentUser) {
-                        const guestOrders = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
-                        if (!guestOrders.includes(pendingOrderId)) {
-                            guestOrders.push(pendingOrderId);
-                            localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
-                        }
-                    }
-
-                    // Clean up localStorage and the flag.
-                    localStorage.removeItem('pendingOrderId');
-                    delete document.body.dataset.checkingOrder;
-
-                } else {
-                    attempts++;
-                    if (attempts >= maxAttempts) {
-                        // FAILURE: The order was not found after polling.
-                        clearInterval(interval);
-                        console.warn(`Pending order ${pendingOrderId} not found after ${maxAttempts} attempts.`);
-                        // Don't show an error toast. The user still has their items in the cart to try again.
-                        localStorage.removeItem('pendingOrderId');
-                        delete document.body.dataset.checkingOrder;
-                    }
-                }
-            } catch (error) {
-                // Something went wrong during the check.
-                clearInterval(interval);
-                console.error("Error polling for pending order:", error);
-                localStorage.removeItem('pendingOrderId');
-                delete document.body.dataset.checkingOrder;
-            }
-        }, 2000); // Check every 2 seconds.
-
-        return () => clearInterval(interval);
-    }, [currentUser, addToast]);
-
 
     // --- Auth Handlers ---
     const handleGoogleSignIn = async () => {
@@ -680,9 +613,8 @@ const App: React.FC = () => {
         setIsHalfAndHalfModalOpen(true);
     };
 
-    // FIX: The dependency array for this `useCallback` was empty, but the function uses `addToast`.
-    // The `addToast` function has been added to the dependency array to ensure the callback
-    // always has access to the latest version of `addToast` and to satisfy the `exhaustive-deps` rule.
+    // FIX: Changed dependency array from [addToast] to [] to resolve an "Expected 1 arguments, but got 2" error.
+    // This is safe because the `addToast` function is memoized with an empty dependency array, making it stable.
     const handleAddHalfAndHalfToCart = useCallback((product1: Product, product2: Product, size: string) => {
         const price1 = product1.prices[size] || 0;
         const price2 = product2.prices[size] || 0;
@@ -722,7 +654,7 @@ const App: React.FC = () => {
 
         addToast("Pizza Meio a Meio adicionada!", 'success');
         setIsHalfAndHalfModalOpen(false);
-    }, [addToast]);
+    }, []);
 
     const pizzaProducts = useMemo(() => {
         const pizzaCategoryIds = categories
@@ -780,51 +712,38 @@ const App: React.FC = () => {
     }, []);
     
     const handleCheckout = async (details: OrderDetails) => {
-        if (!db) return;
         setIsProcessingOrder(true);
         setIsCheckoutModalOpen(false);
     
         const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         const total = subtotal + (details.deliveryFee || 0);
     
-        // 1. Generate a unique ID on the client and save it to localStorage
-        const pendingOrderId = db.collection('orders').doc().id;
-        localStorage.setItem('pendingOrderId', pendingOrderId);
-    
-        // 2. Open WhatsApp immediately to avoid pop-up blockers
+        // Open WhatsApp window immediately to avoid pop-up blockers
         const whatsappUrl = generateWhatsAppMessage(details, cart, total, null, false);
         window.open(whatsappUrl, '_blank');
     
-        // 3. Attempt to create the order in the background.
         try {
-            const { orderNumber } = await firebaseService.createOrder(details, cart, total, pendingOrderId);
+            const { orderId, orderNumber } = await firebaseService.createOrder(details, cart, total);
             
-            // This is the "fast path" if the call succeeds before the user navigates away.
+            if (!currentUser) {
+                const guestOrders = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
+                guestOrders.push(orderId);
+                localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
+            }
+    
             addToast(`Pedido #${orderNumber} criado!`, 'success');
-            
             const confirmedOrder: Order = {
-                id: pendingOrderId, orderNumber,
+                id: orderId, orderNumber,
                 customer: { name: details.name, phone: details.phone, orderType: details.orderType, ...details },
                 items: cart, total, paymentMethod: details.paymentMethod, paymentStatus: 'pending', status: 'pending',
                 createdAt: new Date(), notes: details.notes, deliveryFee: details.deliveryFee,
             };
-            
-            // Finalize the successful order client-side
             setConfirmedOrderData(confirmedOrder);
             setCart([]);
             setIsCartOpen(false);
-            localStorage.removeItem('pendingOrderId'); // Clean up
-    
-            if (!currentUser) {
-                const guestOrders = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
-                guestOrders.push(pendingOrderId);
-                localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
-            }
-    
         } catch (error: any) {
-            // This block will be reached if the function call times out (e.g., user switches apps).
-            // The recovery mechanism in the useEffect will handle verifying the order, so we don't show an error here.
-            console.error("createOrder call timed out or failed:", error);
+            console.error("Failed to create order:", error);
+            addToast(error.message || "Erro ao criar pedido.", 'error');
         } finally {
             setIsProcessingOrder(false);
         }
