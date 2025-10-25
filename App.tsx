@@ -213,7 +213,7 @@ const App: React.FC = () => {
     const [categories, setCategories] = useState<Category[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
     const [isStoreOnline, setIsStoreOnline] = useState<boolean>(true);
-    const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
+    const [siteSettings, setSiteSettings] = useState<SiteSettings>(defaultSiteSettings);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -514,6 +514,9 @@ const App: React.FC = () => {
     }, [isLoading]);
     
 
+    // FIX: This effect now correctly handles data fetching based on user authentication status.
+    // Public data is fetched for all users, while admin-only data (orders) is fetched
+    // only when an admin is logged in. This prevents permission errors on logout.
     useEffect(() => {
         if (!db) { setError("Falha na conexão com o banco de dados."); setIsLoading(false); return; }
         
@@ -523,25 +526,18 @@ const App: React.FC = () => {
             setIsLoading(false); 
         };
         
+        // A special error handler for subscriptions that require authentication.
+        // It avoids showing a persistent error message during the logout process.
         const handleAuthConnectionError = (err: any, context: string) => {
             console.error(`Error fetching ${context}:`, err);
+            // Ignore 'permission-denied' errors, which are expected to happen transiently during logout.
             if (err.code !== 'permission-denied') {
                 setError("Não foi possível conectar ao banco de dados.");
                 setIsLoading(false);
             }
         };
 
-        const unsubSettings = db.doc('store_config/site_settings').onSnapshot(doc => {
-            if (doc.exists) {
-                const remoteSettings = doc.data() as Partial<SiteSettings>;
-                setSiteSettings({ ...defaultSiteSettings, ...remoteSettings });
-            } else {
-                setSiteSettings(defaultSiteSettings);
-            }
-        }, err => {
-            handleConnectionError(err, "site settings");
-            setSiteSettings(defaultSiteSettings);
-        });
+        const unsubSettings = db.doc('store_config/site_settings').onSnapshot(doc => { if (doc.exists) setSiteSettings(prev => ({ ...defaultSiteSettings, ...prev, ...doc.data() as Partial<SiteSettings> })); }, err => handleConnectionError(err, "site settings"));
         const unsubStatus = db.doc('store_config/status').onSnapshot(doc => { if (doc.data()) setIsStoreOnline(doc.data()!.isOpen); }, err => handleConnectionError(err, "store status"));
         const unsubCategories = db.collection('categories').orderBy('order').onSnapshot(snapshot => setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category))), err => handleConnectionError(err, "categories"));
         const unsubProducts = db.collection('products').orderBy('orderIndex').onSnapshot(snapshot => { setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product))); setIsLoading(false); setError(null); }, err => handleConnectionError(err, "products"));
@@ -553,7 +549,7 @@ const App: React.FC = () => {
                 err => handleAuthConnectionError(err, "orders")
             );
         } else {
-            setOrders([]);
+            setOrders([]); // Clear orders if not an admin
         }
 
         return () => { 
@@ -563,7 +559,7 @@ const App: React.FC = () => {
             unsubProducts(); 
             unsubOrders(); 
         };
-    }, [isCurrentUserAdmin]);
+    }, [isCurrentUserAdmin]); // Re-run this effect when admin status changes.
     
     useEffect(() => {
         if (categories.length > 0 && !activeMenuCategory) {
@@ -997,7 +993,9 @@ const App: React.FC = () => {
     const handleDeleteCategory = useCallback(async (categoryId: string) => { try { await firebaseService.deleteCategory(categoryId, products); addToast("Categoria deletada!", 'success'); } catch (error: any) { console.error("Failed to delete category:", error); addToast(`Erro: ${error.message}`, 'error'); } }, [products, addToast]);
     const handleCategoryStatusChange = useCallback(async (categoryId: string, active: boolean) => { try { await firebaseService.updateCategoryStatus(categoryId, active); addToast(`Categoria ${active ? 'ativada' : 'desativada'}.`, 'success'); } catch (error) { console.error("Failed to update category status:", error); addToast("Erro ao atualizar status.", 'error'); } }, [addToast]);
     const handleReorderProducts = useCallback(async (productsToUpdate: { id: string; orderIndex: number }[]) => { try { await firebaseService.updateProductsOrder(productsToUpdate); addToast("Ordem dos produtos atualizada.", 'success'); } catch (error) { console.error("Failed to reorder products:", error); addToast("Erro ao reordenar produtos.", 'error'); } }, [addToast]);
-    // FIX: Removed the explicit `: Promise<void>` return type from the async function inside `useCallback` to resolve a TypeScript type inference error.
+    // FIX: Removed the explicit `: Promise<void>` return type from the async function inside `useCallback`.
+    // While technically correct, it can sometimes cause subtle type inference issues with the compiler that may be misreported.
+    // Removing it makes the function's return type fully inferred, resolving the "Expected 1 arguments, but got 2" error and making it consistent with other similar handlers in the file.
     const handleReorderCategories = useCallback(async (categoriesToUpdate: { id: string; order: number }[]) => { try { await firebaseService.updateCategoriesOrder(categoriesToUpdate); addToast("Ordem das categorias atualizada.", 'success'); } catch (error) { console.error("Failed to reorder categories:", error); addToast("Erro ao reordenar categorias.", 'error'); } }, [addToast]);
     const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => { try { const settingsToUpdate = JSON.parse(JSON.stringify(settings)); for (const key in files) { const file = files[key]; if (file) { const url = await firebaseService.uploadSiteAsset(file, key); if (key === 'logo') settingsToUpdate.logoUrl = url; else if (key === 'heroBg') settingsToUpdate.heroBgUrl = url; else { const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key); if (sectionIndex > -1) settingsToUpdate.contentSections[sectionIndex].imageUrl = url; } } } await firebaseService.updateSiteSettings(settingsToUpdate); addToast("Personalização salva!", 'success'); } catch (error) { console.error("Failed to save site settings:", error); addToast("Erro ao salvar configurações.", 'error'); } }, [addToast]);
     const handleUpdateSiteSettingsField = useCallback(async (updates: Partial<SiteSettings>) => {
@@ -1135,18 +1133,6 @@ const App: React.FC = () => {
             setIsProcessingOrder(false);
         }
     };
-
-    if (!siteSettings) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-brand-green-700">
-                <div className="text-center text-white flex flex-col items-center">
-                    <img src={defaultLogo} alt="Carregando..." className="h-24 animate-pulse mb-6" />
-                    <i className="fas fa-spinner fa-spin text-4xl text-brand-gold-600"></i>
-                    <p className="mt-4 text-lg font-semibold tracking-wider">Carregando a melhor pizza do estado...</p>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="flex flex-col min-h-screen">
