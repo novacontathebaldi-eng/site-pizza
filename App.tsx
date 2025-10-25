@@ -156,8 +156,8 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     message += `*Forma:* ${paymentMethodMap[details.paymentMethod]}\n`;
 
     if (details.paymentMethod === 'pix') {
-        message += `*PIX:* CNPJ 62.247.199/0001-04\n`;
-        message += `👆 Use o CNPJ acima para pagar seu pedido via *PIX*. 💰📱\n`;
+        message += `*PIX CNPJ*: 62.247.199/0001-04\n`;
+        message += `👆 Use o *CNPJ* acima para pagar seu pedido via *PIX*. 💰📱\n`;
     }
     
     if (!isPaid && details.paymentMethod === 'cash') {
@@ -177,7 +177,9 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     if (details.notes) {
         message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
     }
-    message += `\nEste *pedido* foi gerado pelo nosso site: *santasensacao.me*`;
+    message += `\n🍕 *Obrigado* por escolher nossa pizzaria! 🤩 Sua preferência nos motiva a oferecer sempre o melhor. Estamos à disposição! 🧑🏻‍🍳👍🏼`;
+    
+    message += `\nEste *pedido* foi gerado pelo nosso site: *santasensacao.me* 🥇`;
     return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
 };
 
@@ -197,7 +199,9 @@ const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNu
     if (details.notes) {
         message += `\n*📝 OBSERVAÇÕES:*\n${details.notes}\n`;
     }
-    message += `\n*Reserva* gerado pelo nosso site: *santasensacao.me*`;
+    message += `\n🍕 *Obrigado* por escolher nossa pizzaria! 🤩 Será um prazer recebê-lo em nossa casa. Se precisar, estamos sempre à disposição! 🧑🏻‍🍳👍🏼`;
+    
+    message += `\nEsta *Reserva* foi gerada pelo nosso site: *santasensacao.me* 🥇`;
     return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
 };
 
