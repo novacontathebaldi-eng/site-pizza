@@ -157,6 +157,7 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
 
     if (details.paymentMethod === 'pix') {
         message += `*PIX:* CNPJ 62.247.199/0001-04\n`;
+        message += `👆 Use o CNPJ acima para pagar seu pedido. ☝️\n`;
     }
     
     if (!isPaid && details.paymentMethod === 'cash') {
