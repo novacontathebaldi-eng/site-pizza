@@ -450,7 +450,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                                                         <li>No app do seu banco, acesse a área PIX.</li>
                                                         <li>Escolha "Pagar com Chave" ou "Tranferir" e selecione CNPJ.</li>
                                                         <li>Cole o número copiado: "{pixCnpj}".</li>
-                                                        <li>Insira o Valor: {order.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} e confirme.</li>
+                                                        {/* FIX: Replaced undefined 'order' variable with 'total' to display the correct order total. */}
+                                                        <li>Insira o Valor: {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} e confirme.</li>
                                                         <li>Envie o comprovante para o nosso WhatsApp e então é só aguardar! 🍕</li>
                                                     </ol>
                                                     <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 bg-gray-800 rotate-45"></div>

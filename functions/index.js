@@ -131,8 +131,6 @@ exports.askSanto = onCall({secrets}, async (request) => {
   }
 
   // 2. Formatamos o histórico para o formato que a API do Gemini espera.
-  // A API espera um array de objetos { role: 'user'|'model', parts: [{ text: '...' }] }
-  // O papel do nosso bot ('bot') é traduzido para 'model' para a API.
   const contents = conversationHistory.map((message) => ({
     role: message.role === "bot" ? "model" : "user",
     parts: [{text: message.content}],
@@ -285,7 +283,6 @@ REGRAS DE SEGURANÇA:
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      // 3. Enviamos o histórico completo para a API
       contents: contents,
       config: {
         systemInstruction: systemInstruction,
