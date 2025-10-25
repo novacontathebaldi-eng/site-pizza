@@ -241,15 +241,8 @@ const App: React.FC = () => {
 
 
     // Order/Payment Flow State
-    const [cart, setCart] = useState<CartItem[]>(() => {
-        try {
-            const savedCart = localStorage.getItem('santaSensacaoCart');
-            return savedCart ? JSON.parse(savedCart) : [];
-        } catch {
-            localStorage.removeItem('santaSensacaoCart');
-            return [];
-        }
-    });
+    const [cart, setCart] = useState<CartItem[]>([]);
+    const [isCartInitialized, setIsCartInitialized] = useState(false);
     const [isProcessingOrder, setIsProcessingOrder] = useState<boolean>(false);
     const [confirmedOrderData, setConfirmedOrderData] = useState<Order | null>(null);
     const [confirmedReservationData, setConfirmedReservationData] = useState<Order | null>(null);
@@ -479,8 +472,11 @@ const App: React.FC = () => {
 
     // Other existing handlers...
     useEffect(() => {
-        localStorage.setItem('santaSensacaoCart', JSON.stringify(cart));
-    }, [cart]);
+        if (isCartInitialized) {
+            localStorage.setItem('santaSensacaoCart', JSON.stringify(cart));
+        }
+    }, [cart, isCartInitialized]);
+
 
     useEffect(() => {
         const sectionIds = ['inicio', 'cardapio', 'sobre', 'contato'];
@@ -574,24 +570,36 @@ const App: React.FC = () => {
         }
     }, [categories]);
 
-    // Recovery effect for orders placed before redirecting to WhatsApp
-    const checkForPendingOrder = useCallback(async () => {
+    // Refactored order recovery logic
+    const isRecoveringOrder = useRef(false);
+    const recoverPendingOrder = useCallback(async () => {
         const pendingOrderId = localStorage.getItem('pendingOrderId');
-    
         if (!pendingOrderId || !db) {
+            // If there's no pending order, initialize cart from storage.
+            if (!isCartInitialized) {
+                try {
+                    const savedCart = localStorage.getItem('santaSensacaoCart');
+                    setCart(savedCart ? JSON.parse(savedCart) : []);
+                } catch {
+                    localStorage.removeItem('santaSensacaoCart');
+                    setCart([]);
+                }
+                setIsCartInitialized(true);
+            }
             return;
-        }
-    
-        if (document.body.dataset.checkingOrder === 'true') {
-            return;
-        }
-        document.body.dataset.checkingOrder = 'true';
-    
-        for (let i = 0; i < 5; i++) { // Poll for up to 10 seconds
-            try {
+        };
+
+        if (isRecoveringOrder.current) return;
+        isRecoveringOrder.current = true;
+
+        let orderFound = false;
+
+        try {
+            // Poll Firestore a few times to give the backend function time to complete
+            for (let i = 0; i < 5; i++) { 
                 const doc = await db.collection('orders').doc(pendingOrderId).get();
                 if (doc.exists) {
-                    console.log("Recovered pending order:", pendingOrderId);
+                    console.log("Recovered pending order on attempt", i + 1);
                     const orderData = { id: doc.id, ...doc.data() } as Order;
                     
                     setConfirmedOrderData(orderData);
@@ -604,39 +612,56 @@ const App: React.FC = () => {
                             localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
                         }
                     }
-    
+                    
                     localStorage.removeItem('pendingOrderId');
-                    delete document.body.dataset.checkingOrder;
-                    return; // Success, exit function
+                    orderFound = true;
+                    break; 
                 }
-            } catch (error) {
-                console.error("Error checking for pending order:", error);
-                delete document.body.dataset.checkingOrder;
-                return; // Stop on error
+                await new Promise(resolve => setTimeout(resolve, 2000));
             }
-            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            if (!orderFound) {
+                console.warn(`Pending order ${pendingOrderId} not found after polling. Removing marker.`);
+                localStorage.removeItem('pendingOrderId');
+            }
+
+        } catch (error) {
+            console.error("Error during order recovery:", error);
+        } finally {
+            // Whether order was found or not, now we can initialize the cart from whatever is in storage
+            if (!isCartInitialized) {
+                 try {
+                    const savedCart = localStorage.getItem('santaSensacaoCart');
+                    setCart(savedCart ? JSON.parse(savedCart) : []);
+                } catch {
+                    localStorage.removeItem('santaSensacaoCart');
+                    setCart([]);
+                }
+                setIsCartInitialized(true);
+            }
+            isRecoveringOrder.current = false;
         }
-    
-        // If loop finishes without finding the order
-        console.warn(`Pending order ${pendingOrderId} not found after several attempts.`);
-        localStorage.removeItem('pendingOrderId');
-        delete document.body.dataset.checkingOrder;
-    }, [currentUser, addToast]);
-    
+    }, [currentUser, addToast, isCartInitialized]);
+
+
+    // Effect to run the recovery logic
     useEffect(() => {
+        // Run on initial mount
+        recoverPendingOrder();
+
+        // Run when the tab becomes visible again
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
-                checkForPendingOrder();
+                recoverPendingOrder();
             }
         };
-    
+
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        checkForPendingOrder(); // Initial check on mount
-    
+
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [checkForPendingOrder]);
+    }, [recoverPendingOrder]);
 
 
     // --- Auth Handlers ---
