@@ -353,20 +353,6 @@ export const syncGuestOrders = async (orderIds: string[]): Promise<void> => {
 
 // --- Order Management Functions (Calling Cloud Functions) ---
 
-export const reserveOrderNumber = async (): Promise<{ orderNumber: number }> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    const reserveOrderNumberFunction = functions.httpsCallable('reserveOrderNumber');
-    try {
-        const result = await reserveOrderNumberFunction();
-        return result.data as { orderNumber: number };
-    } catch (error) {
-        console.error("Error calling reserveOrderNumber function:", error);
-        throw new Error("Não foi possível obter o número do pedido. Tente novamente.");
-    }
-};
-
 /**
  * Creates an order document in Firestore.
  * @param details The customer and order details from the checkout form.
@@ -375,13 +361,13 @@ export const reserveOrderNumber = async (): Promise<{ orderNumber: number }> => 
  * @param orderId The client-generated unique ID for the order.
  * @returns An object containing the new order's ID and its number.
  */
-export const createOrder = async (details: OrderDetails, cart: CartItem[], total: number, orderId: string, orderNumber: number): Promise<{ orderId: string, orderNumber: number }> => {
+export const createOrder = async (details: OrderDetails, cart: CartItem[], total: number, orderId: string): Promise<{ orderId: string, orderNumber: number }> => {
     if (!functions) {
         throw new Error("Firebase Functions is not initialized.");
     }
     const createOrderFunction = functions.httpsCallable('createOrder');
     try {
-        const result = await createOrderFunction({ details, cart, total, orderId, orderNumber });
+        const result = await createOrderFunction({ details, cart, total, orderId });
         return result.data;
     } catch (error) {
         console.error("Error calling createOrder function:", error);

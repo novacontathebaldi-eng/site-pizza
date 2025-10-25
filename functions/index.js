@@ -378,10 +378,20 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
   }
 });
 
+
 /**
- * Reserves a sequential order number atomically.
+ * Creates an order in Firestore.
  */
-exports.reserveOrderNumber = onCall({secrets}, async (request) => {
+exports.createOrder = onCall({secrets}, async (request) => {
+  const {details, cart, total, orderId} = request.data;
+  const userId = request.auth?.uid || null;
+
+  // 1. Validate input
+  if (!details || !cart || !total || !orderId) {
+    throw new Error("Dados do pedido incompletos.");
+  }
+
+  // 2. Generate a sequential order number atomically
   const counterRef = db.doc("_internal/counters");
   let orderNumber;
   try {
@@ -395,27 +405,13 @@ exports.reserveOrderNumber = onCall({secrets}, async (request) => {
         transaction.update(counterRef, {orderNumber: orderNumber + 1});
       }
     });
-    return {orderNumber};
   } catch (error) {
-    logger.error("Falha ao reservar o número do pedido:", error);
-    throw new Error("Não foi possível reservar o número do pedido.");
-  }
-});
-
-
-/**
- * Creates an order in Firestore.
- */
-exports.createOrder = onCall({secrets}, async (request) => {
-  const {details, cart, total, orderId, orderNumber} = request.data;
-  const userId = request.auth?.uid || null;
-
-  // 1. Validate input
-  if (!details || !cart || !total || !orderId || !orderNumber) {
-    throw new Error("Dados do pedido incompletos.");
+    logger.error("Falha ao gerar o número do pedido:", error);
+    throw new Error("Não foi possível gerar o número do pedido.");
   }
 
-  // 2. Prepare order data for Firestore
+
+  // 3. Prepare order data for Firestore
   const orderStatus = "pending";
 
   const orderData = {
@@ -442,12 +438,12 @@ exports.createOrder = onCall({secrets}, async (request) => {
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 
-  // 3. Create the order document
+  // 4. Create the order document
   const orderRef = db.collection("orders").doc(orderId);
   await orderRef.set(orderData);
   logger.info(`Pedido #${orderNumber} (ID: ${orderId}) criado no Firestore.`);
 
-  // 4. Return order info
+  // 5. Return order info
   return {orderId, orderNumber};
 });
 

@@ -14,7 +14,7 @@ import { ReservationModal } from './components/ReservationModal';
 import { Chatbot } from '@/components/Chatbot';
 import { LoginModal } from '@/components/LoginModal';
 import { UserAreaModal } from '@/components/UserAreaModal';
-import { db, auth, functions } from './services/firebase';
+import { db, auth } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
 import defaultLogo from './assets/logo.png';
@@ -108,16 +108,16 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     const formattedDate = now.toLocaleDateString('pt-BR');
     const formattedTime = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-    let message = `*🍕 NOVO PEDIDO - SANTA SENSAÇÃO 🍕*\n`;
-    message += `*Pedido:*${orderNumStr}\n\n`;
+    let message = `*🍕 NOVO PEDIDO - SANTA SENSAÇÃO*\n`;
+    message += `${orderNumStr}\n\n`;
     
     message += `🗓️ *Data:* ${formattedDate}\n`;
     message += `⏰ *Hora:* ${formattedTime}\n\n`;
 
     if (details.orderType === 'delivery') {
-        message += `*🛵💨 Pedido para Entrega*\n\n`;
+        message += `*Pedido para Entrega 🛵💨*\n\n`;
     } else if (details.orderType === 'pickup') {
-        message += `*🏪🚶 Pedido para Retirada*\n\n`;
+        message += `*Pedido para Retirada 🏪🚶*\n\n`;
     }
 
     if (isPaid) {
@@ -157,7 +157,7 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
 
     if (details.paymentMethod === 'pix') {
         message += `*PIX:* CNPJ 62.247.199/0001-04\n`;
-        message += `👆 Use o CNPJ acima para pagar seu pedido. 💰📱\n`;
+        message += `👆 Use o CNPJ acima para pagar seu pedido via *PIX*. 💰📱\n`;
     }
     
     if (!isPaid && details.paymentMethod === 'cash') {
@@ -165,8 +165,8 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
             const amountForChange = parseFloat(details.changeAmount.replace(',', '.'));
             if (!isNaN(amountForChange) && amountForChange >= total) {
                 const change = amountForChange - total;
-                message += `*Levar troco para:* R$ ${amountForChange.toFixed(2).replace('.', ',')}\n`;
-                message += `*Troco:* R$ ${change.toFixed(2).replace('.', ',')}\n`;
+                message += `💵*Levar troco para:* R$ ${amountForChange.toFixed(2).replace('.', ',')}\n`;
+                message += `💵*Troco:* R$ ${change.toFixed(2).replace('.', ',')}\n`;
             } else {
                 message += `*Precisa de troco para:* R$ ${details.changeAmount}\n`;
             }
@@ -242,7 +242,6 @@ const App: React.FC = () => {
 
     // Order/Payment Flow State
     const [cart, setCart] = useState<CartItem[]>([]);
-    const [isCartInitialized, setIsCartInitialized] = useState(false);
     const [isProcessingOrder, setIsProcessingOrder] = useState<boolean>(false);
     const [confirmedOrderData, setConfirmedOrderData] = useState<Order | null>(null);
     const [confirmedReservationData, setConfirmedReservationData] = useState<Order | null>(null);
@@ -426,7 +425,7 @@ const App: React.FC = () => {
             const guestOrderIds: string[] = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
             if (guestOrderIds.length > 0) {
                 try {
-                    await firebaseService.syncGuestOrders(guestOrderIds);
+                    await firebaseService.syncGuestOrders(user.uid, guestOrderIds);
                     localStorage.removeItem('santaSensacaoGuestOrders');
                     addToast('Seus pedidos anteriores foram associados à sua conta!', 'success');
                 } catch (error) {
@@ -472,11 +471,9 @@ const App: React.FC = () => {
 
     // Other existing handlers...
     useEffect(() => {
-        if (isCartInitialized) {
-            localStorage.setItem('santaSensacaoCart', JSON.stringify(cart));
-        }
-    }, [cart, isCartInitialized]);
-
+        const savedCart = localStorage.getItem('santaSensacaoCart');
+        if (savedCart) setCart(JSON.parse(savedCart));
+    }, []);
 
     useEffect(() => {
         const sectionIds = ['inicio', 'cardapio', 'sobre', 'contato'];
@@ -570,38 +567,37 @@ const App: React.FC = () => {
         }
     }, [categories]);
 
-    // Refactored order recovery logic
-    const isRecoveringOrder = useRef(false);
-    const recoverPendingOrder = useCallback(async () => {
+    useEffect(() => { localStorage.setItem('santaSensacaoCart', JSON.stringify(cart)); }, [cart]);
+
+    // Recovery effect for orders placed before redirecting to WhatsApp
+    useEffect(() => {
         const pendingOrderId = localStorage.getItem('pendingOrderId');
+
+        // Do nothing if there's no pending order ID or if db is not initialized.
         if (!pendingOrderId || !db) {
-            // If there's no pending order, initialize cart from storage.
-            if (!isCartInitialized) {
-                try {
-                    const savedCart = localStorage.getItem('santaSensacaoCart');
-                    setCart(savedCart ? JSON.parse(savedCart) : []);
-                } catch {
-                    localStorage.removeItem('santaSensacaoCart');
-                    setCart([]);
-                }
-                setIsCartInitialized(true);
-            }
             return;
-        };
+        }
+        
+        // Flag to prevent this from running multiple times if the component re-renders quickly.
+        if (document.body.dataset.checkingOrder === 'true') {
+            return;
+        }
+        document.body.dataset.checkingOrder = 'true';
 
-        if (isRecoveringOrder.current) return;
-        isRecoveringOrder.current = true;
-
-        let orderFound = false;
-
-        try {
-            // Poll Firestore a few times to give the backend function time to complete
-            for (let i = 0; i < 5; i++) { 
+        let attempts = 0;
+        const maxAttempts = 5; // Try 5 times (total 10 seconds)
+        
+        const interval = setInterval(async () => {
+            try {
                 const doc = await db.collection('orders').doc(pendingOrderId).get();
+                
                 if (doc.exists) {
-                    console.log("Recovered pending order on attempt", i + 1);
+                    // SUCCESS: The order was found in Firestore.
+                    clearInterval(interval);
+                    console.log("Recovered pending order:", pendingOrderId);
                     const orderData = { id: doc.id, ...doc.data() } as Order;
                     
+                    // Show confirmation modal and clear cart.
                     setConfirmedOrderData(orderData);
                     setCart([]);
                     
@@ -612,56 +608,33 @@ const App: React.FC = () => {
                             localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
                         }
                     }
-                    
+
+                    // Clean up localStorage and the flag.
                     localStorage.removeItem('pendingOrderId');
-                    orderFound = true;
-                    break; 
-                }
-                await new Promise(resolve => setTimeout(resolve, 2000));
-            }
+                    delete document.body.dataset.checkingOrder;
 
-            if (!orderFound) {
-                console.warn(`Pending order ${pendingOrderId} not found after polling. Removing marker.`);
+                } else {
+                    attempts++;
+                    if (attempts >= maxAttempts) {
+                        // FAILURE: The order was not found after polling.
+                        clearInterval(interval);
+                        console.warn(`Pending order ${pendingOrderId} not found after ${maxAttempts} attempts.`);
+                        // Don't show an error toast. The user still has their items in the cart to try again.
+                        localStorage.removeItem('pendingOrderId');
+                        delete document.body.dataset.checkingOrder;
+                    }
+                }
+            } catch (error) {
+                // Something went wrong during the check.
+                clearInterval(interval);
+                console.error("Error polling for pending order:", error);
                 localStorage.removeItem('pendingOrderId');
+                delete document.body.dataset.checkingOrder;
             }
+        }, 2000); // Check every 2 seconds.
 
-        } catch (error) {
-            console.error("Error during order recovery:", error);
-        } finally {
-            // Whether order was found or not, now we can initialize the cart from whatever is in storage
-            if (!isCartInitialized) {
-                 try {
-                    const savedCart = localStorage.getItem('santaSensacaoCart');
-                    setCart(savedCart ? JSON.parse(savedCart) : []);
-                } catch {
-                    localStorage.removeItem('santaSensacaoCart');
-                    setCart([]);
-                }
-                setIsCartInitialized(true);
-            }
-            isRecoveringOrder.current = false;
-        }
-    }, [currentUser, addToast, isCartInitialized]);
-
-
-    // Effect to run the recovery logic
-    useEffect(() => {
-        // Run on initial mount
-        recoverPendingOrder();
-
-        // Run when the tab becomes visible again
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                recoverPendingOrder();
-            }
-        };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [recoverPendingOrder]);
+        return () => clearInterval(interval);
+    }, [currentUser, addToast]);
 
 
     // --- Auth Handlers ---
@@ -834,49 +807,54 @@ const App: React.FC = () => {
     }, []);
     
     const handleCheckout = async (details: OrderDetails) => {
-        if (!db || !functions) return;
+        if (!db) return;
         setIsProcessingOrder(true);
         setIsCheckoutModalOpen(false);
-    
-        let reservedOrderNumber;
-        try {
-            // 1. Reserve order number FIRST. This introduces a small, necessary delay.
-            const { orderNumber } = await firebaseService.reserveOrderNumber();
-            reservedOrderNumber = orderNumber;
-        } catch (error: any) {
-            console.error("Failed to reserve order number:", error);
-            addToast(error.message || "Não foi possível iniciar o pedido. Tente novamente.", 'error');
-            setIsProcessingOrder(false);
-            setIsCheckoutModalOpen(true); // Re-open modal for user to retry
-            return;
-        }
-    
-        // --- From here, the flow is similar to the original, but with the order number ---
     
         const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         const total = subtotal + (details.deliveryFee || 0);
     
-        // 2. Generate a unique document ID on the client and save it to localStorage for recovery.
+        // 1. Generate a unique ID on the client and save it to localStorage
         const pendingOrderId = db.collection('orders').doc().id;
         localStorage.setItem('pendingOrderId', pendingOrderId);
     
-        // 3. Open WhatsApp immediately with the correct order number
-        const whatsappUrl = generateWhatsAppMessage(details, cart, total, reservedOrderNumber, false);
+        // 2. Open WhatsApp immediately to avoid pop-up blockers
+        const whatsappUrl = generateWhatsAppMessage(details, cart, total, null, false);
         window.open(whatsappUrl, '_blank');
     
-        // 4. Attempt to create the order in the background.
-        firebaseService.createOrder(details, cart, total, pendingOrderId, reservedOrderNumber)
-            .then(({ orderNumber }) => {
-                console.log(`Background creation for order #${orderNumber} acknowledged.`);
-                // The recovery mechanism will handle the UI update. We can just log here.
-            })
-            .catch((error: any) => {
-                console.error(`Background createOrder for order #${reservedOrderNumber} failed:`, error);
-                // The recovery mechanism will time out and the user will still have their cart.
-            });
-        
-        // We can stop the main spinner now as the user interaction is complete.
-        setIsProcessingOrder(false);
+        // 3. Attempt to create the order in the background.
+        try {
+            const { orderNumber } = await firebaseService.createOrder(details, cart, total, pendingOrderId);
+            
+            // This is the "fast path" if the call succeeds before the user navigates away.
+            addToast(`Pedido #${orderNumber} criado!`, 'success');
+            
+            const confirmedOrder: Order = {
+                id: pendingOrderId, orderNumber,
+                customer: { name: details.name, phone: details.phone, orderType: details.orderType, ...details },
+                items: cart, total, paymentMethod: details.paymentMethod, paymentStatus: 'pending', status: 'pending',
+                createdAt: new Date(), notes: details.notes, deliveryFee: details.deliveryFee,
+            };
+            
+            // Finalize the successful order client-side
+            setConfirmedOrderData(confirmedOrder);
+            setCart([]);
+            setIsCartOpen(false);
+            localStorage.removeItem('pendingOrderId'); // Clean up
+    
+            if (!currentUser) {
+                const guestOrders = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
+                guestOrders.push(pendingOrderId);
+                localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
+            }
+    
+        } catch (error: any) {
+            // This block will be reached if the function call times out (e.g., user switches apps).
+            // The recovery mechanism in the useEffect will handle verifying the order, so we don't show an error here.
+            console.error("createOrder call timed out or failed:", error);
+        } finally {
+            setIsProcessingOrder(false);
+        }
     };
 
     const handleConfirmReservation = async (details: ReservationDetails) => {
