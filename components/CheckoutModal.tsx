@@ -92,33 +92,35 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                                     <strong className="text-sm">PIX CNPJ:</strong>
                                     <span className="font-mono text-sm bg-gray-200 px-2 py-1 rounded">{pixCnpj}</span>
-                                    <button type="button" onClick={handleCopyPix} className="text-xs bg-accent text-white font-semibold py-1 px-3 rounded-md hover:bg-opacity-90 flex items-center gap-1.5">
-                                        <i className={`fas ${copySuccess ? 'fa-check' : 'fa-copy'}`}></i>
-                                        {copySuccess ? 'Copiado' : 'Copiar'}
-                                    </button>
-                                    <div className="relative">
-                                        <button type="button" onMouseEnter={() => setShowPixHelp(true)} onMouseLeave={() => setShowPixHelp(false)} className="text-gray-400 hover:text-gray-600">
-                                            <i className="fas fa-question-circle"></i>
+                                    <div className="flex items-center gap-x-2">
+                                        <button type="button" onClick={handleCopyPix} className="text-xs bg-accent text-white font-semibold py-1 px-3 rounded-md hover:bg-opacity-90 flex items-center gap-1.5">
+                                            <i className={`fas ${copySuccess ? 'fa-check' : 'fa-copy'}`}></i>
+                                            {copySuccess ? 'Copiado' : 'Copiar'}
                                         </button>
-                                        {showPixHelp && (
-                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-gray-800 text-white text-xs rounded-lg p-3 z-10 shadow-lg" style={{ animation: 'fadeInUp 0.2s ease-out' }}>
-                                                <p className="font-bold mb-1">Como Pagar com CNPJ:</p>
-                                                <ol className="list-decimal list-inside text-left space-y-1">
-                                                    <li>No app do seu banco, acesse a área PIX.</li>
-                                                    <li>Escolha "Pagar com Chave" ou "Transferir" e selecione CNPJ.</li>
-                                                    <li>Cole o número copiado: "{pixCnpj}".</li>
-                                                    <li>Insira o Valor: {order.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} e confirme.</li>
-                                                </ol>
-                                                <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 bg-gray-800 rotate-45"></div>
-                                            </div>
-                                        )}
+                                        <div className="relative">
+                                            <button type="button" onMouseEnter={() => setShowPixHelp(true)} onMouseLeave={() => setShowPixHelp(false)} className="text-gray-400 hover:text-gray-600">
+                                                <i className="fas fa-question-circle"></i>
+                                            </button>
+                                            {showPixHelp && (
+                                                <div className="absolute bottom-full right-0 mb-2 w-64 bg-gray-800 text-white text-xs rounded-lg p-3 z-10 shadow-lg" style={{ animation: 'fadeInUp 0.2s ease-out' }}>
+                                                    <p className="font-bold mb-1">Como Pagar com CNPJ:</p>
+                                                    <ol className="list-decimal list-inside text-left space-y-1">
+                                                        <li>No app do seu banco, acesse a área PIX.</li>
+                                                        <li>Escolha "Pagar com Chave" ou "Transferir" e selecione CNPJ.</li>
+                                                        <li>Cole o número copiado: "{pixCnpj}".</li>
+                                                        <li>Insira o Valor: {order.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} e confirme.</li>
+                                                    </ol>
+                                                    <div className="absolute right-2 -bottom-1 w-2 h-2 bg-gray-800 rotate-45"></div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         )}
 
                         <p className="text-gray-600 text-sm px-2">
-                            Obrigado pela preferência!
+                            Por favor, não se esqueça de enviar seu pedido pelo WhatsApp! Se precisar, pode nos contatar a qualquer momento.
                         </p>
 
                         <button
@@ -127,15 +129,6 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
                         >
                             <i className="fab fa-whatsapp mr-2"></i> Enviar WhatsApp
                         </button>
-
-                        {order.paymentMethod === 'pix' && !isPaidOnline && (
-                             <button
-                                onClick={() => setIsQrCodeModalOpen(true)}
-                                className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all flex items-center justify-center min-h-[52px]"
-                            >
-                                <i className="fas fa-qrcode mr-2"></i> Ver QR CODE PIX
-                            </button>
-                        )}
                     </div>
                 </div>
             </div>
