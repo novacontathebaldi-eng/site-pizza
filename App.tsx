@@ -101,18 +101,32 @@ const defaultSiteSettings: SiteSettings = {
 };
 
 const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, orderNumber: number | null, isPaid: boolean) => {
-    const orderTypeMap = { delivery: 'Entrega', pickup: 'Retirada na loja', local: 'Consumo no Local' };
     const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
     const orderNumStr = orderNumber ? ` #${orderNumber}` : '';
 
-    let message = `*🍕 NOVO PEDIDO${orderNumStr} - SANTA SENSAÇÃO 🍕*\n\n`;
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString('pt-BR');
+    const formattedTime = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    let message = `*🍕 NOVO PEDIDO - SANTA SENSAÇÃO 🍕*\n`;
+    message += `*Pedido:*${orderNumStr}\n\n`;
+    
+    message += `🗓️ *Data:* ${formattedDate}\n`;
+    message += `⏰ *Hora:* ${formattedTime}\n\n`;
+
+    if (details.orderType === 'delivery') {
+        message += `*🛵💨 Pedido para Entrega*\n\n`;
+    } else if (details.orderType === 'pickup') {
+        message += `*🏪🚶 Pedido para Retirada*\n\n`;
+    }
+
     if (isPaid) {
         message += `*✅ JÁ PAGO VIA PIX PELO SITE*\n\n`;
     }
+    
     message += `*👤 DADOS DO CLIENTE:*\n`;
     message += `*Nome:* ${details.name}\n`;
     message += `*Telefone:* ${details.phone}\n`;
-    message += `*Tipo de Pedido:* ${orderTypeMap[details.orderType]}\n`;
     
     if (details.orderType === 'delivery') {
         message += `\n*📍 ENDEREÇO DE ENTREGA:*\n`;
@@ -140,9 +154,21 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     
     message += `*💳 PAGAMENTO:*\n`;
     message += `*Forma:* ${paymentMethodMap[details.paymentMethod]}\n`;
+
+    if (details.paymentMethod === 'pix') {
+        message += `*PIX:* CNPJ 62.247.199/0001-04\n`;
+    }
+    
     if (!isPaid && details.paymentMethod === 'cash') {
-        if (details.changeNeeded) {
-            message += `*Precisa de troco para:* R$ ${details.changeAmount}\n`;
+        if (details.changeNeeded && details.changeAmount) {
+            const amountForChange = parseFloat(details.changeAmount.replace(',', '.'));
+            if (!isNaN(amountForChange) && amountForChange >= total) {
+                const change = amountForChange - total;
+                message += `*Levar troco para:* R$ ${amountForChange.toFixed(2).replace('.', ',')}\n`;
+                message += `*Troco:* R$ ${change.toFixed(2).replace('.', ',')}\n`;
+            } else {
+                message += `*Precisa de troco para:* R$ ${details.changeAmount}\n`;
+            }
         } else {
             message += `*Não preciso de troco.*\n`;
         }
@@ -962,7 +988,10 @@ const App: React.FC = () => {
     const handleDeleteCategory = useCallback(async (categoryId: string) => { try { await firebaseService.deleteCategory(categoryId, products); addToast("Categoria deletada!", 'success'); } catch (error: any) { console.error("Failed to delete category:", error); addToast(`Erro: ${error.message}`, 'error'); } }, [products, addToast]);
     const handleCategoryStatusChange = useCallback(async (categoryId: string, active: boolean) => { try { await firebaseService.updateCategoryStatus(categoryId, active); addToast(`Categoria ${active ? 'ativada' : 'desativada'}.`, 'success'); } catch (error) { console.error("Failed to update category status:", error); addToast("Erro ao atualizar status.", 'error'); } }, [addToast]);
     const handleReorderProducts = useCallback(async (productsToUpdate: { id: string; orderIndex: number }[]) => { try { await firebaseService.updateProductsOrder(productsToUpdate); addToast("Ordem dos produtos atualizada.", 'success'); } catch (error) { console.error("Failed to reorder products:", error); addToast("Erro ao reordenar produtos.", 'error'); } }, [addToast]);
-    const handleReorderCategories = useCallback(async (categoriesToUpdate: { id: string; order: number }[]): Promise<void> => { try { await firebaseService.updateCategoriesOrder(categoriesToUpdate); addToast("Ordem das categorias atualizada.", 'success'); } catch (error) { console.error("Failed to reorder categories:", error); addToast("Erro ao reordenar categorias.", 'error'); } }, [addToast]);
+    // FIX: Removed the explicit `: Promise<void>` return type from the async function inside `useCallback`.
+    // While technically correct, it can sometimes cause subtle type inference issues with the compiler that may be misreported.
+    // Removing it makes the function's return type fully inferred, resolving the "Expected 1 arguments, but got 2" error and making it consistent with other similar handlers in the file.
+    const handleReorderCategories = useCallback(async (categoriesToUpdate: { id: string; order: number }[]) => { try { await firebaseService.updateCategoriesOrder(categoriesToUpdate); addToast("Ordem das categorias atualizada.", 'success'); } catch (error) { console.error("Failed to reorder categories:", error); addToast("Erro ao reordenar categorias.", 'error'); } }, [addToast]);
     const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => { try { const settingsToUpdate = JSON.parse(JSON.stringify(settings)); for (const key in files) { const file = files[key]; if (file) { const url = await firebaseService.uploadSiteAsset(file, key); if (key === 'logo') settingsToUpdate.logoUrl = url; else if (key === 'heroBg') settingsToUpdate.heroBgUrl = url; else { const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key); if (sectionIndex > -1) settingsToUpdate.contentSections[sectionIndex].imageUrl = url; } } } await firebaseService.updateSiteSettings(settingsToUpdate); addToast("Personalização salva!", 'success'); } catch (error) { console.error("Failed to save site settings:", error); addToast("Erro ao salvar configurações.", 'error'); } }, [addToast]);
     const handleUpdateSiteSettingsField = useCallback(async (updates: Partial<SiteSettings>) => {
         try {
