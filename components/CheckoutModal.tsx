@@ -118,7 +118,7 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
                         )}
 
                         <p className="text-gray-600 text-sm px-2">
-                            Por favor, não se esqueça de enviar seu pedido pelo WhatsApp! Se precisar, pode nos contatar a qualquer momento.
+                            Obrigado pela preferência!
                         </p>
 
                         <button
