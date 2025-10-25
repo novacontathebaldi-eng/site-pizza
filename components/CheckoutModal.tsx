@@ -105,10 +105,12 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
                                                 <div className="absolute bottom-full right-0 mb-2 w-64 bg-gray-800 text-white text-xs rounded-lg p-3 z-10 shadow-lg" style={{ animation: 'fadeInUp 0.2s ease-out' }}>
                                                     <p className="font-bold mb-1">Como Pagar com CNPJ:</p>
                                                     <ol className="list-decimal list-inside text-left space-y-1">
+                                                        <li>Não esqueça de enviar o seu pedido pelo WhatsApp.</li>
                                                         <li>No app do seu banco, acesse a área PIX.</li>
                                                         <li>Escolha "Pagar com Chave" ou "Transferir" e selecione CNPJ.</li>
                                                         <li>Cole o número copiado: "{pixCnpj}".</li>
                                                         <li>Insira o Valor: {order.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} e confirme.</li>
+                                                        <li>Envie o comprovante para o nosso WhatsApp e então é só aguardar! 🍕</li>
                                                     </ol>
                                                     <div className="absolute right-2 -bottom-1 w-2 h-2 bg-gray-800 rotate-45"></div>
                                                 </div>
@@ -120,7 +122,7 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
                         )}
 
                         <p className="text-gray-600 text-sm px-2">
-                            Por favor, não se esqueça de enviar seu pedido pelo WhatsApp! Se precisar, pode nos contatar a qualquer momento.
+                            Obrigado pela preferência! Se precisar, estamos à disposição!
                         </p>
 
                         <button
@@ -129,6 +131,15 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
                         >
                             <i className="fab fa-whatsapp mr-2"></i> Enviar WhatsApp
                         </button>
+
+                        {order.paymentMethod === 'pix' && !isPaidOnline && (
+                             <button
+                                onClick={() => setIsQrCodeModalOpen(true)}
+                                className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all flex items-center justify-center min-h-[52px]"
+                            >
+                                <i className="fas fa-qrcode mr-2"></i> Ver QR CODE PIX
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -438,9 +449,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                                                         <li>Primeiro envie seu pedido clicando em "Enviar Pedido" abaixo.</li>
                                                         <li>No app do seu banco, acesse a área PIX.</li>
                                                         <li>Escolha "Pagar com Chave" ou "Tranferir" e selecione CNPJ.</li>
-                                                        <li>Cole o número copiado: "62.247.199/0001-04".</li>
-                                                        <li>Insira o Valor: R$ ${total.toFixed(2).replace('.', ',')} e confirme.</li>
-                                                        <li>Envie o comprovamte para o nosso WhatsApp e então é só aguardar 🍕.</li>
+                                                        <li>Cole o número copiado: "{pixCnpj}".</li>
+                                                        <li>Insira o Valor: {order.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} e confirme.</li>
+                                                        <li>Envie o comprovante para o nosso WhatsApp e então é só aguardar! 🍕</li>
                                                     </ol>
                                                     <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 bg-gray-800 rotate-45"></div>
                                                 </div>
