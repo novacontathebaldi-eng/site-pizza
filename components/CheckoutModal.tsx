@@ -42,6 +42,18 @@ interface OrderConfirmationModalProps {
 }
 
 export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ order, onClose, onSendWhatsApp }) => {
+    const [isQrCodeModalOpen, setIsQrCodeModalOpen] = useState(false);
+    const [copySuccess, setCopySuccess] = useState(false);
+    const [showPixHelp, setShowPixHelp] = useState(false);
+    const pixCnpj = "62.247.199/0001-04";
+
+    const handleCopyPix = () => {
+        navigator.clipboard.writeText(pixCnpj).then(() => {
+            setCopySuccess(true);
+            setTimeout(() => setCopySuccess(false), 2500);
+        });
+    };
+
     if (!order) return null;
 
     // FIX: The type 'PaymentStatus' does not include 'paid_online'. The correct check is for 'paid', which now represents a completed payment.
@@ -51,41 +63,84 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
     const totalLabel = isPaidOnline ? "Total Pago:" : "Total do Pedido:";
 
     return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col animate-fade-in-up">
-                <div className="flex justify-between items-center p-5 border-b border-gray-200">
-                    <h2 className="text-2xl font-bold text-text-on-light flex items-center gap-3">
-                        <i className={`fas ${titleIcon}`}></i>
-                        {title}
-                    </h2>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
-                </div>
-                <div className="p-6 text-center space-y-4">
-                    <p className="text-gray-600 text-base">
-                        Seu pedido foi registrado em nosso sistema! Para finalizá-lo, é necessário enviá-lo para nossa cozinha via WhatsApp. Se você já fez isso, ótimo! Agora é só aguardar.
-                    </p>
-                    
-                    <div className="text-left bg-gray-50 p-4 rounded-lg border text-gray-800 space-y-2 text-sm">
-                        <p><strong><i className="fas fa-receipt fa-fw mr-2 text-gray-400"></i>Pedido:</strong> #{order.orderNumber}</p>
-                        <p><strong><i className="fas fa-user fa-fw mr-2 text-gray-400"></i>Nome:</strong> {order.customer.name}</p>
-                        {order.total != null && (
-                            <p><strong><i className="fas fa-dollar-sign fa-fw mr-2 text-gray-400"></i>{totalLabel}</strong> {order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+        <>
+            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col animate-fade-in-up">
+                    <div className="flex justify-between items-center p-5 border-b border-gray-200">
+                        <h2 className="text-2xl font-bold text-text-on-light flex items-center gap-3">
+                            <i className={`fas ${titleIcon}`}></i>
+                            {title}
+                        </h2>
+                        <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                    </div>
+                    <div className="overflow-y-auto p-6 text-center space-y-4">
+                        <p className="text-gray-600 text-base">
+                            Seu pedido foi registrado em nosso sistema! Para finalizá-lo, é necessário enviá-lo para nossa cozinha via WhatsApp. Se você já fez isso, ótimo! Agora é só aguardar.
+                        </p>
+                        
+                        <div className="text-left bg-gray-50 p-4 rounded-lg border text-gray-800 space-y-2 text-sm">
+                            <p><strong><i className="fas fa-receipt fa-fw mr-2 text-gray-400"></i>Pedido:</strong> #{order.orderNumber}</p>
+                            <p><strong><i className="fas fa-user fa-fw mr-2 text-gray-400"></i>Nome:</strong> {order.customer.name}</p>
+                            {order.total != null && (
+                                <p><strong><i className="fas fa-dollar-sign fa-fw mr-2 text-gray-400"></i>{totalLabel}</strong> {order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                            )}
+                        </div>
+
+                        {order.paymentMethod === 'pix' && !isPaidOnline && (
+                             <div className="p-4 bg-gray-50 rounded-md border text-left space-y-3 text-sm animate-fade-in-up">
+                                <p className="text-center font-bold text-base text-gray-800">Opções de Pagamento PIX</p>
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                                    <strong className="text-sm">PIX CNPJ:</strong>
+                                    <span className="font-mono text-sm bg-gray-200 px-2 py-1 rounded">{pixCnpj}</span>
+                                    <button type="button" onClick={handleCopyPix} className="text-xs bg-accent text-white font-semibold py-1 px-3 rounded-md hover:bg-opacity-90 flex items-center gap-1.5">
+                                        <i className={`fas ${copySuccess ? 'fa-check' : 'fa-copy'}`}></i>
+                                        {copySuccess ? 'Copiado' : 'Copiar'}
+                                    </button>
+                                    <div className="relative">
+                                        <button type="button" onMouseEnter={() => setShowPixHelp(true)} onMouseLeave={() => setShowPixHelp(false)} className="text-gray-400 hover:text-gray-600">
+                                            <i className="fas fa-question-circle"></i>
+                                        </button>
+                                        {showPixHelp && (
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-gray-800 text-white text-xs rounded-lg p-3 z-10 shadow-lg" style={{ animation: 'fadeInUp 0.2s ease-out' }}>
+                                                <p className="font-bold mb-1">Como Pagar com CNPJ:</p>
+                                                <ol className="list-decimal list-inside text-left space-y-1">
+                                                    <li>No app do seu banco, acesse a área PIX.</li>
+                                                    <li>Escolha "Pagar com Chave" ou "Transferir" e selecione CNPJ.</li>
+                                                    <li>Cole o número copiado: "{pixCnpj}".</li>
+                                                    <li>Insira o Valor: {order.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} e confirme.</li>
+                                                </ol>
+                                                <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 bg-gray-800 rotate-45"></div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <p className="text-gray-600 text-sm px-2">
+                            Por favor, não se esqueça de enviar seu pedido pelo WhatsApp! Se precisar, pode nos contatar a qualquer momento.
+                        </p>
+
+                        <button
+                            onClick={() => onSendWhatsApp(order)}
+                            className="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-green-600 transition-all flex items-center justify-center min-h-[52px]"
+                        >
+                            <i className="fab fa-whatsapp mr-2"></i> Enviar WhatsApp
+                        </button>
+
+                        {order.paymentMethod === 'pix' && !isPaidOnline && (
+                             <button
+                                onClick={() => setIsQrCodeModalOpen(true)}
+                                className="w-full bg-accent text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-opacity-90 transition-all flex items-center justify-center min-h-[52px]"
+                            >
+                                <i className="fas fa-qrcode mr-2"></i> Ver QR CODE PIX
+                            </button>
                         )}
                     </div>
-
-                    <p className="text-gray-600 text-sm px-2">
-                        Por favor, não se esqueça de enviar seu pedido pelo WhatsApp! Se precisar, pode nos contatar a qualquer momento.
-                    </p>
-
-                    <button
-                        onClick={() => onSendWhatsApp(order)}
-                        className="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-green-600 transition-all flex items-center justify-center min-h-[52px]"
-                    >
-                        <i className="fab fa-whatsapp mr-2"></i> Enviar WhatsApp
-                    </button>
                 </div>
             </div>
-        </div>
+            <PixQrCodeModal isOpen={isQrCodeModalOpen} onClose={() => setIsQrCodeModalOpen(false)} />
+        </>
     );
 };
 
