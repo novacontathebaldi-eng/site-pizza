@@ -37,57 +37,226 @@ export const uploadSiteAsset = async (file: File, assetName: string): Promise<st
     return await snapshot.ref.getDownloadURL();
 };
 
+export const deleteSiteAsset = async (fileUrl: string): Promise<void> => {
+    if (!storage) {
+        throw new Error("Firebase Storage não está inicializado.");
+    }
 
-// Product Functions
+    // Don't try to delete default assets or non-firebase URLs
+    if (!fileUrl || !fileUrl.includes('firebasestorage.googleapis.com')) {
+        return;
+    }
+
+    try {
+        const fileRef = storage.refFromURL(fileUrl);
+        await fileRef.delete();
+    } catch (error: any) {
+        if (error.code === 'storage/object-not-found') {
+            console.warn(`File not found, could not delete: ${fileUrl}`);
+            return; // It's fine if it's already gone
+        }
+        console.error("Error deleting site asset:", error);
+        throw error;
+    }
+};
+
+// --- Cloud Functions ---
+
+export const askChatbot = async (history: ChatMessage[]): Promise<string> => {
+    if (!functions) throw new Error("Firebase Functions not initialized.");
+    const askSanto = functions.httpsCallable('askSanto');
+    const response = await askSanto({ history });
+    return response.data.reply;
+};
+
+export const verifyGoogleToken = async (idToken: string): Promise<string> => {
+    if (!functions) throw new Error("Firebase Functions not initialized.");
+    const verifyToken = functions.httpsCallable('verifyGoogleToken');
+    const result = await verifyToken({ idToken });
+    return result.data.customToken;
+};
+
+export const createOrder = async (details: OrderDetails, cart: CartItem[], total: number, orderId: string): Promise<{ orderId: string, orderNumber: number }> => {
+    if (!functions) throw new Error("Firebase Functions not initialized.");
+    const createOrderFunction = functions.httpsCallable('createOrder');
+    const result = await createOrderFunction({ details, cart, total, orderId });
+    return result.data;
+};
+
+export const createReservation = async (details: ReservationDetails): Promise<{ orderId: string, orderNumber: number }> => {
+    if (!functions) throw new Error("Firebase Functions not initialized.");
+    const createReservationFunction = functions.httpsCallable('createReservation');
+    const result = await createReservationFunction({ details });
+    return result.data;
+};
+
+export const manageProfilePicture = async (imageBase64: string | null): Promise<{ success: boolean, photoURL: string | null }> => {
+    if (!functions) throw new Error("Firebase Functions not initialized.");
+    const managePic = functions.httpsCallable('manageProfilePicture');
+    const result = await managePic({ imageBase64 });
+    return result.data;
+};
+
+export const syncGuestOrders = async (uid: string, orderIds: string[]): Promise<{ success: boolean, message: string }> => {
+    if (!functions) throw new Error("Firebase Functions not initialized.");
+    // The cloud function already gets the UID from the context, so we don't need to pass it.
+    const syncOrders = functions.httpsCallable('syncGuestOrders');
+    const result = await syncOrders({ orderIds });
+    return result.data;
+};
+
+
+// --- User Profile ---
+
+export const createUserProfile = async (user: firebase.User, name: string, phone: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const userRef = db.collection('users').doc(user.uid);
+    await userRef.set({
+        name,
+        email: user.email,
+        photoURL: user.photoURL,
+        phone,
+        addresses: [],
+    }, { merge: true });
+};
+
+export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const userRef = db.collection('users').doc(uid);
+    const doc = await userRef.get();
+    if (doc.exists) {
+        return { uid, ...doc.data() } as UserProfile;
+    }
+    return null;
+};
+
+export const updateUserProfile = async (uid: string, data: Partial<UserProfile>): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const userRef = db.collection('users').doc(uid);
+    await userRef.update(data);
+};
+
+
+// --- User Addresses ---
+
+export const addAddress = async (uid: string, address: Omit<Address, 'id'>): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const newAddress = { ...address, id: db.collection('users').doc().id };
+    
+    const userRef = db.collection('users').doc(uid);
+    await db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists) {
+            throw "User does not exist!";
+        }
+        const userProfile = userDoc.data() as UserProfile;
+        const addresses = userProfile.addresses || [];
+
+        // If this is the only address, or it's marked as favorite, make it the favorite
+        if (addresses.length === 0 || newAddress.isFavorite) {
+            newAddress.isFavorite = true;
+            // Unset other favorites
+            addresses.forEach(addr => addr.isFavorite = false);
+        }
+
+        const newAddresses = [...addresses, newAddress];
+        transaction.update(userRef, { addresses: newAddresses });
+    });
+};
+
+export const updateAddress = async (uid: string, updatedAddress: Address): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const userRef = db.collection('users').doc(uid);
+    await db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists) throw new Error("User not found.");
+
+        const user = userDoc.data() as UserProfile;
+        const addresses = user.addresses || [];
+        
+        // If setting a new favorite, unset the old one.
+        if (updatedAddress.isFavorite) {
+            addresses.forEach(a => {
+                if (a.id !== updatedAddress.id) a.isFavorite = false;
+            });
+        }
+        
+        const addressIndex = addresses.findIndex(a => a.id === updatedAddress.id);
+        if (addressIndex > -1) {
+            addresses[addressIndex] = updatedAddress;
+        } else {
+            throw new Error("Address not found.");
+        }
+        
+        transaction.update(userRef, { addresses });
+    });
+};
+
+export const deleteAddress = async (uid: string, addressId: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const userRef = db.collection('users').doc(uid);
+    
+    await db.runTransaction(async (transaction) => {
+        const doc = await transaction.get(userRef);
+        if (!doc.exists) throw new Error("User not found.");
+
+        const user = doc.data() as UserProfile;
+        let addresses = user.addresses || [];
+        const addressToDelete = addresses.find(a => a.id === addressId);
+        
+        if (!addressToDelete) {
+             console.warn("Address to delete not found");
+             return;
+        }
+
+        addresses = addresses.filter(a => a.id !== addressId);
+
+        // If the deleted address was the favorite, and there are other addresses, make the first one the new favorite.
+        if (addressToDelete.isFavorite && addresses.length > 0) {
+            addresses[0].isFavorite = true;
+        }
+
+        transaction.update(userRef, { addresses });
+    });
+};
+
+// --- Product CRUD ---
+
 export const addProduct = async (productData: Omit<Product, 'id'>): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     await db.collection('products').add(productData);
 };
 
-export const updateProduct = async (productId: string, productData: Omit<Product, 'id'>): Promise<void> => {
-    if (!productId) throw new Error("Product ID is missing for update.");
+export const updateProduct = async (id: string, productData: Partial<Product>): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    const productRef = db.collection('products').doc(productId);
-    await productRef.update(productData as { [key: string]: any });
+    await db.collection('products').doc(id).update(productData);
+};
+
+export const deleteProduct = async (productId: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    await db.collection('products').doc(productId).update({ deleted: true });
 };
 
 export const updateProductStatus = async (productId: string, active: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    const productRef = db.collection('products').doc(productId);
-    await productRef.update({ active });
+    await db.collection('products').doc(productId).update({ active });
 };
 
 export const updateProductStockStatus = async (productId: string, stockStatus: 'available' | 'out_of_stock'): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    const productRef = db.collection('products').doc(productId);
-    await productRef.update({ stockStatus });
+    await db.collection('products').doc(productId).update({ stockStatus });
 };
 
-// Soft deletes a product by marking it as 'deleted'
-export const deleteProduct = async (productId: string): Promise<void> => {
+export const updateProductsOrder = async (productsToUpdate: { id: string, orderIndex: number }[]): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    if (!productId) throw new Error("Invalid Product ID for deletion.");
-    const productRef = db.collection('products').doc(productId);
-    await productRef.update({ deleted: true });
+    const batch = db.batch();
+    productsToUpdate.forEach(p => {
+        const productRef = db.collection('products').doc(p.id);
+        batch.update(productRef, { orderIndex: p.orderIndex });
+    });
+    await batch.commit();
 };
 
-// Restores a soft-deleted product
-export const restoreProduct = async (productId: string): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    if (!productId) throw new Error("Invalid Product ID for restoration.");
-    const productRef = db.collection('products').doc(productId);
-    await productRef.update({ deleted: false });
-};
-
-// Permanently deletes a product from Firestore
-export const permanentDeleteProduct = async (productId: string): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    if (!productId) throw new Error("Invalid Product ID for permanent deletion.");
-    const productRef = db.collection('products').doc(productId);
-    await productRef.delete();
-};
-
-// Bulk soft-deletes products
 export const bulkDeleteProducts = async (productIds: string[]): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     const batch = db.batch();
@@ -98,7 +267,16 @@ export const bulkDeleteProducts = async (productIds: string[]): Promise<void> =>
     await batch.commit();
 };
 
-// Bulk permanently deletes products
+export const restoreProduct = async (productId: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    await db.collection('products').doc(productId).update({ deleted: false });
+};
+
+export const permanentDeleteProduct = async (productId: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    await db.collection('products').doc(productId).delete();
+};
+
 export const bulkPermanentDeleteProducts = async (productIds: string[]): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     const batch = db.batch();
@@ -110,314 +288,78 @@ export const bulkPermanentDeleteProducts = async (productIds: string[]): Promise
 };
 
 
-export const updateProductsOrder = async (productsToUpdate: { id: string; orderIndex: number }[]): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    const batch = db.batch();
-    productsToUpdate.forEach(productUpdate => {
-        const productRef = db.collection('products').doc(productUpdate.id);
-        batch.update(productRef, { orderIndex: productUpdate.orderIndex });
-    });
-    await batch.commit();
-};
-
-
-// Category Functions
+// --- Category CRUD ---
 export const addCategory = async (categoryData: Omit<Category, 'id'>): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     await db.collection('categories').add(categoryData);
 };
 
-export const updateCategory = async (categoryId: string, categoryData: Omit<Category, 'id'>): Promise<void> => {
-    if (!categoryId) throw new Error("Category ID is missing for update.");
+export const updateCategory = async (id: string, categoryData: Partial<Category>): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    const categoryRef = db.collection('categories').doc(categoryId);
-    await categoryRef.update(categoryData as { [key: string]: any });
+    await db.collection('categories').doc(id).update(categoryData);
+};
+
+export const deleteCategory = async (categoryId: string, products: Product[]): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const productsInCategory = products.filter(p => p.categoryId === categoryId);
+    if (productsInCategory.length > 0) {
+        throw new Error("Não é possível excluir categorias que contêm produtos.");
+    }
+    await db.collection('categories').doc(categoryId).delete();
 };
 
 export const updateCategoryStatus = async (categoryId: string, active: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    const categoryRef = db.collection('categories').doc(categoryId);
-    await categoryRef.update({ active });
+    await db.collection('categories').doc(categoryId).update({ active });
 };
 
-export const deleteCategory = async (categoryId: string, allProducts: Product[]): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    if (!categoryId) throw new Error("Invalid document reference.");
-    
-    const isCategoryInUse = allProducts.some(product => product.categoryId === categoryId);
-    if (isCategoryInUse) {
-        throw new Error("Não é possível excluir esta categoria, pois ela está sendo usada por um ou mais produtos.");
-    }
-
-    const categoryRef = db.collection('categories').doc(categoryId);
-    await categoryRef.delete();
-};
-
-export const updateCategoriesOrder = async (categoriesToUpdate: { id: string; order: number }[]): Promise<void> => {
+export const updateCategoriesOrder = async (categoriesToUpdate: { id: string, order: number }[]): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     const batch = db.batch();
-    categoriesToUpdate.forEach(categoryUpdate => {
-        const categoryRef = db.collection('categories').doc(categoryUpdate.id);
-        batch.update(categoryRef, { order: categoryUpdate.order });
+    categoriesToUpdate.forEach(c => {
+        const categoryRef = db.collection('categories').doc(c.id);
+        batch.update(categoryRef, { order: c.order });
     });
     await batch.commit();
 };
 
-// Site Settings Function
+
+// --- Site Settings ---
 export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    const settingsRef = db.doc('store_config/site_settings');
-    await settingsRef.set(settings, { merge: true });
-};
-
-export const createReservation = async (details: ReservationDetails): Promise<{ orderId: string, orderNumber: number }> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    const createReservationFunction = functions.httpsCallable('createReservation');
-    try {
-        const result = await createReservationFunction({ details });
-        return result.data;
-    } catch (error) {
-        console.error("Error calling createReservation function:", error);
-        throw new Error("Não foi possível criar a reserva. Tente novamente.");
-    }
-};
-
-// --- User Profile & Auth Functions ---
-
-export const manageProfilePicture = async (imageBase64: string | null): Promise<{success: boolean, photoURL: string | null}> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    const manageFunction = functions.httpsCallable('manageProfilePicture');
-    try {
-        const result = await manageFunction({ imageBase64 });
-        return result.data as {success: boolean, photoURL: string | null};
-    } catch (error) {
-        console.error("Error calling manageProfilePicture function:", error);
-        throw new Error("Falha ao gerenciar a foto do perfil.");
-    }
-};
-
-export const verifyGoogleToken = async (idToken: string): Promise<string> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    const verifyFunction = functions.httpsCallable('verifyGoogleToken');
-    try {
-        const result = await verifyFunction({ idToken });
-        return result.data.customToken;
-    } catch (error) {
-        console.error("Error calling verifyGoogleToken function:", error);
-        throw new Error("Falha na autenticação com o Google.");
-    }
-};
-
-export const createUserProfile = async (user: firebase.User, name: string, phone: string): Promise<void> => {
-    if (!db) throw new Error("Firestore not initialized.");
-    const userRef = db.collection('users').doc(user.uid);
-    const profile: UserProfile = {
-        uid: user.uid,
-        name: name,
-        email: user.email!,
-        photoURL: user.photoURL || '',
-        phone: phone,
-        addresses: [],
-    };
-    await userRef.set(profile);
-};
-
-export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
-    if (!db) return null;
-    const doc = await db.collection('users').doc(uid).get();
-    if (!doc.exists) return null;
-    return { uid, ...doc.data() } as UserProfile;
-};
-
-export const updateUserProfile = async (uid: string, data: Partial<Pick<UserProfile, 'name' | 'phone'>>): Promise<void> => {
-    if (!db) throw new Error("Firestore not initialized.");
-    await db.collection('users').doc(uid).set(data, { merge: true });
-};
-
-// Address management functions
-export const addAddress = async (uid: string, address: Omit<Address, 'id'>): Promise<string> => {
-    if (!db) throw new Error("Firestore not initialized.");
-    const userRef = db.collection('users').doc(uid);
-    const newAddressId = db.collection('users').doc().id;
-
-    await db.runTransaction(async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists) throw "Documento de usuário não existe!";
-        
-        const userData = userDoc.data() as UserProfile;
-        let addresses = userData.addresses || [];
-        const newAddress: Address = { ...address, id: newAddressId };
-
-        // If this is the very first address, make it the favorite
-        if (addresses.length === 0) {
-            newAddress.isFavorite = true;
-        } else if (newAddress.isFavorite) {
-            // If this new address is marked as favorite, unfavorite all others
-            addresses = addresses.map(addr => ({ ...addr, isFavorite: false }));
-        }
-        
-        addresses.push(newAddress);
-
-        transaction.update(userRef, { addresses });
-    });
-    return newAddressId;
-};
-
-export const updateAddress = async (uid: string, updatedAddress: Address): Promise<void> => {
-    if (!db) throw new Error("Firestore not initialized.");
-    const userRef = db.collection('users').doc(uid);
-    
-    await db.runTransaction(async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists) throw "Documento de usuário não existe!";
-
-        const userData = userDoc.data() as UserProfile;
-        let addresses = userData.addresses || [];
-
-        if (updatedAddress.isFavorite) {
-            addresses = addresses.map(addr => ({ ...addr, isFavorite: false }));
-        }
-
-        const addressIndex = addresses.findIndex(addr => addr.id === updatedAddress.id);
-        if (addressIndex > -1) {
-            addresses[addressIndex] = updatedAddress;
-        } else {
-            addresses.push(updatedAddress);
-        }
-
-        transaction.update(userRef, { addresses });
-    });
-};
-
-export const deleteAddress = async (uid: string, addressId: string): Promise<void> => {
-    if (!db) throw new Error("Firestore not initialized.");
-    const userRef = db.collection('users').doc(uid);
-    
-    await db.runTransaction(async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists) throw "Documento de usuário não existe!";
-        
-        const userData = userDoc.data() as UserProfile;
-        const addresses = (userData.addresses || []).filter(addr => addr.id !== addressId);
-        
-        transaction.update(userRef, { addresses });
-    });
+    await db.doc('store_config/site_settings').set(settings, { merge: true });
 };
 
 
-// --- Chatbot Function ---
-export const askChatbot = async (messages: ChatMessage[]): Promise<string> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    const askSantoFunction = functions.httpsCallable('askSanto');
-    try {
-        // Enviamos o histórico completo no payload com a chave 'history'
-        const result = await askSantoFunction({ history: messages });
-        return result.data.reply;
-    } catch (error) {
-        console.error("Error calling askSanto function:", error);
-        return "Desculpe, estou com um problema para me conectar. Tente novamente mais tarde.";
-    }
-};
-
-/**
- * Associates guest orders stored in localStorage with a user ID upon login.
- * This function calls a Cloud Function to perform the update securely.
- * @param orderIds An array of order document IDs to update.
- */
-export const syncGuestOrders = async (orderIds: string[]): Promise<void> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    if (orderIds.length === 0) {
-        return;
-    }
-
-    const syncFunction = functions.httpsCallable('syncGuestOrders');
-    try {
-        await syncFunction({ orderIds });
-    } catch (error) {
-        console.error("Error calling syncGuestOrders function:", error);
-        // Re-throw the error so the UI can catch it and display a message
-        throw new Error("Não foi possível associar os pedidos anteriores.");
-    }
-};
-
-
-// --- Order Management Functions (Calling Cloud Functions) ---
-
-/**
- * Creates an order document in Firestore.
- * @param details The customer and order details from the checkout form.
- * @param cart The items in the shopping cart.
- * @param total The total amount of the order.
- * @param orderId The client-generated unique ID for the order.
- * @returns An object containing the new order's ID and its number.
- */
-export const createOrder = async (details: OrderDetails, cart: CartItem[], total: number, orderId: string): Promise<{ orderId: string, orderNumber: number }> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    const createOrderFunction = functions.httpsCallable('createOrder');
-    try {
-        const result = await createOrderFunction({ details, cart, total, orderId });
-        return result.data;
-    } catch (error) {
-        console.error("Error calling createOrder function:", error);
-        throw new Error("Não foi possível criar o pedido. Tente novamente.");
-    }
-};
+// --- Order Management ---
 
 export const updateOrderStatus = async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    const orderRef = db.collection('orders').doc(orderId);
-    await orderRef.update({ status, ...payload });
+    const updateData = payload ? { status, ...payload } : { status };
+    await db.collection('orders').doc(orderId).update(updateData);
 };
 
 export const updateOrderPaymentStatus = async (orderId: string, paymentStatus: PaymentStatus): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    const orderRef = db.collection('orders').doc(orderId);
-    await orderRef.update({ paymentStatus });
+    await db.collection('orders').doc(orderId).update({ paymentStatus });
 };
 
 export const updateOrderReservationTime = async (orderId: string, reservationTime: string): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    const orderRef = db.collection('orders').doc(orderId);
-    await orderRef.update({ 'customer.reservationTime': reservationTime });
+    await db.collection('orders').doc(orderId).update({ 'customer.reservationTime': reservationTime });
 };
 
 export const deleteOrder = async (orderId: string): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    const orderRef = db.collection('orders').doc(orderId);
-    await orderRef.delete();
+    await db.collection('orders').doc(orderId).delete();
 };
 
 export const permanentDeleteMultipleOrders = async (orderIds: string[]): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    if (orderIds.length === 0) {
-        return;
-    }
-
-    // Firestore allows a maximum of 500 writes in a single batch.
-    // Chunking the array to handle more than 500 deletions at once.
-    const chunks = [];
-    for (let i = 0; i < orderIds.length; i += 500) {
-        chunks.push(orderIds.slice(i, i + 500));
-    }
-
-    for (const chunk of chunks) {
-        const batch = db.batch();
-        chunk.forEach(orderId => {
-            const orderRef = db.collection('orders').doc(orderId);
-            batch.delete(orderRef);
-        });
-        await batch.commit();
-    }
+    const batch = db.batch();
+    orderIds.forEach(id => {
+        const orderRef = db.collection('orders').doc(id);
+        batch.delete(orderRef);
+    });
+    await batch.commit();
 };
