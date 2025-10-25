@@ -997,7 +997,69 @@ const App: React.FC = () => {
     // While technically correct, it can sometimes cause subtle type inference issues with the compiler that may be misreported.
     // Removing it makes the function's return type fully inferred, resolving the "Expected 1 arguments, but got 2" error and making it consistent with other similar handlers in the file.
     const handleReorderCategories = useCallback(async (categoriesToUpdate: { id: string; order: number }[]) => { try { await firebaseService.updateCategoriesOrder(categoriesToUpdate); addToast("Ordem das categorias atualizada.", 'success'); } catch (error) { console.error("Failed to reorder categories:", error); addToast("Erro ao reordenar categorias.", 'error'); } }, [addToast]);
-    const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => { try { const settingsToUpdate = JSON.parse(JSON.stringify(settings)); for (const key in files) { const file = files[key]; if (file) { const url = await firebaseService.uploadSiteAsset(file, key); if (key === 'logo') settingsToUpdate.logoUrl = url; else if (key === 'heroBg') settingsToUpdate.heroBgUrl = url; else { const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key); if (sectionIndex > -1) settingsToUpdate.contentSections[sectionIndex].imageUrl = url; } } } await firebaseService.updateSiteSettings(settingsToUpdate); addToast("Personalização salva!", 'success'); } catch (error) { console.error("Failed to save site settings:", error); addToast("Erro ao salvar configurações.", 'error'); } }, [addToast]);
+    
+    const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => {
+        try {
+            const settingsToUpdate = JSON.parse(JSON.stringify(settings));
+            const originalSettings = siteSettings; // State before UI changes
+    
+            // Helper to queue deletion
+            const queueDeletionIfNeeded = async (url: string | undefined) => {
+                if (url && url.includes('firebasestorage.googleapis.com')) {
+                    await firebaseService.deleteImageByUrl(url).catch(err => console.error(`Failed to delete old image ${url}`, err));
+                }
+            };
+    
+            // Handle file uploads (which implies replacement of the old image)
+            for (const key in files) {
+                const file = files[key];
+                if (file) {
+                    if (key === 'logo') await queueDeletionIfNeeded(originalSettings.logoUrl);
+                    else if (key === 'heroBg') await queueDeletionIfNeeded(originalSettings.heroBgUrl);
+                    else {
+                        const oldSection = originalSettings.contentSections.find(s => s.id === key);
+                        if (oldSection) await queueDeletionIfNeeded(oldSection.imageUrl);
+                    }
+    
+                    const newUrl = await firebaseService.uploadSiteAsset(file, key);
+    
+                    if (key === 'logo') settingsToUpdate.logoUrl = newUrl;
+                    else if (key === 'heroBg') settingsToUpdate.heroBgUrl = newUrl;
+                    else {
+                        const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
+                        if (sectionIndex > -1) settingsToUpdate.contentSections[sectionIndex].imageUrl = newUrl;
+                    }
+                }
+            }
+    
+            // Handle explicit removals marked by the UI
+            if (settingsToUpdate.logoUrl === 'DELETE_AND_RESET') {
+                await queueDeletionIfNeeded(originalSettings.logoUrl);
+                settingsToUpdate.logoUrl = defaultLogo;
+            }
+            if (settingsToUpdate.heroBgUrl === 'DELETE_AND_RESET') {
+                await queueDeletionIfNeeded(originalSettings.heroBgUrl);
+                settingsToUpdate.heroBgUrl = defaultHeroBg;
+            }
+            if (settingsToUpdate.contentSections) {
+                for (let i = 0; i < settingsToUpdate.contentSections.length; i++) {
+                    const section = settingsToUpdate.contentSections[i];
+                    if (section.imageUrl === 'DELETE_AND_RESET') {
+                        const oldSection = originalSettings.contentSections.find(s => s.id === section.id);
+                        await queueDeletionIfNeeded(oldSection?.imageUrl);
+                        section.imageUrl = defaultAboutImg; // Use a consistent default for all sections
+                    }
+                }
+            }
+    
+            await firebaseService.updateSiteSettings(settingsToUpdate);
+            addToast("Personalização salva!", 'success');
+        } catch (error) {
+            console.error("Failed to save site settings:", error);
+            addToast("Erro ao salvar configurações.", 'error');
+        }
+    }, [siteSettings, addToast]);
+    
     const handleUpdateSiteSettingsField = useCallback(async (updates: Partial<SiteSettings>) => {
         try {
             await firebaseService.updateSiteSettings(updates);

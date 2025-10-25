@@ -37,6 +37,30 @@ export const uploadSiteAsset = async (file: File, assetName: string): Promise<st
     return await snapshot.ref.getDownloadURL();
 };
 
+/**
+ * Deletes a file from Firebase Storage based on its public URL.
+ * Ignores errors if the file doesn't exist.
+ * @param url The public URL of the file to delete.
+ */
+export const deleteImageByUrl = async (url: string): Promise<void> => {
+    if (!storage || !url || !url.includes('firebasestorage.googleapis.com')) {
+        // Not a Firebase Storage URL we should manage, or storage not initialized.
+        return;
+    }
+
+    try {
+        const fileRef = storage.refFromURL(url);
+        await fileRef.delete();
+    } catch (error: any) {
+        // It's common to try to delete a file that's already gone, so we'll ignore 'object-not-found' errors.
+        if (error.code !== 'storage/object-not-found') {
+            console.error("Error deleting image from storage:", error);
+            // Re-throw if the caller needs to handle other errors
+            throw error;
+        }
+    }
+};
+
 
 // Product Functions
 export const addProduct = async (productData: Omit<Product, 'id'>): Promise<void> => {
@@ -163,218 +187,31 @@ export const updateCategoriesOrder = async (categoriesToUpdate: { id: string; or
     await batch.commit();
 };
 
-// Site Settings Function
+// Site Settings
 export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     const settingsRef = db.doc('store_config/site_settings');
     await settingsRef.set(settings, { merge: true });
 };
 
-export const createReservation = async (details: ReservationDetails): Promise<{ orderId: string, orderNumber: number }> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    const createReservationFunction = functions.httpsCallable('createReservation');
-    try {
-        const result = await createReservationFunction({ details });
-        return result.data;
-    } catch (error) {
-        console.error("Error calling createReservation function:", error);
-        throw new Error("Não foi possível criar a reserva. Tente novamente.");
-    }
-};
 
-// --- User Profile & Auth Functions ---
-
-export const manageProfilePicture = async (imageBase64: string | null): Promise<{success: boolean, photoURL: string | null}> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    const manageFunction = functions.httpsCallable('manageProfilePicture');
-    try {
-        const result = await manageFunction({ imageBase64 });
-        return result.data as {success: boolean, photoURL: string | null};
-    } catch (error) {
-        console.error("Error calling manageProfilePicture function:", error);
-        throw new Error("Falha ao gerenciar a foto do perfil.");
-    }
-};
-
-export const verifyGoogleToken = async (idToken: string): Promise<string> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    const verifyFunction = functions.httpsCallable('verifyGoogleToken');
-    try {
-        const result = await verifyFunction({ idToken });
-        return result.data.customToken;
-    } catch (error) {
-        console.error("Error calling verifyGoogleToken function:", error);
-        throw new Error("Falha na autenticação com o Google.");
-    }
-};
-
-export const createUserProfile = async (user: firebase.User, name: string, phone: string): Promise<void> => {
-    if (!db) throw new Error("Firestore not initialized.");
-    const userRef = db.collection('users').doc(user.uid);
-    const profile: UserProfile = {
-        uid: user.uid,
-        name: name,
-        email: user.email!,
-        photoURL: user.photoURL || '',
-        phone: phone,
-        addresses: [],
-    };
-    await userRef.set(profile);
-};
-
-export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
-    if (!db) return null;
-    const doc = await db.collection('users').doc(uid).get();
-    if (!doc.exists) return null;
-    return { uid, ...doc.data() } as UserProfile;
-};
-
-export const updateUserProfile = async (uid: string, data: Partial<Pick<UserProfile, 'name' | 'phone'>>): Promise<void> => {
-    if (!db) throw new Error("Firestore not initialized.");
-    await db.collection('users').doc(uid).set(data, { merge: true });
-};
-
-// Address management functions
-export const addAddress = async (uid: string, address: Omit<Address, 'id'>): Promise<string> => {
-    if (!db) throw new Error("Firestore not initialized.");
-    const userRef = db.collection('users').doc(uid);
-    const newAddressId = db.collection('users').doc().id;
-
-    await db.runTransaction(async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists) throw "Documento de usuário não existe!";
-        
-        const userData = userDoc.data() as UserProfile;
-        let addresses = userData.addresses || [];
-        const newAddress: Address = { ...address, id: newAddressId };
-
-        // If this is the very first address, make it the favorite
-        if (addresses.length === 0) {
-            newAddress.isFavorite = true;
-        } else if (newAddress.isFavorite) {
-            // If this new address is marked as favorite, unfavorite all others
-            addresses = addresses.map(addr => ({ ...addr, isFavorite: false }));
-        }
-        
-        addresses.push(newAddress);
-
-        transaction.update(userRef, { addresses });
-    });
-    return newAddressId;
-};
-
-export const updateAddress = async (uid: string, updatedAddress: Address): Promise<void> => {
-    if (!db) throw new Error("Firestore not initialized.");
-    const userRef = db.collection('users').doc(uid);
-    
-    await db.runTransaction(async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists) throw "Documento de usuário não existe!";
-
-        const userData = userDoc.data() as UserProfile;
-        let addresses = userData.addresses || [];
-
-        if (updatedAddress.isFavorite) {
-            addresses = addresses.map(addr => ({ ...addr, isFavorite: false }));
-        }
-
-        const addressIndex = addresses.findIndex(addr => addr.id === updatedAddress.id);
-        if (addressIndex > -1) {
-            addresses[addressIndex] = updatedAddress;
-        } else {
-            addresses.push(updatedAddress);
-        }
-
-        transaction.update(userRef, { addresses });
-    });
-};
-
-export const deleteAddress = async (uid: string, addressId: string): Promise<void> => {
-    if (!db) throw new Error("Firestore not initialized.");
-    const userRef = db.collection('users').doc(uid);
-    
-    await db.runTransaction(async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists) throw "Documento de usuário não existe!";
-        
-        const userData = userDoc.data() as UserProfile;
-        const addresses = (userData.addresses || []).filter(addr => addr.id !== addressId);
-        
-        transaction.update(userRef, { addresses });
-    });
-};
-
-
-// --- Chatbot Function ---
-export const askChatbot = async (messages: ChatMessage[]): Promise<string> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    const askSantoFunction = functions.httpsCallable('askSanto');
-    try {
-        // Enviamos o histórico completo no payload com a chave 'history'
-        const result = await askSantoFunction({ history: messages });
-        return result.data.reply;
-    } catch (error) {
-        console.error("Error calling askSanto function:", error);
-        return "Desculpe, estou com um problema para me conectar. Tente novamente mais tarde.";
-    }
-};
-
-/**
- * Associates guest orders stored in localStorage with a user ID upon login.
- * This function calls a Cloud Function to perform the update securely.
- * @param orderIds An array of order document IDs to update.
- */
-export const syncGuestOrders = async (orderIds: string[]): Promise<void> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
-    if (orderIds.length === 0) {
-        return;
-    }
-
-    const syncFunction = functions.httpsCallable('syncGuestOrders');
-    try {
-        await syncFunction({ orderIds });
-    } catch (error) {
-        console.error("Error calling syncGuestOrders function:", error);
-        // Re-throw the error so the UI can catch it and display a message
-        throw new Error("Não foi possível associar os pedidos anteriores.");
-    }
-};
-
-
-// --- Order Management Functions (Calling Cloud Functions) ---
-
-/**
- * Creates an order document in Firestore.
- * @param details The customer and order details from the checkout form.
- * @param cart The items in the shopping cart.
- * @param total The total amount of the order.
- * @param orderId The client-generated unique ID for the order.
- * @returns An object containing the new order's ID and its number.
- */
-export const createOrder = async (details: OrderDetails, cart: CartItem[], total: number, orderId: string): Promise<{ orderId: string, orderNumber: number }> => {
-    if (!functions) {
-        throw new Error("Firebase Functions is not initialized.");
-    }
+// Order Functions (Cloud Functions)
+export const createOrder = async (details: OrderDetails, cart: CartItem[], total: number, orderId: string): Promise<{ orderId: string; orderNumber: number; }> => {
+    if (!functions) throw new Error("Firebase Functions not initialized.");
     const createOrderFunction = functions.httpsCallable('createOrder');
-    try {
-        const result = await createOrderFunction({ details, cart, total, orderId });
-        return result.data;
-    } catch (error) {
-        console.error("Error calling createOrder function:", error);
-        throw new Error("Não foi possível criar o pedido. Tente novamente.");
-    }
+    const response = await createOrderFunction({ details, cart, total, orderId });
+    return response.data as { orderId: string; orderNumber: number; };
 };
 
+export const createReservation = async (details: ReservationDetails): Promise<{ orderId: string; orderNumber: number; }> => {
+    if (!functions) throw new Error("Firebase Functions not initialized.");
+    const createReservationFunction = functions.httpsCallable('createReservation');
+    const response = await createReservationFunction({ details });
+    return response.data as { orderId: string; orderNumber: number; };
+};
+
+
+// Firestore Order Updates (Admin)
 export const updateOrderStatus = async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     const orderRef = db.collection('orders').doc(orderId);
@@ -393,31 +230,139 @@ export const updateOrderReservationTime = async (orderId: string, reservationTim
     await orderRef.update({ 'customer.reservationTime': reservationTime });
 };
 
+
 export const deleteOrder = async (orderId: string): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    const orderRef = db.collection('orders').doc(orderId);
-    await orderRef.delete();
+    await db.collection('orders').doc(orderId).delete();
 };
 
 export const permanentDeleteMultipleOrders = async (orderIds: string[]): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
-    if (orderIds.length === 0) {
-        return;
+    const batch = db.batch();
+    orderIds.forEach(id => {
+        const orderRef = db.collection('orders').doc(id);
+        batch.delete(orderRef);
+    });
+    await batch.commit();
+};
+
+// Chatbot
+export const askChatbot = async (history: ChatMessage[]): Promise<string> => {
+    if (!functions) throw new Error("Firebase Functions not initialized.");
+    try {
+        const askSanto = functions.httpsCallable('askSanto');
+        const response = await askSanto({ history });
+        return (response.data as any).reply;
+    } catch (error) {
+        console.error("Error calling chatbot function:", error);
+        throw new Error("Failed to get a response from the assistant.");
+    }
+};
+
+// User Profile & Auth
+export const verifyGoogleToken = async (idToken: string): Promise<string> => {
+    if (!functions) throw new Error("Firebase Functions is not initialized.");
+    const verifyToken = functions.httpsCallable('verifyGoogleToken');
+    const result = await verifyToken({ idToken });
+    return result.data.customToken;
+};
+
+export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const userRef = db.collection('users').doc(uid);
+    const doc = await userRef.get();
+    if (doc.exists) {
+        return { uid, ...doc.data() } as UserProfile;
+    }
+    return null;
+};
+
+export const createUserProfile = async (user: firebase.User, name: string, phone: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const userRef = db.collection('users').doc(user.uid);
+    const profile: Partial<UserProfile> = {
+        name: name || user.displayName || 'Usuário',
+        email: user.email || '',
+        photoURL: user.photoURL || '',
+        phone: phone || '',
+        addresses: [],
+    };
+    await userRef.set(profile, { merge: true });
+};
+
+export const updateUserProfile = async (uid: string, data: Partial<Pick<UserProfile, 'name' | 'phone'>>): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    await db.collection('users').doc(uid).update(data);
+};
+
+export const addAddress = async (uid: string, address: Omit<Address, 'id'>): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const userRef = db.collection('users').doc(uid);
+    const newAddress = { ...address, id: db.collection('users').doc().id };
+
+    if (newAddress.isFavorite) {
+        const doc = await userRef.get();
+        if (doc.exists) {
+            const profile = doc.data() as UserProfile;
+            const addresses = (profile.addresses || []).map(addr => ({ ...addr, isFavorite: false }));
+            await userRef.update({
+                addresses: [...addresses, newAddress]
+            });
+            return;
+        }
     }
 
-    // Firestore allows a maximum of 500 writes in a single batch.
-    // Chunking the array to handle more than 500 deletions at once.
-    const chunks = [];
-    for (let i = 0; i < orderIds.length; i += 500) {
-        chunks.push(orderIds.slice(i, i + 500));
-    }
+    await userRef.update({
+        addresses: firebase.firestore.FieldValue.arrayUnion(newAddress)
+    });
+};
 
-    for (const chunk of chunks) {
-        const batch = db.batch();
-        chunk.forEach(orderId => {
-            const orderRef = db.collection('orders').doc(orderId);
-            batch.delete(orderRef);
-        });
-        await batch.commit();
+export const updateAddress = async (uid: string, address: Address): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const userRef = db.collection('users').doc(uid);
+    const doc = await userRef.get();
+    if (doc.exists) {
+        const profile = doc.data() as UserProfile;
+        let addresses = profile.addresses || [];
+
+        if (address.isFavorite) {
+            addresses = addresses.map(addr => ({ ...addr, isFavorite: false }));
+        }
+
+        const addressIndex = addresses.findIndex(a => a.id === address.id);
+        if (addressIndex > -1) {
+            addresses[addressIndex] = address;
+        } else {
+            addresses.push(address);
+        }
+        await userRef.update({ addresses });
     }
+};
+
+export const deleteAddress = async (uid: string, addressId: string): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    const userRef = db.collection('users').doc(uid);
+    const doc = await userRef.get();
+    if (doc.exists) {
+        const profile = doc.data() as UserProfile;
+        const addresses = (profile.addresses || []).filter(a => a.id !== addressId);
+        // If the deleted address was the favorite and there are other addresses, make the first one the new favorite.
+        if (addresses.length > 0 && !addresses.some(a => a.isFavorite)) {
+            addresses[0].isFavorite = true;
+        }
+        await userRef.update({ addresses });
+    }
+};
+
+export const manageProfilePicture = async (imageBase64: string | null): Promise<void> => {
+    if (!functions) throw new Error("Firebase Functions is not initialized.");
+    const managePic = functions.httpsCallable('manageProfilePicture');
+    await managePic({ imageBase64 });
+};
+
+export const syncGuestOrders = async (uid: string, orderIds: string[]): Promise<{ success: boolean; message: string; }> => {
+    if (!functions) throw new Error("Firebase Functions is not initialized.");
+    const syncFunc = functions.httpsCallable('syncGuestOrders');
+    const result = await syncFunc({ orderIds });
+    return result.data as { success: boolean; message: string; };
 };

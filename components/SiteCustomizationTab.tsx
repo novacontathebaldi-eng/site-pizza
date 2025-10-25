@@ -56,9 +56,11 @@ const ImageUploader: React.FC<{
     imageUrl: string;
     onUrlChange: (url: string) => void;
     onFileChange: (file: File | null) => void;
-}> = ({ label, imageUrl, onUrlChange, onFileChange }) => {
+    onRemove: () => void;
+}> = ({ label, imageUrl, onUrlChange, onFileChange, onRemove }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState(imageUrl);
+    const isCustomUpload = imageUrl && imageUrl.includes('firebasestorage.googleapis.com');
 
     useEffect(() => {
         // If imageUrl is a blob url, don't update preview from props
@@ -95,9 +97,14 @@ const ImageUploader: React.FC<{
                 </div>
                 <div className="flex-grow space-y-2">
                     <input value={imageUrl} onChange={handleUrlChange} className="w-full px-3 py-2 border rounded-md text-sm" placeholder="Ou cole uma URL aqui" />
-                    <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full text-sm bg-gray-200 text-gray-800 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300">
-                        <i className="fas fa-upload mr-2"></i>Enviar Arquivo
-                    </button>
+                    <div className="flex gap-2">
+                        <button type="button" onClick={() => fileInputRef.current?.click()} className="flex-1 text-sm bg-gray-200 text-gray-800 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300">
+                            <i className="fas fa-upload mr-2"></i>Enviar Arquivo
+                        </button>
+                         <button type="button" onClick={onRemove} disabled={!isCustomUpload} className="text-sm bg-red-100 text-red-700 font-semibold py-2 px-3 rounded-lg hover:bg-red-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed">
+                            <i className="fas fa-trash-alt mr-1"></i>Remover
+                        </button>
+                    </div>
                     <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
                 </div>
             </div>
@@ -253,7 +260,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                     </button>
                     {activeAccordion === 'static' && (
                         <div className="p-4 border-t space-y-4">
-                            <ImageUploader label="Logo da Pizzaria" imageUrl={formData.logoUrl} onUrlChange={(url) => handleUrlChange('logoUrl', url)} onFileChange={(file) => handleFileChange('logo', file)} />
+                            <ImageUploader label="Logo da Pizzaria" imageUrl={formData.logoUrl} onUrlChange={(url) => handleUrlChange('logoUrl', url)} onFileChange={(file) => handleFileChange('logo', file)} onRemove={() => handleUrlChange('logoUrl', 'DELETE_AND_RESET')} />
                             <div>
                                 <label className="block text-sm font-semibold mb-1">Slogan (Hero)</label>
                                 <input name="heroSlogan" value={formData.heroSlogan} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" />
@@ -266,7 +273,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                                 <label className="block text-sm font-semibold mb-1">Subtítulo (Hero)</label>
                                 <textarea name="heroSubtitle" value={formData.heroSubtitle} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" rows={3} />
                             </div>
-                            <ImageUploader label="Imagem de Fundo (Hero)" imageUrl={formData.heroBgUrl} onUrlChange={(url) => handleUrlChange('heroBgUrl', url)} onFileChange={(file) => handleFileChange('heroBg', file)} />
+                            <ImageUploader label="Imagem de Fundo (Hero)" imageUrl={formData.heroBgUrl} onUrlChange={(url) => handleUrlChange('heroBgUrl', url)} onFileChange={(file) => handleFileChange('heroBg', file)} onRemove={() => handleUrlChange('heroBgUrl', 'DELETE_AND_RESET')} />
                         </div>
                     )}
                 </div>
@@ -372,7 +379,7 @@ const SortableContentSectionItem: React.FC<{
             </header>
             {isOpen && (
                 <div className="p-4 space-y-4">
-                    <ImageUploader label="Imagem da Seção" imageUrl={section.imageUrl} onUrlChange={(url) => onChange(section.id, 'imageUrl', url)} onFileChange={(file) => onFileChange(section.id, file)} />
+                    <ImageUploader label="Imagem da Seção" imageUrl={section.imageUrl} onUrlChange={(url) => onChange(section.id, 'imageUrl', url)} onFileChange={(file) => onFileChange(section.id, file)} onRemove={() => onChange(section.id, 'imageUrl', 'DELETE_AND_RESET')} />
                     
                     <div>
                         <label className="block text-sm font-semibold mb-2">Etiqueta</label>
