@@ -998,49 +998,6 @@ const App: React.FC = () => {
     // Removing it makes the function's return type fully inferred, resolving the "Expected 1 arguments, but got 2" error and making it consistent with other similar handlers in the file.
     const handleReorderCategories = useCallback(async (categoriesToUpdate: { id: string; order: number }[]) => { try { await firebaseService.updateCategoriesOrder(categoriesToUpdate); addToast("Ordem das categorias atualizada.", 'success'); } catch (error) { console.error("Failed to reorder categories:", error); addToast("Erro ao reordenar categorias.", 'error'); } }, [addToast]);
     const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => { try { const settingsToUpdate = JSON.parse(JSON.stringify(settings)); for (const key in files) { const file = files[key]; if (file) { const url = await firebaseService.uploadSiteAsset(file, key); if (key === 'logo') settingsToUpdate.logoUrl = url; else if (key === 'heroBg') settingsToUpdate.heroBgUrl = url; else { const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key); if (sectionIndex > -1) settingsToUpdate.contentSections[sectionIndex].imageUrl = url; } } } await firebaseService.updateSiteSettings(settingsToUpdate); addToast("Personalização salva!", 'success'); } catch (error) { console.error("Failed to save site settings:", error); addToast("Erro ao salvar configurações.", 'error'); } }, [addToast]);
-    
-    const handleResetImage = useCallback(async (imageType: 'logo' | 'heroBg' | 'section', sectionId?: string) => {
-        try {
-            const settingsToUpdate = { ...siteSettings };
-            
-            // Define as URLs originais das imagens
-            const originalImages = {
-                logo: '/assets/logo.png',
-                heroBg: '/assets/ambiente-pizzaria.webp',
-                section: '/assets/sobre-imagem.webp'
-            };
-            
-            if (imageType === 'logo') {
-                // Deletar imagem atual do Storage se for do Firebase
-                if (settingsToUpdate.logoUrl && settingsToUpdate.logoUrl.includes('firebasestorage.googleapis.com')) {
-                    await firebaseService.deleteImageFromStorage(settingsToUpdate.logoUrl);
-                }
-                settingsToUpdate.logoUrl = originalImages.logo;
-            } else if (imageType === 'heroBg') {
-                // Deletar imagem atual do Storage se for do Firebase
-                if (settingsToUpdate.heroBgUrl && settingsToUpdate.heroBgUrl.includes('firebasestorage.googleapis.com')) {
-                    await firebaseService.deleteImageFromStorage(settingsToUpdate.heroBgUrl);
-                }
-                settingsToUpdate.heroBgUrl = originalImages.heroBg;
-            } else if (imageType === 'section' && sectionId) {
-                const sectionIndex = settingsToUpdate.contentSections.findIndex(s => s.id === sectionId);
-                if (sectionIndex > -1) {
-                    // Deletar imagem atual do Storage se for do Firebase
-                    if (settingsToUpdate.contentSections[sectionIndex].imageUrl && 
-                        settingsToUpdate.contentSections[sectionIndex].imageUrl.includes('firebasestorage.googleapis.com')) {
-                        await firebaseService.deleteImageFromStorage(settingsToUpdate.contentSections[sectionIndex].imageUrl);
-                    }
-                    settingsToUpdate.contentSections[sectionIndex].imageUrl = originalImages.section;
-                }
-            }
-            
-            await firebaseService.updateSiteSettings(settingsToUpdate);
-            addToast("Imagem restaurada para a original!", 'success');
-        } catch (error) {
-            console.error("Failed to reset image:", error);
-            addToast("Erro ao restaurar imagem.", 'error');
-        }
-    }, [siteSettings, addToast]);
     const handleUpdateSiteSettingsField = useCallback(async (updates: Partial<SiteSettings>) => {
         try {
             await firebaseService.updateSiteSettings(updates);
@@ -1225,8 +1182,7 @@ const App: React.FC = () => {
                     onReorderCategories={handleReorderCategories} 
                     onSeedDatabase={seedDatabase} 
                     onSaveSiteSettings={handleSaveSiteSettings} 
-                    onUpdateSiteSettingsField={handleUpdateSiteSettingsField}
-                    onResetImage={handleResetImage} 
+                    onUpdateSiteSettingsField={handleUpdateSiteSettingsField} 
                     onUpdateOrderStatus={handleUpdateOrderStatus} 
                     onUpdateOrderPaymentStatus={handleUpdateOrderPaymentStatus} 
                     onUpdateOrderReservationTime={handleUpdateOrderReservationTime} 

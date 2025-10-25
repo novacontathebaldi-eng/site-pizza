@@ -37,29 +37,6 @@ export const uploadSiteAsset = async (file: File, assetName: string): Promise<st
     return await snapshot.ref.getDownloadURL();
 };
 
-// Delete Image from Firebase Storage
-export const deleteImageFromStorage = async (imageUrl: string): Promise<void> => {
-    if (!storage) {
-        throw new Error("Firebase Storage não está inicializado.");
-    }
-    
-    try {
-        // Extract the file path from the URL
-        const url = new URL(imageUrl);
-        const pathMatch = url.pathname.match(/\/o\/(.+)\?/);
-        if (!pathMatch) {
-            throw new Error("URL inválida do Firebase Storage");
-        }
-        
-        const filePath = decodeURIComponent(pathMatch[1]);
-        const storageRef = storage.ref(filePath);
-        await storageRef.delete();
-    } catch (error) {
-        console.error("Erro ao deletar imagem do Storage:", error);
-        throw new Error("Falha ao deletar imagem do Storage");
-    }
-};
-
 
 // Product Functions
 export const addProduct = async (productData: Omit<Product, 'id'>): Promise<void> => {

@@ -8,7 +8,6 @@ import { CSS } from '@dnd-kit/utilities';
 interface SiteCustomizationTabProps {
     settings: SiteSettings;
     onSave: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
-    onResetImage: (imageType: 'logo' | 'heroBg' | 'section', sectionId?: string) => Promise<void>;
 }
 
 // IconInput Component (Helper)
@@ -57,9 +56,7 @@ const ImageUploader: React.FC<{
     imageUrl: string;
     onUrlChange: (url: string) => void;
     onFileChange: (file: File | null) => void;
-    onResetImage?: () => void;
-    showResetButton?: boolean;
-}> = ({ label, imageUrl, onUrlChange, onFileChange, onResetImage, showResetButton = false }) => {
+}> = ({ label, imageUrl, onUrlChange, onFileChange }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState(imageUrl);
 
@@ -98,21 +95,9 @@ const ImageUploader: React.FC<{
                 </div>
                 <div className="flex-grow space-y-2">
                     <input value={imageUrl} onChange={handleUrlChange} className="w-full px-3 py-2 border rounded-md text-sm" placeholder="Ou cole uma URL aqui" />
-                    <div className="flex gap-2">
-                        <button type="button" onClick={() => fileInputRef.current?.click()} className="flex-1 text-sm bg-gray-200 text-gray-800 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300">
-                            <i className="fas fa-upload mr-2"></i>Enviar Arquivo
-                        </button>
-                        {showResetButton && onResetImage && (
-                            <button 
-                                type="button" 
-                                onClick={onResetImage} 
-                                className="text-sm bg-red-500 text-white font-semibold py-2 px-3 rounded-lg hover:bg-red-600"
-                                title="Remover imagem e voltar para a original"
-                            >
-                                <i className="fas fa-undo mr-2"></i>Remover
-                            </button>
-                        )}
-                    </div>
+                    <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full text-sm bg-gray-200 text-gray-800 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300">
+                        <i className="fas fa-upload mr-2"></i>Enviar Arquivo
+                    </button>
                     <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
                 </div>
             </div>
@@ -121,7 +106,7 @@ const ImageUploader: React.FC<{
 };
 
 // Main Component
-export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ settings, onSave, onResetImage }) => {
+export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ settings, onSave }) => {
     const [formData, setFormData] = useState<SiteSettings>(settings);
     const [files, setFiles] = useState<{ [key: string]: File | null }>({});
     const [isSaving, setIsSaving] = useState(false);
@@ -268,14 +253,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                     </button>
                     {activeAccordion === 'static' && (
                         <div className="p-4 border-t space-y-4">
-                            <ImageUploader 
-                                label="Logo da Pizzaria" 
-                                imageUrl={formData.logoUrl} 
-                                onUrlChange={(url) => handleUrlChange('logoUrl', url)} 
-                                onFileChange={(file) => handleFileChange('logo', file)}
-                                onResetImage={() => onResetImage('logo')}
-                                showResetButton={true}
-                            />
+                            <ImageUploader label="Logo da Pizzaria" imageUrl={formData.logoUrl} onUrlChange={(url) => handleUrlChange('logoUrl', url)} onFileChange={(file) => handleFileChange('logo', file)} />
                             <div>
                                 <label className="block text-sm font-semibold mb-1">Slogan (Hero)</label>
                                 <input name="heroSlogan" value={formData.heroSlogan} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" />
@@ -288,14 +266,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                                 <label className="block text-sm font-semibold mb-1">Subtítulo (Hero)</label>
                                 <textarea name="heroSubtitle" value={formData.heroSubtitle} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" rows={3} />
                             </div>
-                            <ImageUploader 
-                                label="Imagem de Fundo (Hero)" 
-                                imageUrl={formData.heroBgUrl} 
-                                onUrlChange={(url) => handleUrlChange('heroBgUrl', url)} 
-                                onFileChange={(file) => handleFileChange('heroBg', file)}
-                                onResetImage={() => onResetImage('heroBg')}
-                                showResetButton={true}
-                            />
+                            <ImageUploader label="Imagem de Fundo (Hero)" imageUrl={formData.heroBgUrl} onUrlChange={(url) => handleUrlChange('heroBgUrl', url)} onFileChange={(file) => handleFileChange('heroBg', file)} />
                         </div>
                     )}
                 </div>
@@ -319,7 +290,6 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                                         onAddListItem={handleAddSectionListItem}
                                         onRemoveListItem={handleRemoveSectionListItem}
                                         onFileChange={handleFileChange}
-                                        onResetImage={onResetImage}
                                     />
                                 ))}
                             </div>
@@ -377,9 +347,8 @@ const SortableContentSectionItem: React.FC<{
     onAddListItem: (sectionId: string) => void,
     onRemoveListItem: (sectionId: string, itemIndex: number) => void,
     onFileChange: (key: string, file: File | null) => void,
-    onResetImage: (imageType: 'logo' | 'heroBg' | 'section', sectionId?: string) => void,
 }> = (props) => {
-    const { section, isOpen, onToggle, onDelete, onChange, onListItemChange, onAddListItem, onRemoveListItem, onFileChange, onResetImage } = props;
+    const { section, isOpen, onToggle, onDelete, onChange, onListItemChange, onAddListItem, onRemoveListItem, onFileChange } = props;
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: section.id });
     const style = { transform: CSS.Transform.toString(transform), transition };
 
@@ -403,14 +372,7 @@ const SortableContentSectionItem: React.FC<{
             </header>
             {isOpen && (
                 <div className="p-4 space-y-4">
-                    <ImageUploader 
-                        label="Imagem da Seção" 
-                        imageUrl={section.imageUrl} 
-                        onUrlChange={(url) => onChange(section.id, 'imageUrl', url)} 
-                        onFileChange={(file) => onFileChange(section.id, file)}
-                        onResetImage={() => onResetImage('section', section.id)}
-                        showResetButton={true}
-                    />
+                    <ImageUploader label="Imagem da Seção" imageUrl={section.imageUrl} onUrlChange={(url) => onChange(section.id, 'imageUrl', url)} onFileChange={(file) => onFileChange(section.id, file)} />
                     
                     <div>
                         <label className="block text-sm font-semibold mb-2">Etiqueta</label>

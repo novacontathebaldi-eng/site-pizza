@@ -32,7 +32,6 @@ interface AdminSectionProps {
     onSeedDatabase: () => Promise<void>;
     onSaveSiteSettings: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
     onUpdateSiteSettingsField: (updates: Partial<SiteSettings>) => Promise<void>;
-    onResetImage: (imageType: 'logo' | 'heroBg' | 'section', sectionId?: string) => Promise<void>;
     onUpdateOrderStatus: (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => Promise<void>;
     onUpdateOrderPaymentStatus: (orderId: string, paymentStatus: PaymentStatus) => Promise<void>;
     onUpdateOrderReservationTime: (orderId: string, reservationTime: string) => Promise<void>;
@@ -191,7 +190,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         allProducts, allCategories, isStoreOnline, siteSettings, orders,
         onSaveProduct, onDeleteProduct, onProductStatusChange, onProductStockStatusChange, onStoreStatusChange,
         onSaveCategory, onDeleteCategory, onCategoryStatusChange, onReorderProducts, onReorderCategories,
-        onSeedDatabase, onSaveSiteSettings, onUpdateSiteSettingsField, onResetImage, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
+        onSeedDatabase, onSaveSiteSettings, onUpdateSiteSettingsField, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
         onDeleteOrder, onPermanentDeleteOrder, onPermanentDeleteMultipleOrders,
         onBulkDeleteProducts, onRestoreProduct, onPermanentDeleteProduct, onBulkPermanentDeleteProducts,
         isCurrentUserAdmin
@@ -935,7 +934,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                             </div>
                         )} </div>
                         
-                        <div id="admin-content-customization"> {activeTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} onResetImage={onResetImage} /> )} </div>
+                        <div id="admin-content-customization"> {activeTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> )} </div>
                         <div id="admin-content-products">
                             {activeTab === 'products' && (
                                 isProductTrashVisible ? (
