@@ -998,39 +998,6 @@ const App: React.FC = () => {
     // Removing it makes the function's return type fully inferred, resolving the "Expected 1 arguments, but got 2" error and making it consistent with other similar handlers in the file.
     const handleReorderCategories = useCallback(async (categoriesToUpdate: { id: string; order: number }[]) => { try { await firebaseService.updateCategoriesOrder(categoriesToUpdate); addToast("Ordem das categorias atualizada.", 'success'); } catch (error) { console.error("Failed to reorder categories:", error); addToast("Erro ao reordenar categorias.", 'error'); } }, [addToast]);
     const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => { try { const settingsToUpdate = JSON.parse(JSON.stringify(settings)); for (const key in files) { const file = files[key]; if (file) { const url = await firebaseService.uploadSiteAsset(file, key); if (key === 'logo') settingsToUpdate.logoUrl = url; else if (key === 'heroBg') settingsToUpdate.heroBgUrl = url; else { const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key); if (sectionIndex > -1) settingsToUpdate.contentSections[sectionIndex].imageUrl = url; } } } await firebaseService.updateSiteSettings(settingsToUpdate); addToast("Personalização salva!", 'success'); } catch (error) { console.error("Failed to save site settings:", error); addToast("Erro ao salvar configurações.", 'error'); } }, [addToast]);
-    
-    const handleRemoveSiteAsset = useCallback(async (assetKey: string, fileUrl: string) => {
-        try {
-            await firebaseService.deleteSiteAsset(fileUrl);
-            
-            let settingUpdate: Partial<SiteSettings> = {};
-            if (assetKey === 'logo') {
-                settingUpdate = { logoUrl: defaultSiteSettings.logoUrl };
-            } else if (assetKey === 'heroBg') {
-                settingUpdate = { heroBgUrl: defaultSiteSettings.heroBgUrl };
-            } else {
-                // Dynamic section image
-                const currentSections = [...siteSettings.contentSections];
-                const sectionIndex = currentSections.findIndex(s => s.id === assetKey);
-                
-                if (sectionIndex > -1) {
-                    const defaultSection = defaultSiteSettings.contentSections.find(s => s.id === assetKey);
-                    currentSections[sectionIndex].imageUrl = defaultSection ? defaultSection.imageUrl : '';
-                    settingUpdate = { contentSections: currentSections };
-                }
-            }
-            
-            if (Object.keys(settingUpdate).length > 0) {
-                await firebaseService.updateSiteSettings(settingUpdate);
-                addToast("Imagem removida e restaurada para o padrão.", 'success');
-            }
-        } catch (error) {
-            console.error("Failed to remove site asset:", error);
-            addToast("Erro ao remover imagem.", 'error');
-            throw error;
-        }
-    }, [addToast, siteSettings.contentSections]);
-    
     const handleUpdateSiteSettingsField = useCallback(async (updates: Partial<SiteSettings>) => {
         try {
             await firebaseService.updateSiteSettings(updates);
@@ -1226,7 +1193,6 @@ const App: React.FC = () => {
                     onRestoreProduct={handleRestoreProduct}
                     onPermanentDeleteProduct={handlePermanentDeleteProduct}
                     onBulkPermanentDeleteProducts={handleBulkPermanentDeleteProducts}
-                    onRemoveSiteAsset={handleRemoveSiteAsset}
                 />
             </main>
             

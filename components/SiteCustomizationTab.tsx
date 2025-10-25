@@ -8,7 +8,6 @@ import { CSS } from '@dnd-kit/utilities';
 interface SiteCustomizationTabProps {
     settings: SiteSettings;
     onSave: (settings: SiteSettings, files: { [key: string]: File | null }) => Promise<void>;
-    onRemoveAsset: (assetKey: string, fileUrl: string) => Promise<void>;
 }
 
 // IconInput Component (Helper)
@@ -57,41 +56,26 @@ const ImageUploader: React.FC<{
     imageUrl: string;
     onUrlChange: (url: string) => void;
     onFileChange: (file: File | null) => void;
-    onRemove: () => void;
-}> = ({ label, imageUrl, onUrlChange, onFileChange, onRemove }) => {
+}> = ({ label, imageUrl, onUrlChange, onFileChange }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState(imageUrl);
-    const isUploadedImage = imageUrl && imageUrl.includes('firebasestorage.googleapis.com');
 
     useEffect(() => {
-        // If a new file is being previewed (blob URL), don't overwrite it with the prop from Firestore.
-        // This prevents the flicker when the parent state updates during a save operation.
+        // If imageUrl is a blob url, don't update preview from props
         if (!preview || !preview.startsWith('blob:')) {
             setPreview(imageUrl);
         }
     }, [imageUrl]);
     
-    // Cleanup blob URL when component unmounts or preview changes to a non-blob URL
-    useEffect(() => {
-        const currentPreview = preview;
-        return () => {
-            if (currentPreview && currentPreview.startsWith('blob:')) {
-                URL.revokeObjectURL(currentPreview);
-            }
-        };
-    }, [preview]);
-
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
             onFileChange(file);
-
-            // Clean up previous blob URL if it exists
+            const objectUrl = URL.createObjectURL(file);
+             // Clean up previous blob url if it exists
             if (preview && preview.startsWith('blob:')) {
                 URL.revokeObjectURL(preview);
             }
-            
-            const objectUrl = URL.createObjectURL(file);
             setPreview(objectUrl);
         }
     };
@@ -111,16 +95,9 @@ const ImageUploader: React.FC<{
                 </div>
                 <div className="flex-grow space-y-2">
                     <input value={imageUrl} onChange={handleUrlChange} className="w-full px-3 py-2 border rounded-md text-sm" placeholder="Ou cole uma URL aqui" />
-                    <div className="flex items-center gap-2">
-                        <button type="button" onClick={() => fileInputRef.current?.click()} className="flex-1 text-sm bg-gray-200 text-gray-800 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300">
-                            <i className="fas fa-upload mr-2"></i>Enviar Arquivo
-                        </button>
-                        {isUploadedImage && (
-                             <button type="button" onClick={onRemove} title="Remover imagem e restaurar padrão" className="bg-red-100 text-red-700 font-semibold py-2 px-3 rounded-lg hover:bg-red-200 flex-shrink-0">
-                                <i className="fas fa-trash-alt"></i>
-                            </button>
-                        )}
-                    </div>
+                    <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full text-sm bg-gray-200 text-gray-800 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300">
+                        <i className="fas fa-upload mr-2"></i>Enviar Arquivo
+                    </button>
                     <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
                 </div>
             </div>
@@ -129,7 +106,7 @@ const ImageUploader: React.FC<{
 };
 
 // Main Component
-export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ settings, onSave, onRemoveAsset }) => {
+export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ settings, onSave }) => {
     const [formData, setFormData] = useState<SiteSettings>(settings);
     const [files, setFiles] = useState<{ [key: string]: File | null }>({});
     const [isSaving, setIsSaving] = useState(false);
@@ -154,18 +131,6 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
 
     const handleUrlChange = (field: keyof SiteSettings, url: string) => {
         setFormData(prev => ({ ...prev, [field]: url }));
-    };
-
-    const handleAssetRemove = async (assetKey: string, fileUrl: string) => {
-        if (!window.confirm('Tem certeza que deseja remover esta imagem e restaurar a original?')) {
-            return;
-        }
-        setIsSaving(true);
-        try {
-            await onRemoveAsset(assetKey, fileUrl);
-        } finally {
-            setIsSaving(false);
-        }
     };
 
     // --- Content Section Handlers ---
@@ -288,7 +253,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                     </button>
                     {activeAccordion === 'static' && (
                         <div className="p-4 border-t space-y-4">
-                            <ImageUploader label="Logo da Pizzaria" imageUrl={formData.logoUrl} onUrlChange={(url) => handleUrlChange('logoUrl', url)} onFileChange={(file) => handleFileChange('logo', file)} onRemove={() => handleAssetRemove('logo', formData.logoUrl)} />
+                            <ImageUploader label="Logo da Pizzaria" imageUrl={formData.logoUrl} onUrlChange={(url) => handleUrlChange('logoUrl', url)} onFileChange={(file) => handleFileChange('logo', file)} />
                             <div>
                                 <label className="block text-sm font-semibold mb-1">Slogan (Hero)</label>
                                 <input name="heroSlogan" value={formData.heroSlogan} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" />
@@ -301,7 +266,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                                 <label className="block text-sm font-semibold mb-1">Subtítulo (Hero)</label>
                                 <textarea name="heroSubtitle" value={formData.heroSubtitle} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" rows={3} />
                             </div>
-                            <ImageUploader label="Imagem de Fundo (Hero)" imageUrl={formData.heroBgUrl} onUrlChange={(url) => handleUrlChange('heroBgUrl', url)} onFileChange={(file) => handleFileChange('heroBg', file)} onRemove={() => handleAssetRemove('heroBg', formData.heroBgUrl)} />
+                            <ImageUploader label="Imagem de Fundo (Hero)" imageUrl={formData.heroBgUrl} onUrlChange={(url) => handleUrlChange('heroBgUrl', url)} onFileChange={(file) => handleFileChange('heroBg', file)} />
                         </div>
                     )}
                 </div>
@@ -325,7 +290,6 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                                         onAddListItem={handleAddSectionListItem}
                                         onRemoveListItem={handleRemoveSectionListItem}
                                         onFileChange={handleFileChange}
-                                        onRemoveAsset={handleAssetRemove}
                                     />
                                 ))}
                             </div>
@@ -383,9 +347,8 @@ const SortableContentSectionItem: React.FC<{
     onAddListItem: (sectionId: string) => void,
     onRemoveListItem: (sectionId: string, itemIndex: number) => void,
     onFileChange: (key: string, file: File | null) => void,
-    onRemoveAsset: (assetKey: string, fileUrl: string) => Promise<void>;
 }> = (props) => {
-    const { section, isOpen, onToggle, onDelete, onChange, onListItemChange, onAddListItem, onRemoveListItem, onFileChange, onRemoveAsset } = props;
+    const { section, isOpen, onToggle, onDelete, onChange, onListItemChange, onAddListItem, onRemoveListItem, onFileChange } = props;
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: section.id });
     const style = { transform: CSS.Transform.toString(transform), transition };
 
@@ -409,7 +372,7 @@ const SortableContentSectionItem: React.FC<{
             </header>
             {isOpen && (
                 <div className="p-4 space-y-4">
-                    <ImageUploader label="Imagem da Seção" imageUrl={section.imageUrl} onUrlChange={(url) => onChange(section.id, 'imageUrl', url)} onFileChange={(file) => onFileChange(section.id, file)} onRemove={() => onRemoveAsset(section.id, section.imageUrl)} />
+                    <ImageUploader label="Imagem da Seção" imageUrl={section.imageUrl} onUrlChange={(url) => onChange(section.id, 'imageUrl', url)} onFileChange={(file) => onFileChange(section.id, file)} />
                     
                     <div>
                         <label className="block text-sm font-semibold mb-2">Etiqueta</label>

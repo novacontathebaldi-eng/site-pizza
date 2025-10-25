@@ -43,7 +43,6 @@ interface AdminSectionProps {
     onPermanentDeleteProduct: (productId: string) => Promise<void>;
     onBulkPermanentDeleteProducts: (productIds: string[]) => Promise<void>;
     isCurrentUserAdmin: boolean;
-    onRemoveSiteAsset: (assetKey: string, fileUrl: string) => Promise<void>;
 }
 
 interface SortableProductItemProps {
@@ -194,7 +193,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         onSeedDatabase, onSaveSiteSettings, onUpdateSiteSettingsField, onUpdateOrderStatus, onUpdateOrderPaymentStatus, onUpdateOrderReservationTime,
         onDeleteOrder, onPermanentDeleteOrder, onPermanentDeleteMultipleOrders,
         onBulkDeleteProducts, onRestoreProduct, onPermanentDeleteProduct, onBulkPermanentDeleteProducts,
-        isCurrentUserAdmin, onRemoveSiteAsset
+        isCurrentUserAdmin
     } = props;
     
     const [user, setUser] = useState<firebase.User | null>(null);
@@ -935,7 +934,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                             </div>
                         )} </div>
                         
-                        <div id="admin-content-customization"> {activeTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} onRemoveAsset={onRemoveSiteAsset} /> )} </div>
+                        <div id="admin-content-customization"> {activeTab === 'customization' && ( <SiteCustomizationTab settings={siteSettings} onSave={onSaveSiteSettings} /> )} </div>
                         <div id="admin-content-products">
                             {activeTab === 'products' && (
                                 isProductTrashVisible ? (
