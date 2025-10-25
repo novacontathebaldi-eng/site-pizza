@@ -90,7 +90,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
     const address = "Rua Porfilio Furtado, 178, Centro - Santa Leopoldina, ES";
     const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
     // Vou colocar um botão no personalizar para carlinhos mudar isso fácil heheheh
-    const facadeImageUrl = "https://firebasestorage.googleapis.com/v0/b/site-pizza-a2930.firebasestorage.app/o/fachada%2FFACHADA.png?alt=media&token=8010021e-a157-475e-8734-4ba56a3e967f";
+    const facadeImageUrl = './assets/FACHADA.webp';
     const operatingHoursText = formatOperatingHours(settings.operatingHours);
 
 
