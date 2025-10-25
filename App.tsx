@@ -14,7 +14,7 @@ import { ReservationModal } from './components/ReservationModal';
 import { Chatbot } from '@/components/Chatbot';
 import { LoginModal } from '@/components/LoginModal';
 import { UserAreaModal } from '@/components/UserAreaModal';
-import { db, auth } from './services/firebase';
+import { db, auth, functions } from './services/firebase';
 import * as firebaseService from './services/firebaseService';
 import { seedDatabase } from './services/seed';
 import defaultLogo from './assets/logo.png';
@@ -157,7 +157,6 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
 
     if (details.paymentMethod === 'pix') {
         message += `*PIX:* CNPJ 62.247.199/0001-04\n`;
-        message += `👆 Use o CNPJ acima para pagar seu pedido. ☝️\n`;
     }
     
     if (!isPaid && details.paymentMethod === 'cash') {
@@ -425,7 +424,7 @@ const App: React.FC = () => {
             const guestOrderIds: string[] = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
             if (guestOrderIds.length > 0) {
                 try {
-                    await firebaseService.syncGuestOrders(user.uid, guestOrderIds);
+                    await firebaseService.syncGuestOrders(guestOrderIds);
                     localStorage.removeItem('santaSensacaoGuestOrders');
                     addToast('Seus pedidos anteriores foram associados à sua conta!', 'success');
                 } catch (error) {
@@ -807,54 +806,49 @@ const App: React.FC = () => {
     }, []);
     
     const handleCheckout = async (details: OrderDetails) => {
-        if (!db) return;
+        if (!db || !functions) return;
         setIsProcessingOrder(true);
         setIsCheckoutModalOpen(false);
+    
+        let reservedOrderNumber;
+        try {
+            // 1. Reserve order number FIRST. This introduces a small, necessary delay.
+            const { orderNumber } = await firebaseService.reserveOrderNumber();
+            reservedOrderNumber = orderNumber;
+        } catch (error: any) {
+            console.error("Failed to reserve order number:", error);
+            addToast(error.message || "Não foi possível iniciar o pedido. Tente novamente.", 'error');
+            setIsProcessingOrder(false);
+            setIsCheckoutModalOpen(true); // Re-open modal for user to retry
+            return;
+        }
+    
+        // --- From here, the flow is similar to the original, but with the order number ---
     
         const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         const total = subtotal + (details.deliveryFee || 0);
     
-        // 1. Generate a unique ID on the client and save it to localStorage
+        // 2. Generate a unique document ID on the client and save it to localStorage for recovery.
         const pendingOrderId = db.collection('orders').doc().id;
         localStorage.setItem('pendingOrderId', pendingOrderId);
     
-        // 2. Open WhatsApp immediately to avoid pop-up blockers
-        const whatsappUrl = generateWhatsAppMessage(details, cart, total, null, false);
+        // 3. Open WhatsApp immediately with the correct order number
+        const whatsappUrl = generateWhatsAppMessage(details, cart, total, reservedOrderNumber, false);
         window.open(whatsappUrl, '_blank');
     
-        // 3. Attempt to create the order in the background.
-        try {
-            const { orderNumber } = await firebaseService.createOrder(details, cart, total, pendingOrderId);
-            
-            // This is the "fast path" if the call succeeds before the user navigates away.
-            addToast(`Pedido #${orderNumber} criado!`, 'success');
-            
-            const confirmedOrder: Order = {
-                id: pendingOrderId, orderNumber,
-                customer: { name: details.name, phone: details.phone, orderType: details.orderType, ...details },
-                items: cart, total, paymentMethod: details.paymentMethod, paymentStatus: 'pending', status: 'pending',
-                createdAt: new Date(), notes: details.notes, deliveryFee: details.deliveryFee,
-            };
-            
-            // Finalize the successful order client-side
-            setConfirmedOrderData(confirmedOrder);
-            setCart([]);
-            setIsCartOpen(false);
-            localStorage.removeItem('pendingOrderId'); // Clean up
-    
-            if (!currentUser) {
-                const guestOrders = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
-                guestOrders.push(pendingOrderId);
-                localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
-            }
-    
-        } catch (error: any) {
-            // This block will be reached if the function call times out (e.g., user switches apps).
-            // The recovery mechanism in the useEffect will handle verifying the order, so we don't show an error here.
-            console.error("createOrder call timed out or failed:", error);
-        } finally {
-            setIsProcessingOrder(false);
-        }
+        // 4. Attempt to create the order in the background.
+        firebaseService.createOrder(details, cart, total, pendingOrderId, reservedOrderNumber)
+            .then(({ orderNumber }) => {
+                console.log(`Background creation for order #${orderNumber} acknowledged.`);
+                // The recovery mechanism will handle the UI update. We can just log here.
+            })
+            .catch((error: any) => {
+                console.error(`Background createOrder for order #${reservedOrderNumber} failed:`, error);
+                // The recovery mechanism will time out and the user will still have their cart.
+            });
+        
+        // We can stop the main spinner now as the user interaction is complete.
+        setIsProcessingOrder(false);
     };
 
     const handleConfirmReservation = async (details: ReservationDetails) => {

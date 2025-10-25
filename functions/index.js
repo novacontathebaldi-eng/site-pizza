@@ -213,8 +213,7 @@ REGRAS ESPECIAIS DE PEDIDO:
 **REGRA GERAL PARA LINKS DO WHATSAPP (MUITO IMPORTANTE):**
 Sempre que você precisar gerar um link para o WhatsApp, para qualquer finalidade (pedido, reserva, atendimento), você DEVE usar o formato Markdown: '[Texto Clicável](URL_completa_e_codificada)'.
 **NUNCA** mostre a URL completa diretamente para o cliente. A resposta final deve conter apenas o texto clicável.
-- **Exemplo Correto:** [Clique aqui para confirmar seu pedido no WhatsApp!](https://wa.me/5527996500341?text=...)
-- **Exemplo ERRADO:** Clique aqui para confirmar seu pedido no WhatsApp! https://wa.me/5527996500341?text=...
+- **Exemplo Correto:** [Clique aqui para confirmar seu pedido no WhatsApp!](https://wa.me/5527996500341?text=)
 
 FLUXO DE PEDIDO PELO WHATSAPP:
 Se o cliente quiser fazer o pedido com você, siga estes passos:
@@ -379,20 +378,10 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
   }
 });
 
-
 /**
- * Creates an order in Firestore.
+ * Reserves a sequential order number atomically.
  */
-exports.createOrder = onCall({secrets}, async (request) => {
-  const {details, cart, total} = request.data;
-  const userId = request.auth?.uid || null;
-
-  // 1. Validate input
-  if (!details || !cart || !total) {
-    throw new Error("Dados do pedido incompletos.");
-  }
-
-  // 2. Generate a sequential order number atomically
+exports.reserveOrderNumber = onCall({secrets}, async (request) => {
   const counterRef = db.doc("_internal/counters");
   let orderNumber;
   try {
@@ -406,13 +395,27 @@ exports.createOrder = onCall({secrets}, async (request) => {
         transaction.update(counterRef, {orderNumber: orderNumber + 1});
       }
     });
+    return {orderNumber};
   } catch (error) {
-    logger.error("Falha ao gerar o número do pedido:", error);
-    throw new Error("Não foi possível gerar o número do pedido.");
+    logger.error("Falha ao reservar o número do pedido:", error);
+    throw new Error("Não foi possível reservar o número do pedido.");
+  }
+});
+
+
+/**
+ * Creates an order in Firestore.
+ */
+exports.createOrder = onCall({secrets}, async (request) => {
+  const {details, cart, total, orderId, orderNumber} = request.data;
+  const userId = request.auth?.uid || null;
+
+  // 1. Validate input
+  if (!details || !cart || !total || !orderId || !orderNumber) {
+    throw new Error("Dados do pedido incompletos.");
   }
 
-
-  // 3. Prepare order data for Firestore
+  // 2. Prepare order data for Firestore
   const orderStatus = "pending";
 
   const orderData = {
@@ -439,12 +442,12 @@ exports.createOrder = onCall({secrets}, async (request) => {
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 
-  // 4. Create the order document
-  const orderRef = await db.collection("orders").add(orderData);
-  const orderId = orderRef.id;
+  // 3. Create the order document
+  const orderRef = db.collection("orders").doc(orderId);
+  await orderRef.set(orderData);
   logger.info(`Pedido #${orderNumber} (ID: ${orderId}) criado no Firestore.`);
 
-  // 5. Return order info
+  // 4. Return order info
   return {orderId, orderNumber};
 });
 

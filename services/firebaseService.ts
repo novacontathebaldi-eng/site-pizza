@@ -329,39 +329,59 @@ export const askChatbot = async (messages: ChatMessage[]): Promise<string> => {
 
 /**
  * Associates guest orders stored in localStorage with a user ID upon login.
- * @param userId The UID of the user who has just logged in.
+ * This function calls a Cloud Function to perform the update securely.
  * @param orderIds An array of order document IDs to update.
  */
-export const syncGuestOrders = async (userId: string, orderIds: string[]): Promise<void> => {
-    if (!db) throw new Error("Firestore is not initialized.");
-    if (!userId || orderIds.length === 0) return;
+export const syncGuestOrders = async (orderIds: string[]): Promise<void> => {
+    if (!functions) {
+        throw new Error("Firebase Functions is not initialized.");
+    }
+    if (orderIds.length === 0) {
+        return;
+    }
 
-    const batch = db.batch();
-    orderIds.forEach(orderId => {
-        const orderRef = db.collection('orders').doc(orderId);
-        batch.update(orderRef, { userId: userId });
-    });
-
-    await batch.commit();
+    const syncFunction = functions.httpsCallable('syncGuestOrders');
+    try {
+        await syncFunction({ orderIds });
+    } catch (error) {
+        console.error("Error calling syncGuestOrders function:", error);
+        // Re-throw the error so the UI can catch it and display a message
+        throw new Error("Não foi possível associar os pedidos anteriores.");
+    }
 };
 
 
 // --- Order Management Functions (Calling Cloud Functions) ---
+
+export const reserveOrderNumber = async (): Promise<{ orderNumber: number }> => {
+    if (!functions) {
+        throw new Error("Firebase Functions is not initialized.");
+    }
+    const reserveOrderNumberFunction = functions.httpsCallable('reserveOrderNumber');
+    try {
+        const result = await reserveOrderNumberFunction();
+        return result.data as { orderNumber: number };
+    } catch (error) {
+        console.error("Error calling reserveOrderNumber function:", error);
+        throw new Error("Não foi possível obter o número do pedido. Tente novamente.");
+    }
+};
 
 /**
  * Creates an order document in Firestore.
  * @param details The customer and order details from the checkout form.
  * @param cart The items in the shopping cart.
  * @param total The total amount of the order.
+ * @param orderId The client-generated unique ID for the order.
  * @returns An object containing the new order's ID and its number.
  */
-export const createOrder = async (details: OrderDetails, cart: CartItem[], total: number): Promise<{ orderId: string, orderNumber: number }> => {
+export const createOrder = async (details: OrderDetails, cart: CartItem[], total: number, orderId: string, orderNumber: number): Promise<{ orderId: string, orderNumber: number }> => {
     if (!functions) {
         throw new Error("Firebase Functions is not initialized.");
     }
     const createOrderFunction = functions.httpsCallable('createOrder');
     try {
-        const result = await createOrderFunction({ details, cart, total });
+        const result = await createOrderFunction({ details, cart, total, orderId, orderNumber });
         return result.data;
     } catch (error) {
         console.error("Error calling createOrder function:", error);
