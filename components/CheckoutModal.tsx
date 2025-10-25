@@ -74,7 +74,7 @@ export const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({ 
                     </div>
 
                     <p className="text-gray-600 text-sm px-2">
-                        Já estamos preparando tudo! Se precisar, você pode nos contatar pelo WhatsApp.
+                        Por favor, não se esqueça de enviar seu pedido pelo WhatsApp! Se precisar, pode nos contatar a qualquer momento.
                     </p>
 
                     <button
@@ -387,9 +387,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                                                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-gray-800 text-white text-xs rounded-lg p-3 z-10 shadow-lg" style={{ animation: 'fadeInUp 0.2s ease-out' }}>
                                                     <p className="font-bold mb-1">Como Pagar com CNPJ:</p>
                                                     <ol className="list-decimal list-inside text-left space-y-1">
+                                                        <li>Primeiro envie seu pedido clicando em "Enviar Pedido" abaixo.</li>
                                                         <li>No app do seu banco, acesse a área PIX.</li>
-                                                        <li>Escolha "Pagar com Chave" e selecione CNPJ.</li>
-                                                        <li>Cole o número copiado e confirme.</li>
+                                                        <li>Escolha "Pagar com Chave" ou "Tranferir" e selecione CNPJ.</li>
+                                                        <li>Cole o número copiado: "62.247.199/0001-04".</li>
+                                                        <li>Insira o Valor: R$ ${total.toFixed(2).replace('.', ',')} e confirme.</li>
+                                                        <li>Envie o comprovamte para o nosso WhatsApp e então é só aguardar 🍕.</li>
                                                     </ol>
                                                     <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 bg-gray-800 rotate-45"></div>
                                                 </div>
@@ -400,6 +403,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                                         <button type="button" onClick={() => setIsQrCodeModalOpen(true)} className="text-sm font-semibold text-accent hover:underline">
                                             <i className="fas fa-qrcode mr-1"></i> Pagar usando QR CODE
                                         </button>
+                                        <span className="block mt-1">Insira o valor total: R$ {total.toFixed(2).replace('.', ',')}</span>
+                                        <span className="block mt-1">Não esqueça de enviar seu pedido clicando em "Enviar Pedido" abaixo.</span>
                                     </div>
                                 </div>
                             )}
