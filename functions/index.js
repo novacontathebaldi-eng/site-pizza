@@ -261,16 +261,27 @@ exports.askSanto = onCall({secrets}, async (request) => {
     const storeStatusText = isOnline ? "Aberta" : "Fechada";
     const operatingHoursText = formatOperatingHours(operatingHours);
 
+    // Get current time in Brasília for context
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      weekday: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    const formattedTime = formatter.format(now);
+    const realTimeInfo = `INFORMAÇÕES DE HORA ATUAL: Agora é ${formattedTime} (horário de Brasília). Use isso para saudações contextuais (bom dia, boa noite), mas LEMBRE-SE: a regra para criar pedidos depende SOMENTE do "Status da Loja", não da hora atual.`;
+
     const realTimeStatusInstruction = `INFORMAÇÕES DE STATUS EM TEMPO REAL (FONTE PRIMÁRIA DE VERDADE):
 - Status da Loja: **${storeStatusText}**
 - Horário de Funcionamento Configurado: **${operatingHoursText}**
-- INFORMAÇÃO DE CONTEXTO EM TEMPO REAL: A data e hora atual em Brasília são: ${brasiliaTime}, apenas para você saber se for questionado.
 
 Use ESTAS informações como a única fonte de verdade sobre o status e horário da loja. IGNORE quaisquer outros horários mencionados neste prompt.`;
 
     const dynamicMenuPrompt = generateMenuPrompt(menuData);
 
-    const systemInstruction = `${realTimeStatusInstruction}\n
+    const systemInstruction = `${realTimeInfo}\n\n${realTimeStatusInstruction}\n
         OBJETIVO PRINCIPAL: Você é Sensação, o assistente virtual da pizzaria 'Santa Sensação'. Seja amigável, prestativo e um pouco divertido. Sua principal regra é ser CONCISO. Dê respostas curtas e diretas. Só forneça detalhes ou passo a passo se o cliente pedir. Não se apresente, apenas continue a conversa. Use negrito com asteriscos duplos (**texto**).
 
 SUAS CAPACIDADES:

@@ -282,48 +282,57 @@ const App: React.FC = () => {
         }
     }, []);
     
-    // Logic to determine if any modal is visible
-    const isModalVisible = useMemo(() => {
-        return isCartOpen || 
-               isCheckoutModalOpen || 
-               isReservationModalOpen || 
-               isChatbotOpen || 
-               isLoginModalOpen || 
-               isUserAreaModalOpen || 
-               !!confirmedOrderData || 
-               !!confirmedReservationData ||
-               isPrivacyPolicyOpen ||
-               isTermsModalOpen ||
-               isHalfAndHalfModalOpen ||
-               isPixQrCodeModalOpen;
-    }, [
-        isCartOpen, 
-        isCheckoutModalOpen, 
-        isReservationModalOpen, 
-        isChatbotOpen, 
-        isLoginModalOpen, 
-        isUserAreaModalOpen, 
-        confirmedOrderData, 
-        confirmedReservationData,
-        isPrivacyPolicyOpen,
-        isTermsModalOpen,
-        isHalfAndHalfModalOpen,
-        isPixQrCodeModalOpen
-    ]);
-
-    // Effect to lock body scroll when a modal is open
+    // Effect to lock body scroll when a modal is open, with special handling for the chatbot on desktop.
     useEffect(() => {
-        if (isModalVisible) {
-            document.body.classList.add('modal-open');
-        } else {
-            document.body.classList.remove('modal-open');
-        }
-
-        // Cleanup function to ensure scroll is restored if component unmounts
+        // Determine if any modal *other than* the chatbot is open
+        const isOtherModalOpen = isCartOpen ||
+                               isCheckoutModalOpen ||
+                               isReservationModalOpen ||
+                               isLoginModalOpen ||
+                               isUserAreaModalOpen ||
+                               !!confirmedOrderData ||
+                               !!confirmedReservationData ||
+                               isPrivacyPolicyOpen ||
+                               isTermsModalOpen ||
+                               isHalfAndHalfModalOpen ||
+                               isPixQrCodeModalOpen;
+    
+        const handleScrollLock = () => {
+            let shouldLock = false;
+            if (isOtherModalOpen) {
+                // If any other modal is open, always lock scroll.
+                shouldLock = true;
+            } else if (isChatbotOpen) {
+                // If only the chatbot is open, lock scroll only on mobile.
+                const isMobile = window.innerWidth < 768; // Tailwind's `md` breakpoint
+                if (isMobile) {
+                    shouldLock = true;
+                }
+            }
+    
+            if (shouldLock) {
+                document.body.classList.add('modal-open');
+            } else {
+                document.body.classList.remove('modal-open');
+            }
+        };
+        
+        handleScrollLock(); // Run on initial render and when dependencies change
+    
+        // Add a resize listener to re-evaluate when window size changes
+        window.addEventListener('resize', handleScrollLock);
+    
+        // Cleanup function to remove class and listener
         return () => {
             document.body.classList.remove('modal-open');
+            window.removeEventListener('resize', handleScrollLock);
         };
-    }, [isModalVisible]);
+    }, [
+        isCartOpen, isCheckoutModalOpen, isReservationModalOpen, isChatbotOpen, 
+        isLoginModalOpen, isUserAreaModalOpen, confirmedOrderData, confirmedReservationData, 
+        isPrivacyPolicyOpen, isTermsModalOpen, isHalfAndHalfModalOpen, isPixQrCodeModalOpen
+    ]);
+    
 
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();

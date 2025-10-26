@@ -218,7 +218,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                                                     className="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition-all flex items-center justify-center text-center"
                                                 >
                                                     <i className="fab fa-whatsapp mr-2"></i>
-                                                    <span>Confirmar e<br/>Enviar Pedido</span>
+                                                    <span>Confirmar e Enviar Pedido</span>
                                                 </button>
                                             </>
                                         )}
@@ -231,7 +231,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                                                 className="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition-all flex items-center justify-center text-center"
                                             >
                                                 <i className="fab fa-whatsapp mr-2"></i>
-                                                <span>Confirmar e<br/>Enviar Reserva</span>
+                                                <span>Confirmar e Enviar Reserva</span>
                                             </button>
                                         )}
                                     </div>
