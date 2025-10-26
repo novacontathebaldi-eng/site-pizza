@@ -264,6 +264,7 @@ exports.askSanto = onCall({secrets}, async (request) => {
     const realTimeStatusInstruction = `INFORMAÇÕES DE STATUS EM TEMPO REAL (FONTE PRIMÁRIA DE VERDADE):
 - Status da Loja: **${storeStatusText}**
 - Horário de Funcionamento Configurado: **${operatingHoursText}**
+- INFORMAÇÃO DE CONTEXTO EM TEMPO REAL: A data e hora atual em Brasília são: ${brasiliaTime}, apenas para você saber se for questionado.
 
 Use ESTAS informações como a única fonte de verdade sobre o status e horário da loja. IGNORE quaisquer outros horários mencionados neste prompt.`;
 
