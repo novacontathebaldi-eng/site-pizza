@@ -25,6 +25,7 @@ import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { CookieConsentBanner } from './components/CookieConsentBanner';
 import { TermsOfServiceModal } from './components/TermsOfServiceModal';
 import { HalfAndHalfModal } from './components/HalfAndHalfModal';
+import { PixQrCodeModal } from './components/PixQrCodeModal';
 
 // Type declarations for Google GAPI library to avoid TypeScript errors
 declare global {
@@ -249,6 +250,7 @@ const App: React.FC = () => {
     const [isProcessingOrder, setIsProcessingOrder] = useState<boolean>(false);
     const [confirmedOrderData, setConfirmedOrderData] = useState<Order | null>(null);
     const [confirmedReservationData, setConfirmedReservationData] = useState<Order | null>(null);
+    const [isPixQrCodeModalOpen, setIsPixQrCodeModalOpen] = useState(false);
     
     // Half-and-Half Pizza State
     const [isHalfAndHalfModalOpen, setIsHalfAndHalfModalOpen] = useState(false);
@@ -292,7 +294,8 @@ const App: React.FC = () => {
                !!confirmedReservationData ||
                isPrivacyPolicyOpen ||
                isTermsModalOpen ||
-               isHalfAndHalfModalOpen;
+               isHalfAndHalfModalOpen ||
+               isPixQrCodeModalOpen;
     }, [
         isCartOpen, 
         isCheckoutModalOpen, 
@@ -304,7 +307,8 @@ const App: React.FC = () => {
         confirmedReservationData,
         isPrivacyPolicyOpen,
         isTermsModalOpen,
-        isHalfAndHalfModalOpen
+        isHalfAndHalfModalOpen,
+        isPixQrCodeModalOpen
     ]);
 
     // Effect to lock body scroll when a modal is open
@@ -821,7 +825,9 @@ const App: React.FC = () => {
         setChatMessages(updatedMessages);
         setIsBotReplying(true);
         try {
-            const botReply = await firebaseService.askChatbot(updatedMessages);
+            const activeProducts = products.filter(p => p.active && !p.deleted);
+            const activeCategories = categories.filter(c => c.active);
+            const botReply = await firebaseService.askChatbot(updatedMessages, activeProducts, activeCategories);
             const newBotMessage: ChatMessage = { role: 'bot', content: botReply };
             setChatMessages(prev => [...prev, newBotMessage]);
         } catch (error) {
@@ -1344,6 +1350,7 @@ const App: React.FC = () => {
                 onSendMessage={handleSendMessageToBot} 
                 isSending={isBotReplying}
                 onCreateOrder={handleCreateOrderFromChat}
+                onShowPixQRCode={() => setIsPixQrCodeModalOpen(true)}
             />
             
             <LoginModal 
@@ -1379,6 +1386,7 @@ const App: React.FC = () => {
                 firstHalf={firstHalfForModal}
                 onAddToCart={handleAddHalfAndHalfToCart}
             />
+            <PixQrCodeModal isOpen={isPixQrCodeModalOpen} onClose={() => setIsPixQrCodeModalOpen(false)} />
 
             {(isProcessingOrder) && <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-6 font-semibold text-lg text-gray-700">Processando seu pedido...</p><p className="mt-2 text-sm text-gray-500">Por favor, aguarde um instante.</p></div></div>}
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]"><div className="w-full flex flex-col items-center space-y-4 sm:items-end">{toasts.map((toast) => (<div key={toast.id} className="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden animate-fade-in-up"><div className="p-4"><div className="flex items-start"><div className="flex-shrink-0">{toast.type === 'success' ? <i className="fas fa-check-circle h-6 w-6 text-green-500"></i> : <i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>}</div><div className="ml-3 w-0 flex-1 pt-0.5"><p className="text-sm font-medium text-gray-900">{toast.message}</p></div></div></div></div>))}</div></div>

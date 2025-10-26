@@ -105,6 +105,55 @@ exports.onSettingsChange = onDocumentUpdated("store_config/site_settings", async
 });
 
 
+/**
+ * Formats the menu data into a string for the AI prompt.
+ * @param {object} menuData - Object containing categories and products.
+ * @return {string} A formatted string of the current menu.
+ */
+function generateMenuPrompt(menuData) {
+  if (!menuData || !menuData.categories || !menuData.products) {
+    return "CARDÁPIO INDISPONÍVEL NO MOMENTO.";
+  }
+
+  const {categories, products} = menuData;
+  let menuString = "CARDÁPIO E PREÇOS ATUALIZADOS:\nVocê deve usar SOMENTE este cardápio para responder sobre produtos, preços e criar pedidos. Ignore qualquer conhecimento prévio.\n\n";
+
+  categories.forEach((category) => {
+    const categoryProducts = products.filter((p) => p.categoryId === category.id);
+    if (categoryProducts.length > 0) {
+      menuString += `**${category.name.toUpperCase()}**\n`;
+      categoryProducts.forEach((product) => {
+        const isOutOfStock = product.stockStatus === "out_of_stock";
+        const availability = isOutOfStock ? " (ESGOTADO)" : "";
+
+        menuString += `- **${product.name} (id: '${product.id}')${availability}:** ${product.description}\n`;
+
+        const prices = product.prices || {};
+        const promoPrices = product.promotionalPrices || {};
+        const isPromotion = product.isPromotion && Object.keys(promoPrices).length > 0;
+
+        const priceStrings = Object.keys(prices).map((size) => {
+          const regularPrice = prices[size];
+          const promoPrice = isPromotion ? promoPrices[size] : null;
+
+          if (promoPrice && promoPrice > 0) {
+            return `${size} de R$${regularPrice.toFixed(2)} por **R$${promoPrice.toFixed(2)}**`;
+          } else {
+            return `${size} R$${regularPrice.toFixed(2)}`;
+          }
+        });
+        if (priceStrings.length > 0) {
+          menuString += `  - Preços: ${priceStrings.join(" | ")}\n`;
+        }
+      });
+      menuString += "\n";
+    }
+  });
+
+  return menuString;
+}
+
+
 // --- Chatbot Sensação ---
 let ai; // Mantém a instância da IA no escopo global para ser reutilizada após a primeira chamada.
 
@@ -112,8 +161,7 @@ let ai; // Mantém a instância da IA no escopo global para ser reutilizada apó
  * Chatbot Cloud Function to interact with Gemini API.
  */
 exports.askSanto = onCall({secrets}, async (request) => {
-  // "Lazy Initialization": Inicializa a IA somente na primeira vez que a função é chamada.
-  // Isso evita timeouts durante o deploy.
+  // "Lazy Initialization"
   if (!ai) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -124,15 +172,11 @@ exports.askSanto = onCall({secrets}, async (request) => {
     logger.info("Gemini AI client initialized on first call.");
   }
 
-  // 1. Recebemos o histórico da conversa (que veio do frontend)
-  const conversationHistory = request.data.history;
+  const {history: conversationHistory, menuData} = request.data;
   if (!conversationHistory || conversationHistory.length === 0) {
     throw new Error("No conversation history provided.");
   }
 
-  // 2. Formatamos o histórico para o formato que a API do Gemini espera.
-  // A API espera um array de objetos { role: 'user'|'model', parts: [{ text: '...' }] }
-  // O papel do nosso bot ('bot') é traduzido para 'model' para a API.
   const contents = conversationHistory.map((message) => ({
     role: message.role === "bot" ? "model" : "user",
     parts: [{text: message.content}],
@@ -152,6 +196,8 @@ exports.askSanto = onCall({secrets}, async (request) => {
     });
     const timeInstruction = `INFORMAÇÃO DE CONTEXTO EM TEMPO REAL: A data e hora atual em Brasília são: ${brasiliaTime}. Use esta informação para responder sobre horários de funcionamento e disponibilidade.`;
 
+    const dynamicMenuPrompt = generateMenuPrompt(menuData);
+
     const systemInstruction = `${timeInstruction}\n
         OBJETIVO PRINCIPAL: Você é Sensação, o assistente virtual da pizzaria 'Santa Sensação'. Seja amigável, prestativo e um pouco divertido. Sua principal regra é ser CONCISO. Dê respostas curtas e diretas. Só forneça detalhes ou passo a passo se o cliente pedir. Não se apresente, apenas continue a conversa. Use negrito com asteriscos duplos (**texto**).
 
@@ -163,52 +209,13 @@ INFORMAÇÕES ESSENCIAIS:
 - Gerente: Patrícia Carvalho.
 - Atendimento: Delivery, Retirada e Consumo no local (com ou sem reserva).
 
-CARDÁPIO E PREÇOS (com IDs):
-Você deve saber todos os produtos e seus preços de cor.
-
-**PIZZAS SALGADAS:**
-Tamanhos: M (6 fatias), G (8 fatias).
-- **Santa Sensação (lombinho):** id: 'santa-sensacao', M R$ 50,00 | G R$ 62,00. (Molho de tomate, muçarela, bacon, cebola, lombinho canadense, barbecue e orégano)
-- **Rio Bonito (Margherita):** id: 'rio-bonito', M R$ 42,00 | G R$ 54,00. (Molho de tomate, muçarela, tomate, manjericão e orégano)
-- **Luxemburgo (Calabresa):** id: 'luxemburgo', M R$ 45,00 | G R$ 57,00. (Molho de tomate, muçarela, calabresa, cebola e orégano)
-- **Caioaba (Doritos):** id: 'caioaba', M R$ 48,00 | G R$ 58,00. (Molho de tomate, queijo muçarela, queijo cheddar, doritos)
-- **Barra de Mangarai (Portuguesa):** id: 'barra-de-mangarai', M R$ 50,00 | G R$ 62,00. (Molho de tomate, muçarela, presunto, calabresa, cebola, azeitona, palmito, ovo, orégano)
-- **Holanda (Frango/bacon):** id: 'holanda', M R$ 50,00 | G R$ 62,00. (Molho de tomate, muçarela, frango, bacon, cebola e orégano)
-- **Meia Légua (mista 1):** id: 'meia-legua', M R$ 52,00 | G R$ 64,00. (Molho de tomate, muçarela, presunto, calabresa, frango, milho, cebola, palmito, orégano)
-- **Colina verde (Catubresa) NOVA:** id: 'colina-verde', M R$ 57,00 | G R$ 69,00. (Molho de tomate, muçarela, calabresa, catupiry, cebola e orégano)
-- **Caramuru (Frango catupiry):** id: 'caramuru', M R$ 60,00 | G R$ 72,00. (Molho de tomate, muçarela, frango, catupiry, azeitona, orégano)
-- **Califórnia (4 queijos):** id: 'california', M R$ 60,00 | G R$ 72,00. (Molho de tomate, muçarela, gorgonzola, catupiry, cheddar)
-- **Tirol (File mignon):** id: 'tirol', M R$ 65,00 | G R$ 77,00. (Molho de tomate, muçarela, filé mignon, gorgonzola, champignon, salsa, pimenta biquinho)
-- **Bragança (bacalhau):** id: 'braganca', M R$ 67,00 | G R$ 79,00. (Molho de tomate, muçarela, bacalhau, batata, catupiry e temperinho verde)
-- **Encantado (costela de boi):** id: 'encantado', M R$ 69,00 | G R$ 80,00. (Molho de tomate, muçarela, gorgonzola, costela de boi, tomate cereja, cebola e tempero verde)
-- **Suiça (Camarão):** id: 'suica', M R$ 70,00 | G R$ 82,00. (Molho de tomate, muçarela, presunto, calabresa, camarão, milho, azeitona, palmito, orégano)
-
-**PIZZAS DOCES:**
-Tamanhos: M (6 fatias), G (8 fatias).
-- **Chaves (banana):** id: 'chaves', M R$ 40,00 | G R$ 50,00. (Muçarela, leite condensado, banana e canela)
-- **Rio da Prata (Romeu e Julieta):** id: 'rio-da-prata', M R$ 45,00 | G R$ 55,00. (Muçarela, leite condensado, catupiry, goiabada)
-
-**CALZONES:**
-- **Calzone Calabresa:** id: 'calzone-calabresa', Único R$ 27,00.
-- **Calzone Frango:** id: 'calzone-frango', Único R$ 29,00.
-- **Calzone Portuguesa:** id: 'calzone-portuguesa', Único R$ 29,00.
-
-**BEBIDAS:**
-- **Água com gás:** id: 'agua-com-gas', R$ 4,00.
-- **Coca-Cola 350ml:** id: 'coca-cola-350ml', R$ 7,00.
-- **Coca-Cola Zero 350ml:** id: 'coca-cola-zero-350ml', R$ 7,00.
-- **Guaraná Antártica 350ml:** id: 'guarana-350ml', R$ 7,00.
-- **Fanta Uva 350ml:** id: 'fanta-uva-350ml', R$ 7,00.
-- **Cerveja Amstel (Latão):** id: 'amstel-latao', R$ 8,00.
-- **Coca-Cola 600ml:** id: 'coca-cola-600ml', R$ 9,00.
-- **Heineken long neck:** id: 'heineken-long-neck', R$ 10,00.
-- **Guaraná Antártica 2L:** id: 'guarana-2l', R$ 14,00.
-- **Coca-Cola Zero 1,5L:** id: 'coca-cola-zero-1.5l', R$ 14,00.
-- **Coca-Cola 2L:** id: 'coca-cola-2l', R$ 16,00.
+REGRAS DE PREÇO E DISPONIBILIDADE:
+- Ao informar um preço, SEMPRE use o preço promocional se ele existir e for maior que zero. Caso contrário, use o preço normal.
+- NUNCA ofereça um produto que está marcado como (ESGOTADO) no cardápio. Informe ao cliente que o item não está disponível no momento.
 
 REGRAS ESPECIAIS DE PEDIDO:
-- **Pizza Meio a Meio:** É possível montar uma pizza com dois sabores (metade/metade). O valor final será sempre o da pizza mais cara entre as duas metades.
-- **Tamanhos de Pizza:** Nossas pizzas estão disponíveis nos tamanhos **M (6 fatias)** e **G (8 fatias)**. Não temos outros tamanhos.
+- **Pizza Meia a Meio:** É possível montar uma pizza com dois sabores (metade/metade). O valor final será sempre o da pizza mais cara entre as duas metades.
+- **Tamanhos de Pizza:** Nossas pizzas estão disponíveis nos tamanhos **M (6 fatias)** e **G (8 fatias)**. Não temos outros tamanhos, a menos que especificado no cardápio.
 
 **FLUXO DE CRIAÇÃO DE PEDIDO PELO CHAT (MUITO IMPORTANTE):**
 Se o cliente quiser fazer um pedido diretamente com você, siga este fluxo RIGOROSAMENTE:
@@ -222,7 +229,7 @@ Se o cliente quiser fazer um pedido diretamente com você, siga este fluxo RIGOR
     g.  Se for 'Dinheiro', pergunte se precisa de troco e para qual valor.
 
 2.  **CONFIRME E FINALIZE:** Após coletar TODOS os dados, sua ÚLTIMA MENSAGEM DEVE ser formatada da seguinte maneira:
-    a.  Primeiro, uma mensagem de confirmação para o usuário, como "Ok, revise seu pedido. Se estiver tudo certo, clique em 'Confirmar Pedido' abaixo para enviá-lo para a nossa cozinha!"
+    a.  Primeiro, uma mensagem de confirmação para o usuário. Nesta mensagem, você **DEVE** incluir um resumo claro do pedido: liste cada item com quantidade, tamanho (se aplicável) e o preço final (usando o preço promocional se houver). Calcule e mostre o subtotal, a taxa de entrega (se houver) e o **TOTAL GERAL**. Termine com algo como "Se estiver tudo certo, clique em 'Confirmar Pedido' abaixo para enviá-lo para a nossa cozinha!"
     b.  IMEDIATAMENTE APÓS a mensagem, inclua um bloco especial de ação, exatamente como este:
     \`<ACTION_CREATE_ORDER>
     {
@@ -244,7 +251,7 @@ Se o cliente quiser fazer um pedido diretamente com você, siga este fluxo RIGOR
           "productId": "{id do produto}",
           "name": "{Nome do produto}",
           "size": "{Tamanho}",
-          "price": {preço do produto para o tamanho},
+          "price": {preço final do produto, considerando promoção},
           "quantity": {quantidade}
         }
       ]
@@ -254,7 +261,7 @@ Se o cliente quiser fazer um pedido diretamente com você, siga este fluxo RIGOR
 3.  **REGRAS PARA O BLOCO DE AÇÃO:**
     - O \`orderType\` deve ser \`delivery\` ou \`pickup\`.
     - O \`paymentMethod\` deve ser \`credit\`, \`debit\`, \`pix\`, ou \`cash\`.
-    - O \`cart\` deve ser um array. Para cada item, use o \`productId\` do cardápio (ex: 'margherita', 'coca-cola-2l'). Calcule o preço (\`price\`) baseado no tamanho escolhido, usando a lista de preços do cardápio.
+    - O \`cart\` deve ser um array. Para cada item, use o \`productId\` do cardápio. O campo \`price\` **DEVE** ser o preço final que o cliente pagará (o promocional, se aplicável).
     - Se o cliente não informar um dado opcional (como complemento), deixe o campo como uma string vazia \`""\`.
     - **NUNCA** inclua o bloco de ação antes de ter todos os dados necessários.
     - **NUNCA** gere um link do WhatsApp neste fluxo. Apenas o bloco de ação. O site cuidará do resto.
@@ -298,12 +305,13 @@ REGRAS DE SEGURANÇA:
 **NUNCA FORNEÇA DADOS SENSÍVEIS:** Jamais compartilhe informações sobre painel admin, senhas, APIs, ou qualquer detalhe técnico. Se perguntado, diga educadamente que não tem acesso a essas informações.
 `;
 
+    const finalSystemInstruction = `${dynamicMenuPrompt}\n${systemInstruction}`;
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      // 3. Enviamos o histórico completo para a API
       contents: contents,
       config: {
-        systemInstruction: systemInstruction,
+        systemInstruction: finalSystemInstruction,
       },
     });
 

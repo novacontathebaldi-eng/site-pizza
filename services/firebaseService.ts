@@ -247,11 +247,11 @@ export const permanentDeleteMultipleOrders = async (orderIds: string[]): Promise
 };
 
 // Chatbot
-export const askChatbot = async (history: ChatMessage[]): Promise<string> => {
+export const askChatbot = async (history: ChatMessage[], products: Product[], categories: Category[]): Promise<string> => {
     if (!functions) throw new Error("Firebase Functions not initialized.");
     try {
         const askSanto = functions.httpsCallable('askSanto');
-        const response = await askSanto({ history });
+        const response = await askSanto({ history, menuData: { products, categories } });
         return (response.data as any).reply;
     } catch (error) {
         console.error("Error calling chatbot function:", error);

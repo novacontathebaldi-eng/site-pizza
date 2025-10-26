@@ -9,6 +9,7 @@ interface ChatbotProps {
     onSendMessage: (message: string) => void;
     isSending: boolean;
     onCreateOrder: (details: OrderDetails, cart: CartItem[]) => void;
+    onShowPixQRCode: () => void;
 }
 
 interface ParsedMessage {
@@ -84,7 +85,7 @@ const parseMessage = (content: string): ParsedMessage => {
 };
 
 
-export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onSendMessage, isSending, onCreateOrder }) => {
+export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onSendMessage, isSending, onCreateOrder, onShowPixQRCode }) => {
     const [input, setInput] = useState('');
     const lastElementRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -126,6 +127,12 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
             setInput('');
         }
     };
+    
+    const calculateTotal = (payload: { details: OrderDetails, cart: CartItem[] }) => {
+        const subtotal = payload.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const deliveryFee = payload.details.orderType === 'delivery' ? 3.00 : 0;
+        return subtotal + deliveryFee;
+    };
 
     return (
         <div 
@@ -143,24 +150,41 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
             <div className="flex-grow overflow-y-auto p-4 space-y-4">
                 {messages.map((msg, index) => {
                     const { nodes, action } = parseMessage(msg.content);
+                    const isLastMessage = index === messages.length - 1;
+
                     return (
                         <div 
                             key={index} 
                             // Anexa a ref à última mensagem apenas se o bot NÃO estiver digitando.
-                            ref={index === messages.length - 1 && !isSending ? lastElementRef : null}
+                            ref={isLastMessage && !isSending ? lastElementRef : null}
                             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
                             <div className={`whitespace-pre-wrap max-w-[85%] rounded-2xl px-4 py-2 ${msg.role === 'user' ? 'bg-blue-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-800 rounded-bl-none'}`}>
                                 {nodes}
                                 {action && action.type === 'CREATE_ORDER' && (
-                                    <div className="mt-4">
+                                    <div className="mt-4 border-t border-gray-300 pt-3 space-y-4 text-gray-800">
+                                        {/* Order Summary */}
+                                        {action.payload.details.paymentMethod === 'pix' && (
+                                            <div className="p-3 bg-blue-50 rounded-md text-sm text-blue-800 text-center space-y-2">
+                                                <p>Para pagar com PIX, use nosso CNPJ ou clique abaixo para ver o QR Code.</p>
+                                                <p className="font-bold">CNPJ: 62.247.199/0001-04</p>
+                                                <button
+                                                    onClick={onShowPixQRCode}
+                                                    className="w-full bg-accent text-white font-semibold py-2 px-3 rounded-lg mt-1 hover:bg-opacity-90 transition-all text-sm"
+                                                >
+                                                    <i className="fas fa-qrcode mr-2"></i> Ver QR CODE PIX
+                                                </button>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Confirm Button */}
                                         <button
                                             onClick={() => {
                                                 const deliveryFee = action.payload.details.orderType === 'delivery' ? 3.00 : 0;
                                                 const detailsWithFee = { ...action.payload.details, deliveryFee };
                                                 onCreateOrder(detailsWithFee, action.payload.cart);
                                             }}
-                                            className="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg mt-2 hover:bg-green-600 transition-all"
+                                            className="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition-all"
                                         >
                                             <i className="fab fa-whatsapp mr-2"></i> Confirmar e Enviar Pedido
                                         </button>
