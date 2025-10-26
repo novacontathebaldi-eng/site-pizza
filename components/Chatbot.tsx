@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 // FIX: Corrected the import path for the `ChatMessage` type. It is defined in `../types` not `../App`.
-import { ChatMessage } from '../types';
+import { ChatMessage, OrderDetails, CartItem } from '../types';
 
 interface ChatbotProps {
     isOpen: boolean;
@@ -8,19 +8,55 @@ interface ChatbotProps {
     messages: ChatMessage[];
     onSendMessage: (message: string) => void;
     isSending: boolean;
+    onCreateOrder: (details: OrderDetails, cart: CartItem[]) => void;
 }
 
-const parseMessage = (content: string) => {
+interface ParsedMessage {
+    nodes: React.ReactNode[];
+    action?: {
+        type: 'CREATE_ORDER';
+        payload: {
+            details: OrderDetails;
+            cart: CartItem[];
+        };
+    };
+}
+
+const parseMessage = (content: string): ParsedMessage => {
+    // Regex para o bloco de ação
+    const actionRegex = /<ACTION_CREATE_ORDER>([\s\S]*?)<\/ACTION_CREATE_ORDER>/;
+    const actionMatch = content.match(actionRegex);
+    let action: ParsedMessage['action'] = undefined;
+    
+    // Remove o bloco de ação do conteúdo principal
+    const cleanContent = content.replace(actionRegex, '').trim();
+
+    if (actionMatch && actionMatch[1]) {
+        try {
+            const payload = JSON.parse(actionMatch[1]);
+            // Validação básica do payload
+            if (payload.details && payload.cart) {
+                action = {
+                    type: 'CREATE_ORDER',
+                    payload: payload
+                };
+            }
+        } catch (e) {
+            console.error("Falha ao analisar o JSON da ação do chatbot:", e);
+        }
+    }
+
+
     // Regex para encontrar links markdown [texto](url) ou texto em negrito **texto**
     const combinedRegex = /\[([^\]]+)\]\(([^)]+)\)|\*\*(.+?)\*\*/g;
     const parts = [];
     let lastIndex = 0;
     let match;
 
-    while ((match = combinedRegex.exec(content)) !== null) {
+    while ((match = combinedRegex.exec(cleanContent)) !== null) {
         // Adiciona o texto simples antes da correspondência atual
         if (match.index > lastIndex) {
-            parts.push(content.substring(lastIndex, match.index));
+            parts.push(cleanContent.substring(lastIndex, match.index));
         }
 
         const [fullMatch, linkText, linkUrl, boldText] = match;
@@ -38,15 +74,17 @@ const parseMessage = (content: string) => {
     }
 
     // Adiciona o texto restante após a última correspondência
-    if (lastIndex < content.length) {
-        parts.push(content.substring(lastIndex));
+    if (lastIndex < cleanContent.length) {
+        parts.push(cleanContent.substring(lastIndex));
     }
 
-    return parts.map((part, index) => <React.Fragment key={index}>{part}</React.Fragment>);
+    const nodes = parts.map((part, index) => <React.Fragment key={index}>{part}</React.Fragment>);
+
+    return { nodes, action };
 };
 
 
-export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onSendMessage, isSending }) => {
+export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onSendMessage, isSending, onCreateOrder }) => {
     const [input, setInput] = useState('');
     const lastElementRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -103,18 +141,35 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
             </header>
 
             <div className="flex-grow overflow-y-auto p-4 space-y-4">
-                {messages.map((msg, index) => (
-                    <div 
-                        key={index} 
-                        // Anexa a ref à última mensagem apenas se o bot NÃO estiver digitando.
-                        ref={index === messages.length - 1 && !isSending ? lastElementRef : null}
-                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                        <div className={`whitespace-pre-wrap max-w-[85%] rounded-2xl px-4 py-2 ${msg.role === 'user' ? 'bg-blue-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-800 rounded-bl-none'}`}>
-                            {parseMessage(msg.content)}
+                {messages.map((msg, index) => {
+                    const { nodes, action } = parseMessage(msg.content);
+                    return (
+                        <div 
+                            key={index} 
+                            // Anexa a ref à última mensagem apenas se o bot NÃO estiver digitando.
+                            ref={index === messages.length - 1 && !isSending ? lastElementRef : null}
+                            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        >
+                            <div className={`whitespace-pre-wrap max-w-[85%] rounded-2xl px-4 py-2 ${msg.role === 'user' ? 'bg-blue-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-800 rounded-bl-none'}`}>
+                                {nodes}
+                                {action && action.type === 'CREATE_ORDER' && (
+                                    <div className="mt-4">
+                                        <button
+                                            onClick={() => {
+                                                const deliveryFee = action.payload.details.orderType === 'delivery' ? 3.00 : 0;
+                                                const detailsWithFee = { ...action.payload.details, deliveryFee };
+                                                onCreateOrder(detailsWithFee, action.payload.cart);
+                                            }}
+                                            className="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg mt-2 hover:bg-green-600 transition-all"
+                                        >
+                                            <i className="fab fa-whatsapp mr-2"></i> Confirmar e Enviar Pedido
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
                  {isSending && (
                     <div ref={lastElementRef} className="flex justify-start"> {/* Anexa a ref ao indicador de carregamento */}
                         <div className="bg-gray-200 text-gray-800 rounded-2xl rounded-bl-none px-4 py-2">

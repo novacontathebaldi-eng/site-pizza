@@ -770,6 +770,49 @@ const App: React.FC = () => {
     }, [categories, products]);
 
 
+    // Centralized Order Creation Logic
+    const initiateOrderCreation = async (details: OrderDetails, cartItems: CartItem[], total: number) => {
+        if (!db) return;
+        setIsProcessingOrder(true);
+        
+        const pendingOrderId = db.collection('orders').doc().id;
+        localStorage.setItem('pendingOrderId', pendingOrderId);
+        
+        const whatsappUrl = generateWhatsAppMessage(details, cartItems, total, null, false);
+        window.open(whatsappUrl, '_blank');
+        
+        try {
+            const { orderNumber } = await firebaseService.createOrder(details, cartItems, total, pendingOrderId);
+            addToast(`Pedido #${orderNumber} criado!`, 'success');
+            
+            const confirmedOrder: Order = {
+                id: pendingOrderId, orderNumber,
+                customer: { name: details.name, phone: details.phone, orderType: details.orderType, ...details },
+                items: cartItems, total, paymentMethod: details.paymentMethod, paymentStatus: 'pending', status: 'pending',
+                createdAt: new Date(), notes: details.notes, deliveryFee: details.deliveryFee,
+            };
+            
+            setConfirmedOrderData(confirmedOrder);
+            localStorage.removeItem('pendingOrderId');
+
+            if (!currentUser) {
+                const guestOrders = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
+                if (!guestOrders.includes(pendingOrderId)) {
+                    guestOrders.push(pendingOrderId);
+                    localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
+                }
+            }
+            return true; // Indicate success
+        } catch (error: any) {
+            console.error("createOrder call failed:", error);
+            // Recovery mechanism will handle this, so no immediate error toast.
+            return false; // Indicate failure or timeout
+        } finally {
+            setIsProcessingOrder(false);
+        }
+    };
+
+
     // Other existing handlers...
     const handleSendMessageToBot = async (message: string) => {
         if (!message.trim() || isBotReplying) return;
@@ -811,55 +854,31 @@ const App: React.FC = () => {
     }, []);
     
     const handleCheckout = async (details: OrderDetails) => {
-        if (!db) return;
-        setIsProcessingOrder(true);
         setIsCheckoutModalOpen(false);
-    
         const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         const total = subtotal + (details.deliveryFee || 0);
-    
-        // 1. Generate a unique ID on the client and save it to localStorage
-        const pendingOrderId = db.collection('orders').doc().id;
-        localStorage.setItem('pendingOrderId', pendingOrderId);
-    
-        // 2. Open WhatsApp immediately to avoid pop-up blockers
-        const whatsappUrl = generateWhatsAppMessage(details, cart, total, null, false);
-        window.open(whatsappUrl, '_blank');
-    
-        // 3. Attempt to create the order in the background.
-        try {
-            const { orderNumber } = await firebaseService.createOrder(details, cart, total, pendingOrderId);
-            
-            // This is the "fast path" if the call succeeds before the user navigates away.
-            addToast(`Pedido #${orderNumber} criado!`, 'success');
-            
-            const confirmedOrder: Order = {
-                id: pendingOrderId, orderNumber,
-                customer: { name: details.name, phone: details.phone, orderType: details.orderType, ...details },
-                items: cart, total, paymentMethod: details.paymentMethod, paymentStatus: 'pending', status: 'pending',
-                createdAt: new Date(), notes: details.notes, deliveryFee: details.deliveryFee,
-            };
-            
-            // Finalize the successful order client-side
-            setConfirmedOrderData(confirmedOrder);
+        
+        const success = await initiateOrderCreation(details, cart, total);
+        if (success) {
             setCart([]);
             setIsCartOpen(false);
-            localStorage.removeItem('pendingOrderId'); // Clean up
-    
-            if (!currentUser) {
-                const guestOrders = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
-                guestOrders.push(pendingOrderId);
-                localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
-            }
-    
-        } catch (error: any) {
-            // This block will be reached if the function call times out (e.g., user switches apps).
-            // The recovery mechanism in the useEffect will handle verifying the order, so we don't show an error here.
-            console.error("createOrder call timed out or failed:", error);
-        } finally {
-            setIsProcessingOrder(false);
         }
     };
+
+    const handleCreateOrderFromChat = async (details: OrderDetails, cartItems: CartItem[]) => {
+        const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const total = subtotal + (details.deliveryFee || 0);
+        
+        await initiateOrderCreation(details, cartItems, total);
+
+        // Send a final confirmation message to the chat
+        const finalBotMessage: ChatMessage = {
+            role: 'bot',
+            content: `Seu pedido foi criado! Para finalizar, envie a mensagem que abriu no seu WhatsApp.`
+        };
+        setChatMessages(prev => [...prev, finalBotMessage]);
+    };
+
 
     const handleConfirmReservation = async (details: ReservationDetails) => {
         setIsProcessingOrder(true);
@@ -1318,7 +1337,14 @@ const App: React.FC = () => {
                 onClose={() => setConfirmedReservationData(null)}
                 onSendWhatsApp={handleSendReservationToWhatsApp}
             />
-            <Chatbot isOpen={isChatbotOpen} onClose={() => setIsChatbotOpen(false)} messages={chatMessages} onSendMessage={handleSendMessageToBot} isSending={isBotReplying}/>
+            <Chatbot 
+                isOpen={isChatbotOpen} 
+                onClose={() => setIsChatbotOpen(false)} 
+                messages={chatMessages} 
+                onSendMessage={handleSendMessageToBot} 
+                isSending={isBotReplying}
+                onCreateOrder={handleCreateOrderFromChat}
+            />
             
             <LoginModal 
                 isOpen={isLoginModalOpen} 
