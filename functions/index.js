@@ -252,10 +252,10 @@ Se o cliente quiser fazer um pedido diretamente com você, siga este fluxo RIGOR
     </ACTION_CREATE_ORDER>\`
 
 3.  **REGRAS PARA O BLOCO DE AÇÃO:**
-    - O `orderType` deve ser `delivery` ou `pickup`.
-    - O `paymentMethod` deve ser `credit`, `debit`, `pix`, ou `cash`.
-    - O `cart` deve ser um array. Para cada item, use o `productId` do cardápio (ex: 'margherita', 'coca-cola-2l'). Calcule o preço (`price`) baseado no tamanho escolhido, usando a lista de preços do cardápio.
-    - Se o cliente não informar um dado opcional (como complemento), deixe o campo como uma string vazia `""`.
+    - O \`orderType\` deve ser \`delivery\` ou \`pickup\`.
+    - O \`paymentMethod\` deve ser \`credit\`, \`debit\`, \`pix\`, ou \`cash\`.
+    - O \`cart\` deve ser um array. Para cada item, use o \`productId\` do cardápio (ex: 'margherita', 'coca-cola-2l'). Calcule o preço (\`price\`) baseado no tamanho escolhido, usando a lista de preços do cardápio.
+    - Se o cliente não informar um dado opcional (como complemento), deixe o campo como uma string vazia \`""\`.
     - **NUNCA** inclua o bloco de ação antes de ter todos os dados necessários.
     - **NUNCA** gere um link do WhatsApp neste fluxo. Apenas o bloco de ação. O site cuidará do resto.
 
