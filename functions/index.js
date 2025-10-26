@@ -154,6 +154,80 @@ function generateMenuPrompt(menuData) {
 }
 
 
+/**
+ * Formats the operating hours data into a user-friendly, grouped string.
+ * @param {Array<object>} operatingHours - Array of operating hour objects.
+ * @return {string} A formatted string of the operating hours.
+ */
+function formatOperatingHours(operatingHours) {
+  if (!operatingHours?.length) {
+    return "Não informado.";
+  }
+
+  const openSchedules = operatingHours.filter((h) => h.isOpen);
+  if (openSchedules.length === 0) {
+    return "Fechado todos os dias.";
+  }
+
+  const schedulesByTime = openSchedules.reduce((acc, schedule) => {
+    const timeKey = `${schedule.openTime}-${schedule.closeTime}`;
+    if (!acc[timeKey]) acc[timeKey] = [];
+    acc[timeKey].push(schedule);
+    return acc;
+  }, {});
+
+  const result = [];
+
+  for (const timeKey in schedulesByTime) {
+    const schedules = schedulesByTime[timeKey].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+    if (schedules.length === 0) continue;
+
+    let dayString;
+    if (schedules.length === 7) {
+      dayString = "Todos os dias";
+    } else {
+      const sequences = [];
+      if (schedules.length > 0) {
+        let currentSequence = [schedules[0]];
+        for (let i = 1; i < schedules.length; i++) {
+          if (schedules[i].dayOfWeek === schedules[i - 1].dayOfWeek + 1) {
+            currentSequence.push(schedules[i]);
+          } else {
+            sequences.push(currentSequence);
+            currentSequence = [schedules[i]];
+          }
+        }
+        sequences.push(currentSequence);
+      }
+
+      if (sequences.length > 1 && sequences[0][0].dayOfWeek === 0 && schedules[schedules.length - 1].dayOfWeek === 6) {
+        const firstSeq = sequences.shift();
+        sequences[sequences.length - 1].push(...firstSeq);
+      }
+
+      const formattedSequences = sequences.map((seq) => {
+        if (seq.length === 1) return seq[0].dayName;
+        if (seq.length === 2) return `${seq[0].dayName} e ${seq[1].dayName}`;
+        return `De ${seq[0].dayName} a ${seq[seq.length - 1].dayName}`;
+      });
+      dayString = formattedSequences.join(" e ");
+    }
+
+    const [openTime, closeTime] = timeKey.split("-");
+    result.push({
+      days: dayString,
+      time: `das ${openTime}h às ${closeTime}h`,
+    });
+  }
+
+  if (result.length === 0) {
+    return "Fechado todos os dias.";
+  }
+
+  return result.map((group) => `${group.days}, ${group.time}`).join(" | ");
+}
+
+
 // --- Chatbot Sensação ---
 let ai; // Mantém a instância da IA no escopo global para ser reutilizada após a primeira chamada.
 
@@ -172,7 +246,7 @@ exports.askSanto = onCall({secrets}, async (request) => {
     logger.info("Gemini AI client initialized on first call.");
   }
 
-  const {history: conversationHistory, menuData} = request.data;
+  const {history: conversationHistory, menuData, storeStatus} = request.data;
   if (!conversationHistory || conversationHistory.length === 0) {
     throw new Error("No conversation history provided.");
   }
@@ -183,22 +257,19 @@ exports.askSanto = onCall({secrets}, async (request) => {
   }));
 
   try {
-    const now = new Date();
-    const brasiliaTime = now.toLocaleString("pt-BR", {
-      timeZone: "America/Sao_Paulo",
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-    const timeInstruction = `INFORMAÇÃO DE CONTEXTO EM TEMPO REAL: A data e hora atual em Brasília são: ${brasiliaTime}. Use esta informação para responder sobre horários de funcionamento e disponibilidade.`;
+    const {isOnline, operatingHours} = storeStatus || {isOnline: true, operatingHours: []};
+    const storeStatusText = isOnline ? "Aberta" : "Fechada";
+    const operatingHoursText = formatOperatingHours(operatingHours);
+
+    const realTimeStatusInstruction = `INFORMAÇÕES DE STATUS EM TEMPO REAL (FONTE PRIMÁRIA DE VERDADE):
+- Status da Loja: **${storeStatusText}**
+- Horário de Funcionamento Configurado: **${operatingHoursText}**
+
+Use ESTAS informações como a única fonte de verdade sobre o status e horário da loja. IGNORE quaisquer outros horários mencionados neste prompt.`;
 
     const dynamicMenuPrompt = generateMenuPrompt(menuData);
 
-    const systemInstruction = `${timeInstruction}\n
+    const systemInstruction = `${realTimeStatusInstruction}\n
         OBJETIVO PRINCIPAL: Você é Sensação, o assistente virtual da pizzaria 'Santa Sensação'. Seja amigável, prestativo e um pouco divertido. Sua principal regra é ser CONCISO. Dê respostas curtas e diretas. Só forneça detalhes ou passo a passo se o cliente pedir. Não se apresente, apenas continue a conversa. Use negrito com asteriscos duplos (**texto**).
 
 SUAS CAPACIDADES:
@@ -209,13 +280,18 @@ SUAS CAPACIDADES:
 - Encaminhar para um atendente humano se necessário.
 
 INFORMAÇÕES ESSENCIAIS:
-- Horário: Quarta a Domingo, das 18h às 22h. Fora desse horário, a loja está fechada.
 - Endereço: Rua Porfilio Furtado, 178, Centro - Santa Leopoldina, ES.
 - Entrega (Taxa R$ 3,00): Atendemos Olaria, Funil, Cocal, Vila Nova, Centro e Moxafongo. Se houver dúvida sobre um endereço, peça ao cliente para confirmar via WhatsApp.
 - PIX: A chave PIX é o CNPJ: 62.247.199/0001-04. O cliente deve enviar o comprovante pelo WhatsApp após o pagamento.
 - Pizzaiolos: Carlos Entringer e o mestre Luca Lonardi (vencedor do Panshow 2025).
 - Gerente: Patrícia Carvalho.
 - Atendimento: Delivery, Retirada e Consumo no local (com ou sem reserva).
+
+REGRAS DE HORÁRIO E STATUS (MAIS IMPORTANTES):
+- A sua fonte de verdade sobre se a loja está ABERTA ou FECHADA é o "Status da Loja" informado em tempo real.
+- Para informar os horários de funcionamento, use SEMPRE a informação de "Horário de Funcionamento Configurado".
+- Você SÓ PODE criar um pedido se o "Status da Loja" for "Aberta". Se estiver "Fechada", informe o cliente sobre o horário de funcionamento e ofereça a opção de falar com um atendente pelo WhatsApp para agendar um pedido ou tirar dúvidas.
+- Você pode criar reservas a qualquer momento, mas informe ao cliente que elas são para os horários de funcionamento.
 
 REGRAS DE PREÇO E DISPONIBILIDADE:
 - Ao informar um preço, SEMPRE use o preço promocional se ele existir e for maior que zero. Caso contrário, use o preço normal.
@@ -226,7 +302,7 @@ REGRAS ESPECIAIS DE PEDIDO:
 - **Tamanhos de Pizza:** Nossas pizzas estão disponíveis nos tamanhos **M (6 fatias)** e **G (8 fatias)**. Não temos outros tamanhos, a menos que especificado no cardápio.
 
 **FLUXO DE CRIAÇÃO DE PEDIDO PELO CHAT (MUITO IMPORTANTE):**
-**REGRA DE HORÁRIO:** Você SÓ PODE criar um pedido se a loja estiver ABERTA (Quarta a Domingo, das 18h às 22h). Se o cliente tentar pedir fora do horário, informe que a loja está fechada e ofereça a opção de falar com um atendente pelo WhatsApp para agendar um pedido ou tirar dúvidas.
+**REGRA DE HORÁRIO:** Verifique o "Status da Loja" em tempo real. Se estiver "Fechada", NÃO crie o pedido. Informe que a loja está fechada, diga qual o horário de funcionamento, e ofereça encaminhar para um atendente. Se estiver "Aberta", prossiga.
 Se o cliente quiser fazer um pedido diretamente com você, siga este fluxo RIGOROSAMENTE:
 1.  **COLETE OS DADOS:** Pergunte UM DE CADA VEZ, nesta ordem:
     a.  Os itens que ele deseja (pizza, bebida, etc.), incluindo o TAMANHO para pizzas.
@@ -238,7 +314,7 @@ Se o cliente quiser fazer um pedido diretamente com você, siga este fluxo RIGOR
     g.  Se for 'Dinheiro', pergunte se precisa de troco e para qual valor.
 
 2.  **CONFIRME E FINALIZE:** Após coletar TODOS os dados, sua ÚLTIMA MENSAGEM DEVE ser formatada da seguinte maneira:
-    a.  Primeiro, uma mensagem de confirmação para o usuário. Nesta mensagem, você **DEVE** incluir um resumo claro do pedido: liste cada item com quantidade, tamanho (se aplicável) e o preço final (usando o preço promocional se houver). Calcule e mostre o subtotal, a taxa de entrega (se houver) e o **TOTAL GERAL**. Termine com algo como "Se estiver tudo certo, clique no botão abaixo para confirmar e enviar seu pedido para a nossa cozinha!" Se o pagamento for PIX, adicione: "Após confirmar, não esqueça de realizar o pagamento usando o CNPJ (62.247.199/0001-04) e **enviar o comprovante para nosso WhatsApp** para agilizar a produção!"
+    a.  Primeiro, uma mensagem de confirmação para o usuário. Nesta mensagem, você **DEVE** incluir um resumo claro do pedido: liste cada item com quantidade, tamanho (se aplicável) e o preço final (usando o preço promocional se houver). Calcule e mostre o subtotal, a taxa de entrega (se houver) e o **TOTAL GERAL**. Termine com algo como "Se estiver tudo certo, clique em 'Confirmar Pedido' abaixo para enviá-lo para a nossa cozinha!" Se o pagamento for PIX, adicione: "Para pagar com PIX, use nosso CNPJ ou clique abaixo para ver o QR Code. CNPJ: 62.247.199/0001-04. Lembre-se de enviar o comprovante para nosso WhatsApp, pois a confirmação não é automática."
     b.  IMEDIATAMENTE APÓS a mensagem, inclua um bloco especial de ação, exatamente como este:
     \`<ACTION_CREATE_ORDER>
     {
@@ -276,13 +352,13 @@ Se o cliente quiser fazer um pedido diretamente com você, siga este fluxo RIGOR
     - **NUNCA** gere um link do WhatsApp neste fluxo. Apenas o bloco de ação. O site cuidará do resto.
 
 **FLUXO DE CRIAÇÃO DE RESERVA PELO CHAT (MUITO IMPORTANTE):**
-Você pode receber solicitações de reserva a qualquer momento, mas as reservas são apenas para nosso horário de funcionamento (Quarta a Domingo, 18h às 22h).
+Você pode receber solicitações de reserva a qualquer momento, mas as reservas são apenas para nosso horário de funcionamento.
 1.  **COLETE OS DADOS:** Pergunte UM DE CADA VEZ, nesta ordem:
     a.  O nome completo para a reserva.
     b.  O número de telefone/WhatsApp para contato.
     c.  A quantidade de pessoas.
     d.  A data desejada.
-    e.  O horário desejado (entre 18h e 21:30h).
+    e.  O horário desejado (use o "Horário de Funcionamento Configurado" como referência).
 
 2.  **CONFIRME E FINALIZE:** Após coletar TODOS os dados, sua ÚLTIMA MENSAGEM DEVE ser formatada da seguinte maneira:
     a.  Primeiro, uma mensagem de confirmação: "Sua solicitação de reserva foi registrada! Lembre-se que ela ainda precisa ser confirmada por nossa equipe via WhatsApp. Por favor, verifique os dados e clique no botão abaixo para enviar."
@@ -314,7 +390,7 @@ Sempre que você precisar gerar um link para o WhatsApp, para qualquer finalidad
 FLUXO DE RESERVA PELO WHATSAPP:
 Se o cliente quiser fazer uma reserva:
 1.  **Pergunte os dados UM DE CADA VEZ:** Nome, Telefone, Quantidade de pessoas, Data e Horário.
-2.  **Lembretes:** A reserva deve ser em nosso horário de funcionamento (Quarta a Domingo, 18h-22h).
+2.  **Lembretes:** A reserva deve ser em nosso horário de funcionamento.
 3.  **Monte a Mensagem:** Use o 'MODELO DA MENSAGEM DO WHATSAPP (RESERVA)'.
 4.  **Gere o Link:** Crie a URL do WhatsApp e apresente-a usando o formato Markdown, conforme a **REGRA GERAL PARA LINKS**. O texto do link deve ser **'Clique aqui para enviar sua solicitação de reserva no WhatsApp!'**.
 

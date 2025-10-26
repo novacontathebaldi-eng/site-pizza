@@ -1,7 +1,7 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
 import { db, storage, functions } from './firebase';
-import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem, ChatMessage, ReservationDetails, UserProfile, Address } from '../types';
+import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem, ChatMessage, ReservationDetails, UserProfile, Address, DaySchedule } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
@@ -247,11 +247,15 @@ export const permanentDeleteMultipleOrders = async (orderIds: string[]): Promise
 };
 
 // Chatbot
-export const askChatbot = async (history: ChatMessage[], products: Product[], categories: Category[]): Promise<string> => {
+export const askChatbot = async (history: ChatMessage[], products: Product[], categories: Category[], isStoreOnline: boolean, operatingHours: DaySchedule[] | undefined): Promise<string> => {
     if (!functions) throw new Error("Firebase Functions not initialized.");
     try {
         const askSanto = functions.httpsCallable('askSanto');
-        const response = await askSanto({ history, menuData: { products, categories } });
+        const response = await askSanto({
+            history,
+            menuData: { products, categories },
+            storeStatus: { isOnline: isStoreOnline, operatingHours: operatingHours || [] }
+        });
         return (response.data as any).reply;
     } catch (error) {
         console.error("Error calling chatbot function:", error);

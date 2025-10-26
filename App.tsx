@@ -827,7 +827,7 @@ const App: React.FC = () => {
         try {
             const activeProducts = products.filter(p => p.active && !p.deleted);
             const activeCategories = categories.filter(c => c.active);
-            const botReply = await firebaseService.askChatbot(updatedMessages, activeProducts, activeCategories);
+            const botReply = await firebaseService.askChatbot(updatedMessages, activeProducts, activeCategories, isStoreOnline, siteSettings.operatingHours);
             const newBotMessage: ChatMessage = { role: 'bot', content: botReply };
             setChatMessages(prev => [...prev, newBotMessage]);
         } catch (error) {
