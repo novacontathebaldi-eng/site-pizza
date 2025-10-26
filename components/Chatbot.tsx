@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 // FIX: Corrected the import path for the `ChatMessage` type. It is defined in `../types` not `../App`.
 import { ChatMessage, OrderDetails, CartItem, ReservationDetails } from '../types';
 
@@ -114,6 +114,16 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
     const prevIsSending = useRef(isSending);
     const [completedActions, setCompletedActions] = useState<Set<number>>(new Set());
 
+    // Find the index of the last message that contains a CREATE_ORDER action.
+    const lastCreateOrderActionIndex = useMemo(() => {
+        for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].content.includes('<ACTION_CREATE_ORDER>')) {
+                return i;
+            }
+        }
+        return -1; // No CREATE_ORDER action found in any message.
+    }, [messages]);
+
     useEffect(() => {
         // Guarda o valor anterior de `isSending` para detectar quando o bot termina de responder.
         prevIsSending.current = isSending;
@@ -182,6 +192,20 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                     const { nodes, action } = parseMessage(msg.content);
                     const isLastMessage = index === messages.length - 1;
 
+                    const shouldShowAction = (() => {
+                        if (!action || completedActions.has(index)) {
+                            return false;
+                        }
+
+                        if (action.type === 'CREATE_ORDER') {
+                            // Only show the "Confirm Order" button if it's the last one in the chat history.
+                            return index === lastCreateOrderActionIndex;
+                        }
+
+                        // For other actions like reservations, always show them until they are completed.
+                        return true;
+                    })();
+
                     return (
                         <div 
                             key={index} 
@@ -191,7 +215,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                         >
                             <div className={`whitespace-pre-wrap max-w-[85%] rounded-2xl px-4 py-2 ${msg.role === 'user' ? 'bg-blue-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-800 rounded-bl-none'}`}>
                                 {nodes}
-                                {!completedActions.has(index) && action && (
+                                {shouldShowAction && (
                                     <div className="mt-4 border-t border-gray-300 pt-3 space-y-4 text-gray-800">
                                         {action.type === 'CREATE_ORDER' && (
                                             <>
