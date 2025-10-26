@@ -888,7 +888,9 @@ const App: React.FC = () => {
 
     const handleConfirmReservation = async (details: ReservationDetails) => {
         setIsProcessingOrder(true);
+        // Close any open modals
         setIsReservationModalOpen(false);
+        setIsChatbotOpen(false);
 
         // Open WhatsApp window immediately
         const whatsappUrl = generateReservationWhatsAppMessage(details, null);
@@ -1350,6 +1352,7 @@ const App: React.FC = () => {
                 onSendMessage={handleSendMessageToBot} 
                 isSending={isBotReplying}
                 onCreateOrder={handleCreateOrderFromChat}
+                onCreateReservation={handleConfirmReservation}
                 onShowPixQRCode={() => setIsPixQrCodeModalOpen(true)}
             />
             

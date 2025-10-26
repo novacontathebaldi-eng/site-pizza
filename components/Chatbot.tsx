@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 // FIX: Corrected the import path for the `ChatMessage` type. It is defined in `../types` not `../App`.
-import { ChatMessage, OrderDetails, CartItem } from '../types';
+import { ChatMessage, OrderDetails, CartItem, ReservationDetails } from '../types';
 
 interface ChatbotProps {
     isOpen: boolean;
@@ -9,6 +9,7 @@ interface ChatbotProps {
     onSendMessage: (message: string) => void;
     isSending: boolean;
     onCreateOrder: (details: OrderDetails, cart: CartItem[]) => void;
+    onCreateReservation: (details: ReservationDetails) => void;
     onShowPixQRCode: () => void;
 }
 
@@ -20,21 +21,30 @@ interface ParsedMessage {
             details: OrderDetails;
             cart: CartItem[];
         };
+    } | {
+        type: 'CREATE_RESERVATION';
+        payload: {
+            details: ReservationDetails;
+        };
     };
 }
 
+
 const parseMessage = (content: string): ParsedMessage => {
-    // Regex para o bloco de ação
-    const actionRegex = /<ACTION_CREATE_ORDER>([\s\S]*?)<\/ACTION_CREATE_ORDER>/;
-    const actionMatch = content.match(actionRegex);
+    // Regex para os blocos de ação
+    const orderActionRegex = /<ACTION_CREATE_ORDER>([\s\S]*?)<\/ACTION_CREATE_ORDER>/;
+    const reservationActionRegex = /<ACTION_CREATE_RESERVATION>([\s\S]*?)<\/ACTION_CREATE_RESERVATION>/;
+    const orderMatch = content.match(orderActionRegex);
+    const reservationMatch = content.match(reservationActionRegex);
+
     let action: ParsedMessage['action'] = undefined;
     
-    // Remove o bloco de ação do conteúdo principal
-    const cleanContent = content.replace(actionRegex, '').trim();
+    // Remove os blocos de ação do conteúdo principal
+    const cleanContent = content.replace(orderActionRegex, '').replace(reservationActionRegex, '').trim();
 
-    if (actionMatch && actionMatch[1]) {
+    if (orderMatch && orderMatch[1]) {
         try {
-            const payload = JSON.parse(actionMatch[1]);
+            const payload = JSON.parse(orderMatch[1]);
             // Validação básica do payload
             if (payload.details && payload.cart) {
                 action = {
@@ -43,7 +53,19 @@ const parseMessage = (content: string): ParsedMessage => {
                 };
             }
         } catch (e) {
-            console.error("Falha ao analisar o JSON da ação do chatbot:", e);
+            console.error("Falha ao analisar o JSON da ação de pedido do chatbot:", e);
+        }
+    } else if (reservationMatch && reservationMatch[1]) {
+        try {
+            const payload = JSON.parse(reservationMatch[1]);
+            if (payload.details) {
+                action = {
+                    type: 'CREATE_RESERVATION',
+                    payload: payload
+                };
+            }
+        } catch (e) {
+            console.error("Falha ao analisar o JSON da ação de reserva do chatbot:", e);
         }
     }
 
@@ -85,16 +107,24 @@ const parseMessage = (content: string): ParsedMessage => {
 };
 
 
-export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onSendMessage, isSending, onCreateOrder, onShowPixQRCode }) => {
+export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onSendMessage, isSending, onCreateOrder, onCreateReservation, onShowPixQRCode }) => {
     const [input, setInput] = useState('');
     const lastElementRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const prevIsSending = useRef(isSending);
+    const [completedActions, setCompletedActions] = useState<Set<number>>(new Set());
 
     useEffect(() => {
         // Guarda o valor anterior de `isSending` para detectar quando o bot termina de responder.
         prevIsSending.current = isSending;
     });
+    
+    // Limpa o estado de ações concluídas quando o chat é fechado para que os botões reapareçam se o chat for reaberto.
+    useEffect(() => {
+        if (!isOpen) {
+            setCompletedActions(new Set());
+        }
+    }, [isOpen]);
 
     useEffect(() => {
         if (lastElementRef.current) {
@@ -161,33 +191,49 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                         >
                             <div className={`whitespace-pre-wrap max-w-[85%] rounded-2xl px-4 py-2 ${msg.role === 'user' ? 'bg-blue-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-800 rounded-bl-none'}`}>
                                 {nodes}
-                                {action && action.type === 'CREATE_ORDER' && (
+                                {!completedActions.has(index) && action && (
                                     <div className="mt-4 border-t border-gray-300 pt-3 space-y-4 text-gray-800">
-                                        {/* Order Summary */}
-                                        {action.payload.details.paymentMethod === 'pix' && (
-                                            <div className="p-3 bg-blue-50 rounded-md text-sm text-blue-800 text-center space-y-2">
-                                                <p>Para pagar com PIX, use nosso CNPJ ou clique abaixo para ver o QR Code.</p>
-                                                <p className="font-bold">CNPJ: 62.247.199/0001-04</p>
+                                        {action.type === 'CREATE_ORDER' && (
+                                            <>
+                                                {action.payload.details.paymentMethod === 'pix' && (
+                                                    <div className="p-3 bg-blue-50 rounded-md text-sm text-blue-800 text-center space-y-2">
+                                                        <p>Para pagar com PIX, use nosso CNPJ ou clique abaixo para ver o QR Code.</p>
+                                                        <p className="font-bold">CNPJ: 62.247.199/0001-04</p>
+                                                        <button
+                                                            onClick={onShowPixQRCode}
+                                                            className="w-full bg-accent text-white font-semibold py-2 px-3 rounded-lg mt-1 hover:bg-opacity-90 transition-all text-sm"
+                                                        >
+                                                            <i className="fas fa-qrcode mr-2"></i> Ver QR CODE PIX
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                
                                                 <button
-                                                    onClick={onShowPixQRCode}
-                                                    className="w-full bg-accent text-white font-semibold py-2 px-3 rounded-lg mt-1 hover:bg-opacity-90 transition-all text-sm"
+                                                    onClick={() => {
+                                                        const deliveryFee = action.payload.details.orderType === 'delivery' ? 3.00 : 0;
+                                                        const detailsWithFee = { ...action.payload.details, deliveryFee };
+                                                        onCreateOrder(detailsWithFee, action.payload.cart);
+                                                        setCompletedActions(prev => new Set(prev).add(index));
+                                                    }}
+                                                    className="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition-all flex items-center justify-center text-center"
                                                 >
-                                                    <i className="fas fa-qrcode mr-2"></i> Ver QR CODE PIX
+                                                    <i className="fab fa-whatsapp mr-2"></i>
+                                                    <span>Confirmar e<br/>Enviar Pedido</span>
                                                 </button>
-                                            </div>
+                                            </>
                                         )}
-                                        
-                                        {/* Confirm Button */}
-                                        <button
-                                            onClick={() => {
-                                                const deliveryFee = action.payload.details.orderType === 'delivery' ? 3.00 : 0;
-                                                const detailsWithFee = { ...action.payload.details, deliveryFee };
-                                                onCreateOrder(detailsWithFee, action.payload.cart);
-                                            }}
-                                            className="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition-all"
-                                        >
-                                            <i className="fab fa-whatsapp mr-2"></i> Confirmar e Enviar Pedido
-                                        </button>
+                                        {action.type === 'CREATE_RESERVATION' && (
+                                             <button
+                                                onClick={() => {
+                                                    onCreateReservation(action.payload.details);
+                                                    setCompletedActions(prev => new Set(prev).add(index));
+                                                }}
+                                                className="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition-all flex items-center justify-center text-center"
+                                            >
+                                                <i className="fab fa-whatsapp mr-2"></i>
+                                                <span>Confirmar e<br/>Enviar Reserva</span>
+                                            </button>
+                                        )}
                                     </div>
                                 )}
                             </div>
