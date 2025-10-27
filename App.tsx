@@ -376,36 +376,51 @@ const App: React.FC = () => {
     // Effect to initialize Google Auth
     useEffect(() => {
         const initGoogleAuth = () => {
+            console.log('initGoogleAuth called. isGapiReady:', isGapiReady, 'window.gapi exists:', !!window.gapi);
+            
             if (window.gapi && !isGapiReady) {
+                console.log('Loading auth2 module...');
                 window.gapi.load('auth2', () => {
+                    console.log('auth2 module loaded, initializing...');
                     try {
                         window.gapi.auth2.init({
                             client_id: '914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com',
                             cookiepolicy: 'single_host_origin',
                             scope: 'profile email'
                         }).then(() => {
+                            console.log('Google Auth2 initialized successfully!');
                             setIsGapiReady(true);
                         }, (error: any) => {
                             console.error('Error initializing Google Auth2:', error);
-                            // Do not show a toast here to avoid bothering users with configuration issues.
+                            console.error('Error details:', JSON.stringify(error, null, 2));
+                            addToast('Erro ao inicializar login com Google. Verifique a configuração do Console do Google Cloud.', 'error');
                         });
                     } catch (error) {
                         console.error('Error loading Google Auth2:', error);
+                        addToast('Erro ao carregar login com Google. Verifique a configuração do Console do Google Cloud.', 'error');
                     }
                 });
+            } else {
+                console.log('Initialization skipped. window.gapi exists:', !!window.gapi, 'isGapiReady:', isGapiReady);
             }
         };
 
-        window.onGoogleScriptLoadCallback = initGoogleAuth;
+        // Set the callback if it doesn't exist
+        if (!window.onGoogleScriptLoadCallback) {
+            window.onGoogleScriptLoadCallback = initGoogleAuth;
+        }
 
+        // If script is already loaded, initialize immediately
         if (window.googleScriptLoaded) {
+            console.log('Google script already loaded, initializing...');
             initGoogleAuth();
         }
 
         return () => {
-            (window as any).onGoogleScriptLoadCallback = undefined;
+            // Don't clear the callback as it might be needed for React remounts
+            // (window as any).onGoogleScriptLoadCallback = undefined;
         };
-    }, [isGapiReady]);
+    }, [isGapiReady, addToast]);
 
 
     // Effect for Firebase Auth state changes
