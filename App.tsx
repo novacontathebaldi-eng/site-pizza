@@ -934,7 +934,6 @@ const App: React.FC = () => {
         };
         const whatsappUrl = generateWhatsAppMessage(details, order.items || [], order.total || 0, order.orderNumber, isPaid);
         window.open(whatsappUrl, '_blank');
-        setConfirmedOrderData(null);
     };
 
     const handleSendReservationToWhatsApp = (reservation: Order) => {
@@ -945,7 +944,6 @@ const App: React.FC = () => {
         };
         const whatsappUrl = generateReservationWhatsAppMessage(details, reservation.orderNumber);
         window.open(whatsappUrl, '_blank');
-        setConfirmedReservationData(null);
     };
 
     const handleSaveProduct = useCallback(async (product: Product) => {
