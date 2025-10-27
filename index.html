@@ -6,6 +6,9 @@
     <title>Pizzaria Santa Sensação - A pizza nº 1 do ES</title>
     <meta name="description" content="Pizzaria Santa Sensação - A pizza nº 1 do Espírito Santo, premiada no Panshow 2025 e com a assinatura do mestre Luca Lonardi.">
     
+    <!-- Google Sign-In Meta Tag -->
+    <meta name="google-signin-client_id" content="914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com">
+    
     <!-- PWA & SEO -->
     <link rel="manifest" href="/manifest.webmanifest">
     <meta name="theme-color" content="#2C5633">
@@ -114,17 +117,17 @@
 </head>
 <body class="bg-brand-ivory-50 text-text-on-light antialiased">
     <div id="root"></div>
-    <script>
-      function onGoogleScriptLoad() {
-        // Set a flag to indicate the script has loaded, in case React mounts after this.
-        window.googleScriptLoaded = true;
-        // If the React callback is already on the window object, call it.
-        if (window.onGoogleScriptLoadCallback) {
-          window.onGoogleScriptLoadCallback();
-        }
+  <script>
+    function onGoogleScriptLoad() {
+      // Set a flag to indicate the script has loaded, in case React mounts after this.
+      window.googleScriptLoaded = true;
+      // If the React callback is already on the window object, call it.
+      if (window.onGoogleScriptLoadCallback) {
+        window.onGoogleScriptLoadCallback();
       }
-    </script>
-    <script src="https://apis.google.com/js/platform.js?onload=onGoogleScriptLoad" async defer></script>
+    }
+  </script>
+  <script src="https://apis.google.com/js/platform.js?onload=onGoogleScriptLoad" async defer></script>
     <script type="module" src="/index.tsx"></script>
 </body>
 </html>

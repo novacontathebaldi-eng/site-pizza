@@ -376,15 +376,17 @@ const App: React.FC = () => {
     // Effect to initialize Google Auth
     useEffect(() => {
         const initGoogleAuth = () => {
-            if (window.gapi && !isGapiReady) {
+            if (window.gapi) {
                 window.gapi.load('auth2', () => {
                     try {
                         window.gapi.auth2.init({
                             client_id: '914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com',
+                            cookiepolicy: 'single_host_origin',
+                            scope: 'profile email'
                         }).then(() => {
                             setIsGapiReady(true);
+                            console.log('Google Auth2 initialized successfully');
                         }, (error: any) => {
-                            // Don't show toast on initial load failure, only on interaction.
                             console.error('Error initializing Google Auth2:', error);
                         });
                     } catch (error) {
@@ -406,7 +408,7 @@ const App: React.FC = () => {
             // @ts-ignore
             delete window.onGoogleScriptLoadCallback;
         };
-    }, [isGapiReady]);
+    }, []);
 
 
     // Effect for Firebase Auth state changes
@@ -656,26 +658,55 @@ const App: React.FC = () => {
 
     // --- Auth Handlers ---
     const handleGoogleSignIn = async () => {
-        if (!isGapiReady || !auth) {
+        if (!auth) {
+            addToast('Serviço de autenticação indisponível.', 'error');
+            return;
+        }
+        
+        if (!isGapiReady) {
             addToast('Serviço de login não está pronto. Tente em instantes.', 'error');
             return;
         }
+        
         try {
+            // Get the Google Auth instance
             const googleAuth = window.gapi.auth2.getAuthInstance();
+            
+            // Sign in with Google
             const googleUser = await googleAuth.signIn();
+            
+            if (!googleUser) {
+                throw new Error('Falha ao obter informações do usuário do Google');
+            }
+            
             const idToken = googleUser.getAuthResponse().id_token;
+            
+            if (!idToken) {
+                throw new Error('Falha ao obter token de autenticação');
+            }
 
             // Garante que a sessão do usuário persista após o navegador ser fechado.
             await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
+            // Verify the token and get custom token from Cloud Function
             const customToken = await firebaseService.verifyGoogleToken(idToken);
+            
+            // Sign in to Firebase with the custom token
             await auth.signInWithCustomToken(customToken);
 
             setIsLoginModalOpen(false);
             addToast(`Bem-vindo(a), ${googleUser.getBasicProfile().getName()}!`, 'success');
         } catch (error: any) {
             console.error("Google Sign-In Error:", error);
-            if (error.error !== 'popup_closed_by_user') {
+            // Check if the user closed the popup
+            if (error.error === 'popup_closed_by_user') {
+                // User cancelled, don't show error
+                return;
+            }
+            // Check if it's the specific "popup_blocked" error
+            if (error.error === 'popup_blocked' || error.message?.includes('popup')) {
+                addToast('Popup bloqueado pelo navegador. Por favor, permita popups para este site.', 'error');
+            } else {
                 addToast('Falha no login com Google. Tente novamente.', 'error');
             }
         }
