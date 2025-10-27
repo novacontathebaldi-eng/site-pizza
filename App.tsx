@@ -381,11 +381,13 @@ const App: React.FC = () => {
                     try {
                         window.gapi.auth2.init({
                             client_id: '914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com',
+                            cookiepolicy: 'single_host_origin',
+                            scope: 'profile email'
                         }).then(() => {
                             setIsGapiReady(true);
                         }, (error: any) => {
-                            // Don't show toast on initial load failure, only on interaction.
                             console.error('Error initializing Google Auth2:', error);
+                            // Do not show a toast here to avoid bothering users with configuration issues.
                         });
                     } catch (error) {
                         console.error('Error loading Google Auth2:', error);
@@ -394,17 +396,14 @@ const App: React.FC = () => {
             }
         };
 
-        // Assign callback for the script in index.html to call
         window.onGoogleScriptLoadCallback = initGoogleAuth;
 
-        // If script is already loaded and callback was missed (race condition), run init
         if (window.googleScriptLoaded) {
             initGoogleAuth();
         }
 
         return () => {
-            // @ts-ignore
-            delete window.onGoogleScriptLoadCallback;
+            (window as any).onGoogleScriptLoadCallback = undefined;
         };
     }, [isGapiReady]);
 
@@ -655,19 +654,10 @@ const App: React.FC = () => {
 
 
     // --- Auth Handlers ---
-    const handleGoogleSignIn = async () => {
-        if (!isGapiReady || !auth) {
-            addToast('Serviço de login não está pronto. Tente em instantes.', 'error');
-            return;
-        }
+    const onGoogleSignInSuccess = async (googleUser: any) => {
         try {
-            const googleAuth = window.gapi.auth2.getAuthInstance();
-            const googleUser = await googleAuth.signIn();
             const idToken = googleUser.getAuthResponse().id_token;
-
-            // Garante que a sessão do usuário persista após o navegador ser fechado.
             await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-
             const customToken = await firebaseService.verifyGoogleToken(idToken);
             await auth.signInWithCustomToken(customToken);
 
@@ -675,9 +665,14 @@ const App: React.FC = () => {
             addToast(`Bem-vindo(a), ${googleUser.getBasicProfile().getName()}!`, 'success');
         } catch (error: any) {
             console.error("Google Sign-In Error:", error);
-            if (error.error !== 'popup_closed_by_user') {
-                addToast('Falha no login com Google. Tente novamente.', 'error');
-            }
+            addToast('Falha no login com Google. Tente novamente.', 'error');
+        }
+    };
+    
+    const onGoogleSignInFailure = (error: any) => {
+        console.error("Google Sign-In Failure:", error);
+        if (error.error !== 'popup_closed_by_user') {
+            addToast('Falha no login com Google. Verifique a configuração e tente novamente.', 'error');
         }
     };
     
@@ -1369,7 +1364,9 @@ const App: React.FC = () => {
                     setIsLoginModalOpen(false);
                     setPasswordResetCode(null);
                 }} 
-                onGoogleSignIn={handleGoogleSignIn} 
+                onGoogleSignInSuccess={onGoogleSignInSuccess}
+                onGoogleSignInFailure={onGoogleSignInFailure}
+                isGapiReady={isGapiReady}
                 addToast={addToast} 
                 onRegisterSuccess={handleRegisterSuccess}
                 onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}

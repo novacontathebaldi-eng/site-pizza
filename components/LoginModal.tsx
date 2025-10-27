@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { auth } from '../services/firebase';
 import * as firebaseService from '../services/firebaseService';
 import firebase from 'firebase/compat/app';
@@ -6,7 +6,9 @@ import firebase from 'firebase/compat/app';
 interface LoginModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onGoogleSignIn: () => void;
+    onGoogleSignInSuccess: (googleUser: any) => void;
+    onGoogleSignInFailure: (error: any) => void;
+    isGapiReady: boolean;
     addToast: (message: string, type: 'success' | 'error') => void;
     onRegisterSuccess: () => void;
     onOpenPrivacyPolicy: () => void;
@@ -17,7 +19,7 @@ interface LoginModalProps {
 type View = 'login' | 'register' | 'forgotPassword' | 'resetPassword';
 type ResetStatus = 'idle' | 'verifying' | 'form' | 'success' | 'error';
 
-export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogleSignIn, addToast, onRegisterSuccess, onOpenPrivacyPolicy, onOpenTermsOfService, passwordResetCode }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogleSignInSuccess, onGoogleSignInFailure, isGapiReady, addToast, onRegisterSuccess, onOpenPrivacyPolicy, onOpenTermsOfService, passwordResetCode }) => {
     const [view, setView] = useState<View>('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -32,6 +34,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
     const [resetStatus, setResetStatus] = useState<ResetStatus>('idle');
     const [newPassword, setNewPassword] = useState('');
     const [confirmNewPassword, setConfirmNewPassword] = useState('');
+    
+    const googleButtonRef = useRef<HTMLDivElement>(null);
 
     const clearFormStates = () => {
         setEmail('');
@@ -58,6 +62,25 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
             }
         }
     }, [isOpen, passwordResetCode]);
+    
+    useEffect(() => {
+        if (isOpen && isGapiReady && googleButtonRef.current) {
+            try {
+                const auth2 = window.gapi.auth2.getAuthInstance();
+                if (auth2) {
+                    auth2.attachClickHandler(
+                        googleButtonRef.current,
+                        {}, // options
+                        onGoogleSignInSuccess,
+                        onGoogleSignInFailure
+                    );
+                }
+            } catch (error) {
+                console.error("Falha ao anexar o manipulador de clique do Google:", error);
+            }
+        }
+    }, [isOpen, isGapiReady, onGoogleSignInSuccess, onGoogleSignInFailure]);
+
 
     if (!isOpen) return null;
 
@@ -249,15 +272,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
                         <div className="relative my-6"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-300"></div></div><div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">ou</span></div></div>
                         
                         <div 
-                            onClick={!isLoading ? onGoogleSignIn : undefined} 
-                            className={`w-full ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                            ref={googleButtonRef}
+                            className={`customGPlusSignIn ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
                             role="button"
                             aria-label="Logar com o Google"
                         >
-                            <div className="customGPlusSignIn">
-                                <span className="icon"></span>
-                                <span className="buttonText">Logar com o Google</span>
-                            </div>
+                            <span className="icon"></span>
+                            <span className="buttonText">Logar com o Google</span>
                         </div>
                     </>
                 );

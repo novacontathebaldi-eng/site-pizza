@@ -75,7 +75,7 @@
         scrollbar-width: none;
       }
 
-      /* Estilos para o botão customizado do Google */
+      /* Estilos para o botão customizado do Google (Exemplo 2) */
       .customGPlusSignIn {
         display: flex;
         align-items: center;
@@ -88,21 +88,21 @@
         white-space: nowrap;
         cursor: pointer;
         font-family: 'Roboto', sans-serif;
-        transition: background-color 0.2s;
+        transition: background-color 0.2s, box-shadow 0.2s;
       }
       .customGPlusSignIn:hover {
         background: #357AE8;
-        box-shadow: 0 0 3px 3px rgba(66,133,244,.3);
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
       }
       .customGPlusSignIn .icon {
         background: white url('https://google-developers.appspot.com/identity/sign-in/g-normal.png') transparent 5px 50% no-repeat;
         display: inline-block;
         vertical-align: middle;
         width: 42px;
-        height: 42px;
+        height: 100%;
+        border-right: #2265d4 1px solid;
         border-top-left-radius: 4.5px;
         border-bottom-left-radius: 4.5px;
-        border-right: #2265d4 1px solid;
       }
       .customGPlusSignIn .buttonText {
         flex-grow: 1;
