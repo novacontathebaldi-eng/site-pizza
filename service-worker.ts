@@ -3,8 +3,8 @@
 // `ExtendableEvent`, and `FetchEvent`, resolving all type-related errors in this file.
 /// <reference lib="webworker" />
 
-// FIX: Force this file to be a module by importing a type. This prevents its global scope from conflicting with the DOM types used by React, which solves the JSX errors.
-import type {} from './types';
+// FIX: Force this file to be a module by exporting an empty object. This prevents its global scope from conflicting with the DOM types used by React, which solves the JSX errors.
+export {};
 
 // This is a global constant that will be replaced by the build process
 // FIX: Removed the `declare const self` line which caused a redeclaration error.

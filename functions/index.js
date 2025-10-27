@@ -13,7 +13,7 @@ const db = admin.firestore();
 const storage = admin.storage();
 
 // Define os secrets que as funções irão usar.
-const secrets = ["GEMINI_API_KEY", "GOOGLE_CLIENT_ID"];
+const secrets = ["GEMINI_API_KEY"];
 
 // --- Reusable function to check and set store status based on schedule ---
 const runStoreStatusCheck = async () => {
@@ -458,14 +458,13 @@ REGRAS DE SEGURANÇA:
  */
 exports.verifyGoogleToken = onCall({secrets}, async (request) => {
   const {idToken} = request.data;
-  const clientId = process.env.GOOGLE_CLIENT_ID;
+  // This client ID is public and is used to initialize the Google Sign-In button on the frontend.
+  // Using it directly here avoids potential issues with Cloud Secret Manager configuration,
+  // resolving the 500 internal server error.
+  const clientId = "914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com";
 
   if (!idToken) {
     throw new onCall.HttpsError("invalid-argument", "The function must be called with an idToken.");
-  }
-  if (!clientId) {
-    logger.error("GOOGLE_CLIENT_ID not set.");
-    throw new onCall.HttpsError("internal", "Authentication is not configured correctly.");
   }
 
   const client = new OAuth2Client(clientId);
