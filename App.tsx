@@ -380,7 +380,7 @@ const App: React.FC = () => {
                 window.gapi.load('auth2', () => {
                     try {
                         window.gapi.auth2.init({
-                            client_id: '914255031241-p0nibfrspj58331iqkb710m4orjijle8.apps.googleusercontent.com',
+                            client_id: '914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com',
                             cookiepolicy: 'single_host_origin',
                             scope: 'profile email'
                         }).then(() => {

@@ -86,3 +86,7 @@ self.addEventListener('install', (event: ExtendableEvent) => {
     // FIX: Explicitly cast `self` to the correct type to resolve a type inference issue where `skipWaiting` was not being identified as a function. This addresses the "not callable" error.
     event.waitUntil((self as unknown as ServiceWorkerGlobalScope).skipWaiting());
 });
+
+// FIX: Convert this file to a module to prevent its global scope from conflicting with the main application's DOM types.
+// This resolves the widespread "Property '...' does not exist on type 'JSX.IntrinsicElements'" errors.
+export {};
