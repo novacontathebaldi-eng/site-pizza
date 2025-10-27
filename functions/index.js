@@ -481,6 +481,10 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
     }
 
     const {sub: googleUid, email, name, picture} = payload;
+    // FIX: Add fallbacks for name and picture to ensure profile data is always valid.
+    const finalName = name || (email ? email.split("@")[0] : "Usuário");
+    const finalPicture = picture || ""; // Ensure it's a string to match UserProfile type
+
     // We create a unique UID for Firebase Auth based on the Google UID
     const uid = `google:${googleUid}`;
     let isNewUser = false;
@@ -489,8 +493,8 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
     try {
       await admin.auth().updateUser(uid, {
         email: email,
-        displayName: name,
-        photoURL: picture,
+        displayName: finalName,
+        photoURL: finalPicture,
       });
     } catch (error) {
       if (error.code === "auth/user-not-found") {
@@ -498,8 +502,8 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
         await admin.auth().createUser({
           uid: uid,
           email: email,
-          displayName: name,
-          photoURL: picture,
+          displayName: finalName,
+          photoURL: finalPicture,
         });
       } else {
         throw error; // Re-throw other errors
@@ -513,9 +517,9 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
     // Create profile in Firestore only if it doesn't exist
     if (isNewUser || !userDoc.exists) {
       await userRef.set({
-        name,
+        name: finalName,
         email,
-        photoURL: picture,
+        photoURL: finalPicture,
         addresses: [], // Initialize with empty addresses
       }, {merge: true});
     }
