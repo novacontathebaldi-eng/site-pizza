@@ -31,8 +31,7 @@ import { PixQrCodeModal } from './components/PixQrCodeModal';
 declare global {
     interface Window {
         gapi: any;
-        googleScriptLoaded: boolean;
-        onGoogleScriptLoadCallback: () => void;
+        google: any; // For Google Identity Services
     }
 }
 
@@ -238,7 +237,6 @@ const App: React.FC = () => {
     const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
     const [isUserAreaModalOpen, setIsUserAreaModalOpen] = useState<boolean>(false);
-    const [isGapiReady, setIsGapiReady] = useState(false);
     const [postRegisterAction, setPostRegisterAction] = useState<string | null>(null);
     const prevUser = useRef<firebase.User | null>(null);
     const [passwordResetCode, setPasswordResetCode] = useState<string | null>(null);
@@ -372,56 +370,6 @@ const App: React.FC = () => {
         localStorage.setItem('santaSensacaoCookieConsent', 'true');
         setShowCookieBanner(false);
     };
-
-    // Effect to initialize Google Auth
-    useEffect(() => {
-        const initGoogleAuth = () => {
-            console.log('initGoogleAuth called. isGapiReady:', isGapiReady, 'window.gapi exists:', !!window.gapi);
-            
-            if (window.gapi && !isGapiReady) {
-                console.log('Loading auth2 module...');
-                window.gapi.load('auth2', () => {
-                    console.log('auth2 module loaded, initializing...');
-                    try {
-                        window.gapi.auth2.init({
-                            client_id: '914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com',
-                            cookiepolicy: 'single_host_origin',
-                            scope: 'profile email'
-                        }).then(() => {
-                            console.log('Google Auth2 initialized successfully!');
-                            setIsGapiReady(true);
-                        }, (error: any) => {
-                            console.error('Error initializing Google Auth2:', error);
-                            console.error('Error details:', JSON.stringify(error, null, 2));
-                            addToast('Erro ao inicializar login com Google. Verifique a configuração do Console do Google Cloud.', 'error');
-                        });
-                    } catch (error) {
-                        console.error('Error loading Google Auth2:', error);
-                        addToast('Erro ao carregar login com Google. Verifique a configuração do Console do Google Cloud.', 'error');
-                    }
-                });
-            } else {
-                console.log('Initialization skipped. window.gapi exists:', !!window.gapi, 'isGapiReady:', isGapiReady);
-            }
-        };
-
-        // Set the callback if it doesn't exist
-        if (!window.onGoogleScriptLoadCallback) {
-            window.onGoogleScriptLoadCallback = initGoogleAuth;
-        }
-
-        // If script is already loaded, initialize immediately
-        if (window.googleScriptLoaded) {
-            console.log('Google script already loaded, initializing...');
-            initGoogleAuth();
-        }
-
-        return () => {
-            // Don't clear the callback as it might be needed for React remounts
-            // (window as any).onGoogleScriptLoadCallback = undefined;
-        };
-    }, [isGapiReady, addToast]);
-
 
     // Effect for Firebase Auth state changes
     useEffect(() => {
@@ -669,26 +617,30 @@ const App: React.FC = () => {
 
 
     // --- Auth Handlers ---
-    const onGoogleSignInSuccess = async (googleUser: any) => {
+    const onGoogleSignInSuccess = async (credentialResponse: any) => {
+        setIsProcessingOrder(true); // Show a general loading spinner
         try {
-            const idToken = googleUser.getAuthResponse().id_token;
+            const idToken = credentialResponse.credential;
+            if (!idToken) {
+                throw new Error("Google Sign-In did not return an ID token.");
+            }
             await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
             const customToken = await firebaseService.verifyGoogleToken(idToken);
             await auth.signInWithCustomToken(customToken);
-
+            
             setIsLoginModalOpen(false);
-            addToast(`Bem-vindo(a), ${googleUser.getBasicProfile().getName()}!`, 'success');
+            addToast('Login com Google efetuado com sucesso!', 'success');
         } catch (error: any) {
             console.error("Google Sign-In Error:", error);
             addToast('Falha no login com Google. Tente novamente.', 'error');
+        } finally {
+            setIsProcessingOrder(false);
         }
     };
     
     const onGoogleSignInFailure = (error: any) => {
         console.error("Google Sign-In Failure:", error);
-        if (error.error !== 'popup_closed_by_user') {
-            addToast('Falha no login com Google. Verifique a configuração e tente novamente.', 'error');
-        }
+        addToast('Falha no login com Google. Tente novamente mais tarde.', 'error');
     };
     
     const handleRegisterSuccess = () => {
@@ -699,12 +651,7 @@ const App: React.FC = () => {
     const handleLogout = async () => {
         if (!auth) return;
         try {
-            if (isGapiReady) {
-                const googleAuth = window.gapi.auth2.getAuthInstance();
-                if (googleAuth && googleAuth.isSignedIn.get()) {
-                    await googleAuth.signOut();
-                }
-            }
+            // No need to sign out from Google Identity Services explicitly on the client
             await auth.signOut();
             setIsUserAreaModalOpen(false);
             addToast('Você foi desconectado.', 'success');
@@ -1381,7 +1328,6 @@ const App: React.FC = () => {
                 }} 
                 onGoogleSignInSuccess={onGoogleSignInSuccess}
                 onGoogleSignInFailure={onGoogleSignInFailure}
-                isGapiReady={isGapiReady}
                 addToast={addToast} 
                 onRegisterSuccess={handleRegisterSuccess}
                 onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}

@@ -3,6 +3,9 @@
 // `ExtendableEvent`, and `FetchEvent`, resolving all type-related errors in this file.
 /// <reference lib="webworker" />
 
+// FIX: Force this file to be a module by importing a type. This prevents its global scope from conflicting with the DOM types used by React, which solves the JSX errors.
+import type {} from './types';
+
 // This is a global constant that will be replaced by the build process
 // FIX: Removed the `declare const self` line which caused a redeclaration error.
 // The `webworker` lib reference correctly types the global `self`.
@@ -86,7 +89,3 @@ self.addEventListener('install', (event: ExtendableEvent) => {
     // FIX: Explicitly cast `self` to the correct type to resolve a type inference issue where `skipWaiting` was not being identified as a function. This addresses the "not callable" error.
     event.waitUntil((self as unknown as ServiceWorkerGlobalScope).skipWaiting());
 });
-
-// FIX: Convert this file to a module to prevent its global scope from conflicting with the main application's DOM types.
-// This resolves the widespread "Property '...' does not exist on type 'JSX.IntrinsicElements'" errors.
-export {};

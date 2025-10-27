@@ -6,9 +6,8 @@ import firebase from 'firebase/compat/app';
 interface LoginModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onGoogleSignInSuccess: (googleUser: any) => void;
+    onGoogleSignInSuccess: (credentialResponse: any) => void;
     onGoogleSignInFailure: (error: any) => void;
-    isGapiReady: boolean;
     addToast: (message: string, type: 'success' | 'error') => void;
     onRegisterSuccess: () => void;
     onOpenPrivacyPolicy: () => void;
@@ -19,7 +18,7 @@ interface LoginModalProps {
 type View = 'login' | 'register' | 'forgotPassword' | 'resetPassword';
 type ResetStatus = 'idle' | 'verifying' | 'form' | 'success' | 'error';
 
-export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogleSignInSuccess, onGoogleSignInFailure, isGapiReady, addToast, onRegisterSuccess, onOpenPrivacyPolicy, onOpenTermsOfService, passwordResetCode }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogleSignInSuccess, onGoogleSignInFailure, addToast, onRegisterSuccess, onOpenPrivacyPolicy, onOpenTermsOfService, passwordResetCode }) => {
     const [view, setView] = useState<View>('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -35,6 +34,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
     const [newPassword, setNewPassword] = useState('');
     const [confirmNewPassword, setConfirmNewPassword] = useState('');
     
+    const googleButtonContainerRef = useRef<HTMLDivElement>(null);
+
     const clearFormStates = () => {
         setEmail('');
         setPassword('');
@@ -50,6 +51,24 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
     useEffect(() => {
         if (isOpen) {
             clearFormStates();
+            
+            // New Google Identity Services (GIS) logic
+            if (window.google && googleButtonContainerRef.current) {
+                try {
+                    window.google.accounts.id.initialize({
+                        client_id: '914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com',
+                        callback: onGoogleSignInSuccess,
+                    });
+                    window.google.accounts.id.renderButton(
+                        googleButtonContainerRef.current,
+                        { theme: 'outline', size: 'large', type: 'standard', text: 'continue_with', shape: 'rectangular', width: "308", locale: 'pt-BR' }
+                    );
+                } catch (err) {
+                    console.error("Error initializing or rendering Google Sign-In button:", err);
+                    onGoogleSignInFailure(err);
+                }
+            }
+
             if (passwordResetCode) {
                 setView('resetPassword');
                 setResetStatus('verifying');
@@ -59,30 +78,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
                 setResetStatus('idle');
             }
         }
-    }, [isOpen, passwordResetCode]);
+    }, [isOpen, passwordResetCode, onGoogleSignInSuccess, onGoogleSignInFailure]);
     
     if (!isOpen) return null;
-
-    const handleGoogleButtonClick = async () => {
-        if (isLoading) return;
-
-        if (!isGapiReady) {
-            addToast('Serviço de login não está pronto. Tente em instantes.', 'error');
-            console.error("Tentativa de login com Google antes da API estar pronta.");
-            return;
-        }
-
-        try {
-            const googleAuth = window.gapi.auth2.getAuthInstance();
-            if (!googleAuth) {
-                throw new Error("A instância de autenticação do Google não foi encontrada.");
-            }
-            const googleUser = await googleAuth.signIn();
-            onGoogleSignInSuccess(googleUser);
-        } catch (error) {
-            onGoogleSignInFailure(error);
-        }
-    };
 
     const handleEmailPasswordSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -271,15 +269,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
                         </form>
                         <div className="relative my-6"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-300"></div></div><div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">ou</span></div></div>
                         
-                        <div 
-                            onClick={handleGoogleButtonClick}
-                            className={`customGPlusSignIn ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
-                            role="button"
-                            aria-label="Logar com o Google"
-                        >
-                            <span className="icon"></span>
-                            <span className="buttonText">Logar com o Google</span>
-                        </div>
+                        <div ref={googleButtonContainerRef} className="flex justify-center"></div>
                     </>
                 );
             case 'forgotPassword':

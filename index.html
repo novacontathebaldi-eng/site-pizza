@@ -11,9 +11,6 @@
     <meta name="theme-color" content="#2C5633">
     <link rel="apple-touch-icon" href="/assets/logo para icones.png">
 
-    <!-- Google Sign-In Client ID -->
-    <meta name="google-signin-client_id" content="914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com">
-
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://www.santasensacao.me/">
@@ -74,44 +71,6 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
-
-      /* Estilos para o botão customizado do Google (Exemplo 2) */
-      .customGPlusSignIn {
-        display: flex;
-        align-items: center;
-        background: #4285f4;
-        color: white;
-        width: 100%;
-        height: 44px;
-        border-radius: 5px;
-        border: 1px solid transparent;
-        white-space: nowrap;
-        cursor: pointer;
-        font-family: 'Roboto', sans-serif;
-        transition: background-color 0.2s, box-shadow 0.2s;
-      }
-      .customGPlusSignIn:hover {
-        background: #357AE8;
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-      }
-      .customGPlusSignIn .icon {
-        background: white url('https://developers.google.com/identity/images/g-logo.png') center no-repeat;
-        background-size: 18px;
-        display: inline-block;
-        vertical-align: middle;
-        width: 42px;
-        height: 100%;
-        border-right: #2265d4 1px solid;
-        border-top-left-radius: 4.5px;
-        border-bottom-left-radius: 4.5px;
-      }
-      .customGPlusSignIn .buttonText {
-        flex-grow: 1;
-        text-align: center;
-        font-size: 14px;
-        font-weight: 500;
-        letter-spacing: .21px;
-      }
     </style>
     
     <script>
@@ -158,25 +117,7 @@
 </head>
 <body class="bg-brand-ivory-50 text-text-on-light antialiased">
     <div id="root"></div>
-    <script>
-      function onGoogleScriptLoad() {
-        console.log('[Google Script] onGoogleScriptLoad called');
-        // Set a flag to indicate the script has loaded, in case React mounts after this.
-        window.googleScriptLoaded = true;
-        console.log('[Google Script] window.googleScriptLoaded set to true');
-        // If the React callback is already on the window object, call it.
-        if (window.onGoogleScriptLoadCallback) {
-          console.log('[Google Script] Calling window.onGoogleScriptLoadCallback');
-          window.onGoogleScriptLoadCallback();
-        } else {
-          console.log('[Google Script] window.onGoogleScriptLoadCallback not yet set, waiting for React to mount');
-        }
-      }
-      
-      // Log when the script tag is parsed
-      console.log('[Google Script] Script tag parsed, loading Google Platform API...');
-    </script>
-    <script src="https://apis.google.com/js/platform.js?onload=onGoogleScriptLoad" async defer></script>
+    <script src="https://accounts.google.com/gsi/client" async></script>
     <script type="module" src="/index.tsx"></script>
 </body>
 </html>
