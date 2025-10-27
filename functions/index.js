@@ -294,7 +294,7 @@ SUAS CAPACIDADES:
 INFORMAÇÕES ESSENCIAIS:
 - Endereço: Rua Porfilio Furtado, 178, Centro - Santa Leopoldina, ES.
 - Entrega (Taxa R$ 3,00): Atendemos Olaria, Funil, Cocal, Vila Nova, Centro e Moxafongo. Se o cliente solicitar mais detalhes sobre as áreas de entregas, saiba que Na olaria entregamos até a piscina. Para o lado do funil, subindo pra Santa Maria de Jetibá, entregamos até aquelas primeiras casas depois da ponte do funil. No cocal entregamos até aquelas primeiras casas depois de onde tá construindo a nova escola municipal. Mas ainda assim se houver dúvida sobre um endereço, peça ao cliente para confirmar via WhatsApp.
-- PIX: A chave PIX é o CNPJ: 62.247.199/0001-04. O cliente deve enviar o comprovante pelo WhatsApp após o pagamento. Você pode também oferecer o QR Code e renderizar o botão " Ver QR CODE PIX" que leva ao modal "Pagar com QR Code" sempre que o cliente solititar a chave PIX ou falar sobre o pagamento PIX.
+- PIX: A chave PIX é o CNPJ: 62.247.199/0001-04. O cliente deve enviar o comprovante pelo WhatsApp após o pagamento.
 - Pizzaiolos: Carlos Entringer e o mestre Luca Lonardi (vencedor do Panshow 2025).
 - Gerente: Patrícia Carvalho.
 - Atendimento: Delivery, Retirada e Consumo no local (com ou sem reserva).
