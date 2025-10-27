@@ -1,10 +1,9 @@
 /* eslint-disable max-len */
-const {onCall, onRequest} = require("firebase-functions/v2/https");
+const {onCall} = require("firebase-functions/v2/https");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
-const crypto = require("crypto");
 const {GoogleGenAI} = require("@google/genai");
 const {OAuth2Client} = require("google-auth-library");
 
@@ -458,9 +457,6 @@ REGRAS DE SEGURANÇA:
  */
 exports.verifyGoogleToken = onCall({secrets}, async (request) => {
   const {idToken} = request.data;
-  // This client ID is public and is used to initialize the Google Sign-In button on the frontend.
-  // Using it directly here avoids potential issues with Cloud Secret Manager configuration,
-  // resolving the 500 internal server error.
   const clientId = "914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com";
 
   if (!idToken) {
@@ -480,41 +476,54 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
       throw new onCall.HttpsError("unauthenticated", "Invalid ID token.");
     }
 
-    const {sub: googleUid, email, name, picture} = payload;
-    // FIX: Add fallbacks for name and picture to ensure profile data is always valid.
-    const finalName = name || (email ? email.split("@")[0] : "Usuário");
-    const finalPicture = picture || ""; // Ensure it's a string to match UserProfile type
+    const {email, name, picture, email_verified: emailVerified} = payload;
+    if (!email) {
+      throw new onCall.HttpsError("unauthenticated", "Google token did not contain an email address.");
+    }
 
-    // We create a unique UID for Firebase Auth based on the Google UID
-    const uid = `google:${googleUid}`;
+    const finalName = name || email.split("@")[0];
+    const finalPicture = picture || "";
+
+    let userRecord;
     let isNewUser = false;
 
-    // Update or create user in Firebase Auth
     try {
-      await admin.auth().updateUser(uid, {
-        email: email,
-        displayName: finalName,
-        photoURL: finalPicture,
-      });
+      // Check if a user with this email already exists
+      userRecord = await admin.auth().getUserByEmail(email);
+
+      // User exists, update their profile with Google info if missing
+      const updates = {};
+      if (!userRecord.displayName && finalName) {
+        updates.displayName = finalName;
+      }
+      if (!userRecord.photoURL && finalPicture) {
+        updates.photoURL = finalPicture;
+      }
+      if (Object.keys(updates).length > 0) {
+        await admin.auth().updateUser(userRecord.uid, updates);
+      }
     } catch (error) {
       if (error.code === "auth/user-not-found") {
+        // User does not exist, create a new one
         isNewUser = true;
-        await admin.auth().createUser({
-          uid: uid,
+        userRecord = await admin.auth().createUser({
           email: email,
+          emailVerified: emailVerified,
           displayName: finalName,
           photoURL: finalPicture,
         });
       } else {
-        throw error; // Re-throw other errors
+        // Re-throw other errors
+        throw error;
       }
     }
 
-    // Create or update user profile in Firestore 'users' collection
+    const uid = userRecord.uid;
+
+    // Create user profile in Firestore if it's a new user or doesn't exist yet
     const userRef = db.collection("users").doc(uid);
     const userDoc = await userRef.get();
 
-    // Create profile in Firestore only if it doesn't exist
     if (isNewUser || !userDoc.exists) {
       await userRef.set({
         name: finalName,
@@ -529,7 +538,7 @@ exports.verifyGoogleToken = onCall({secrets}, async (request) => {
     return {customToken};
   } catch (error) {
     logger.error("Error verifying Google token:", error);
-    throw new onCall.HttpsError("unauthenticated", "Token verification failed.", error.message);
+    throw new onCall.HttpsError("internal", "Token verification failed.", error.message);
   }
 });
 
