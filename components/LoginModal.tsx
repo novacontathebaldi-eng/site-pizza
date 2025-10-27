@@ -35,8 +35,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
     const [newPassword, setNewPassword] = useState('');
     const [confirmNewPassword, setConfirmNewPassword] = useState('');
     
-    const googleButtonRef = useRef<HTMLDivElement>(null);
-
     const clearFormStates = () => {
         setEmail('');
         setPassword('');
@@ -63,26 +61,28 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
         }
     }, [isOpen, passwordResetCode]);
     
-    useEffect(() => {
-        if (isOpen && isGapiReady && googleButtonRef.current) {
-            try {
-                const auth2 = window.gapi.auth2.getAuthInstance();
-                if (auth2) {
-                    auth2.attachClickHandler(
-                        googleButtonRef.current,
-                        {}, // options
-                        onGoogleSignInSuccess,
-                        onGoogleSignInFailure
-                    );
-                }
-            } catch (error) {
-                console.error("Falha ao anexar o manipulador de clique do Google:", error);
-            }
-        }
-    }, [isOpen, isGapiReady, onGoogleSignInSuccess, onGoogleSignInFailure]);
-
-
     if (!isOpen) return null;
+
+    const handleGoogleButtonClick = async () => {
+        if (isLoading) return;
+
+        if (!isGapiReady) {
+            addToast('Serviço de login não está pronto. Tente em instantes.', 'error');
+            console.error("Tentativa de login com Google antes da API estar pronta.");
+            return;
+        }
+
+        try {
+            const googleAuth = window.gapi.auth2.getAuthInstance();
+            if (!googleAuth) {
+                throw new Error("A instância de autenticação do Google não foi encontrada.");
+            }
+            const googleUser = await googleAuth.signIn();
+            onGoogleSignInSuccess(googleUser);
+        } catch (error) {
+            onGoogleSignInFailure(error);
+        }
+    };
 
     const handleEmailPasswordSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -272,7 +272,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
                         <div className="relative my-6"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-300"></div></div><div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">ou</span></div></div>
                         
                         <div 
-                            ref={googleButtonRef}
+                            onClick={handleGoogleButtonClick}
                             className={`customGPlusSignIn ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
                             role="button"
                             aria-label="Logar com o Google"
