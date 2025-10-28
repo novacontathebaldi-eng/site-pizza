@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { auth } from '../services/firebase';
 import * as firebaseService from '../services/firebaseService';
 import firebase from 'firebase/compat/app';
@@ -6,8 +6,7 @@ import firebase from 'firebase/compat/app';
 interface LoginModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onGoogleSignInSuccess: (credentialResponse: any) => void;
-    onGoogleSignInFailure: (error: any) => void;
+    onGoogleSignIn: () => void;
     addToast: (message: string, type: 'success' | 'error') => void;
     onRegisterSuccess: () => void;
     onOpenPrivacyPolicy: () => void;
@@ -18,7 +17,7 @@ interface LoginModalProps {
 type View = 'login' | 'register' | 'forgotPassword' | 'resetPassword';
 type ResetStatus = 'idle' | 'verifying' | 'form' | 'success' | 'error';
 
-export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogleSignInSuccess, onGoogleSignInFailure, addToast, onRegisterSuccess, onOpenPrivacyPolicy, onOpenTermsOfService, passwordResetCode }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogleSignIn, addToast, onRegisterSuccess, onOpenPrivacyPolicy, onOpenTermsOfService, passwordResetCode }) => {
     const [view, setView] = useState<View>('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -33,8 +32,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
     const [resetStatus, setResetStatus] = useState<ResetStatus>('idle');
     const [newPassword, setNewPassword] = useState('');
     const [confirmNewPassword, setConfirmNewPassword] = useState('');
-    
-    const googleButtonContainerRef = useRef<HTMLDivElement>(null);
 
     const clearFormStates = () => {
         setEmail('');
@@ -51,24 +48,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
     useEffect(() => {
         if (isOpen) {
             clearFormStates();
-            
-            // New Google Identity Services (GIS) logic
-            if (window.google && googleButtonContainerRef.current) {
-                try {
-                    window.google.accounts.id.initialize({
-                        client_id: '914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com',
-                        callback: onGoogleSignInSuccess,
-                    });
-                    window.google.accounts.id.renderButton(
-                        googleButtonContainerRef.current,
-                        { theme: 'outline', size: 'large', type: 'standard', text: 'continue_with', shape: 'rectangular', width: "308", locale: 'pt-BR' }
-                    );
-                } catch (err) {
-                    console.error("Error initializing or rendering Google Sign-In button:", err);
-                    onGoogleSignInFailure(err);
-                }
-            }
-
             if (passwordResetCode) {
                 setView('resetPassword');
                 setResetStatus('verifying');
@@ -78,8 +57,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
                 setResetStatus('idle');
             }
         }
-    }, [isOpen, passwordResetCode, onGoogleSignInSuccess, onGoogleSignInFailure]);
-    
+    }, [isOpen, passwordResetCode]);
+
     if (!isOpen) return null;
 
     const handleEmailPasswordSubmit = async (e: React.FormEvent) => {
@@ -267,9 +246,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
                                 {isLoading ? <i className="fas fa-spinner fa-spin"></i> : (view === 'register' ? 'Criar Conta' : 'Entrar')}
                             </button>
                         </form>
+                        {/* Botão de login com Google temporariamente desativado a pedido */}
+                        {/*
                         <div className="relative my-6"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-300"></div></div><div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">ou</span></div></div>
-                        
-                        <div ref={googleButtonContainerRef} className="flex justify-center"></div>
+                        <button onClick={onGoogleSignIn} className="w-full bg-white border border-gray-300 text-gray-700 font-semibold py-3 px-4 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-3">
+                            <i className="fab fa-google text-red-500"></i>
+                            <span>Continuar com o Google</span>
+                        </button>
+                        */}
                     </>
                 );
             case 'forgotPassword':

@@ -31,7 +31,8 @@ import { PixQrCodeModal } from './components/PixQrCodeModal';
 declare global {
     interface Window {
         gapi: any;
-        google: any; // For Google Identity Services
+        googleScriptLoaded: boolean;
+        onGoogleScriptLoadCallback: () => void;
     }
 }
 
@@ -237,6 +238,7 @@ const App: React.FC = () => {
     const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
     const [isUserAreaModalOpen, setIsUserAreaModalOpen] = useState<boolean>(false);
+    const [isGapiReady, setIsGapiReady] = useState(false);
     const [postRegisterAction, setPostRegisterAction] = useState<string | null>(null);
     const prevUser = useRef<firebase.User | null>(null);
     const [passwordResetCode, setPasswordResetCode] = useState<string | null>(null);
@@ -370,6 +372,42 @@ const App: React.FC = () => {
         localStorage.setItem('santaSensacaoCookieConsent', 'true');
         setShowCookieBanner(false);
     };
+
+    // Effect to initialize Google Auth
+    useEffect(() => {
+        const initGoogleAuth = () => {
+            if (window.gapi && !isGapiReady) {
+                window.gapi.load('auth2', () => {
+                    try {
+                        window.gapi.auth2.init({
+                            client_id: '914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com',
+                        }).then(() => {
+                            setIsGapiReady(true);
+                        }, (error: any) => {
+                            // Don't show toast on initial load failure, only on interaction.
+                            console.error('Error initializing Google Auth2:', error);
+                        });
+                    } catch (error) {
+                        console.error('Error loading Google Auth2:', error);
+                    }
+                });
+            }
+        };
+
+        // Assign callback for the script in index.html to call
+        window.onGoogleScriptLoadCallback = initGoogleAuth;
+
+        // If script is already loaded and callback was missed (race condition), run init
+        if (window.googleScriptLoaded) {
+            initGoogleAuth();
+        }
+
+        return () => {
+            // @ts-ignore
+            delete window.onGoogleScriptLoadCallback;
+        };
+    }, [isGapiReady]);
+
 
     // Effect for Firebase Auth state changes
     useEffect(() => {
@@ -617,30 +655,30 @@ const App: React.FC = () => {
 
 
     // --- Auth Handlers ---
-    const onGoogleSignInSuccess = async (credentialResponse: any) => {
-        setIsProcessingOrder(true); // Show a general loading spinner
+    const handleGoogleSignIn = async () => {
+        if (!isGapiReady || !auth) {
+            addToast('Serviço de login não está pronto. Tente em instantes.', 'error');
+            return;
+        }
         try {
-            const idToken = credentialResponse.credential;
-            if (!idToken) {
-                throw new Error("Google Sign-In did not return an ID token.");
-            }
+            const googleAuth = window.gapi.auth2.getAuthInstance();
+            const googleUser = await googleAuth.signIn();
+            const idToken = googleUser.getAuthResponse().id_token;
+
+            // Garante que a sessão do usuário persista após o navegador ser fechado.
             await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
             const customToken = await firebaseService.verifyGoogleToken(idToken);
             await auth.signInWithCustomToken(customToken);
-            
+
             setIsLoginModalOpen(false);
-            addToast('Login com Google efetuado com sucesso!', 'success');
+            addToast(`Bem-vindo(a), ${googleUser.getBasicProfile().getName()}!`, 'success');
         } catch (error: any) {
             console.error("Google Sign-In Error:", error);
-            addToast('Falha no login com Google. Tente novamente.', 'error');
-        } finally {
-            setIsProcessingOrder(false);
+            if (error.error !== 'popup_closed_by_user') {
+                addToast('Falha no login com Google. Tente novamente.', 'error');
+            }
         }
-    };
-    
-    const onGoogleSignInFailure = (error: any) => {
-        console.error("Google Sign-In Failure:", error);
-        addToast('Falha no login com Google. Tente novamente mais tarde.', 'error');
     };
     
     const handleRegisterSuccess = () => {
@@ -651,7 +689,12 @@ const App: React.FC = () => {
     const handleLogout = async () => {
         if (!auth) return;
         try {
-            // No need to sign out from Google Identity Services explicitly on the client
+            if (isGapiReady) {
+                const googleAuth = window.gapi.auth2.getAuthInstance();
+                if (googleAuth && googleAuth.isSignedIn.get()) {
+                    await googleAuth.signOut();
+                }
+            }
             await auth.signOut();
             setIsUserAreaModalOpen(false);
             addToast('Você foi desconectado.', 'success');
@@ -891,6 +934,7 @@ const App: React.FC = () => {
         };
         const whatsappUrl = generateWhatsAppMessage(details, order.items || [], order.total || 0, order.orderNumber, isPaid);
         window.open(whatsappUrl, '_blank');
+        setConfirmedOrderData(null);
     };
 
     const handleSendReservationToWhatsApp = (reservation: Order) => {
@@ -901,6 +945,7 @@ const App: React.FC = () => {
         };
         const whatsappUrl = generateReservationWhatsAppMessage(details, reservation.orderNumber);
         window.open(whatsappUrl, '_blank');
+        setConfirmedReservationData(null);
     };
 
     const handleSaveProduct = useCallback(async (product: Product) => {
@@ -1326,8 +1371,7 @@ const App: React.FC = () => {
                     setIsLoginModalOpen(false);
                     setPasswordResetCode(null);
                 }} 
-                onGoogleSignInSuccess={onGoogleSignInSuccess}
-                onGoogleSignInFailure={onGoogleSignInFailure}
+                onGoogleSignIn={handleGoogleSignIn} 
                 addToast={addToast} 
                 onRegisterSuccess={handleRegisterSuccess}
                 onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}

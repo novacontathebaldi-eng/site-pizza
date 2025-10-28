@@ -1,9 +1,10 @@
 /* eslint-disable max-len */
-const {onCall, HttpsError} = require("firebase-functions/v2/https");
+const {onCall, onRequest} = require("firebase-functions/v2/https");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
+const crypto = require("crypto");
 const {GoogleGenAI} = require("@google/genai");
 const {OAuth2Client} = require("google-auth-library");
 
@@ -12,7 +13,7 @@ const db = admin.firestore();
 const storage = admin.storage();
 
 // Define os secrets que as funções irão usar.
-const secrets = ["GEMINI_API_KEY"];
+const secrets = ["GEMINI_API_KEY", "GOOGLE_CLIENT_ID"];
 
 // --- Reusable function to check and set store status based on schedule ---
 const runStoreStatusCheck = async () => {
@@ -281,7 +282,7 @@ Use ESTAS informações como a única fonte de verdade sobre o status e horário
     const dynamicMenuPrompt = generateMenuPrompt(menuData);
 
     const systemInstruction = `${realTimeInfo}\n\n${realTimeStatusInstruction}\n
-        OBJETIVO PRINCIPAL: Você é Sensação, o assistente virtual da pizzaria 'Santa Sensação'. Seja amigável, prestativo e um pouco divertido. Sua principal regra é ser CONCISO. Dê respostas curtas e diretas. Só forneça detalhes ou passo a passo se o cliente pedir. Não se apresente, pois já é apresentado no inico, mas se o cliente pedir você pode, no geral, apenas continue a conversa. Use negrito com asteriscos duplos (**texto**).
+        OBJETIVO PRINCIPAL: Você é Sensação, o assistente virtual da pizzaria 'Santa Sensação'. Seja amigável, prestativo e um pouco divertido. Sua principal regra é ser CONCISO. Dê respostas curtas e diretas. Só forneça detalhes ou passo a passo se o cliente pedir. Não se apresente, apenas continue a conversa. Use negrito com asteriscos duplos (**texto**).
 
 SUAS CAPACIDADES:
 - Apresentar o cardápio e os preços.
@@ -292,7 +293,7 @@ SUAS CAPACIDADES:
 
 INFORMAÇÕES ESSENCIAIS:
 - Endereço: Rua Porfilio Furtado, 178, Centro - Santa Leopoldina, ES.
-- Entrega (Taxa R$ 3,00): Atendemos Olaria, Funil, Cocal, Vila Nova, Centro e Moxafongo. Se o cliente solicitar mais detalhes sobre as áreas de entregas, saiba que Na olaria entregamos até a piscina. Para o lado do funil, subindo pra Santa Maria de Jetibá, entregamos até aquelas primeiras casas depois da ponte do funil. No cocal entregamos até aquelas primeiras casas depois de onde tá construindo a nova escola municipal. Mas ainda assim se houver dúvida sobre um endereço, peça ao cliente para confirmar via WhatsApp.
+- Entrega (Taxa R$ 3,00): Atendemos Olaria, Funil, Cocal, Vila Nova, Centro e Moxafongo. Se houver dúvida sobre um endereço, peça ao cliente para confirmar via WhatsApp.
 - PIX: A chave PIX é o CNPJ: 62.247.199/0001-04. O cliente deve enviar o comprovante pelo WhatsApp após o pagamento.
 - Pizzaiolos: Carlos Entringer e o mestre Luca Lonardi (vencedor do Panshow 2025).
 - Gerente: Patrícia Carvalho.
@@ -301,25 +302,23 @@ INFORMAÇÕES ESSENCIAIS:
 REGRAS DE HORÁRIO E STATUS (MAIS IMPORTANTES):
 - A sua fonte de verdade sobre se a loja está ABERTA ou FECHADA é o "Status da Loja" informado em tempo real.
 - Para informar os horários de funcionamento, use SEMPRE a informação de "Horário de Funcionamento Configurado".
-- Você SÓ PODE criar um pedido se o "Status da Loja" for "Aberta". Se estiver "Fechada", informe o cliente sobre o horário de funcionamento.
+- Você SÓ PODE criar um pedido se o "Status da Loja" for "Aberta". Se estiver "Fechada", informe o cliente sobre o horário de funcionamento e ofereça a opção de falar com um atendente pelo WhatsApp para agendar um pedido ou tirar dúvidas.
 - Você pode criar reservas a qualquer momento, mas informe ao cliente que elas são para os horários de funcionamento.
-- De 00:00 até 05:00 você não deve encaminhar para um atendente pois está, mas você pode passar o email: suporte.thebaldi@gmail.com.
-- Nos horários em que a pizzaria está fechada vcoê deve ajudar o cliente em qualquer solicitação ou suporte, se a loja estiver fechada você pode ser flexivel para falar de outros assuntos com o cliente se ele puxar papo sobre outras coisas, futebol, atualidades, música, história, etc...
- 
+
 REGRAS DE PREÇO E DISPONIBILIDADE:
 - Ao informar um preço, SEMPRE use o preço promocional se ele existir e for maior que zero. Caso contrário, use o preço normal.
 - NUNCA ofereça um produto que está marcado como (ESGOTADO) no cardápio. Informe ao cliente que o item não está disponível no momento.
 
 REGRAS ESPECIAIS DE PEDIDO:
 - **Pizza Meia a Meio:** É possível montar uma pizza com dois sabores (metade/metade). O valor final será sempre o da pizza mais cara entre as duas metades.
-- **Tamanhos de Pizza:** Nossas pizzas estão disponíveis nos tamanhos **M** (6 fatias) e **G** (8 fatias). Não temos outros tamanhos, a menos que especificado no cardápio.
+- **Tamanhos de Pizza:** Nossas pizzas estão disponíveis nos tamanhos **M (6 fatias)** e **G (8 fatias)**. Não temos outros tamanhos, a menos que especificado no cardápio.
 
 **FLUXO DE CRIAÇÃO DE PEDIDO PELO CHAT (MUITO IMPORTANTE):**
 **REGRA DE HORÁRIO:** Verifique o "Status da Loja" em tempo real. Se estiver "Fechada", NÃO crie o pedido. Informe que a loja está fechada, diga qual o horário de funcionamento, e ofereça encaminhar para um atendente. Se estiver "Aberta", prossiga.
 Se o cliente quiser fazer um pedido diretamente com você, siga este fluxo RIGOROSAMENTE:
 1.  **COLETE OS DADOS:** Pergunte UM DE CADA VEZ, nesta ordem:
-    a.  O nome completo.
-    b.  Os itens que ele deseja (pizza, bebida, etc.), incluindo o TAMANHO para pizzas.
+    a.  Os itens que ele deseja (pizza, bebida, etc.), incluindo o TAMANHO para pizzas.
+    b.  O nome completo.
     c.  O número de telefone/WhatsApp.
     d.  O tipo de pedido ('Entrega' ou 'Retirada').
     e.  Se for 'Entrega', pergunte o endereço completo (Localidade, Rua, Número). Lembre-se das áreas de entrega.
@@ -413,7 +412,7 @@ Se o cliente pedir para falar com um humano, relatar um bug, ou estiver frustrad
 2.  **Monte a Mensagem para o WhatsApp:** A mensagem deve começar com: 'Olá! Vim do site e o assistente Sensação me encaminhou. {Seu resumo aqui}'.
 3.  **Escolha o Número:**
     - Para dúvidas gerais e pedidos: '5527996500341'.
-    - Para problemas técnicos (bugs): '5527996670426'. Se o cliente relatar um bug, pergunte qual número ele prefere. Para bugs, temos também temos o email: suporte.thebaldi@gmail.com.
+    - Para problemas técnicos (bugs): '5527996670426'. Se o cliente relatar um bug, pergunte qual número ele prefere.
 4.  **Gere o Link:** Crie a URL do WhatsApp com a mensagem codificada e apresente-a usando o formato Markdown, conforme a **REGRA GERAL PARA LINKS**. O texto do link deve ser **'Conversar com um atendente pelo WhatsApp'**.
 
 
@@ -430,7 +429,7 @@ Se o cliente pedir para falar com um humano, relatar um bug, ou estiver frustrad
 O assistente Sensação gerou esta *solicitação de reserva* pelo nosso site: *santasensacao.me*
 
 REGRAS DE SEGURANÇA:
-**NUNCA FORNEÇA DADOS SENSÍVEIS:** Jamais compartilhe informações sobre painel admin, senhas, APIs, ou qualquer detalhe técnico. Se perguntado, diga educadamente que não tem acesso a essas informações e que o suporte técnico pode ajudar melhor com isso e pergunte se ele quer entrar em contato com o suporte técnico.
+**NUNCA FORNEÇA DADOS SENSÍVEIS:** Jamais compartilhe informações sobre painel admin, senhas, APIs, ou qualquer detalhe técnico. Se perguntado, diga educadamente que não tem acesso a essas informações.
 `;
 
     const finalSystemInstruction = `${dynamicMenuPrompt}\n${systemInstruction}`;
@@ -455,12 +454,16 @@ REGRAS DE SEGURANÇA:
  * Verifies a Google ID token, creates or updates a Firebase user,
  * and returns a custom token for session authentication.
  */
-exports.verifyGoogleToken = onCall(async (request) => {
+exports.verifyGoogleToken = onCall({secrets}, async (request) => {
   const {idToken} = request.data;
-  const clientId = "914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com";
+  const clientId = process.env.GOOGLE_CLIENT_ID;
 
   if (!idToken) {
-    throw new HttpsError("invalid-argument", "The function must be called with an idToken.");
+    throw new onCall.HttpsError("invalid-argument", "The function must be called with an idToken.");
+  }
+  if (!clientId) {
+    logger.error("GOOGLE_CLIENT_ID not set.");
+    throw new onCall.HttpsError("internal", "Authentication is not configured correctly.");
   }
 
   const client = new OAuth2Client(clientId);
@@ -470,78 +473,58 @@ exports.verifyGoogleToken = onCall(async (request) => {
       idToken: idToken,
       audience: clientId,
     });
-
     const payload = ticket.getPayload();
-    
+
     if (!payload) {
-      throw new HttpsError("unauthenticated", "Invalid ID token.");
+      throw new onCall.HttpsError("unauthenticated", "Invalid ID token.");
     }
 
-    const {email, name, picture, email_verified: emailVerified} = payload;
-
-    if (!email) {
-      throw new HttpsError("unauthenticated", "Google token did not contain an email address.");
-    }
-
-    const finalName = name || email.split("@")[0];
-    const finalPicture = picture || "";
-
-    let userRecord;
+    const {sub: googleUid, email, name, picture} = payload;
+    // We create a unique UID for Firebase Auth based on the Google UID
+    const uid = `google:${googleUid}`;
     let isNewUser = false;
 
+    // Update or create user in Firebase Auth
     try {
-      // Check if a user with this email already exists
-      userRecord = await admin.auth().getUserByEmail(email);
-
-      // User exists, update their profile with Google info if missing
-      const updates = {};
-      if (!userRecord.displayName && finalName) {
-        updates.displayName = finalName;
-      }
-      if (!userRecord.photoURL && finalPicture) {
-        updates.photoURL = finalPicture;
-      }
-      if (Object.keys(updates).length > 0) {
-        await admin.auth().updateUser(userRecord.uid, updates);
-      }
+      await admin.auth().updateUser(uid, {
+        email: email,
+        displayName: name,
+        photoURL: picture,
+      });
     } catch (error) {
       if (error.code === "auth/user-not-found") {
-        // User does not exist, create a new one
         isNewUser = true;
-        userRecord = await admin.auth().createUser({
+        await admin.auth().createUser({
+          uid: uid,
           email: email,
-          emailVerified: emailVerified,
-          displayName: finalName,
-          photoURL: finalPicture,
+          displayName: name,
+          photoURL: picture,
         });
       } else {
-        // Re-throw other errors
-        throw error;
+        throw error; // Re-throw other errors
       }
     }
 
-    const uid = userRecord.uid;
-
-    // Create user profile in Firestore if it's a new user or doesn't exist yet
+    // Create or update user profile in Firestore 'users' collection
     const userRef = db.collection("users").doc(uid);
     const userDoc = await userRef.get();
 
+    // Create profile in Firestore only if it doesn't exist
     if (isNewUser || !userDoc.exists) {
       await userRef.set({
-        name: finalName,
+        name,
         email,
-        photoURL: finalPicture,
-        addresses: [],
+        photoURL: picture,
+        addresses: [], // Initialize with empty addresses
       }, {merge: true});
     }
 
     // Create a custom token for the Firebase user
     const customToken = await admin.auth().createCustomToken(uid);
-
     return {customToken};
   } catch (error) {
     logger.error("Error verifying Google token:", error);
-    throw new HttpsError("internal", "Token verification failed.", error.message);
+    throw new onCall.HttpsError("unauthenticated", "Token verification failed.", error.message);
   }
 });
 
@@ -682,7 +665,7 @@ exports.createReservation = onCall({secrets}, async (request) => {
 exports.manageProfilePicture = onCall({secrets}, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) {
-    throw new HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
+    throw new onCall.HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
   }
 
   const {imageBase64} = request.data;
@@ -700,7 +683,7 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
       return {success: true, photoURL: null};
     } catch (error) {
       logger.error(`Falha ao remover a foto de perfil para ${uid}:`, error);
-      throw new HttpsError("internal", "Não foi possível remover a foto de perfil.");
+      throw new onCall.HttpsError("internal", "Não foi possível remover a foto de perfil.");
     }
   }
 
@@ -709,7 +692,7 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
     try {
       const matches = imageBase64.match(/^data:(image\/[a-z]+);base64,(.+)$/);
       if (!matches || matches.length !== 3) {
-        throw new HttpsError("invalid-argument", "Formato de imagem base64 inválido.");
+        throw new onCall.HttpsError("invalid-argument", "Formato de imagem base64 inválido.");
       }
       const mimeType = matches[1];
       const base64Data = matches[2];
@@ -734,11 +717,11 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
       return {success: true, photoURL};
     } catch (error) {
       logger.error(`Falha ao atualizar a foto de perfil para ${uid}:`, error);
-      throw new HttpsError("internal", "Não foi possível salvar a nova foto de perfil.");
+      throw new onCall.HttpsError("internal", "Não foi possível salvar a nova foto de perfil.");
     }
   }
 
-  throw new HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
+  throw new onCall.HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
 });
 
 /**
@@ -749,7 +732,7 @@ exports.syncGuestOrders = onCall({secrets}, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) {
     logger.error("syncGuestOrders foi chamada sem autenticação.");
-    throw new HttpsError(
+    throw new onCall.HttpsError(
         "unauthenticated",
         "A função deve ser chamada por um usuário autenticado.",
     );
@@ -759,7 +742,7 @@ exports.syncGuestOrders = onCall({secrets}, async (request) => {
   const {orderIds} = request.data;
   if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
     logger.warn(`syncGuestOrders foi chamada com orderIds inválido para o usuário ${uid}.`);
-    throw new HttpsError(
+    throw new onCall.HttpsError(
         "invalid-argument",
         "A função deve ser chamada com um array de IDs de pedidos.",
     );
@@ -782,7 +765,7 @@ exports.syncGuestOrders = onCall({secrets}, async (request) => {
     return {success: true, message: "Pedidos associados com sucesso."};
   } catch (error) {
     logger.error(`[Falha] Erro ao associar pedidos para o usuário ${uid}:`, error);
-    throw new HttpsError(
+    throw new onCall.HttpsError(
         "internal",
         "Ocorreu um erro ao associar seus pedidos.",
         error.message,
