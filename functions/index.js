@@ -455,7 +455,7 @@ REGRAS DE SEGURANÇA:
  * Verifies a Google ID token, creates or updates a Firebase user,
  * and returns a custom token for session authentication.
  */
-exports.verifyGoogleToken = onCall({secrets}, async (request) => {
+exports.verifyGoogleToken = onCall(async (request) => {
   const {idToken} = request.data;
   const clientId = "914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com";
 
