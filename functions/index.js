@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-const {onCall} = require("firebase-functions/v2/https");
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
@@ -460,7 +460,7 @@ exports.verifyGoogleToken = onCall(async (request) => {
   const clientId = "914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com";
 
   if (!idToken) {
-    throw new onCall.HttpsError("invalid-argument", "The function must be called with an idToken.");
+    throw new HttpsError("invalid-argument", "The function must be called with an idToken.");
   }
 
   const client = new OAuth2Client(clientId);
@@ -470,15 +470,17 @@ exports.verifyGoogleToken = onCall(async (request) => {
       idToken: idToken,
       audience: clientId,
     });
-    const payload = ticket.getPayload();
 
+    const payload = ticket.getPayload();
+    
     if (!payload) {
-      throw new onCall.HttpsError("unauthenticated", "Invalid ID token.");
+      throw new HttpsError("unauthenticated", "Invalid ID token.");
     }
 
     const {email, name, picture, email_verified: emailVerified} = payload;
+
     if (!email) {
-      throw new onCall.HttpsError("unauthenticated", "Google token did not contain an email address.");
+      throw new HttpsError("unauthenticated", "Google token did not contain an email address.");
     }
 
     const finalName = name || email.split("@")[0];
@@ -529,16 +531,17 @@ exports.verifyGoogleToken = onCall(async (request) => {
         name: finalName,
         email,
         photoURL: finalPicture,
-        addresses: [], // Initialize with empty addresses
+        addresses: [],
       }, {merge: true});
     }
 
     // Create a custom token for the Firebase user
     const customToken = await admin.auth().createCustomToken(uid);
+
     return {customToken};
   } catch (error) {
     logger.error("Error verifying Google token:", error);
-    throw new onCall.HttpsError("internal", "Token verification failed.", error.message);
+    throw new HttpsError("internal", "Token verification failed.", error.message);
   }
 });
 
@@ -679,7 +682,7 @@ exports.createReservation = onCall({secrets}, async (request) => {
 exports.manageProfilePicture = onCall({secrets}, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) {
-    throw new onCall.HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
+    throw new HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
   }
 
   const {imageBase64} = request.data;
@@ -697,7 +700,7 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
       return {success: true, photoURL: null};
     } catch (error) {
       logger.error(`Falha ao remover a foto de perfil para ${uid}:`, error);
-      throw new onCall.HttpsError("internal", "Não foi possível remover a foto de perfil.");
+      throw new HttpsError("internal", "Não foi possível remover a foto de perfil.");
     }
   }
 
@@ -706,7 +709,7 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
     try {
       const matches = imageBase64.match(/^data:(image\/[a-z]+);base64,(.+)$/);
       if (!matches || matches.length !== 3) {
-        throw new onCall.HttpsError("invalid-argument", "Formato de imagem base64 inválido.");
+        throw new HttpsError("invalid-argument", "Formato de imagem base64 inválido.");
       }
       const mimeType = matches[1];
       const base64Data = matches[2];
@@ -731,11 +734,11 @@ exports.manageProfilePicture = onCall({secrets}, async (request) => {
       return {success: true, photoURL};
     } catch (error) {
       logger.error(`Falha ao atualizar a foto de perfil para ${uid}:`, error);
-      throw new onCall.HttpsError("internal", "Não foi possível salvar a nova foto de perfil.");
+      throw new HttpsError("internal", "Não foi possível salvar a nova foto de perfil.");
     }
   }
 
-  throw new onCall.HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
+  throw new HttpsError("invalid-argument", "Payload inválido para gerenciar foto de perfil.");
 });
 
 /**
@@ -746,7 +749,7 @@ exports.syncGuestOrders = onCall({secrets}, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) {
     logger.error("syncGuestOrders foi chamada sem autenticação.");
-    throw new onCall.HttpsError(
+    throw new HttpsError(
         "unauthenticated",
         "A função deve ser chamada por um usuário autenticado.",
     );
@@ -756,7 +759,7 @@ exports.syncGuestOrders = onCall({secrets}, async (request) => {
   const {orderIds} = request.data;
   if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
     logger.warn(`syncGuestOrders foi chamada com orderIds inválido para o usuário ${uid}.`);
-    throw new onCall.HttpsError(
+    throw new HttpsError(
         "invalid-argument",
         "A função deve ser chamada com um array de IDs de pedidos.",
     );
@@ -779,7 +782,7 @@ exports.syncGuestOrders = onCall({secrets}, async (request) => {
     return {success: true, message: "Pedidos associados com sucesso."};
   } catch (error) {
     logger.error(`[Falha] Erro ao associar pedidos para o usuário ${uid}:`, error);
-    throw new onCall.HttpsError(
+    throw new HttpsError(
         "internal",
         "Ocorreu um erro ao associar seus pedidos.",
         error.message,
