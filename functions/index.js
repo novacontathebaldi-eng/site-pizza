@@ -246,7 +246,7 @@ exports.askSanto = onCall({secrets}, async (request) => {
     logger.info("Gemini AI client initialized on first call.");
   }
 
-  const {history: conversationHistory, menuData, storeStatus} = request.data;
+  const {history: conversationHistory, menuData, storeStatus, userProfile, myOrders} = request.data;
   if (!conversationHistory || conversationHistory.length === 0) {
     throw new Error("No conversation history provided.");
   }
@@ -279,9 +279,30 @@ exports.askSanto = onCall({secrets}, async (request) => {
 
 Use ESTAS informações como a única fonte de verdade sobre o status e horário da loja. IGNORE quaisquer outros horários mencionados neste prompt.`;
 
+    let userContextPrompt = "";
+    if (userProfile) {
+      // Stringify a limited set of data to avoid making the prompt too large.
+      const simplifiedOrders = (myOrders || []).slice(0, 10).map((o) => ({
+        orderNumber: o.orderNumber,
+        createdAt: o.createdAt, // Timestamps can be large, but are useful context
+        items: o.items ? o.items.map((i) => `${i.quantity}x ${i.name} (${i.size})`).join(", ") : "Reserva",
+        total: o.total,
+        status: o.status,
+      }));
+
+      userContextPrompt = `\n\nDADOS DO USUÁRIO LOGADO (FONTE PRIMÁRIA DE VERDADE):
+- Nome: ${userProfile.name}
+- Telefone: ${userProfile.phone || "Não informado"}
+- Endereços Salvos: ${JSON.stringify(userProfile.addresses || [])}
+
+HISTÓRICO DE PEDIDOS RECENTES (use para repetir pedidos):\n${JSON.stringify(simplifiedOrders)}\n`;
+    }
+
     const dynamicMenuPrompt = generateMenuPrompt(menuData);
 
     const systemInstruction = `${realTimeInfo}\n\n${realTimeStatusInstruction}\n
+        ${userContextPrompt}
+
         OBJETIVO PRINCIPAL: Você é Sensação, o assistente virtual da pizzaria 'Santa Sensação'. Seja amigável, prestativo e um pouco divertido. Sua principal regra é ser CONCISO. Dê respostas curtas e diretas. Só forneça detalhes ou passo a passo se o cliente pedir. Não se apresente, pois já é apresentado no inico, mas se o cliente pedir você pode, no geral, apenas continue a conversa. Use negrito com asteriscos duplos (**texto**).
 
 SUAS CAPACIDADES:
@@ -300,7 +321,7 @@ INFORMAÇÕES ESSENCIAIS:
 - Atendimento: Delivery, Retirada e Consumo no local (com ou sem reserva).
 
 REGRAS DE HORÁRIO E STATUS (MAIS IMPORTANTES):
-- A sua fonte de verdade sobre se a loja está ABERTA ou FECHADA é o "Status da Loja" informado em tempo real.
+- A sua fonte de verdade sobre se a loja está ABERTA ou FECHADA é o "Status da Loja" em tempo real.
 - Para informar os horários de funcionamento, use SEMPRE a informação de "Horário de Funcionamento Configurado".
 - Você SÓ PODE criar um pedido se o "Status da Loja" for "Aberta". Se estiver "Fechada", informe o cliente sobre o horário de funcionamento.
 - Você pode criar reservas a qualquer momento, mas informe ao cliente que elas são para os horários de funcionamento.
@@ -314,6 +335,13 @@ REGRAS DE PREÇO E DISPONIBILIDADE:
 REGRAS ESPECIAIS DE PEDIDO:
 - **Pizza Meia a Meio:** É possível montar uma pizza com dois sabores (metade/metade). O valor final será sempre o da pizza mais cara entre as duas metades.
 - **Tamanhos de Pizza:** Nossas pizzas estão disponíveis nos tamanhos **M** (6 fatias) e **G** (8 fatias). Não temos outros tamanhos, a menos que especificado no cardápio.
+
+REGRAS PARA USUÁRIOS LOGADOS (SE HOUVER DADOS DO USUÁRIO):
+- Se os "DADOS DO USUÁRIO LOGADO" estiverem presentes, use-os como prioridade.
+- **Nome e Telefone:** NÃO pergunte pelo nome ou telefone. Use os dados fornecidos automaticamente para criar pedidos.
+- **Endereço de Entrega:** Verifique os "Endereços Salvos". Se houver um com "isFavorite: true", pergunte "Podemos entregar no seu endereço favorito em {rua}, {número}?". Se não houver favorito, sugira o primeiro da lista. Sempre dê a opção de escolher outro endereço salvo ou digitar um novo.
+- **Repetir Pedido:** Se o cliente pedir para repetir um pedido (ex: "o último pedido", "a pizza de calabresa que pedi semana passada"), use o "HISTÓRICO DE PEDIDOS" para encontrar o pedido. Liste os itens encontrados e pergunte "Deseja pedir novamente: {lista de itens}?". Se confirmado, inicie o fluxo de criação de pedido com esses itens.
+- **Alteração de Dados:** Se o cliente pedir para mudar nome, telefone ou endereço, responda educadamente: "Você pode atualizar suas informações a qualquer momento na sua 'Área do Cliente' no menu principal." e NÃO tente coletar os novos dados.
 
 **FLUXO DE CRIAÇÃO DE PEDIDO PELO CHAT (MUITO IMPORTANTE):**
 **REGRA DE HORÁRIO:** Verifique o "Status da Loja" em tempo real. Se estiver "Fechada", NÃO crie o pedido. Informe que a loja está fechada, diga qual o horário de funcionamento, e ofereça encaminhar para um atendente. Se estiver "Aberta", prossiga.

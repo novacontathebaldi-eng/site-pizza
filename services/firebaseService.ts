@@ -247,14 +247,24 @@ export const permanentDeleteMultipleOrders = async (orderIds: string[]): Promise
 };
 
 // Chatbot
-export const askChatbot = async (history: ChatMessage[], products: Product[], categories: Category[], isStoreOnline: boolean, operatingHours: DaySchedule[] | undefined): Promise<string> => {
+export const askChatbot = async (
+    history: ChatMessage[],
+    products: Product[],
+    categories: Category[],
+    isStoreOnline: boolean,
+    operatingHours: DaySchedule[] | undefined,
+    userProfile: UserProfile | null,
+    myOrders: Order[]
+): Promise<string> => {
     if (!functions) throw new Error("Firebase Functions not initialized.");
     try {
         const askSanto = functions.httpsCallable('askSanto');
         const response = await askSanto({
             history,
             menuData: { products, categories },
-            storeStatus: { isOnline: isStoreOnline, operatingHours: operatingHours || [] }
+            storeStatus: { isOnline: isStoreOnline, operatingHours: operatingHours || [] },
+            userProfile,
+            myOrders
         });
         return (response.data as any).reply;
     } catch (error) {

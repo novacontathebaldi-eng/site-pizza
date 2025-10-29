@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 // FIX: Corrected the import path for the `ChatMessage` type. It is defined in `../types` not `../App`.
-import { ChatMessage, OrderDetails, CartItem, ReservationDetails } from '../types';
+import { ChatMessage, OrderDetails, CartItem, ReservationDetails, UserProfile, Order } from '../types';
 
 interface ChatbotProps {
     isOpen: boolean;
@@ -11,6 +11,8 @@ interface ChatbotProps {
     onCreateOrder: (details: OrderDetails, cart: CartItem[]) => void;
     onCreateReservation: (details: ReservationDetails) => void;
     onShowPixQRCode: () => void;
+    userProfile: UserProfile | null;
+    myOrders: Order[];
 }
 
 interface ParsedMessage {
@@ -107,7 +109,7 @@ const parseMessage = (content: string): ParsedMessage => {
 };
 
 
-export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onSendMessage, isSending, onCreateOrder, onCreateReservation, onShowPixQRCode }) => {
+export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onSendMessage, isSending, onCreateOrder, onCreateReservation, onShowPixQRCode, userProfile, myOrders }) => {
     const [input, setInput] = useState('');
     const lastElementRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);

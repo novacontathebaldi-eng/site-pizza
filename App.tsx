@@ -235,6 +235,7 @@ const App: React.FC = () => {
     // Auth State
     const [currentUser, setCurrentUser] = useState<firebase.User | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+    const [myOrders, setMyOrders] = useState<Order[]>([]);
     const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
     const [isUserAreaModalOpen, setIsUserAreaModalOpen] = useState<boolean>(false);
@@ -477,6 +478,24 @@ const App: React.FC = () => {
     
         return () => unsubProfile();
     }, [currentUser?.uid]);
+
+    // This effect fetches orders for the currently logged-in user to provide context to the chatbot.
+    useEffect(() => {
+        if (!db || !currentUser?.uid) {
+            setMyOrders([]); // Clear orders on logout
+            return;
+        }
+
+        const query = db.collection('orders').where('userId', '==', currentUser.uid).orderBy('createdAt', 'desc').limit(10);
+        const unsubscribe = query.onSnapshot(snapshot => {
+            const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+            setMyOrders(fetchedOrders);
+        }, error => {
+            console.error("Error fetching user orders for chatbot context:", error);
+            // Do not show a toast for this background fetch to avoid bothering the user.
+        });
+        return () => unsubscribe();
+    }, [currentUser]);
     
     // Effect to trigger post-registration flow
     useEffect(() => {
@@ -836,7 +855,15 @@ const App: React.FC = () => {
         try {
             const activeProducts = products.filter(p => p.active && !p.deleted);
             const activeCategories = categories.filter(c => c.active);
-            const botReply = await firebaseService.askChatbot(updatedMessages, activeProducts, activeCategories, isStoreOnline, siteSettings.operatingHours);
+            const botReply = await firebaseService.askChatbot(
+                updatedMessages,
+                activeProducts,
+                activeCategories,
+                isStoreOnline,
+                siteSettings.operatingHours,
+                userProfile,
+                myOrders
+            );
             const newBotMessage: ChatMessage = { role: 'bot', content: botReply };
             setChatMessages(prev => [...prev, newBotMessage]);
         } catch (error) {
@@ -1361,6 +1388,8 @@ const App: React.FC = () => {
                 onCreateOrder={handleCreateOrderFromChat}
                 onCreateReservation={handleConfirmReservation}
                 onShowPixQRCode={() => setIsPixQrCodeModalOpen(true)}
+                userProfile={userProfile}
+                myOrders={myOrders}
             />
             
             <LoginModal 
