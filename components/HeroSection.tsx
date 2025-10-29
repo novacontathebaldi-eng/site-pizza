@@ -112,18 +112,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ settings, isLoading, o
                     </button>
                 </div>
 
-                <div className="mt-8 flex justify-center gap-3">
-                    <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 text-brand-ivory-50/90">
-                        <i className="fas fa-motorcycle text-brand-gold-600"></i>
-                        <span className="font-semibold text-sm">Delivery</span>
+                <div className="mt-8 flex flex-nowrap justify-center gap-2 sm:gap-3">
+                    <div className="flex items-center justify-center gap-1 sm:gap-2 bg-white/10 backdrop-blur-sm px-2 sm:px-4 py-2 rounded-full border border-white/20 text-brand-ivory-50/90">
+                        <i className="fas fa-motorcycle text-brand-gold-600 text-sm sm:text-base"></i>
+                        <span className="font-semibold text-xs sm:text-sm whitespace-nowrap">Delivery</span>
                     </div>
-                    <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 text-brand-ivory-50/90">
-                        <i className="fas fa-shopping-bag text-brand-gold-600"></i>
-                        <span className="font-semibold text-sm">Retirada</span>
+                    <div className="flex items-center justify-center gap-1 sm:gap-2 bg-white/10 backdrop-blur-sm px-2 sm:px-4 py-2 rounded-full border border-white/20 text-brand-ivory-50/90">
+                        <i className="fas fa-shopping-bag text-brand-gold-600 text-sm sm:text-base"></i>
+                        <span className="font-semibold text-xs sm:text-sm whitespace-nowrap">Retirada</span>
                     </div>
-                    <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full border border-white/20 text-brand-ivory-50/90">
-                        <i className="fas fa-utensils text-brand-gold-600"></i>
-                        <span className="font-semibold text-sm">No Local</span>
+                    <div className="flex items-center justify-center gap-1 sm:gap-2 bg-white/10 backdrop-blur-sm px-2 sm:px-4 py-2 rounded-full border border-white/20 text-brand-ivory-50/90">
+                        <i className="fas fa-utensils text-brand-gold-600 text-sm sm:text-base"></i>
+                        <span className="font-semibold text-xs sm:text-sm whitespace-nowrap">No Local</span>
                     </div>
                 </div>
             </div>
