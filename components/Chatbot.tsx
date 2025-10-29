@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 // FIX: Corrected the import path for the `ChatMessage` type. It is defined in `../types` not `../App`.
 import { ChatMessage, OrderDetails, CartItem, ReservationDetails, UserProfile, Order } from '../types';
+import botProfilePic from '../assets/perfilbot.png';
+import defaultUserPic from '../assets/perfil.png';
 
 interface ChatbotProps {
     isOpen: boolean;
@@ -115,6 +117,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
     const inputRef = useRef<HTMLInputElement>(null);
     const prevIsSending = useRef(isSending);
     const [completedActions, setCompletedActions] = useState<Set<number>>(new Set());
+    const userImageSrc = useMemo(() => userProfile?.photoURL || defaultUserPic, [userProfile]);
 
     // Find the index of the last message that contains a CREATE_ORDER action.
     const lastCreateOrderActionIndex = useMemo(() => {
@@ -206,9 +209,16 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                             key={index} 
                             // Anexa a ref à última mensagem apenas se o bot NÃO estiver digitando.
                             ref={isLastMessage && !isSending ? lastElementRef : null}
-                            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                            className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
-                            <div className={`whitespace-pre-wrap max-w-[85%] rounded-2xl px-4 py-2 ${msg.role === 'user' ? 'bg-blue-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-800 rounded-bl-none'}`}>
+                            {msg.role === 'bot' && (
+                                <img 
+                                    src={botProfilePic} 
+                                    alt="Sensação Bot" 
+                                    className="w-8 h-8 rounded-full border-2 border-accent object-cover flex-shrink-0" 
+                                />
+                            )}
+                            <div className={`whitespace-pre-wrap max-w-[80%] rounded-2xl px-4 py-2 ${msg.role === 'user' ? 'bg-blue-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-800 rounded-bl-none'}`}>
                                 {nodes}
 
                                 {/* Exibe informações de PIX se a mensagem for de um pedido com PIX, independente de estar concluído */}
@@ -259,11 +269,23 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                                     </div>
                                 )}
                             </div>
+                            {msg.role === 'user' && (
+                                <img 
+                                   src={userImageSrc} 
+                                   alt="Usuário" 
+                                   className="w-8 h-8 rounded-full border-2 border-accent object-cover flex-shrink-0" 
+                                />
+                            )}
                         </div>
                     );
                 })}
                  {isSending && (
-                    <div ref={lastElementRef} className="flex justify-start"> {/* Anexa a ref ao indicador de carregamento */}
+                    <div ref={lastElementRef} className="flex items-end gap-2 justify-start">
+                        <img 
+                            src={botProfilePic} 
+                            alt="Sensação Bot" 
+                            className="w-8 h-8 rounded-full border-2 border-accent object-cover flex-shrink-0" 
+                        />
                         <div className="bg-gray-200 text-gray-800 rounded-2xl rounded-bl-none px-4 py-2">
                             <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-gray-600">Sensação está digitando</span>
