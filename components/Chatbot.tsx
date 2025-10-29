@@ -129,13 +129,6 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
         prevIsSending.current = isSending;
     });
     
-    // Limpa o estado de ações concluídas quando o chat é fechado para que os botões reapareçam se o chat for reaberto.
-    useEffect(() => {
-        if (!isOpen) {
-            setCompletedActions(new Set());
-        }
-    }, [isOpen]);
-
     useEffect(() => {
         if (lastElementRef.current) {
             const lastMessage = messages[messages.length - 1];
@@ -215,36 +208,39 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                         >
                             <div className={`whitespace-pre-wrap max-w-[85%] rounded-2xl px-4 py-2 ${msg.role === 'user' ? 'bg-blue-500 text-white rounded-br-none' : 'bg-gray-200 text-gray-800 rounded-bl-none'}`}>
                                 {nodes}
+
+                                {/* Exibe informações de PIX se a mensagem for de um pedido com PIX, independente de estar concluído */}
+                                {action?.type === 'CREATE_ORDER' && action.payload.details.paymentMethod === 'pix' && (
+                                    <div className="mt-4 border-t border-gray-300 pt-3 text-gray-800">
+                                        <div className="p-3 bg-blue-50 rounded-md text-sm text-blue-800 text-center space-y-2">
+                                            <p>Para pagar com PIX, use nosso CNPJ ou clique abaixo para ver o QR Code.</p>
+                                            <p className="font-bold">CNPJ: 62.247.199/0001-04</p>
+                                            <button
+                                                onClick={onShowPixQRCode}
+                                                className="w-full bg-accent text-white font-semibold py-2 px-3 rounded-lg mt-1 hover:bg-opacity-90 transition-all text-sm"
+                                            >
+                                                <i className="fas fa-qrcode mr-2"></i> Ver QR CODE PIX
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Exibe os botões de ação apenas se a ação não foi concluída */}
                                 {shouldShowAction && (
-                                    <div className="mt-4 border-t border-gray-300 pt-3 space-y-4 text-gray-800">
+                                    <div className={`mt-4 space-y-4 text-gray-800 ${(action.type !== 'CREATE_ORDER' || action.payload.details.paymentMethod !== 'pix') ? 'border-t border-gray-300 pt-3' : ''}`}>
                                         {action.type === 'CREATE_ORDER' && (
-                                            <>
-                                                {action.payload.details.paymentMethod === 'pix' && (
-                                                    <div className="p-3 bg-blue-50 rounded-md text-sm text-blue-800 text-center space-y-2">
-                                                        <p>Para pagar com PIX, use nosso CNPJ ou clique abaixo para ver o QR Code.</p>
-                                                        <p className="font-bold">CNPJ: 62.247.199/0001-04</p>
-                                                        <button
-                                                            onClick={onShowPixQRCode}
-                                                            className="w-full bg-accent text-white font-semibold py-2 px-3 rounded-lg mt-1 hover:bg-opacity-90 transition-all text-sm"
-                                                        >
-                                                            <i className="fas fa-qrcode mr-2"></i> Ver QR CODE PIX
-                                                        </button>
-                                                    </div>
-                                                )}
-                                                
-                                                <button
-                                                    onClick={() => {
-                                                        const deliveryFee = action.payload.details.orderType === 'delivery' ? 3.00 : 0;
-                                                        const detailsWithFee = { ...action.payload.details, deliveryFee };
-                                                        onCreateOrder(detailsWithFee, action.payload.cart);
-                                                        setCompletedActions(prev => new Set(prev).add(index));
-                                                    }}
-                                                    className="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition-all flex items-center justify-center text-center"
-                                                >
-                                                    <i className="fab fa-whatsapp mr-2"></i>
-                                                    <span>Confirmar Pedido</span>
-                                                </button>
-                                            </>
+                                            <button
+                                                onClick={() => {
+                                                    const deliveryFee = action.payload.details.orderType === 'delivery' ? 3.00 : 0;
+                                                    const detailsWithFee = { ...action.payload.details, deliveryFee };
+                                                    onCreateOrder(detailsWithFee, action.payload.cart);
+                                                    setCompletedActions(prev => new Set(prev).add(index));
+                                                }}
+                                                className="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition-all flex items-center justify-center text-center"
+                                            >
+                                                <i className="fab fa-whatsapp mr-2"></i>
+                                                <span>Confirmar Pedido</span>
+                                            </button>
                                         )}
                                         {action.type === 'CREATE_RESERVATION' && (
                                              <button
