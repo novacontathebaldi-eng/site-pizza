@@ -264,6 +264,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                     <div ref={lastElementRef} className="flex justify-start"> {/* Anexa a ref ao indicador de carregamento */}
                         <div className="bg-gray-200 text-gray-800 rounded-2xl rounded-bl-none px-4 py-2">
                             <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-gray-600">Sensação está digitando</span>
                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
@@ -279,9 +280,8 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder={isSending ? "Sensação está digitando..." : "Digite sua pergunta..."}
+                    placeholder="Digite sua pergunta..."
                     className="w-full px-4 py-2 border rounded-full focus:ring-2 focus:ring-accent"
-                    readOnly={isSending}
                 />
                 <button 
                     type="submit" 
