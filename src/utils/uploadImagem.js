@@ -1,99 +1,65 @@
+// Importa o cliente Supabase que acabamos de configurar
+import { supabase } from '../services/supabase.ts';
+
 /**
-
-Função para fazer upload de imagem
-
-@param {File} arquivo - Arquivo selecionado pelo input
-
-@returns {Promise<string>} - URL pública da imagem
-*/
+ * Função para fazer upload de imagem diretamente para o Supabase Storage.
+ * @param {File} arquivo - Arquivo de imagem selecionado pelo input.
+ * @returns {Promise<string>} - A URL pública da imagem após o upload.
+ */
 export async function uploadImagem(arquivo) {
   try {
     // Validação 1: Arquivo existe?
     if (!arquivo) {
-      throw new Error('❌ Nenhum arquivo selecionado')
+      throw new Error('❌ Nenhum arquivo selecionado');
     }
 
-    // Validação 2: Tamanho máximo 50 MB
-    const tamanhoMaximo = 50 * 1024 * 1024 // 50 MB em bytes
+    // Validação 2: Tamanho máximo 50 MB (limite do Supabase Free Tier)
+    const tamanhoMaximo = 50 * 1024 * 1024; // 50 MB em bytes
     if (arquivo.size > tamanhoMaximo) {
-      throw new Error(`❌ Arquivo muito grande. Máximo: 50 MB. Seu arquivo: ${(arquivo.size / 1024 / 1024).toFixed(2)} MB`)
+      throw new Error(`❌ Arquivo muito grande. Máximo: 50 MB. Seu arquivo: ${(arquivo.size / 1024 / 1024).toFixed(2)} MB`);
     }
 
-    // Validação 3: É imagem?
+    // Validação 3: É uma imagem?
     if (!arquivo.type.startsWith('image/')) {
-      throw new Error('❌ O arquivo precisa ser uma imagem')
+      throw new Error('❌ O arquivo precisa ser uma imagem');
     }
 
-    // Gera nome único com timestamp
-    const timestamp = Date.now()
-    const nomeOriginal = arquivo.name
-      .replace(/[^a-zA-Z0-9.-]/g, '_') // Remove caracteres especiais
-      .toLowerCase()
-    const nomeArquivo = `${timestamp}_${nomeOriginal}`
+    // Gera um nome de arquivo único para evitar conflitos, usando timestamp.
+    const timestamp = Date.now();
+    const nomeOriginal = arquivo.name.replace(/[^a-zA-Z0-9.-]/g, '_').toLowerCase();
+    const nomeArquivo = `${timestamp}_${nomeOriginal}`;
 
-    console.log('⏳ Processando arquivo...', nomeArquivo)
+    console.log('⏳ Enviando para o Supabase Storage...', nomeArquivo);
 
-    // Converte arquivo para base64
-    const base64 = await lerArquivoBase64(arquivo)
+    // Faz o upload do arquivo diretamente para o bucket 'sitepizza' no Supabase.
+    const { data, error } = await supabase.storage
+      .from('sitepizza') // Nome do seu bucket no Supabase
+      .upload(nomeArquivo, arquivo, {
+        cacheControl: '3600', // Cache de 1 hora
+        upsert: false, // Não sobrescreve se o arquivo já existir
+      });
 
-    console.log('⏳ Enviando para servidor...')
-
-    // Chama função do Vercel
-    const response = await fetch('/api/upload-imagem', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        arquivo: base64, // Dados em base64
-        nomeArquivo: nomeArquivo,
-        mimeType: arquivo.type // Enviando o tipo do arquivo
-      })
-    })
-
-    const dados = await response.json()
-
-    // Se houve erro na resposta
-    if (!response.ok) {
-      // Tenta extrair uma mensagem de erro mais detalhada do corpo da resposta
-      const erroMsg = dados.erro || dados.detalhe || 'Erro desconhecido ao fazer upload';
-      throw new Error(erroMsg);
+    // Se o Supabase retornar um erro, lança o erro para ser tratado.
+    if (error) {
+      throw error;
     }
 
-    console.log('✅ Upload bem-sucedido!')
-    console.log('🔗 URL da imagem:', dados.url)
+    // Se o upload foi bem-sucedido, pega a URL pública do arquivo.
+    const { data: { publicUrl } } = supabase.storage
+      .from('sitepizza')
+      .getPublicUrl(nomeArquivo);
 
-    return dados.url
+    console.log('✅ Upload bem-sucedido!');
+    console.log('🔗 URL da imagem:', publicUrl);
+
+    // Retorna a URL pública da imagem.
+    return publicUrl;
 
   } catch (erro) {
-    console.error('❌ Erro no upload:', erro.message)
-    // Re-lança o erro para que a UI possa capturá-lo
-    throw erro
+    // Em caso de qualquer erro no processo, exibe no console e lança para a UI.
+    console.error('❌ Erro no upload:', erro.message);
+    throw erro;
   }
-}
-
-/**
-
-Helper: Converte arquivo para base64
-
-@param {File} arquivo
-
-@returns {Promise<string>}
-*/
-function lerArquivoBase64(arquivo) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-
-    reader.onload = (e) => {
-      resolve(e.target.result) // base64 string
-    }
-
-    reader.onerror = () => {
-      reject(new Error('Erro ao ler arquivo'))
-    }
-
-    reader.readAsDataURL(arquivo)
-  })
 }
 
 /**
