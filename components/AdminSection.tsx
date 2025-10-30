@@ -12,6 +12,7 @@ import firebase from 'firebase/compat/app';
 import { auth } from '../services/firebase';
 import { SupportModal } from './SupportModal';
 import notificationSound from '../assets/notf1.mp3';
+import { UploadImagem } from './UploadImagem';
 
 interface AdminSectionProps {
     allProducts: Product[];
@@ -1059,7 +1060,32 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                 </div>
                             )}
                         </div>
-                        <div id="admin-content-data"> {activeTab === 'data' && ( <div> <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3> <div className="bg-gray-50 p-4 rounded-lg mb-6 border"> <h4 className="font-semibold text-lg mb-2">Backup</h4> <p className="text-gray-600 mb-3">Crie um backup completo dos seus dados.</p> <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700"><i className="fas fa-download mr-2"></i>Fazer Backup</button> </div> <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200"> <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4> <p className="text-yellow-700 mb-3">Popula o banco com dados iniciais. Use apenas uma vez.</p> <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600"><i className="fas fa-database mr-2"></i>Popular Banco</button> </div> </div> )} </div>
+                        <div id="admin-content-data">
+                            {activeTab === 'data' && (
+                                <div>
+                                    <h3 className="text-xl font-bold mb-4">Gerenciamento de Dados</h3>
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                        <div className="space-y-6">
+                                            <div className="bg-gray-50 p-4 rounded-lg border">
+                                                <h4 className="font-semibold text-lg mb-2">Backup</h4>
+                                                <p className="text-gray-600 mb-3 text-sm">Crie um backup completo dos seus produtos, categorias e configurações em um arquivo JSON.</p>
+                                                <button onClick={handleBackup} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700">
+                                                    <i className="fas fa-download mr-2"></i>Fazer Backup
+                                                </button>
+                                            </div>
+                                            <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                                                <h4 className="font-semibold text-lg mb-2 text-yellow-800"><i className="fas fa-exclamation-triangle mr-2"></i>Ação Perigosa</h4>
+                                                <p className="text-yellow-700 mb-3 text-sm">Popula o banco com dados iniciais. Use apenas uma vez em uma instalação nova.</p>
+                                                <button onClick={handleSeedDatabase} className="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600">
+                                                    <i className="fas fa-database mr-2"></i>Popular Banco
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <UploadImagem />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </section>

@@ -26,6 +26,7 @@ import { CookieConsentBanner } from './components/CookieConsentBanner';
 import { TermsOfServiceModal } from './components/TermsOfServiceModal';
 import { HalfAndHalfModal } from './components/HalfAndHalfModal';
 import { PixQrCodeModal } from './components/PixQrCodeModal';
+import { uploadImagem } from './src/utils/uploadImagem.js';
 
 // Type declarations for Google GAPI library to avoid TypeScript errors
 declare global {
@@ -1062,27 +1063,12 @@ const App: React.FC = () => {
     const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => {
         try {
             const settingsToUpdate = JSON.parse(JSON.stringify(settings));
-            const originalSettings = siteSettings; // State before UI changes
-    
-            // Helper to queue deletion
-            const queueDeletionIfNeeded = async (url: string | undefined) => {
-                if (url && url.includes('firebasestorage.googleapis.com')) {
-                    await firebaseService.deleteImageByUrl(url).catch(err => console.error(`Failed to delete old image ${url}`, err));
-                }
-            };
     
             // Handle file uploads (which implies replacement of the old image)
             for (const key in files) {
                 const file = files[key];
                 if (file) {
-                    if (key === 'logo') await queueDeletionIfNeeded(originalSettings.logoUrl);
-                    else if (key === 'heroBg') await queueDeletionIfNeeded(originalSettings.heroBgUrl);
-                    else {
-                        const oldSection = originalSettings.contentSections.find(s => s.id === key);
-                        if (oldSection) await queueDeletionIfNeeded(oldSection.imageUrl);
-                    }
-    
-                    const newUrl = await firebaseService.uploadSiteAsset(file, key);
+                    const newUrl = await uploadImagem(file);
     
                     if (key === 'logo') settingsToUpdate.logoUrl = newUrl;
                     else if (key === 'heroBg') settingsToUpdate.heroBgUrl = newUrl;
@@ -1095,19 +1081,15 @@ const App: React.FC = () => {
     
             // Handle explicit removals marked by the UI
             if (settingsToUpdate.logoUrl === 'DELETE_AND_RESET') {
-                await queueDeletionIfNeeded(originalSettings.logoUrl);
                 settingsToUpdate.logoUrl = defaultLogo;
             }
             if (settingsToUpdate.heroBgUrl === 'DELETE_AND_RESET') {
-                await queueDeletionIfNeeded(originalSettings.heroBgUrl);
                 settingsToUpdate.heroBgUrl = defaultHeroBg;
             }
             if (settingsToUpdate.contentSections) {
                 for (let i = 0; i < settingsToUpdate.contentSections.length; i++) {
                     const section = settingsToUpdate.contentSections[i];
                     if (section.imageUrl === 'DELETE_AND_RESET') {
-                        const oldSection = originalSettings.contentSections.find(s => s.id === section.id);
-                        await queueDeletionIfNeeded(oldSection?.imageUrl);
                         section.imageUrl = defaultAboutImg; // Use a consistent default for all sections
                     }
                 }

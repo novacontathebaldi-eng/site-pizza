@@ -3,7 +3,7 @@
 // while using a modern version of the Firebase SDK, resolving the namespace and property errors.
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/firestore';
-import 'firebase/compat/storage';
+// import 'firebase/compat/storage'; // REMOVED as per migration to Supabase
 import 'firebase/compat/auth'; // Import for authentication
 import 'firebase/compat/functions'; // Import for Firebase Functions
 
@@ -22,7 +22,6 @@ const firebaseConfig = {
 };
 
 let db: firebase.firestore.Firestore | null = null;
-let storage: firebase.storage.Storage | null = null;
 let auth: firebase.auth.Auth | null = null; // Add auth service
 let functions: firebase.functions.Functions | null = null; // Add functions service
 
@@ -32,7 +31,6 @@ try {
     firebase.initializeApp(firebaseConfig);
   }
   db = firebase.firestore();
-  storage = firebase.storage();
   auth = firebase.auth();
   functions = firebase.functions();
   
@@ -41,9 +39,9 @@ try {
     experimentalForceLongPolling: true,
   });
   
-  console.log("Firebase inicializado com sucesso. Conectando ao Firestore, Storage, Auth e Functions...");
+  console.log("Firebase inicializado com sucesso. Conectando ao Firestore, Auth e Functions...");
 } catch (error) {
   console.error('Falha ao inicializar o Firebase. Verifique seu objeto firebaseConfig em `services/firebase.ts`.', error);
 }
 
-export { db, storage, auth, functions };
+export { db, auth, functions };

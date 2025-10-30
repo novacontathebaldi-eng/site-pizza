@@ -1,6 +1,6 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
-import { db, storage, functions } from './firebase';
+import { db, functions } from './firebase';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem, ChatMessage, ReservationDetails, UserProfile, Address, DaySchedule } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
@@ -8,59 +8,6 @@ export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
     const statusRef = db.doc('store_config/status');
     await statusRef.set({ isOpen: isOnline }, { merge: true });
 };
-
-// Image Upload Function
-export const uploadImage = async (file: File): Promise<string> => {
-    if (!storage) {
-        throw new Error("Firebase Storage não está inicializado.");
-    }
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `products/${new Date().getTime()}_${Math.random().toString(36).substring(2, 9)}.${fileExtension}`;
-    const storageRef = storage.ref(fileName);
-
-    const snapshot = await storageRef.put(file);
-    const downloadURL = await snapshot.ref.getDownloadURL();
-    
-    return downloadURL;
-};
-
-// Site Asset Upload Function
-export const uploadSiteAsset = async (file: File, assetName: string): Promise<string> => {
-    if (!storage) {
-        throw new Error("Firebase Storage não está inicializado.");
-    }
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `site/${assetName}_${new Date().getTime()}.${fileExtension}`;
-    const storageRef = storage.ref(fileName);
-    
-    const snapshot = await storageRef.put(file);
-    return await snapshot.ref.getDownloadURL();
-};
-
-/**
- * Deletes a file from Firebase Storage based on its public URL.
- * Ignores errors if the file doesn't exist.
- * @param url The public URL of the file to delete.
- */
-export const deleteImageByUrl = async (url: string): Promise<void> => {
-    if (!storage || !url || !url.includes('firebasestorage.googleapis.com')) {
-        // Not a Firebase Storage URL we should manage, or storage not initialized.
-        return;
-    }
-
-    try {
-        const fileRef = storage.refFromURL(url);
-        await fileRef.delete();
-    } catch (error: any) {
-        // It's common to try to delete a file that's already gone, so we'll ignore 'object-not-found' errors.
-        if (error.code !== 'storage/object-not-found') {
-            console.error("Error deleting image from storage:", error);
-            // Re-throw if the caller needs to handle other errors
-            throw error;
-        }
-    }
-};
-
 
 // Product Functions
 export const addProduct = async (productData: Omit<Product, 'id'>): Promise<void> => {
