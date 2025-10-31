@@ -14,8 +14,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyCTMHlUCGOpU7VRIdbP2VADzUF9n1lI88A",
   authDomain: "site-pizza-a2930.firebaseapp.com",
   projectId: "site-pizza-a2930",
-  // FIX: Corrigido o valor do storageBucket para o formato correto.
-  // Isso é importante para outras funcionalidades que usam o Firebase Storage, como o upload de foto de perfil.
+  // ✅ CORRETO: O formato padrão para o Storage Bucket é com '.appspot.com'.
   storageBucket: "site-pizza-a2930.appspot.com",
   messagingSenderId: "914255031241",
   appId: "1:914255031241:web:84ae273b22cb7d04499618"

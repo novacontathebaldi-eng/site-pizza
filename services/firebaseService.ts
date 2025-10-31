@@ -1,6 +1,6 @@
 // FIX: Updated all functions to use Firebase v8 syntax to resolve module import errors.
 import firebase from 'firebase/compat/app';
-import { db, functions } from './firebase';
+import { db, auth, functions } from './firebase';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, OrderDetails, CartItem, ChatMessage, ReservationDetails, UserProfile, Address, DaySchedule } from '../types';
 
 export const updateStoreStatus = async (isOnline: boolean): Promise<void> => {
@@ -142,19 +142,50 @@ export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promi
 };
 
 
-// Order Functions (Cloud Functions)
-export const createOrder = async (details: OrderDetails, cart: CartItem[], total: number, orderId: string): Promise<{ orderId: string; orderNumber: number; }> => {
-    if (!functions) throw new Error("Firebase Functions not initialized.");
-    const createOrderFunction = functions.httpsCallable('createOrder');
-    const response = await createOrderFunction({ details, cart, total, orderId });
-    return response.data as { orderId: string; orderNumber: number; };
+// Order Functions (Vercel API)
+export const createOrderInFirestore = async (
+    details: OrderDetails,
+    cart: CartItem[],
+    total: number,
+    orderId: string,
+    idToken: string | null
+): Promise<number> => {
+    const response = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': idToken ? `Bearer ${idToken}` : ''
+        },
+        body: JSON.stringify({ details, cart, total, orderId })
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to create order: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.orderNumber;
 };
 
-export const createReservation = async (details: ReservationDetails): Promise<{ orderId: string; orderNumber: number; }> => {
-    if (!functions) throw new Error("Firebase Functions not initialized.");
-    const createReservationFunction = functions.httpsCallable('createReservation');
-    const response = await createReservationFunction({ details });
-    return response.data as { orderId: string; orderNumber: number; };
+export const createReservationInFirestore = async (
+    details: ReservationDetails,
+    idToken: string | null
+): Promise<{orderId: string, orderNumber: number}> => {
+    const response = await fetch('/api/create-reservation', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': idToken ? `Bearer ${idToken}` : ''
+        },
+        body: JSON.stringify({ details })
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to create reservation: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
 };
 
 
@@ -203,29 +234,44 @@ export const askChatbot = async (
     userProfile: UserProfile | null,
     myOrders: Order[]
 ): Promise<string> => {
-    if (!functions) throw new Error("Firebase Functions not initialized.");
-    try {
-        const askSanto = functions.httpsCallable('askSanto');
-        const response = await askSanto({
+    const response = await fetch('/api/ask-santo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
             history,
             menuData: { products, categories },
             storeStatus: { isOnline: isStoreOnline, operatingHours: operatingHours || [] },
             userProfile,
             myOrders
-        });
-        return (response.data as any).reply;
-    } catch (error) {
-        console.error("Error calling chatbot function:", error);
-        throw new Error("Failed to get a response from the assistant.");
+        })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Network error' }));
+        console.error("Chatbot API Error:", errorData);
+        throw new Error(`Failed to get response: ${response.status} - ${errorData.error || 'Unknown error'}`);
     }
+
+    const data = await response.json();
+    return data.reply;
 };
 
 // User Profile & Auth
-export const verifyGoogleToken = async (idToken: string): Promise<string> => {
-    if (!functions) throw new Error("Firebase Functions is not initialized.");
-    const verifyToken = functions.httpsCallable('verifyGoogleToken');
-    const result = await verifyToken({ idToken });
-    return result.data.customToken;
+export const verifyGoogleTokenAndSignIn = async (idToken: string): Promise<void> => {
+    if (!auth) throw new Error("Firebase Auth not initialized.");
+    const response = await fetch('/api/verify-google-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken })
+    });
+
+    if (!response.ok) {
+        throw new Error(`Token verification failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const customToken = data.customToken;
+    await auth.signInWithCustomToken(customToken);
 };
 
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {

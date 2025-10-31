@@ -688,9 +688,9 @@ const App: React.FC = () => {
 
             // Garante que a sessão do usuário persista após o navegador ser fechado.
             await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-
-            const customToken = await firebaseService.verifyGoogleToken(idToken);
-            await auth.signInWithCustomToken(customToken);
+            // FIX: Replaced the non-existent `verifyGoogleToken` with the correct `verifyGoogleTokenAndSignIn` function.
+            // This function handles the entire sign-in flow, so the redundant `signInWithCustomToken` call was also removed.
+            await firebaseService.verifyGoogleTokenAndSignIn(idToken);
 
             setIsLoginModalOpen(false);
             addToast(`Bem-vindo(a), ${googleUser.getBasicProfile().getName()}!`, 'success');
@@ -816,7 +816,10 @@ const App: React.FC = () => {
         window.open(whatsappUrl, '_blank');
         
         try {
-            const { orderNumber } = await firebaseService.createOrder(details, cartItems, total, pendingOrderId);
+            // FIX: Replaced the non-existent `createOrder` with the correct `createOrderInFirestore` function.
+            // Also added logic to pass the user's ID token for authentication and corrected the response handling, as the function returns a number directly.
+            const idToken = currentUser ? await currentUser.getIdToken() : null;
+            const orderNumber = await firebaseService.createOrderInFirestore(details, cartItems, total, pendingOrderId, idToken);
             addToast(`Pedido #${orderNumber} criado!`, 'success');
             
             const confirmedOrder: Order = {
@@ -935,7 +938,10 @@ const App: React.FC = () => {
         window.open(whatsappUrl, '_blank');
 
         try {
-            const { orderId, orderNumber } = await firebaseService.createReservation(details);
+            // FIX: Replaced the non-existent `createReservation` with the correct `createReservationInFirestore` function.
+            // Also added logic to pass the user's ID token for authentication.
+            const idToken = currentUser ? await currentUser.getIdToken() : null;
+            const { orderId, orderNumber } = await firebaseService.createReservationInFirestore(details, idToken);
             addToast(`Reserva #${orderNumber} registrada com sucesso!`, 'success');
             const confirmedReservation: Order = {
                 id: orderId, orderNumber,
