@@ -1,46 +1,10 @@
-// FIX: The following imports were updated to use the Firebase v9 compatibility layer (`/compat`).
-// This is necessary to support the existing v8 (namespaced) syntax throughout the application
-// while using a modern version of the Firebase SDK, resolving the namespace and property errors.
-import firebase from 'firebase/compat/app';
-import 'firebase/compat/firestore';
-// import 'firebase/compat/storage'; // REMOVED as per migration to Supabase
-import 'firebase/compat/auth'; // Import for authentication
-import 'firebase/compat/functions'; // Import for Firebase Functions
+import { createClient } from '@supabase/supabase-js'
 
-// AÇÃO NECESSÁRIA: Credenciais corrigidas.
-// O problema era um erro de digitação na apiKey. Esta versão está 100% correta,
-// baseada na captura de tela da seção "Credenciais" (Browser key).
-const firebaseConfig = {
-  apiKey: "AIzaSyCTMHlUCGOpU7VRIdbP2VADzUF9n1lI88A",
-  authDomain: "site-pizza-a2930.firebaseapp.com",
-  projectId: "site-pizza-a2930",
-  // ✅ CORRETO: O formato padrão para o Storage Bucket é com '.appspot.com'.
-  storageBucket: "site-pizza-a2930.appspot.com",
-  messagingSenderId: "914255031241",
-  appId: "1:914255031241:web:84ae273b22cb7d04499618"
-};
+// As credenciais públicas para conectar com o Supabase.
+// É seguro usar estas no frontend (navegador).
+const supabaseUrl = "https://lwkfyvprbhkphoxkorjq.supabase.co"
+// ATUALIZADO: Usando a chave publicável (publishable key) em vez da chave anônima (anon key) legada.
+const supabaseKey = "sb_publishable_FfE6ZD2msjpRA0o8f1HTmA_Hfvl9bUn"
 
-let db: firebase.firestore.Firestore | null = null;
-let auth: firebase.auth.Auth | null = null; // Add auth service
-let functions: firebase.functions.Functions | null = null; // Add functions service
-
-try {
-  // Use the initialization pattern from the user's working old version.
-  if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-  }
-  db = firebase.firestore();
-  auth = firebase.auth();
-  functions = firebase.functions();
-  
-  // Keep db settings
-  db.settings({
-    experimentalForceLongPolling: true,
-  });
-  
-  console.log("Firebase inicializado com sucesso. Conectando ao Firestore, Auth e Functions...");
-} catch (error) {
-  console.error('Falha ao inicializar o Firebase. Verifique seu objeto firebaseConfig em `services/firebase.ts`.', error);
-}
-
-export { db, auth, functions };
+// Cria e exporta o cliente Supabase para ser usado em outras partes do app.
+export const supabase = createClient(supabaseUrl, supabaseKey)

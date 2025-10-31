@@ -3,7 +3,7 @@ import { Product, Category } from '../types';
 import * as firebaseService from '../services/firebaseService';
 import { CameraModal } from './CameraModal';
 import firebase from 'firebase/compat/app';
-import { uploadImagem } from '@/src/utils/uploadImagem.js';
+import { uploadImagem } from '../src/utils/uploadImagem.js';
 
 
 interface ProductModalProps {

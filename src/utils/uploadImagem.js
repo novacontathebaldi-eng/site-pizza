@@ -1,70 +1,80 @@
-// Função auxiliar para converter um arquivo (File) para uma string base64
-const fileToBase64 = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.readAsDataURL(file);
-  reader.onload = () => resolve(reader.result);
-  reader.onerror = error => reject(error);
-});
+// Importa o cliente Supabase que acabamos de configurar
+import { supabase } from '../services/supabase.ts';
 
 /**
-* Função para fazer upload de imagem, enviando-a para nossa API no servidor Vercel.
-* @param {File} arquivo - Arquivo de imagem selecionado.
-* @returns {Promise<string>} - A URL pública da imagem após o upload.
-*/
+ * Função para fazer upload de imagem diretamente para o Supabase Storage.
+ * @param {File} arquivo - Arquivo de imagem selecionado pelo input.
+ * @returns {Promise<string>} - A URL pública da imagem após o upload.
+ */
 export async function uploadImagem(arquivo) {
+  try {
+    // Validação 1: Arquivo existe?
+    if (!arquivo) {
+      throw new Error('❌ Nenhum arquivo selecionado');
+    }
+
+    // Validação 2: Tamanho máximo 50 MB (limite do Supabase Free Tier)
+    const tamanhoMaximo = 50 * 1024 * 1024; // 50 MB em bytes
+    if (arquivo.size > tamanhoMaximo) {
+      throw new Error(`❌ Arquivo muito grande. Máximo: 50 MB. Seu arquivo: ${(arquivo.size / 1024 / 1024).toFixed(2)} MB`);
+    }
+
+    // Validação 3: É uma imagem?
+    if (!arquivo.type.startsWith('image/')) {
+      throw new Error('❌ O arquivo precisa ser uma imagem');
+    }
+
+    // Gera um nome de arquivo único para evitar conflitos, usando timestamp.
+    const timestamp = Date.now();
+    const nomeOriginal = arquivo.name.replace(/[^a-zA-Z0-9.-]/g, '_').toLowerCase();
+    const nomeArquivo = `${timestamp}_${nomeOriginal}`;
+
+    console.log('⏳ Enviando para o Supabase Storage...', nomeArquivo);
+
+    // Faz o upload do arquivo diretamente para o bucket 'sitepizza' no Supabase.
+    const { data, error } = await supabase.storage
+      .from('sitepizza') // Nome do seu bucket no Supabase
+      .upload(nomeArquivo, arquivo, {
+        cacheControl: '3600', // Cache de 1 hora
+        upsert: false, // Não sobrescreve se o arquivo já existir
+      });
+
+    // Se o Supabase retornar um erro, lança o erro para ser tratado.
+    if (error) {
+      throw error;
+    }
+
+    // Se o upload foi bem-sucedido, pega a URL pública do arquivo.
+    const { data: { publicUrl } } = supabase.storage
+      .from('sitepizza')
+      .getPublicUrl(nomeArquivo);
+
+    console.log('✅ Upload bem-sucedido!');
+    console.log('🔗 URL da imagem:', publicUrl);
+
+    // Retorna a URL pública da imagem.
+    return publicUrl;
+
+  } catch (erro) {
+    // Em caso de qualquer erro no processo, exibe no console e lança para a UI.
+    console.error('❌ Erro no upload:', erro.message);
+    throw erro;
+  }
+}
+
+/**
+
+EXEMPLO DE USO:
+
 try {
-  // Validação 1: Arquivo existe?
-  if (!arquivo) {
-    throw new Error('Nenhum arquivo selecionado');
-  }
-  
-  // Validação 2: Limite de tamanho de 4.5MB (limite da Vercel no plano Hobby)
-  const tamanhoMaximo = 4.5 * 1024 * 1024;
-  if (arquivo.size > tamanhoMaximo) {
-      throw new Error(`Arquivo muito grande. O limite para envio pelo painel é de 4.5 MB.`);
-  }
 
-  // Converte o arquivo para base64 para poder enviá-lo via JSON
-  const base64Arquivo = await fileToBase64(arquivo);
+const url = await uploadImagem(arquivo)
 
-  // Gera um nome de arquivo único para evitar conflitos
-  const timestamp = Date.now();
-  const nomeOriginal = arquivo.name.replace(/[^a-zA-Z0-9.-]/g, '_').toLowerCase();
-  const nomeArquivo = `${timestamp}_${nomeOriginal}`;
-
-  console.log('⏳ Processando arquivo...', nomeArquivo);
-
-  // Envia os dados para a nossa função de servidor na Vercel
-  const response = await fetch('/api/upload-imagem', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      arquivo: base64Arquivo,
-      nomeArquivo: nomeArquivo,
-      mimeType: arquivo.type,
-    }),
-  });
-  
-  console.log('⏳ Enviando para servidor...');
-
-  const data = await response.json();
-
-  // Se a resposta do servidor não for OK, lança um erro com a mensagem do servidor
-  if (!response.ok) {
-    throw new Error(data.detalhe || data.erro || 'Erro desconhecido no servidor.');
-  }
-  
-  console.log('✅ Upload bem-sucedido!', data.url);
-
-  // Retorna a URL pública da imagem
-  return data.url;
+console.log('Imagem salva em:', url)
 
 } catch (erro) {
-  // Em caso de erro, exibe no console e lança para a UI
-  console.error('❌ Erro no upload:', erro.message);
-  // Lançar o erro novamente para que o componente que chamou a função possa tratá-lo
-  throw erro;
+
+alert('Erro: ' + erro.message)
+
 }
-}
+*/
