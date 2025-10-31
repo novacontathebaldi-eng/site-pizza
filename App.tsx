@@ -49,6 +49,7 @@ const defaultSiteSettings: SiteSettings = {
     heroTitle: "Pizzaria Santa Sensação",
     heroSubtitle: "A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.",
     heroBgUrl: defaultHeroBg,
+    facadeImageUrl: "https://firebasestorage.googleapis.com/v0/b/site-pizza-a2930.firebasestorage.app/o/fachada%2FFACHADA.png?alt=media&token=8010021e-a157-475e-8734-4ba56a3e967f",
     automaticSchedulingEnabled: true,
     operatingHours: [
         { dayOfWeek: 0, dayName: 'Domingo', isOpen: true, openTime: '19:00', closeTime: '22:00' },
@@ -1072,6 +1073,7 @@ const App: React.FC = () => {
     
                     if (key === 'logo') settingsToUpdate.logoUrl = newUrl;
                     else if (key === 'heroBg') settingsToUpdate.heroBgUrl = newUrl;
+                    else if (key === 'facade') settingsToUpdate.facadeImageUrl = newUrl;
                     else {
                         const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
                         if (sectionIndex > -1) settingsToUpdate.contentSections[sectionIndex].imageUrl = newUrl;
@@ -1085,6 +1087,9 @@ const App: React.FC = () => {
             }
             if (settingsToUpdate.heroBgUrl === 'DELETE_AND_RESET') {
                 settingsToUpdate.heroBgUrl = defaultHeroBg;
+            }
+            if (settingsToUpdate.facadeImageUrl === 'DELETE_AND_RESET') {
+                settingsToUpdate.facadeImageUrl = defaultSiteSettings.facadeImageUrl;
             }
             if (settingsToUpdate.contentSections) {
                 for (let i = 0; i < settingsToUpdate.contentSections.length; i++) {
@@ -1101,7 +1106,7 @@ const App: React.FC = () => {
             console.error("Failed to save site settings:", error);
             addToast("Erro ao salvar configurações.", 'error');
         }
-    }, [siteSettings, addToast]);
+    }, [addToast]);
     
     const handleUpdateSiteSettingsField = useCallback(async (updates: Partial<SiteSettings>) => {
         try {

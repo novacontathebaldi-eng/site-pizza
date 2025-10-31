@@ -181,6 +181,7 @@ export interface SiteSettings {
     heroTitle: string;
     heroSubtitle: string;
     heroBgUrl: string;
+    facadeImageUrl?: string;
     contentSections: ContentSection[];
     footerLinks: FooterLink[];
     automaticSchedulingEnabled?: boolean;

@@ -274,6 +274,13 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                                 <textarea name="heroSubtitle" value={formData.heroSubtitle} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" rows={3} />
                             </div>
                             <ImageUploader label="Imagem de Fundo (Hero)" imageUrl={formData.heroBgUrl} onUrlChange={(url) => handleUrlChange('heroBgUrl', url)} onFileChange={(file) => handleFileChange('heroBg', file)} onRemove={() => handleUrlChange('heroBgUrl', 'DELETE_AND_RESET')} />
+                            <ImageUploader 
+                                label="Imagem da Fachada (Seção Contato)" 
+                                imageUrl={formData.facadeImageUrl || ''} 
+                                onUrlChange={(url) => handleUrlChange('facadeImageUrl', url)} 
+                                onFileChange={(file) => handleFileChange('facade', file)}
+                                onRemove={() => handleUrlChange('facadeImageUrl', 'DELETE_AND_RESET')} 
+                            />
                         </div>
                     )}
                 </div>

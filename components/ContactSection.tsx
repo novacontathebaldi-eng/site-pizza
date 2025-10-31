@@ -89,8 +89,8 @@ const formatOperatingHours = (operatingHours?: DaySchedule[]): string => {
 export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
     const address = "Rua Porfilio Furtado, 178, Centro - Santa Leopoldina, ES";
     const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
-    // Vou colocar um botão no personalizar para carlinhos mudar isso fácil heheheh
-    const facadeImageUrl = './assets/FACHADA.webp';
+    // A URL agora vem das configurações do site, tornando-a personalizável.
+    const facadeImageUrl = settings.facadeImageUrl;
     const operatingHoursText = formatOperatingHours(settings.operatingHours);
 
 

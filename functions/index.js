@@ -6,6 +6,7 @@
   const admin = require("firebase-admin");
   const crypto = require("crypto");
   const {OAuth2Client} = require("google-auth-library");
+  const fetch = require("node-fetch");
 
   admin.initializeApp();
   const db = admin.firestore();
