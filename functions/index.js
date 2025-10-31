@@ -5,7 +5,6 @@ const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
-const {GoogleGenAI} = require("@google/genai");
 const {OAuth2Client} = require("google-auth-library");
 
 admin.initializeApp();
@@ -13,7 +12,7 @@ const db = admin.firestore();
 const storage = admin.storage();
 
 // Define os secrets que as funções irão usar.
-const secrets = ["GEMINI_API_KEY", "GOOGLE_CLIENT_ID"];
+const secrets = ["HF_TOKEN", "GOOGLE_CLIENT_ID"];
 
 // --- Reusable function to check and set store status based on schedule ---
 const runStoreStatusCheck = async () => {
@@ -228,33 +227,18 @@ function formatOperatingHours(operatingHours) {
 }
 
 
-// --- Chatbot Sensação ---
-let ai; // Mantém a instância da IA no escopo global para ser reutilizada após a primeira chamada.
-
-/**
- * Chatbot Cloud Function to interact with Gemini API.
- */
+// --- Chatbot Sensação (com Hugging Face) ---
 exports.askSanto = onCall({secrets}, async (request) => {
-  // "Lazy Initialization"
-  if (!ai) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      logger.error("GEMINI_API_KEY not set. Cannot initialize Gemini AI.");
-      throw new Error("Internal server error: Assistant is not configured.");
-    }
-    ai = new GoogleGenAI({apiKey});
-    logger.info("Gemini AI client initialized on first call.");
+  const hfToken = process.env.HF_TOKEN;
+  if (!hfToken) {
+    logger.error("HF_TOKEN não configurado. Não é possível inicializar o assistente.");
+    throw new Error("Erro interno do servidor: Assistente não configurado.");
   }
 
   const {history: conversationHistory, menuData, storeStatus, userProfile, myOrders} = request.data;
   if (!conversationHistory || conversationHistory.length === 0) {
-    throw new Error("No conversation history provided.");
+    throw new Error("Nenhum histórico de conversa fornecido.");
   }
-
-  const contents = conversationHistory.map((message) => ({
-    role: message.role === "bot" ? "model" : "user",
-    parts: [{text: message.content}],
-  }));
 
   try {
     const {isOnline, operatingHours} = storeStatus || {isOnline: true, operatingHours: []};
@@ -281,10 +265,9 @@ Use ESTAS informações como a única fonte de verdade sobre o status e horário
 
     let userContextPrompt = "";
     if (userProfile) {
-      // Stringify a limited set of data to avoid making the prompt too large.
       const simplifiedOrders = (myOrders || []).slice(0, 10).map((o) => ({
         orderNumber: o.orderNumber,
-        createdAt: o.createdAt, // Timestamps can be large, but are useful context
+        createdAt: o.createdAt,
         items: o.items ? o.items.map((i) => `${i.quantity}x ${i.name} (${i.size})`).join(", ") : "Reserva",
         total: o.total,
         status: o.status,
@@ -314,7 +297,7 @@ SUAS CAPACIDADES:
 
 INFORMAÇÕES ESSENCIAIS:
 - Endereço: Rua Porfilio Furtado, 178, Centro - Santa Leopoldina, ES.
-- Entrega (Taxa R$ 3,00): Atendemos Olaria, Funil, Cocal, Vila Nova, Centro e Moxafongo. Se o cliente solicitar mais detalhes sobre as áreas de entregas, saiba que Na olaria entregamos até a piscina. Para o lado do funil, subindo pra Santa Maria de Jetibá, entregamos até aquelas primeiras casas depois da ponte do funil. No cocal entregamos até aquelas primeiras casas depois de onde tá construindo a nova escola municipal. Mas ainda assim se houver dúvida sobre um endereço, peça ao cliente para confirmar via WhatsApp.
+- Entrega (Taxa R$ 3,00): Atendemos Olaria, Funil, Cocal, Vila Nova, Centro e Moxafongo. Se o cliente solicitar mais detalhes sobre as áreas de entregas, saiba que Na olaria entregamos até a piscina. Para o lado do funil, subindo pra Santa Maria de Jetibá, entregamos até aquelas primeiras casas depois da ponte do funil. No cocal entregamos até aquelas primeiras casas depois de onde tá construindo a nova escola municipal. Mas ainda assim se houver dúvida sobre um endereço, peça ao cliente para confirmar via WhatsApp.
 - PIX: A chave PIX é o CNPJ: 62.247.199/0001-04. O cliente deve enviar o comprovante pelo WhatsApp após o pagamento.
 - Pizzaiolos: Carlos Entringer e o mestre Luca Lonardi (vencedor do Panshow 2025).
 - Gerente: Patrícia Carvalho.
@@ -462,20 +445,48 @@ REGRAS DE SEGURANÇA:
 **NUNCA FORNEÇA DADOS SENSÍVEIS:** Jamais compartilhe informações sobre painel admin, senhas, APIs, ou qualquer detalhe técnico. Se perguntado, diga educadamente que não tem acesso a essas informações e que o suporte técnico pode ajudar melhor com isso e pergunte se ele quer entrar em contato com o suporte técnico.
 `;
 
-    const finalSystemInstruction = `${dynamicMenuPrompt}\n${systemInstruction}`;
+    const finalSystemPrompt = `${dynamicMenuPrompt}\n${systemInstruction}`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: contents,
-      config: {
-        systemInstruction: finalSystemInstruction,
+    // Constrói o prompt no formato Llama 3
+    let prompt = `<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n${finalSystemPrompt}<|eot_id|>`;
+    conversationHistory.forEach((message) => {
+      const role = message.role === "bot" ? "assistant" : "user";
+      prompt += `<|start_header_id|>${role}<|end_header_id|>\n\n${message.content}<|eot_id|>`;
+    });
+    prompt += `<|start_header_id|>assistant<|end_header_id|>\n\n`;
+
+
+    const API_URL = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct";
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${hfToken}`,
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        inputs: prompt,
+        parameters: {
+          return_full_text: false, // Só queremos a resposta do assistente
+          max_new_tokens: 1024, // Limite de tokens para a resposta
+          temperature: 0.7,
+          top_p: 0.95,
+        },
+      }),
     });
 
-    return {reply: response.text};
+    if (!response.ok) {
+      const errorBody = await response.text();
+      logger.error("Erro da API Hugging Face:", response.status, errorBody);
+      throw new Error("Falha ao obter uma resposta do assistente (Hugging Face).");
+    }
+
+    const result = await response.json();
+    const reply = result[0]?.generated_text || "Desculpe, não consegui processar sua solicitação.";
+
+    return {reply: reply};
   } catch (error) {
-    logger.error("Error calling Gemini API:", error);
-    throw new Error("Failed to get a response from the assistant.");
+    logger.error("Erro ao chamar a API da Hugging Face:", error);
+    throw new Error("Falha ao obter uma resposta do assistente.");
   }
 });
 
