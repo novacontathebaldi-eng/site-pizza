@@ -3,11 +3,15 @@ const admin = require("firebase-admin");
 const { OAuth2Client } = require("google-auth-library");
 
 // --- INICIALIZAÇÃO DO FIREBASE ADMIN ---
-// É necessário configurar a variável de ambiente FIREBASE_SERVICE_ACCOUNT_JSON no Vercel
-// com o conteúdo do arquivo JSON da sua conta de serviço do Firebase.
+// Utiliza as variáveis de ambiente individuais configuradas no Vercel.
 try {
   if (!admin.apps.length) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+    const serviceAccount = {
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      // A chave privada precisa ter os caracteres de nova linha restaurados.
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    };
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });

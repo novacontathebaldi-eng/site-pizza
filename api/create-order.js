@@ -4,7 +4,12 @@ const admin = require("firebase-admin");
 // --- INICIALIZAÇÃO DO FIREBASE ADMIN ---
 try {
   if (!admin.apps.length) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+    const serviceAccount = {
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      // A chave privada precisa ter os caracteres de nova linha restaurados.
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    };
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
