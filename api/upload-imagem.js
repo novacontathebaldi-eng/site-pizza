@@ -1,63 +1,66 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
 
-// As credenciais são lidas das Variáveis de Ambiente na Vercel para segurança
+// Inicializa Supabase com variáveis de ambiente (seguras)
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SECRET_KEY
-);
+)
 
 export default async function handler(req, res) {
-  // Permite apenas requisições do tipo POST
+  // Apenas POST é permitido
   if (req.method !== 'POST') {
-    return res.status(405).json({ erro: 'Método não permitido' });
+    return res.status(405).json({
+      erro: 'Método não permitido. Use POST.'
+    })
   }
 
   try {
-    const { arquivo, nomeArquivo, mimeType } = req.body;
+    // Recebe arquivo em base64, nome e o tipo do arquivo (MIME type)
+    const { arquivo, nomeArquivo, mimeType } = req.body
 
-    // Validação básica dos dados recebidos
+    // Valida dados
     if (!arquivo || !nomeArquivo) {
-      return res.status(400).json({ erro: 'Dados do arquivo ou nome faltando' });
+      return res.status(400).json({ 
+        erro: 'Arquivo ou nome faltando' 
+      })
     }
 
-    // A imagem chega como uma string base64 (ex: "data:image/jpeg;base64,...").
-    // Pegamos apenas a parte dos dados, depois da vírgula.
-    const base64Data = arquivo.split(',')[1];
-    // Convertendo a string base64 em um formato que o Supabase entende (Buffer).
-    const buffer = Buffer.from(base64Data, 'base64');
+    // Converte base64 para Buffer
+    const base64Data = arquivo.split(',')[1]
+    const buffer = Buffer.from(base64Data, 'base64')
 
-    // Faz o upload para o Supabase Storage
+    // Faz upload para Supabase Storage
     const { data, error } = await supabase.storage
-      .from('sitepizza') // Nome do bucket
+      .from('sitepizza')
       .upload(nomeArquivo, buffer, {
-        contentType: mimeType || 'image/jpeg', // Garante que o tipo do arquivo seja enviado
-        upsert: false,
-      });
+        contentType: mimeType || 'image/jpeg', // Usa o tipo do arquivo enviado
+        upsert: false // Não sobrescreve se existir
+      })
 
-    // Se o Supabase retornar um erro, o enviamos na resposta
+    // Se houve erro
     if (error) {
-      console.error('Erro no upload para o Supabase:', error);
+      console.error('Erro Supabase:', error)
       return res.status(500).json({ 
-        erro: 'Erro ao fazer upload para o Supabase',
-        detalhe: error.message 
-      });
+        erro: 'Erro ao fazer upload no Supabase',
+        detalhe: error.message
+      })
     }
 
-    // Constrói a URL pública da imagem para retornar ao frontend
-    const urlPublica = `${process.env.SUPABASE_URL}/storage/v1/object/public/sitepizza/${nomeArquivo}`;
+    // Construir URL pública
+    const urlPublica = `${process.env.SUPABASE_URL}/storage/v1/object/public/sitepizza/${nomeArquivo}`
 
-    // Retorna uma resposta de sucesso com a URL da imagem
+    // Retorna sucesso com URL
     res.status(200).json({
       sucesso: true,
       url: urlPublica,
-      mensagem: 'Imagem enviada com sucesso'
-    });
-
+      mensagem: 'Imagem enviada com sucesso',
+      arquivo: nomeArquivo
+    })
   } catch (erro) {
-    console.error('Erro interno na função:', erro);
-    res.status(500).json({ 
-      erro: 'Erro interno no servidor',
-      detalhe: erro.message 
-    });
+    console.error('Erro:', erro)
+    res.status(500).json({
+      erro: 'Erro interno do servidor',
+      detalhe: erro.message
+    })
   }
 }

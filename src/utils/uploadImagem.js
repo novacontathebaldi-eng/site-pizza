@@ -1,70 +1,114 @@
-// Função auxiliar para converter um arquivo (File) para uma string base64
-const fileToBase64 = (file) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = error => reject(error);
-});
-
 /**
- * Função para fazer upload de imagem, enviando-a para nossa API no servidor Vercel.
- * @param {File} arquivo - Arquivo de imagem selecionado.
- * @returns {Promise<string>} - A URL pública da imagem após o upload.
- */
+
+Função para fazer upload de imagem
+
+@param {File} arquivo - Arquivo selecionado pelo input
+
+@returns {Promise<string>} - URL pública da imagem
+*/
 export async function uploadImagem(arquivo) {
   try {
     // Validação 1: Arquivo existe?
     if (!arquivo) {
-      throw new Error('Nenhum arquivo selecionado');
+      throw new Error('❌ Nenhum arquivo selecionado')
     }
-    
-    // Validação 2: Limite de tamanho de 4.5MB (limite da Vercel no plano Hobby)
-    const tamanhoMaximo = 4.5 * 1024 * 1024;
+
+    // Validação 2: Tamanho máximo 50 MB
+    const tamanhoMaximo = 50 * 1024 * 1024 // 50 MB em bytes
     if (arquivo.size > tamanhoMaximo) {
-        throw new Error(`Arquivo muito grande. O limite para envio pelo painel é de 4.5 MB.`);
+      throw new Error(`❌ Arquivo muito grande. Máximo: 50 MB. Seu arquivo: ${(arquivo.size / 1024 / 1024).toFixed(2)} MB`)
     }
 
-    // Converte o arquivo para base64 para poder enviá-lo via JSON
-    const base64Arquivo = await fileToBase64(arquivo);
+    // Validação 3: É imagem?
+    if (!arquivo.type.startsWith('image/')) {
+      throw new Error('❌ O arquivo precisa ser uma imagem')
+    }
 
-    // Gera um nome de arquivo único para evitar conflitos
-    const timestamp = Date.now();
-    const nomeOriginal = arquivo.name.replace(/[^a-zA-Z0-9.-]/g, '_').toLowerCase();
-    const nomeArquivo = `${timestamp}_${nomeOriginal}`;
+    // Gera nome único com timestamp
+    const timestamp = Date.now()
+    const nomeOriginal = arquivo.name
+      .replace(/[^a-zA-Z0-9.-]/g, '_') // Remove caracteres especiais
+      .toLowerCase()
+    const nomeArquivo = `${timestamp}_${nomeOriginal}`
 
-    console.log('⏳ Processando arquivo...', nomeArquivo);
+    console.log('⏳ Processando arquivo...', nomeArquivo)
 
-    // Envia os dados para a nossa função de servidor na Vercel
+    // Converte arquivo para base64
+    const base64 = await lerArquivoBase64(arquivo)
+
+    console.log('⏳ Enviando para servidor...')
+
+    // Chama função do Vercel
     const response = await fetch('/api/upload-imagem', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        arquivo: base64Arquivo,
+        arquivo: base64, // Dados em base64
         nomeArquivo: nomeArquivo,
-        mimeType: arquivo.type,
-      }),
-    });
-    
-    console.log('⏳ Enviando para servidor...');
+        mimeType: arquivo.type // Enviando o tipo do arquivo
+      })
+    })
 
-    const data = await response.json();
+    const dados = await response.json()
 
-    // Se a resposta do servidor não for OK, lança um erro com a mensagem do servidor
+    // Se houve erro na resposta
     if (!response.ok) {
-      throw new Error(data.detalhe || data.erro || 'Erro desconhecido no servidor.');
+      // Tenta extrair uma mensagem de erro mais detalhada do corpo da resposta
+      const erroMsg = dados.erro || dados.detalhe || 'Erro desconhecido ao fazer upload';
+      throw new Error(erroMsg);
     }
-    
-    console.log('✅ Upload bem-sucedido!', data.url);
 
-    // Retorna a URL pública da imagem
-    return data.url;
+    console.log('✅ Upload bem-sucedido!')
+    console.log('🔗 URL da imagem:', dados.url)
+
+    return dados.url
 
   } catch (erro) {
-    // Em caso de erro, exibe no console e lança para a UI
-    console.error('❌ Erro no upload:', erro.message);
-    // Lançar o erro novamente para que o componente que chamou a função possa tratá-lo
-    throw erro;
+    console.error('❌ Erro no upload:', erro.message)
+    // Re-lança o erro para que a UI possa capturá-lo
+    throw erro
   }
 }
+
+/**
+
+Helper: Converte arquivo para base64
+
+@param {File} arquivo
+
+@returns {Promise<string>}
+*/
+function lerArquivoBase64(arquivo) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.onload = (e) => {
+      resolve(e.target.result) // base64 string
+    }
+
+    reader.onerror = () => {
+      reject(new Error('Erro ao ler arquivo'))
+    }
+
+    reader.readAsDataURL(arquivo)
+  })
+}
+
+/**
+
+EXEMPLO DE USO:
+
+try {
+
+const url = await uploadImagem(arquivo)
+
+console.log('Imagem salva em:', url)
+
+} catch (erro) {
+
+alert('Erro: ' + erro.message)
+
+}
+*/
