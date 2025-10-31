@@ -485,6 +485,7 @@
       const result = await response.json();
       const reply = result[0]?.generated_text || "Desculpe, não consegui processar sua solicitação.";
 
+      logger.info("Resposta do assistente gerada com sucesso.");
       return {reply: reply};
     } catch (error) {
       logger.error("Erro ao chamar a API da Hugging Face:", error);
