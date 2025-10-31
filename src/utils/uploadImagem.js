@@ -1,5 +1,6 @@
 // Importa o cliente Supabase que acabamos de configurar
-import { supabase } from '../../services/supabase';
+// ATUALIZADO: Usando o alias '@/' para um caminho mais robusto.
+import { supabase } from '@/services/supabase.ts';
 
 /**
  * Função para fazer upload de imagem diretamente para o Supabase Storage.
