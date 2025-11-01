@@ -1,11 +1,4 @@
 {
   "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "functions": {
-    "api/**/*.js": {
-      "maxDuration": 60,
-      "memory": 1024,
-      "runtime": "nodejs20.x"
-    }
-  }
+  "outputDirectory": "dist"
 }

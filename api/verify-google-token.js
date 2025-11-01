@@ -1,6 +1,6 @@
 // /api/verify-google-token.js
-const admin = require("firebase-admin");
-const { OAuth2Client } = require("google-auth-library");
+import admin from "firebase-admin";
+import { OAuth2Client } from "google-auth-library";
 
 // Função para garantir que o Firebase Admin seja inicializado apenas uma vez (lazy initialization)
 const ensureFirebaseAdminInitialized = () => {
@@ -29,7 +29,7 @@ const ensureFirebaseAdminInitialized = () => {
   }
 };
 
-module.exports = async (req, res) => {
+export default async (req, res) => {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');

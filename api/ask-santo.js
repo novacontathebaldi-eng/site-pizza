@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 let genAIInstance;
 
@@ -15,7 +15,7 @@ const ensureGenAIInitialized = () => {
   genAIInstance = new GoogleGenerativeAI(apiKey);
 };
 
-module.exports = async (req, res) => {
+export default async (req, res) => {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
