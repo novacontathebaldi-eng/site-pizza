@@ -33,10 +33,10 @@ try {
   auth = firebase.auth();
   functions = firebase.functions();
   
-  // Keep db settings
+  // A configuração `merge: true` foi removida. Ela causava um conflito com `experimentalForceLongPolling`
+  // que impedia a inicialização do Firebase. O aviso amarelo que pode aparecer sem ela é inofensivo.
   db.settings({
     experimentalForceLongPolling: true,
-    merge: true, // Silences the "overriding host" warning
   });
   
   console.log("Firebase inicializado com sucesso. Conectando ao Firestore, Auth e Functions...");
