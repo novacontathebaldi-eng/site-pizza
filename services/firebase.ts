@@ -36,6 +36,7 @@ try {
   // Keep db settings
   db.settings({
     experimentalForceLongPolling: true,
+    merge: true, // Silences the "overriding host" warning
   });
   
   console.log("Firebase inicializado com sucesso. Conectando ao Firestore, Auth e Functions...");
