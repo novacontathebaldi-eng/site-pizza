@@ -246,8 +246,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
                                 {isLoading ? <i className="fas fa-spinner fa-spin"></i> : (view === 'register' ? 'Criar Conta' : 'Entrar')}
                             </button>
                         </form>
-                        {/* Botão de login com Google temporariamente desativado a pedido */}
-                        {/*
+                        {/* 
                         <div className="relative my-6"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-300"></div></div><div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">ou</span></div></div>
                         <button onClick={onGoogleSignIn} className="w-full bg-white border border-gray-300 text-gray-700 font-semibold py-3 px-4 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-3">
                             <i className="fab fa-google text-red-500"></i>

@@ -26,7 +26,7 @@ import { CookieConsentBanner } from './components/CookieConsentBanner';
 import { TermsOfServiceModal } from './components/TermsOfServiceModal';
 import { HalfAndHalfModal } from './components/HalfAndHalfModal';
 import { PixQrCodeModal } from './components/PixQrCodeModal';
-import { uploadImagem } from './src/utils/uploadImagem.js';
+import { uploadImagem } from './src/utils/uploadImagem';
 
 // Type declarations for Google GAPI library to avoid TypeScript errors
 declare global {
@@ -241,7 +241,6 @@ const App: React.FC = () => {
     const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
     const [isUserAreaModalOpen, setIsUserAreaModalOpen] = useState<boolean>(false);
-    const [isGapiReady, setIsGapiReady] = useState(false);
     const [postRegisterAction, setPostRegisterAction] = useState<string | null>(null);
     const prevUser = useRef<firebase.User | null>(null);
     const [passwordResetCode, setPasswordResetCode] = useState<string | null>(null);
@@ -375,42 +374,6 @@ const App: React.FC = () => {
         localStorage.setItem('santaSensacaoCookieConsent', 'true');
         setShowCookieBanner(false);
     };
-
-    // Effect to initialize Google Auth
-    useEffect(() => {
-        const initGoogleAuth = () => {
-            if (window.gapi && !isGapiReady) {
-                window.gapi.load('auth2', () => {
-                    try {
-                        window.gapi.auth2.init({
-                            client_id: '914255031241-o9ilfh14poff9ik89uabv1me8f28v8o9.apps.googleusercontent.com',
-                        }).then(() => {
-                            setIsGapiReady(true);
-                        }, (error: any) => {
-                            // Don't show toast on initial load failure, only on interaction.
-                            console.error('Error initializing Google Auth2:', error);
-                        });
-                    } catch (error) {
-                        console.error('Error loading Google Auth2:', error);
-                    }
-                });
-            }
-        };
-
-        // Assign callback for the script in index.html to call
-        window.onGoogleScriptLoadCallback = initGoogleAuth;
-
-        // If script is already loaded and callback was missed (race condition), run init
-        if (window.googleScriptLoaded) {
-            initGoogleAuth();
-        }
-
-        return () => {
-            // @ts-ignore
-            delete window.onGoogleScriptLoadCallback;
-        };
-    }, [isGapiReady]);
-
 
     // Effect for Firebase Auth state changes
     useEffect(() => {
@@ -677,29 +640,7 @@ const App: React.FC = () => {
 
     // --- Auth Handlers ---
     const handleGoogleSignIn = async () => {
-        if (!isGapiReady || !auth) {
-            addToast('Serviço de login não está pronto. Tente em instantes.', 'error');
-            return;
-        }
-        try {
-            const googleAuth = window.gapi.auth2.getAuthInstance();
-            const googleUser = await googleAuth.signIn();
-            const idToken = googleUser.getAuthResponse().id_token;
-
-            // Garante que a sessão do usuário persista após o navegador ser fechado.
-            await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-            // FIX: Replaced the non-existent `verifyGoogleToken` with the correct `verifyGoogleTokenAndSignIn` function.
-            // This function handles the entire sign-in flow, so the redundant `signInWithCustomToken` call was also removed.
-            await firebaseService.verifyGoogleTokenAndSignIn(idToken);
-
-            setIsLoginModalOpen(false);
-            addToast(`Bem-vindo(a), ${googleUser.getBasicProfile().getName()}!`, 'success');
-        } catch (error: any) {
-            console.error("Google Sign-In Error:", error);
-            if (error.error !== 'popup_closed_by_user') {
-                addToast('Falha no login com Google. Tente novamente.', 'error');
-            }
-        }
+        addToast('Login com Google está temporariamente desativado.', 'error');
     };
     
     const handleRegisterSuccess = () => {
@@ -710,12 +651,6 @@ const App: React.FC = () => {
     const handleLogout = async () => {
         if (!auth) return;
         try {
-            if (isGapiReady) {
-                const googleAuth = window.gapi.auth2.getAuthInstance();
-                if (googleAuth && googleAuth.isSignedIn.get()) {
-                    await googleAuth.signOut();
-                }
-            }
             await auth.signOut();
             setIsUserAreaModalOpen(false);
             addToast('Você foi desconectado.', 'success');
@@ -1321,7 +1256,7 @@ const App: React.FC = () => {
                 />
             </div>
             
-            <div className="fixed bottom-5 right-5 z-40 flex flex-col-reverse items-end gap-3">
+            <div className="fixed bottom-5 right-5 z-[60] flex flex-col-reverse items-end gap-3">
                 {isFooterVisible ? (
                     <button onClick={scrollToTop} className="w-14 h-14 bg-accent text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110 animate-fade-in-up" aria-label="Voltar ao topo">
                         <i className="fas fa-arrow-up text-xl"></i>
@@ -1341,7 +1276,7 @@ const App: React.FC = () => {
                 ) : null}
             </div>
 
-            <button onClick={() => setIsChatbotOpen(true)} className="fixed bottom-5 left-5 z-40 w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110" aria-label="Abrir assistente virtual"><i className="fas fa-headset text-2xl"></i></button>
+            <button onClick={() => setIsChatbotOpen(true)} className="fixed bottom-5 left-5 z-[60] w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110" aria-label="Abrir assistente virtual"><i className="fas fa-headset text-2xl"></i></button>
 
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cart} onUpdateQuantity={handleUpdateCartQuantity} onCheckout={() => { if (!isStoreOnline) { addToast("A loja está fechada. Não é possível finalizar o pedido.", 'error'); return; } setIsCartOpen(false); setIsCheckoutModalOpen(true); }} isStoreOnline={isStoreOnline} categories={categories} products={products} setActiveCategoryId={setActiveMenuCategory}/>
             <CheckoutModal

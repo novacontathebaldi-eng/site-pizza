@@ -2,13 +2,15 @@
 const admin = require("firebase-admin");
 
 // --- INICIALIZAÇÃO DO FIREBASE ADMIN ---
+// As credenciais são verificadas dentro do handler para garantir que um erro claro seja retornado se estiverem faltando.
+const serviceAccount = {
+  project_id: process.env.FIREBASE_PROJECT_ID,
+  client_email: process.env.FIREBASE_CLIENT_EMAIL,
+  private_key: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+};
+
 try {
-  if (!admin.apps.length) {
-    const serviceAccount = {
-      project_id: process.env.FIREBASE_PROJECT_ID,
-      client_email: process.env.FIREBASE_CLIENT_EMAIL,
-      private_key: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-    };
+  if (!admin.apps.length && serviceAccount.project_id) {
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
@@ -17,8 +19,6 @@ try {
   console.error('Firebase admin initialization error', e.stack);
 }
 // --- FIM DA INICIALIZAÇÃO ---
-
-const db = admin.firestore();
 
 // Função para verificar o token de autenticação do Firebase (opcional, mas recomendado)
 const getUserIdFromToken = async (req) => {
@@ -48,6 +48,14 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // **NOVA VERIFICAÇÃO DE SEGURANÇA**
+  if (!serviceAccount.project_id || !serviceAccount.client_email || !serviceAccount.private_key) {
+    console.error("Firebase Admin credentials are not set in environment variables.");
+    return res.status(500).json({ error: "Configuration error: Firebase Admin credentials missing." });
+  }
+  
+  const db = admin.firestore();
 
   try {
     const {details, cart, total, orderId} = req.body;

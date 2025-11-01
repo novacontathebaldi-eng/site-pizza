@@ -3,13 +3,15 @@ const admin = require("firebase-admin");
 const { OAuth2Client } = require("google-auth-library");
 
 // --- INICIALIZAÇÃO DO FIREBASE ADMIN ---
+// As credenciais são verificadas dentro do handler para garantir que um erro claro seja retornado se estiverem faltando.
+const serviceAccount = {
+  project_id: process.env.FIREBASE_PROJECT_ID,
+  client_email: process.env.FIREBASE_CLIENT_EMAIL,
+  private_key: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+};
+
 try {
-  if (!admin.apps.length) {
-    const serviceAccount = {
-      project_id: process.env.FIREBASE_PROJECT_ID,
-      client_email: process.env.FIREBASE_CLIENT_EMAIL,
-      private_key: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-    };
+  if (!admin.apps.length && serviceAccount.project_id) {
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
@@ -18,8 +20,6 @@ try {
   console.error('Firebase admin initialization error', e.stack);
 }
 // --- FIM DA INICIALIZAÇÃO ---
-
-const db = admin.firestore();
 
 module.exports = async (req, res) => {
   // CORS
@@ -35,15 +35,23 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   
-  const { idToken } = req.body;
+  // **NOVAS VERIFICAÇÕES DE SEGURANÇA**
+  if (!serviceAccount.project_id || !serviceAccount.client_email || !serviceAccount.private_key) {
+    console.error("Firebase Admin credentials are not set in environment variables.");
+    return res.status(500).json({ error: "Configuration error: Firebase Admin credentials missing." });
+  }
+
   const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    console.error("GOOGLE_CLIENT_ID not set.");
+    return res.status(500).json({ error: "Configuration error: Google Client ID is missing." });
+  }
+  
+  const db = admin.firestore();
+  const { idToken } = req.body;
 
   if (!idToken) {
     return res.status(400).json({ error: "The function must be called with an idToken." });
-  }
-  if (!clientId) {
-    console.error("GOOGLE_CLIENT_ID not set.");
-    return res.status(500).json({ error: "Authentication is not configured correctly." });
   }
 
   const client = new OAuth2Client(clientId);

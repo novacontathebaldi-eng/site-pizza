@@ -9,24 +9,24 @@
     <!-- PWA & SEO -->
     <link rel="manifest" href="/manifest.webmanifest">
     <meta name="theme-color" content="#2C5633">
-    <link rel="apple-touch-icon" href="/assets/logo-para-icones.png">
+    <link rel="apple-touch-icon" href="/assets/logo.png">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://www.santasensacao.me/">
     <meta property="og:title" content="Pizzaria Santa Sensação - A pizza nº 1 do ES">
     <meta property="og:description" content="A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.">
-    <meta property="og:image" content="https://www.santasensacao.me/assets/logo-para-icones.png">
+    <meta property="og:image" content="https://www.santasensacao.me/assets/logo.png">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://www.santasensacao.me/">
     <meta property="twitter:title" content="Pizzaria Santa Sensação - A pizza nº 1 do ES">
     <meta property="twitter:description" content="A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.">
-    <meta property="twitter:image" content="https://www.santasensacao.me/assets/logo-para-icones.png">
+    <meta property="twitter:image" content="https://www.santasensacao.me/assets/logo.png">
     
     <!-- Ícone do Navegador (Favicon) -->
-    <link rel="icon" type="image/png" href="/assets/logo-para-icones.png">
+    <link rel="icon" type="image/png" href="/assets/logo.png">
 
     <!-- Preload da imagem de fundo da área do cliente -->
     <link rel="preload" href="/assets/fundocliente.png" as="image">
@@ -60,17 +60,6 @@
 </head>
 <body class="bg-brand-ivory-50 text-text-on-light antialiased">
     <div id="root"></div>
-    <script>
-      function onGoogleScriptLoad() {
-        // Set a flag to indicate the script has loaded, in case React mounts after this.
-        window.googleScriptLoaded = true;
-        // If the React callback is already on the window object, call it.
-        if (window.onGoogleScriptLoadCallback) {
-          window.onGoogleScriptLoadCallback();
-        }
-      }
-    </script>
-    <script src="https://apis.google.com/js/platform.js?onload=onGoogleScriptLoad" async defer></script>
     <script type="module" src="/index.tsx"></script>
 </body>
 </html>

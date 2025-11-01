@@ -1,5 +1,5 @@
 import React, { useState, ChangeEvent } from 'react';
-import { uploadImagem } from '../src/utils/uploadImagem.js';
+import { uploadImagem } from '../src/utils/uploadImagem';
 
 export function UploadImagem() {
     const [status, setStatus] = useState('');

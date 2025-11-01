@@ -15,16 +15,18 @@ if (req.method !== 'POST') {
 return res.status(405).json({ error: 'Method not allowed' });
 }
 
+// **NOVA VERIFICAÇÃO DE SEGURANÇA**
+// Garante que a chave da API do Gemini está configurada antes de prosseguir.
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  console.error('GEMINI_API_KEY not set');
+  return res.status(500).json({ error: 'Configuration error: Assistant API key is missing.' });
+}
+
 try {
 const { history, menuData, storeStatus, userProfile, myOrders } = req.body;
 if (!history || history.length === 0) {
   return res.status(400).json({ error: 'No conversation history provided' });
-}
-
-const apiKey = process.env.GEMINI_API_KEY;
-if (!apiKey) {
-  console.error('GEMINI_API_KEY not set');
-  return res.status(500).json({ error: 'Assistant is not configured' });
 }
 
 // FIX: Updated to use the correct, non-deprecated `GoogleGenAI` class.
