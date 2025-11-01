@@ -5,11 +5,11 @@ const { OAuth2Client } = require("google-auth-library");
 // --- INICIALIZAÇÃO DO FIREBASE ADMIN ---
 try {
   if (!admin.apps.length) {
-    // FIX: Changed keys to camelCase (projectId, clientEmail, privateKey) to match the Firebase Admin SDK's expected format.
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
     const serviceAccount = {
       projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY,
+      privateKey: privateKey,
     };
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
