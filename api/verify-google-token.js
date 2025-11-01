@@ -7,10 +7,10 @@ const { OAuth2Client } = require("google-auth-library");
 try {
   if (!admin.apps.length) {
     const serviceAccount = {
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      project_id: process.env.FIREBASE_PROJECT_ID,
+      client_email: process.env.FIREBASE_CLIENT_EMAIL,
       // A chave privada é lida diretamente da variável de ambiente.
-      privateKey: process.env.FIREBASE_PRIVATE_KEY,
+      private_key: process.env.FIREBASE_PRIVATE_KEY,
     };
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
