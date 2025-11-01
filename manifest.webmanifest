@@ -8,13 +8,13 @@
   "theme_color": "#2C5633",
   "icons": [
     {
-      "src": "/assets/logo para icones.png",
+      "src": "/assets/logo-para-icones.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/assets/logo para icones.png",
+      "src": "/assets/logo-para-icones.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
