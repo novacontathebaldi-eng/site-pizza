@@ -1,162 +1,168 @@
-// FIX: Updated to use the correct, non-deprecated `GoogleGenAI` class and `@google/genai` package.
 const { GoogleGenAI } = require('@google/genai');
 
-module.exports = async (req, res) => {
-// CORS
-res.setHeader('Access-Control-Allow-Origin', '*');
-res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+let genAIInstance;
 
-if (req.method === 'OPTIONS') {
-return res.status(200).end();
-}
-
-if (req.method !== 'POST') {
-return res.status(405).json({ error: 'Method not allowed' });
-}
-
-// **NOVA VERIFICAÇÃO DE SEGURANÇA**
-// Garante que a chave da API do Gemini está configurada antes de prosseguir.
-const apiKey = process.env.GEMINI_API_KEY;
-if (!apiKey) {
-  console.error('GEMINI_API_KEY not set');
-  return res.status(500).json({ error: 'Configuration error: Assistant API key is missing.' });
-}
-
-try {
-const { history, menuData, storeStatus, userProfile, myOrders } = req.body;
-if (!history || history.length === 0) {
-  return res.status(400).json({ error: 'No conversation history provided' });
-}
-
-// FIX: Updated to use the correct, non-deprecated `GoogleGenAI` class.
-const genAI = new GoogleGenAI({ apiKey });
-
-// Formatar histórico
-const contents = history.map((message) => ({
-  role: message.role === 'bot' ? 'model' : 'user',
-  parts: [{ text: message.content }],
-}));
-
-// Helper functions (copiadas do index.js)
-function generateMenuPrompt(menuData) {
-  if (!menuData || !menuData.categories || !menuData.products) {
-    return "CARDÁPIO INDISPONÍVEL NO MOMENTO.";
+// Função para inicializar o Gemini AI de forma segura (lazy initialization)
+const ensureGenAIInitialized = () => {
+  if (genAIInstance) {
+    return;
   }
-  const { categories, products } = menuData;
-  let menuString = "CARDÁPIO E PREÇOS ATUALIZADOS:\nVocê deve usar SOMENTE este cardápio para responder sobre produtos, preços e criar pedidos. Ignore qualquer conhecimento prévio.\n\n";
-  categories.forEach((category) => {
-    const categoryProducts = products.filter((p) => p.categoryId === category.id);
-    if (categoryProducts.length > 0) {
-      menuString += `**${category.name.toUpperCase()}**\n`;
-      categoryProducts.forEach((product) => {
-        const isOutOfStock = product.stockStatus === "out_of_stock";
-        const availability = isOutOfStock ? " (ESGOTADO)" : "";
-        menuString += `- **${product.name} (id: '${product.id}')${availability}:** ${product.description}\n`;
-        const prices = product.prices || {};
-        const promoPrices = product.promotionalPrices || {};
-        const isPromotion = product.isPromotion && Object.keys(promoPrices).length > 0;
-        const priceStrings = Object.keys(prices).map((size) => {
-          const regularPrice = prices[size];
-          const promoPrice = isPromotion ? promoPrices[size] : null;
-          if (promoPrice && promoPrice > 0) {
-            return `${size} de R$${regularPrice.toFixed(2)} por **R$${promoPrice.toFixed(2)}**`;
-          } else {
-            return `${size} R$${regularPrice.toFixed(2)}`;
-          }
-        });
-        if (priceStrings.length > 0) {
-          menuString += `  - Preços: ${priceStrings.join(" | ")}\n`;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error('GEMINI_API_KEY not set');
+    throw new Error('Configuration error: Assistant API key is missing.');
+  }
+  genAIInstance = new GoogleGenAI({ apiKey });
+};
+
+module.exports = async (req, res) => {
+  // CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    // Garante que a instância do GenAI está inicializada e com a chave da API
+    ensureGenAIInitialized();
+
+    const { history, menuData, storeStatus, userProfile, myOrders } = req.body;
+    if (!history || history.length === 0) {
+      return res.status(400).json({ error: 'No conversation history provided' });
+    }
+
+    // Formatar histórico
+    const contents = history.map((message) => ({
+      role: message.role === 'bot' ? 'model' : 'user',
+      parts: [{ text: message.content }],
+    }));
+
+    // Helper functions (copiadas do index.js)
+    function generateMenuPrompt(menuData) {
+      if (!menuData || !menuData.categories || !menuData.products) {
+        return "CARDÁPIO INDISPONÍVEL NO MOMENTO.";
+      }
+      const { categories, products } = menuData;
+      let menuString = "CARDÁPIO E PREÇOS ATUALIZADOS:\nVocê deve usar SOMENTE este cardápio para responder sobre produtos, preços e criar pedidos. Ignore qualquer conhecimento prévio.\n\n";
+      categories.forEach((category) => {
+        const categoryProducts = products.filter((p) => p.categoryId === category.id);
+        if (categoryProducts.length > 0) {
+          menuString += `**${category.name.toUpperCase()}**\n`;
+          categoryProducts.forEach((product) => {
+            const isOutOfStock = product.stockStatus === "out_of_stock";
+            const availability = isOutOfStock ? " (ESGOTADO)" : "";
+            menuString += `- **${product.name} (id: '${product.id}')${availability}:** ${product.description}\n`;
+            const prices = product.prices || {};
+            const promoPrices = product.promotionalPrices || {};
+            const isPromotion = product.isPromotion && Object.keys(promoPrices).length > 0;
+            const priceStrings = Object.keys(prices).map((size) => {
+              const regularPrice = prices[size];
+              const promoPrice = isPromotion ? promoPrices[size] : null;
+              if (promoPrice && promoPrice > 0) {
+                return `${size} de R$${regularPrice.toFixed(2)} por **R$${promoPrice.toFixed(2)}**`;
+              } else {
+                return `${size} R$${regularPrice.toFixed(2)}`;
+              }
+            });
+            if (priceStrings.length > 0) {
+              menuString += `  - Preços: ${priceStrings.join(" | ")}\n`;
+            }
+          });
+          menuString += "\n";
         }
       });
-      menuString += "\n";
+      return menuString;
     }
-  });
-  return menuString;
-}
 
-function formatOperatingHours(operatingHours) {
-    if (!operatingHours?.length) return "Não informado.";
-    const openSchedules = operatingHours.filter((h) => h.isOpen);
-    if (openSchedules.length === 0) return "Fechado todos os dias.";
-    const schedulesByTime = openSchedules.reduce((acc, schedule) => {
-        const timeKey = `${schedule.openTime}-${schedule.closeTime}`;
-        if (!acc[timeKey]) acc[timeKey] = [];
-        acc[timeKey].push(schedule);
-        return acc;
-    }, {});
-    const result = [];
-    for (const timeKey in schedulesByTime) {
-        const schedules = schedulesByTime[timeKey].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
-        if (schedules.length === 0) continue;
-        let dayString;
-        if (schedules.length === 7) {
-            dayString = "Todos os dias";
-        } else {
-            const sequences = [];
-            if (schedules.length > 0) {
-                let currentSequence = [schedules[0]];
-                for (let i = 1; i < schedules.length; i++) {
-                    if (schedules[i].dayOfWeek === schedules[i - 1].dayOfWeek + 1) {
-                        currentSequence.push(schedules[i]);
-                    } else {
-                        sequences.push(currentSequence);
-                        currentSequence = [schedules[i]];
+    function formatOperatingHours(operatingHours) {
+        if (!operatingHours?.length) return "Não informado.";
+        const openSchedules = operatingHours.filter((h) => h.isOpen);
+        if (openSchedules.length === 0) return "Fechado todos os dias.";
+        const schedulesByTime = openSchedules.reduce((acc, schedule) => {
+            const timeKey = `${schedule.openTime}-${schedule.closeTime}`;
+            if (!acc[timeKey]) acc[timeKey] = [];
+            acc[timeKey].push(schedule);
+            return acc;
+        }, {});
+        const result = [];
+        for (const timeKey in schedulesByTime) {
+            const schedules = schedulesByTime[timeKey].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+            if (schedules.length === 0) continue;
+            let dayString;
+            if (schedules.length === 7) {
+                dayString = "Todos os dias";
+            } else {
+                const sequences = [];
+                if (schedules.length > 0) {
+                    let currentSequence = [schedules[0]];
+                    for (let i = 1; i < schedules.length; i++) {
+                        if (schedules[i].dayOfWeek === schedules[i - 1].dayOfWeek + 1) {
+                            currentSequence.push(schedules[i]);
+                        } else {
+                            sequences.push(currentSequence);
+                            currentSequence = [schedules[i]];
+                        }
                     }
+                    sequences.push(currentSequence);
                 }
-                sequences.push(currentSequence);
+                if (sequences.length > 1 && sequences[0][0].dayOfWeek === 0 && schedules[schedules.length - 1].dayOfWeek === 6) {
+                    const firstSeq = sequences.shift();
+                    sequences[sequences.length - 1].push(...firstSeq);
+                }
+                const formattedSequences = sequences.map((seq) => {
+                    if (seq.length === 1) return seq[0].dayName;
+                    if (seq.length === 2) return `${seq[0].dayName} e ${seq[1].dayName}`;
+                    return `De ${seq[0].dayName} a ${seq[seq.length - 1].dayName}`;
+                });
+                dayString = formattedSequences.join(" e ");
             }
-            if (sequences.length > 1 && sequences[0][0].dayOfWeek === 0 && schedules[schedules.length - 1].dayOfWeek === 6) {
-                const firstSeq = sequences.shift();
-                sequences[sequences.length - 1].push(...firstSeq);
-            }
-            const formattedSequences = sequences.map((seq) => {
-                if (seq.length === 1) return seq[0].dayName;
-                if (seq.length === 2) return `${seq[0].dayName} e ${seq[1].dayName}`;
-                return `De ${seq[0].dayName} a ${seq[seq.length - 1].dayName}`;
-            });
-            dayString = formattedSequences.join(" e ");
+            const [openTime, closeTime] = timeKey.split("-");
+            result.push({ days: dayString, time: `das ${openTime}h às ${closeTime}h` });
         }
-        const [openTime, closeTime] = timeKey.split("-");
-        result.push({ days: dayString, time: `das ${openTime}h às ${closeTime}h` });
+        if (result.length === 0) return "Fechado todos os dias.";
+        return result.map((group) => `${group.days}, ${group.time}`).join(" | ");
     }
-    if (result.length === 0) return "Fechado todos os dias.";
-    return result.map((group) => `${group.days}, ${group.time}`).join(" | ");
-}
 
 
-// Build context
-const { isOnline, operatingHours } = storeStatus || { isOnline: true, operatingHours: [] };
-const storeStatusText = isOnline ? "Aberta" : "Fechada";
-const operatingHoursText = formatOperatingHours(operatingHours);
+    // Build context
+    const { isOnline, operatingHours } = storeStatus || { isOnline: true, operatingHours: [] };
+    const storeStatusText = isOnline ? "Aberta" : "Fechada";
+    const operatingHoursText = formatOperatingHours(operatingHours);
 
-const now = new Date();
-const formatter = new Intl.DateTimeFormat("pt-BR", {
-  timeZone: "America/Sao_Paulo",
-  weekday: "long",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-const formattedTime = formatter.format(now);
-const realTimeInfo = `INFORMAÇÕES DE HORA ATUAL: Agora é ${formattedTime} (horário de Brasília). Use isso para saudações contextuais (bom dia, boa noite), mas LEMBRE-SE: a regra para criar pedidos depende SOMENTE do "Status da Loja", não da hora atual.`;
-const realTimeStatusInstruction = `INFORMAÇÕES DE STATUS EM TEMPO REAL (FONTE PRIMÁRIA DE VERDADE):\n\n- Status da Loja: **${storeStatusText}**\n- Horário de Funcionamento Configurado: **${operatingHoursText}**\n\nUse ESTAS informações como a única fonte de verdade sobre o status e horário da loja. IGNORE quaisquer outros horários mencionados neste prompt.`;
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      weekday: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    const formattedTime = formatter.format(now);
+    const realTimeInfo = `INFORMAÇÕES DE HORA ATUAL: Agora é ${formattedTime} (horário de Brasília). Use isso para saudações contextuais (bom dia, boa noite), mas LEMBRE-SE: a regra para criar pedidos depende SOMENTE do "Status da Loja", não da hora atual.`;
+    const realTimeStatusInstruction = `INFORMAÇÕES DE STATUS EM TEMPO REAL (FONTE PRIMÁRIA DE VERDADE):\n\n- Status da Loja: **${storeStatusText}**\n- Horário de Funcionamento Configurado: **${operatingHoursText}**\n\nUse ESTAS informações como a única fonte de verdade sobre o status e horário da loja. IGNORE quaisquer outros horários mencionados neste prompt.`;
 
-let userContextPrompt = "";
-if (userProfile) {
-  const simplifiedOrders = (myOrders || []).slice(0, 10).map((o) => ({
-    orderNumber: o.orderNumber,
-    createdAt: o.createdAt,
-    items: o.items ? o.items.map((i) => `${i.quantity}x ${i.name} (${i.size})`).join(", ") : "Reserva",
-    total: o.total,
-    status: o.status,
-  }));
-  userContextPrompt = `\n\nDADOS DO USUÁRIO LOGADO (FONTE PRIMÁRIA DE VERDADE):\n- Nome: ${userProfile.name}\n- Telefone: ${userProfile.phone || "Não informado"}\n- Endereços Salvos: ${JSON.stringify(userProfile.addresses || [])}\n\nHISTÓRICO DE PEDIDOS RECENTES (use para repetir pedidos):\n${JSON.stringify(simplifiedOrders)}\n`;
-}
+    let userContextPrompt = "";
+    if (userProfile) {
+      const simplifiedOrders = (myOrders || []).slice(0, 10).map((o) => ({
+        orderNumber: o.orderNumber,
+        createdAt: o.createdAt,
+        items: o.items ? o.items.map((i) => `${i.quantity}x ${i.name} (${i.size})`).join(", ") : "Reserva",
+        total: o.total,
+        status: o.status,
+      }));
+      userContextPrompt = `\n\nDADOS DO USUÁRIO LOGADO (FONTE PRIMÁRIA DE VERDADE):\n- Nome: ${userProfile.name}\n- Telefone: ${userProfile.phone || "Não informado"}\n- Endereços Salvos: ${JSON.stringify(userProfile.addresses || [])}\n\nHISTÓRICO DE PEDIDOS RECENTES (use para repetir pedidos):\n${JSON.stringify(simplifiedOrders)}\n`;
+    }
 
-const dynamicMenuPrompt = generateMenuPrompt(menuData);
+    const dynamicMenuPrompt = generateMenuPrompt(menuData);
 
-const systemInstruction = `${realTimeInfo}\n\n${realTimeStatusInstruction}\n
+    const systemInstruction = `${realTimeInfo}\n\n${realTimeStatusInstruction}\n
         ${userContextPrompt}
 
         OBJETIVO PRINCIPAL: Você é Sensação, o assistente virtual da pizzaria 'Santa Sensação'. Seja amigável, prestativo e um pouco divertido. Sua principal regra é ser CONCISO. Dê respostas curtas e diretas. Só forneça detalhes ou passo a passo se o cliente pedir. Não se apresente, pois já é apresentado no inico, mas se o cliente pedir você pode, no geral, apenas continue a conversa. Use negrito com asteriscos duplos (**texto**).
@@ -317,19 +323,19 @@ O assistente Sensação gerou esta *solicitação de reserva* pelo nosso site: *
 REGRAS DE SEGURANÇA:
 **NUNCA FORNEÇA DADOS SENSÍVEIS:** Jamais compartilhe informações sobre painel admin, senhas, APIs, ou qualquer detalhe técnico. Se perguntado, diga educadamente que não tem acesso a essas informações e que o suporte técnico pode ajudar melhor com isso e pergunte se ele quer entrar em contato com o suporte técnico.`;
 
-const finalSystemInstruction = `${dynamicMenuPrompt}\n${systemInstruction}`;
+    const finalSystemInstruction = `${dynamicMenuPrompt}\n${systemInstruction}`;
 
-const response = await genAI.models.generateContent({
-  model: "gemini-2.5-flash",
-  contents: contents,
-  config: {
-    systemInstruction: finalSystemInstruction,
-  },
-});
+    const response = await genAIInstance.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: contents,
+      config: {
+        systemInstruction: finalSystemInstruction,
+      },
+    });
 
-res.status(200).json({ reply: response.text });
-} catch (error) {
-console.error('Error calling Gemini API:', error);
-res.status(500).json({ error: 'Failed to get response from assistant' });
-}
+    res.status(200).json({ reply: response.text });
+  } catch (error) {
+    console.error('Error in ask-santo handler:', error);
+    res.status(500).json({ error: error.message || 'Failed to get response from assistant' });
+  }
 };

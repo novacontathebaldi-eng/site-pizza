@@ -1255,8 +1255,10 @@ const App: React.FC = () => {
                     onUserAreaClick={handleUserIconClick}
                 />
             </div>
+
+            {/* Z-INDEX HIERARCHY: Toasts (100) > Modals (50) > Floating Buttons (40) > Cookie Banner (30) > Headers (20) */}
             
-            <div className="fixed bottom-5 right-5 z-[60] flex flex-col-reverse items-end gap-3">
+            <div className="fixed bottom-5 right-5 z-40 flex flex-col-reverse items-end gap-3">
                 {isFooterVisible ? (
                     <button onClick={scrollToTop} className="w-14 h-14 bg-accent text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110 animate-fade-in-up" aria-label="Voltar ao topo">
                         <i className="fas fa-arrow-up text-xl"></i>
@@ -1276,7 +1278,7 @@ const App: React.FC = () => {
                 ) : null}
             </div>
 
-            <button onClick={() => setIsChatbotOpen(true)} className="fixed bottom-5 left-5 z-[60] w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110" aria-label="Abrir assistente virtual"><i className="fas fa-headset text-2xl"></i></button>
+            <button onClick={() => setIsChatbotOpen(true)} className="fixed bottom-5 left-5 z-40 w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110" aria-label="Abrir assistente virtual"><i className="fas fa-headset text-2xl"></i></button>
 
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cart} onUpdateQuantity={handleUpdateCartQuantity} onCheckout={() => { if (!isStoreOnline) { addToast("A loja está fechada. Não é possível finalizar o pedido.", 'error'); return; } setIsCartOpen(false); setIsCheckoutModalOpen(true); }} isStoreOnline={isStoreOnline} categories={categories} products={products} setActiveCategoryId={setActiveMenuCategory}/>
             <CheckoutModal
