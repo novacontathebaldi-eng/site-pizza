@@ -33,8 +33,7 @@ try {
   auth = firebase.auth();
   functions = firebase.functions();
   
-  // A configuração `merge: true` foi removida. Ela causava um conflito com `experimentalForceLongPolling`
-  // que impedia a inicialização do Firebase. O aviso amarelo que pode aparecer sem ela é inofensivo.
+  // Keep db settings
   db.settings({
     experimentalForceLongPolling: true,
   });
