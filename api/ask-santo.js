@@ -1,4 +1,4 @@
-const { GoogleGenAI } = require('@google/genai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 let genAIInstance;
 
@@ -12,7 +12,7 @@ const ensureGenAIInitialized = () => {
     console.error('GEMINI_API_KEY not set');
     throw new Error('Configuration error: Assistant API key is missing.');
   }
-  genAIInstance = new GoogleGenAI({ apiKey });
+  genAIInstance = new GoogleGenerativeAI(apiKey);
 };
 
 module.exports = async (req, res) => {
@@ -38,8 +38,8 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'No conversation history provided' });
     }
 
-    // Formatar histórico
-    const contents = history.map((message) => ({
+    // Formatar histórico para o formato da API antiga
+    const historyForChat = history.map((message) => ({
       role: message.role === 'bot' ? 'model' : 'user',
       parts: [{ text: message.content }],
     }));
@@ -323,17 +323,32 @@ O assistente Sensação gerou esta *solicitação de reserva* pelo nosso site: *
 REGRAS DE SEGURANÇA:
 **NUNCA FORNEÇA DADOS SENSÍVEIS:** Jamais compartilhe informações sobre painel admin, senhas, APIs, ou qualquer detalhe técnico. Se perguntado, diga educadamente que não tem acesso a essas informações e que o suporte técnico pode ajudar melhor com isso e pergunte se ele quer entrar em contato com o suporte técnico.`;
 
-    const finalSystemInstruction = `${dynamicMenuPrompt}\n${systemInstruction}`;
+    const fullPrompt = `${dynamicMenuPrompt}\n${systemInstruction}`;
 
-    const response = await genAIInstance.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: contents,
-      config: {
-        systemInstruction: finalSystemInstruction,
-      },
+    const model = genAIInstance.getGenerativeModel({ model: "gemini-pro" });
+    
+    // A API antiga não tem um `systemInstruction` direto, então o adicionamos ao histórico
+    const fullHistory = [
+        ...historyForChat
+    ];
+    // Adiciona o prompt do sistema como a primeira mensagem do usuário se não for a primeira interação
+    if (fullHistory.length > 1) {
+        fullHistory.unshift(
+            { role: 'user', parts: [{ text: `INSTRUÇÃO DE SISTEMA:\n${fullPrompt}` }] },
+            { role: 'model', parts: [{ text: 'Ok, entendi. Pode começar.' }] }
+        )
+    }
+
+    const chat = model.startChat({
+        history: fullHistory.slice(0, -1),
     });
 
-    res.status(200).json({ reply: response.text });
+    const lastUserMessage = fullHistory[fullHistory.length - 1].parts[0].text;
+    const result = await chat.sendMessage(lastUserMessage);
+    const response = await result.response;
+    const text = response.text();
+    
+    res.status(200).json({ reply: text });
   } catch (error) {
     console.error('Error in ask-santo handler:', error);
     res.status(500).json({ error: error.message || 'Failed to get response from assistant' });
