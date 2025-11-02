@@ -27,6 +27,7 @@ import { HalfAndHalfModal } from './components/HalfAndHalfModal';
 import { PixQrCodeModal } from './components/PixQrCodeModal';
 import { ProductDetailModal } from './components/ProductDetailModal';
 import { uploadImagem } from './src/utils/uploadImagem';
+import { SupportModal } from './components/SupportModal';
 
 // Type declarations for Google GAPI library to avoid TypeScript errors
 declare global {
@@ -216,6 +217,84 @@ const getInitialMenuView = (): 'grid' | 'compact' => {
   return 'grid'; // Default
 };
 
+const thebaldiLogoUrl = 'https://lwkfyvprbhkphoxkorjq.supabase.co/storage/v1/object/public/sitepizza/thebaldi.jpg';
+
+interface ForSaleOverlayProps {
+    onContinue: () => void;
+    onContact: () => void;
+    logoUrl: string;
+}
+const ForSaleOverlay: React.FC<ForSaleOverlayProps> = ({ onContinue, onContact, logoUrl }) => {
+    return (
+        <div className="fixed inset-0 bg-brand-green-700/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 text-white animate-fade-in-up">
+            <div className="text-center max-w-2xl bg-brand-olive-600/50 p-8 rounded-2xl shadow-2xl border border-white/20">
+                <img src={logoUrl} alt="Logo THEBALDI" className="w-48 mx-auto mb-6" />
+                <h1 className="text-4xl md:text-5xl font-extrabold text-brand-gold-600 mb-4">
+                    Este Site Está à Venda!
+                </h1>
+                <p className="text-lg text-brand-ivory-50/90 mb-4">
+                    Este site de pizzaria é um projeto de demonstração totalmente funcional, construído com as mais modernas tecnologias.
+                </p>
+                <div className="bg-white/10 p-4 rounded-lg border border-white/20 mb-8">
+                    <p className="font-bold text-xl mb-2">Desenvolvido pelo THEBALDI</p>
+                    <p className="text-brand-green-300">
+                        O THEBALDI é especialista em criar soluções web de alta performance. De sites institucionais a e-commerces complexos, transformamos sua ideia em realidade digital.
+                    </p>
+                </div>
+                <p className="text-lg text-brand-ivory-50/90 mb-8">
+                    Interessado em adquirir este projeto ou em criar um site exclusivo para o seu negócio?
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button 
+                        onClick={onContact} 
+                        className="bg-brand-gold-600 text-text-on-dark font-bold py-3 px-8 rounded-xl text-lg hover:bg-opacity-90 transition-all transform hover:scale-105 flex items-center justify-center"
+                    >
+                        <i className="fas fa-envelope mr-2"></i>
+                        <span>Entrar em Contato</span>
+                    </button>
+                    <button 
+                        onClick={onContinue} 
+                        className="bg-transparent border-2 border-brand-gold-600 text-brand-gold-600 font-bold py-3 px-8 rounded-xl text-lg hover:bg-brand-gold-600 hover:text-text-on-dark transition-all transform hover:scale-105 flex items-center justify-center"
+                    >
+                        <i className="fas fa-pizza-slice mr-2"></i>
+                        <span>Navegar pela Pizzaria</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+interface ForSalePopupProps {
+    onClose: () => void;
+    onContact: () => void;
+}
+const ForSalePopup: React.FC<ForSalePopupProps> = ({ onClose, onContact }) => {
+    return (
+        <div className="fixed bottom-5 right-5 z-40 w-full max-w-sm bg-white rounded-xl shadow-2xl border border-brand-gold-600/50 animate-fade-in-up">
+            <div className="p-4">
+                <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0 w-12 h-12 bg-accent text-white rounded-full flex items-center justify-center text-2xl">
+                        <i className="fas fa-tags"></i>
+                    </div>
+                    <div className="flex-grow">
+                        <h3 className="font-bold text-lg text-text-on-light">Este site está à venda!</h3>
+                        <p className="text-sm text-gray-600 mt-1">
+                            Gostou do que viu? Este projeto pode ser seu, ou podemos criar um do zero para o seu negócio.
+                        </p>
+                        <button onClick={onContact} className="mt-3 bg-brand-olive-600 text-white font-semibold py-1.5 px-4 rounded-lg text-sm hover:bg-opacity-90">
+                            <i className="fas fa-envelope mr-2"></i> Fale Conosco
+                        </button>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-700 flex-shrink-0 -mt-2 -mr-2 w-8 h-8 text-2xl">
+                        &times;
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const App: React.FC = () => {
     // App State
@@ -283,6 +362,11 @@ const App: React.FC = () => {
     const [menuViewMode, setMenuViewMode] = useState<'grid' | 'compact'>(getInitialMenuView);
     const [isProductDetailModalOpen, setIsProductDetailModalOpen] = useState(false);
     const [productForDetailModal, setProductForDetailModal] = useState<Product | null>(null);
+
+    // "For Sale" states
+    const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+    const [showForSaleOverlay, setShowForSaleOverlay] = useState(() => !sessionStorage.getItem('forSaleOverlayDismissed'));
+    const [showForSalePopup, setShowForSalePopup] = useState(false);
 
     const handleShowProductDetails = (product: Product) => {
         setProductForDetailModal(product);
@@ -353,7 +437,9 @@ const App: React.FC = () => {
                                isTermsModalOpen ||
                                isHalfAndHalfModalOpen ||
                                isPixQrCodeModalOpen ||
-                               isProductDetailModalOpen;
+                               isProductDetailModalOpen ||
+                               isSupportModalOpen ||
+                               showForSaleOverlay;
     
         const handleScrollLock = () => {
             let shouldLock = false;
@@ -389,10 +475,9 @@ const App: React.FC = () => {
         isCartOpen, isCheckoutModalOpen, isReservationModalOpen, isChatbotOpen, 
         isLoginModalOpen, isUserAreaModalOpen, confirmedOrderData, confirmedReservationData, 
         isPrivacyPolicyOpen, isTermsModalOpen, isHalfAndHalfModalOpen, isPixQrCodeModalOpen,
-        isProductDetailModalOpen
+        isProductDetailModalOpen, isSupportModalOpen, showForSaleOverlay
     ]);
     
-
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
         setToasts(prevToasts => [...prevToasts, { id, message, type }]);
@@ -400,6 +485,33 @@ const App: React.FC = () => {
             setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
         }, 4000);
     }, []);
+
+    // "For Sale" Logic
+    const handleContinueToSite = () => {
+        sessionStorage.setItem('forSaleOverlayDismissed', 'true');
+        setShowForSaleOverlay(false);
+    };
+    
+    // Timer for recurring pop-up
+    useEffect(() => {
+        let timer: number;
+        
+        const isAnyModalOpen = isCartOpen || isCheckoutModalOpen || isReservationModalOpen || isLoginModalOpen || isUserAreaModalOpen || !!confirmedOrderData || !!confirmedReservationData || isSupportModalOpen || isChatbotOpen || isPrivacyPolicyOpen || isTermsModalOpen || isHalfAndHalfModalOpen || isPixQrCodeModalOpen || isProductDetailModalOpen;
+
+        if (!showForSaleOverlay && !showForSalePopup && !isAnyModalOpen) {
+            timer = window.setTimeout(() => {
+                setShowForSalePopup(true);
+            }, 45000); // 45 seconds
+        }
+
+        return () => window.clearTimeout(timer);
+    }, [
+        showForSaleOverlay, showForSalePopup,
+        isCartOpen, isCheckoutModalOpen, isReservationModalOpen, isLoginModalOpen, isUserAreaModalOpen,
+        confirmedOrderData, confirmedReservationData, isSupportModalOpen, isChatbotOpen,
+        isPrivacyPolicyOpen, isTermsModalOpen, isHalfAndHalfModalOpen, isPixQrCodeModalOpen, isProductDetailModalOpen
+    ]);
+
 
     // Effect to check for cookie consent on initial load
     useEffect(() => {
@@ -1143,6 +1255,7 @@ const App: React.FC = () => {
                     onRestoreProduct={handleRestoreProduct}
                     onPermanentDeleteProduct={handlePermanentDeleteProduct}
                     onBulkPermanentDeleteProducts={handleBulkPermanentDeleteProducts}
+                    onOpenSupportModal={() => setIsSupportModalOpen(true)}
                 />
             </main>
             
@@ -1285,6 +1398,25 @@ const App: React.FC = () => {
                 onSelectHalfAndHalf={handleSelectHalfAndHalf}
                 isStoreOnline={isStoreOnline}
             />
+            <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
+
+            {showForSaleOverlay && (
+                <ForSaleOverlay 
+                    onContinue={handleContinueToSite}
+                    onContact={() => setIsSupportModalOpen(true)}
+                    logoUrl={thebaldiLogoUrl}
+                />
+            )}
+            
+            {showForSalePopup && (
+                <ForSalePopup
+                    onClose={() => setShowForSalePopup(false)}
+                    onContact={() => {
+                        setShowForSalePopup(false);
+                        setIsSupportModalOpen(true);
+                    }}
+                />
+            )}
 
             {(isProcessingOrder) && <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-6 font-semibold text-lg text-gray-700">Processando seu pedido...</p><p className="mt-2 text-sm text-gray-500">Por favor, aguarde um instante.</p></div></div>}
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]"><div className="w-full flex flex-col items-center space-y-4 sm:items-end">{toasts.map((toast) => (<div key={toast.id} className="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden animate-fade-in-up"><div className="p-4"><div className="flex items-start"><div className="flex-shrink-0">{toast.type === 'success' ? <i className="fas fa-check-circle h-6 w-6 text-green-500"></i> : <i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>}</div><div className="ml-3 w-0 flex-1 pt-0.5"><p className="text-sm font-medium text-gray-900">{toast.message}</p></div></div></div></div>))}</div></div>

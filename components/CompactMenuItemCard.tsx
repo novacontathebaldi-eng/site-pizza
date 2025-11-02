@@ -21,7 +21,10 @@ export const CompactMenuItemCard: React.FC<CompactMenuItemCardProps> = ({ produc
             ? product.promotionalPrices
             : product.prices;
             
-        const prices = Object.values(effectivePrices).filter(p => typeof p === 'number' && p > 0);
+        // FIX: Added an explicit type predicate `(p): p is number` to the filter.
+        // This ensures TypeScript correctly infers `prices` as `number[]`,
+        // resolving an error where `Math.min` received `unknown` arguments.
+        const prices = Object.values(effectivePrices).filter((p): p is number => typeof p === 'number' && p > 0);
         
         if (prices.length === 0) return 'Indisponível';
 
