@@ -224,6 +224,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const [isQrCodeModalOpen, setIsQrCodeModalOpen] = useState(false);
     const [copySuccess, setCopySuccess] = useState(false);
     const [showPixHelp, setShowPixHelp] = useState(false);
+    const [showPaymentHelp, setShowPaymentHelp] = useState(false);
     const pixCnpj = "62.247.199/0001-04";
 
 
@@ -387,7 +388,26 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                             )}
                             
                             <div>
-                                <label className="block text-sm font-semibold mb-1">Método de Pagamento *</label>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <label className="block text-sm font-semibold">Método de Pagamento *</label>
+                                    <div className="relative flex items-center">
+                                        <button 
+                                            type="button" 
+                                            onMouseEnter={() => setShowPaymentHelp(true)} 
+                                            onMouseLeave={() => setShowPaymentHelp(false)} 
+                                            className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                                            aria-label="Informações sobre pagamento"
+                                        >
+                                            <i className="fas fa-question-circle"></i>
+                                        </button>
+                                        {showPaymentHelp && (
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 bg-gray-800 text-white text-xs rounded-lg p-3 z-10 shadow-lg" style={{ animation: 'fadeInUp 0.2s ease-out' }}>
+                                                O pagamento é feito no momento da entrega (maquininha/dinheiro) ou combinado via WhatsApp. Para pagamnetos PIX é necessário enviar o comprovante via WhatsApp. Nenhuma cobrança é feita por este site.
+                                                <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 bg-gray-800 rotate-45"></div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                                 <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as any)} className="w-full px-3 py-2 border rounded-md bg-white" required>
                                     <option value="" disabled>Selecione...</option>
                                     <option value="credit">Cartão de Crédito</option>
