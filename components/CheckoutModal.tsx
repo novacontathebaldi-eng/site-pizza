@@ -328,11 +328,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold mb-1">Tipo de Pedido *</label>
-                                <select value={orderType} onChange={e => setOrderType(e.target.value as any)} className="w-full px-3 py-2 border rounded-md bg-white" required>
-                                    <option value="" disabled>Selecione...</option>
-                                    <option value="delivery">Entrega</option>
-                                    <option value="pickup">Retirada na loja</option>
-                                </select>
+                                <div className="flex flex-col sm:flex-row justify-start gap-3 mt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setOrderType('delivery')}
+                                        className={`flex-1 font-bold py-3 px-4 rounded-lg transition-all border-2 flex items-center justify-center gap-2 text-base ${orderType === 'delivery' ? 'bg-accent text-white border-accent' : 'bg-white text-gray-700 border-gray-300 hover:border-accent'}`}
+                                    >
+                                        <i className="fas fa-motorcycle fa-fw"></i> Entrega
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setOrderType('pickup')}
+                                        className={`flex-1 font-bold py-3 px-4 rounded-lg transition-all border-2 flex items-center justify-center gap-2 text-base ${orderType === 'pickup' ? 'bg-accent text-white border-accent' : 'bg-white text-gray-700 border-gray-300 hover:border-accent'}`}
+                                    >
+                                        <i className="fas fa-store-alt fa-fw"></i> Retirada
+                                    </button>
+                                </div>
                             </div>
 
                             {orderType === 'delivery' && (
@@ -402,7 +413,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                                         </button>
                                         {showPaymentHelp && (
                                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 bg-gray-800 text-white text-xs rounded-lg p-3 z-10 shadow-lg" style={{ animation: 'fadeInUp 0.2s ease-out' }}>
-                                                O pagamento é feito no momento da entrega (maquininha/dinheiro) ou combinado via WhatsApp. Para pagamnetos PIX é necessário enviar o comprovante via WhatsApp. Nenhuma cobrança é feita por este site.
+                                                O pagamento é feito no momento da entrega (maquininha/dinheiro) ou combinado via WhatsApp para PIX. Nenhuma cobrança é feita por este site.
                                                 <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 bg-gray-800 rotate-45"></div>
                                             </div>
                                         )}
