@@ -208,6 +208,15 @@ const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNu
     return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
 };
 
+const getInitialMenuView = (): 'grid' | 'compact' => {
+  const savedView = typeof window !== 'undefined' ? localStorage.getItem('santaSensacaoMenuView') : null;
+  if (savedView === 'grid' || savedView === 'compact') {
+    return savedView;
+  }
+  return 'grid'; // Default
+};
+
+
 const App: React.FC = () => {
     // App State
     const [products, setProducts] = useState<Product[]>([]);
@@ -271,7 +280,7 @@ const App: React.FC = () => {
     ]);
     const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
     
-    const [menuViewMode, setMenuViewMode] = useState<'grid' | 'compact'>('grid');
+    const [menuViewMode, setMenuViewMode] = useState<'grid' | 'compact'>(getInitialMenuView);
     const [isProductDetailModalOpen, setIsProductDetailModalOpen] = useState(false);
     const [productForDetailModal, setProductForDetailModal] = useState<Product | null>(null);
 
@@ -283,14 +292,6 @@ const App: React.FC = () => {
     const handleMenuViewChange = (mode: 'grid' | 'compact') => {
         setMenuViewMode(mode);
     };
-
-    // Load menu view preference on initial load
-    useEffect(() => {
-        const savedView = localStorage.getItem('santaSensacaoMenuView');
-        if (savedView === 'grid' || savedView === 'compact') {
-            setMenuViewMode(savedView);
-        }
-    }, []);
 
     // Effect to save preference when it changes or when user logs in/out
     useEffect(() => {
@@ -1178,7 +1179,24 @@ const App: React.FC = () => {
 
             <button onClick={() => setIsChatbotOpen(true)} className="fixed bottom-5 left-5 z-40 w-14 h-14 bg-brand-green-700/80 backdrop-blur-sm text-white rounded-full shadow-lg flex items-center justify-center transform transition-transform hover:scale-110" aria-label="Abrir assistente virtual"><i className="fas fa-headset text-2xl"></i></button>
 
-            <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cart} onUpdateQuantity={handleUpdateCartQuantity} onCheckout={() => { if (!isStoreOnline) { addToast("A loja está fechada. Não é possível finalizar o pedido.", 'error'); return; } setIsCartOpen(false); setIsCheckoutModalOpen(true); }} isStoreOnline={isStoreOnline} categories={categories} products={products} setActiveCategoryId={setActiveMenuCategory}/>
+            <CartSidebar 
+                isOpen={isCartOpen} 
+                onClose={() => setIsCartOpen(false)} 
+                cartItems={cart} 
+                onUpdateQuantity={handleUpdateCartQuantity} 
+                onCheckout={() => { 
+                    if (!isStoreOnline) { 
+                        addToast("A loja está fechada. Não é possível finalizar o pedido.", 'error'); 
+                        return; 
+                    } 
+                    setIsCartOpen(false); 
+                    setIsCheckoutModalOpen(true); 
+                }} 
+                isStoreOnline={isStoreOnline} 
+                categories={categories} 
+                products={products} 
+                // FIX: Corrected the prop from the undefined 'setActiveCategoryId' to the existing state setter 'setActiveMenuCategory'.
+                setActiveCategoryId={setActiveMenuCategory}/>
             <CheckoutModal
                 isOpen={isCheckoutModalOpen}
                 onClose={() => setIsCheckoutModalOpen(false)}

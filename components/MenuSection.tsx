@@ -127,24 +127,26 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                 
                 <div id="sticky-menu-header" className={`sticky ${isStoreOnline ? 'top-20' : 'top-[7.5rem]'} bg-white/95 backdrop-blur-sm z-30 -mx-4 shadow-sm`}>
                     <div className="border-b border-gray-200">
-                        <div className="flex items-center overflow-x-auto whitespace-nowrap scrollbar-hide px-2 sm:px-4">
-                            <div className="flex-grow flex lg:justify-center">
-                                {sortedActiveCategories.map(category => (
-                                    <a 
-                                        key={category.id} 
-                                        ref={(el) => { tabRefs.current.set(category.id, el); }}
-                                        href={`#category-section-${category.id}`}
-                                        onClick={(e) => handleTabClick(e, category.id)}
-                                        className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors
-                                            ${activeCategoryId === category.id 
-                                                ? 'border-b-2 border-accent text-accent' 
-                                                : 'text-gray-500 hover:text-gray-700'
-                                            }`}
-                                    >
-                                        <i className={`${categoryIcons[category.id] || 'fas fa-utensils'} w-5 text-center`}></i>
-                                        <span>{category.name}</span>
-                                    </a>
-                                ))}
+                        <div className="flex items-center justify-between px-2 sm:px-4">
+                            <div className="flex-1 overflow-x-auto whitespace-nowrap scrollbar-hide">
+                                <div className="flex lg:justify-center">
+                                    {sortedActiveCategories.map(category => (
+                                        <a 
+                                            key={category.id} 
+                                            ref={(el) => { tabRefs.current.set(category.id, el); }}
+                                            href={`#category-section-${category.id}`}
+                                            onClick={(e) => handleTabClick(e, category.id)}
+                                            className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors
+                                                ${activeCategoryId === category.id 
+                                                    ? 'border-b-2 border-accent text-accent' 
+                                                    : 'text-gray-500 hover:text-gray-700'
+                                                }`}
+                                        >
+                                            <i className={`${categoryIcons[category.id] || 'fas fa-utensils'} w-5 text-center`}></i>
+                                            <span>{category.name}</span>
+                                        </a>
+                                    ))}
+                                </div>
                             </div>
                             <button
                                 onClick={() => onMenuViewChange(menuViewMode === 'grid' ? 'compact' : 'grid')}
