@@ -210,8 +210,6 @@ const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNu
 
 const App: React.FC = () => {
     // App State
-    const [name, setName] = useState<string>('');
-    const [phone, setPhone] = useState<string>('');
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
@@ -219,6 +217,15 @@ const App: React.FC = () => {
     const [siteSettings, setSiteSettings] = useState<SiteSettings>(defaultSiteSettings);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Checkout Form State (lifted for guest persistence)
+    const [name, setName] = useState<string>('');
+    const [phone, setPhone] = useState<string>('');
+    const [neighborhood, setNeighborhood] = useState<string>('');
+    const [street, setStreet] = useState<string>('');
+    const [number, setNumber] = useState<string>('');
+    const [complement, setComplement] = useState<string>('');
+    const [notes, setNotes] = useState<string>('');
 
     // UI State
     const [activeSection, setActiveSection] = useState('Início');
@@ -388,27 +395,48 @@ const App: React.FC = () => {
                 setUserProfile(profile);
                 if (profile?.name) setName(profile.name);
                 if (profile?.phone) setPhone(profile.phone);
+                // When user logs in, clear any guest address/notes data from state.
+                setNeighborhood('');
+                setStreet('');
+                setNumber('');
+                setComplement('');
+                setNotes('');
                  // Check for admin custom claim
                 const idTokenResult = await user.getIdTokenResult(true);
                 setIsCurrentUserAdmin(idTokenResult.claims.admin === true);
             } else {
                 setUserProfile(null);
-                // Para usuários não logados, tenta carregar as informações salvas do navegador.
+                // For non-logged-in users, try to load saved info from the browser.
                 try {
                     const savedGuestInfo = localStorage.getItem('santaSensacaoGuestInfo');
                     if (savedGuestInfo) {
-                        const { name: savedName, phone: savedPhone } = JSON.parse(savedGuestInfo);
+                        const { name: savedName, phone: savedPhone, neighborhood, street, number, complement, notes } = JSON.parse(savedGuestInfo);
                         setName(savedName || '');
                         setPhone(savedPhone || '');
+                        setNeighborhood(neighborhood || '');
+                        setStreet(street || '');
+                        setNumber(number || '');
+                        setComplement(complement || '');
+                        setNotes(notes || '');
                     } else {
-                        // Se não houver dados salvos, limpa os campos.
+                        // If no saved data, clear all fields.
                         setName('');
                         setPhone('');
+                        setNeighborhood('');
+                        setStreet('');
+                        setNumber('');
+                        setComplement('');
+                        setNotes('');
                     }
                 } catch (e) {
-                    console.error("Falha ao carregar informações de convidado.", e);
+                    console.error("Failed to load guest info.", e);
                     setName('');
                     setPhone('');
+                    setNeighborhood('');
+                    setStreet('');
+                    setNumber('');
+                    setComplement('');
+                    setNotes('');
                 }
                 setIsCurrentUserAdmin(false);
             }
@@ -860,7 +888,15 @@ const App: React.FC = () => {
             // Salva as informações do cliente sem conta no navegador para preenchimento automático futuro.
             if (!currentUser) {
                 try {
-                    const guestInfo = { name: details.name, phone: details.phone };
+                    const guestInfo = { 
+                        name: details.name, 
+                        phone: details.phone,
+                        neighborhood: details.neighborhood,
+                        street: details.street,
+                        number: details.number,
+                        complement: details.complement,
+                        notes: details.notes,
+                    };
                     localStorage.setItem('santaSensacaoGuestInfo', JSON.stringify(guestInfo));
                 } catch (e) {
                     console.error("Falha ao salvar informações de convidado:", e);
@@ -1311,9 +1347,14 @@ const App: React.FC = () => {
                 cartItems={cart}
                 onConfirmCheckout={handleCheckout}
                 isProcessing={isProcessingOrder}
+                profile={userProfile}
                 name={name} setName={setName}
                 phone={phone} setPhone={setPhone}
-                profile={userProfile}
+                neighborhood={neighborhood} setNeighborhood={setNeighborhood}
+                street={street} setStreet={setStreet}
+                number={number} setNumber={setNumber}
+                complement={complement} setComplement={setComplement}
+                notes={notes} setNotes={setNotes}
             />
             <ReservationModal 
                 isOpen={isReservationModalOpen} 

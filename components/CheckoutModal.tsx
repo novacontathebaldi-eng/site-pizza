@@ -195,29 +195,42 @@ interface CheckoutModalProps {
     cartItems: CartItem[];
     onConfirmCheckout: (details: OrderDetails) => void;
     isProcessing: boolean;
+    profile: UserProfile | null;
     name: string;
     setName: (name: string) => void;
     phone: string;
     setPhone: (phone: string) => void;
-    profile: UserProfile | null;
+    neighborhood: string;
+    setNeighborhood: (neighborhood: string) => void;
+    street: string;
+    setStreet: (street: string) => void;
+    number: string;
+    setNumber: (number: string) => void;
+    complement: string;
+    setComplement: (complement: string) => void;
+    notes: string;
+    setNotes: (notes: string) => void;
 }
 
-export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cartItems, onConfirmCheckout, isProcessing, name, setName, phone, setPhone, profile }) => {
+export const CheckoutModal: React.FC<CheckoutModalProps> = ({ 
+    isOpen, onClose, cartItems, onConfirmCheckout, isProcessing, profile,
+    name, setName,
+    phone, setPhone,
+    neighborhood, setNeighborhood,
+    street, setStreet,
+    number, setNumber,
+    complement, setComplement,
+    notes, setNotes
+}) => {
     const deliverableAddresses = profile?.addresses?.filter(a => a.isDeliveryArea) || [];
     const favoriteAddress = deliverableAddresses.find(a => a.isFavorite);
 
     const [orderType, setOrderType] = useState<'delivery' | 'pickup' | ''>('');
-    
-    const [neighborhood, setNeighborhood] = useState('');
-    const [street, setStreet] = useState('');
-    const [number, setNumber] = useState('');
     const [isNoNumber, setIsNoNumber] = useState(false);
-    const [complement, setComplement] = useState('');
-
+    
     const [paymentMethod, setPaymentMethod] = useState<'credit' | 'debit' | 'pix' | 'cash' | ''>('');
     const [changeNeeded, setChangeNeeded] = useState(false);
     const [changeAmount, setChangeAmount] = useState('');
-    const [notes, setNotes] = useState('');
     const [selectedAddressId, setSelectedAddressId] = useState<string>(favoriteAddress ? favoriteAddress.id : 'manual');
 
     // Estados para a funcionalidade PIX
@@ -228,39 +241,35 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     const pixCnpj = "62.247.199/0001-04";
 
 
-    // Reset state when modal opens/closes or profile changes
+    // Reset local state when modal opens/closes or profile changes
     useEffect(() => {
         if (isOpen) {
             const fav = profile?.addresses?.filter(a => a.isDeliveryArea).find(a => a.isFavorite);
             setSelectedAddressId(fav ? fav.id : 'manual');
+            setIsNoNumber(number === 'S/N');
         } else {
-            // Full reset when closing
+            // Reset only local state on close.
             setOrderType('');
-            setNeighborhood(''); setStreet(''); setNumber(''); setIsNoNumber(false); setComplement('');
-            setPaymentMethod(''); setChangeNeeded(false); setChangeAmount('');
-            setNotes('');
+            setPaymentMethod(''); 
+            setChangeNeeded(false); 
+            setChangeAmount('');
             setSelectedAddressId(favoriteAddress ? favoriteAddress.id : 'manual');
         }
-    }, [isOpen, profile]);
+    }, [isOpen, profile, number, favoriteAddress]);
     
     useEffect(() => {
         if (isNoNumber) setNumber('S/N');
         else if (number === 'S/N') setNumber('');
-    }, [isNoNumber]);
+    }, [isNoNumber, number, setNumber]);
     
     useEffect(() => {
         if (orderType !== 'delivery') {
             setSelectedAddressId('manual');
-            setNeighborhood(''); setStreet(''); setNumber(''); setComplement('');
         }
     }, [orderType]);
     
     useEffect(() => {
-        if (selectedAddressId === 'manual') {
-            if(orderType === 'delivery' && !profile) { // Only clear for non-logged-in users wanting to type manually
-                setNeighborhood(''); setStreet(''); setNumber(''); setComplement('');
-            }
-        } else {
+        if (selectedAddressId !== 'manual') {
             const selectedAddr = deliverableAddresses.find(a => a.id === selectedAddressId);
             if (selectedAddr) {
                 setNeighborhood(selectedAddr.localidade);
@@ -270,7 +279,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
                 setIsNoNumber(selectedAddr.number === 'S/N');
             }
         }
-    }, [selectedAddressId, profile, orderType]);
+    }, [selectedAddressId, deliverableAddresses, setNeighborhood, setStreet, setNumber, setComplement]);
 
 
     if (!isOpen) return null;
