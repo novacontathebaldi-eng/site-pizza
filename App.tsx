@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-// FIX: The 'Partial' type is a built-in TypeScript utility and does not need to be imported.
 import { Product, Category, CartItem, OrderDetails, SiteSettings, Order, OrderStatus, PaymentStatus, ChatMessage, ReservationDetails, UserProfile, DaySchedule } from './types';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
@@ -26,7 +25,6 @@ import { CookieConsentBanner } from './components/CookieConsentBanner';
 import { TermsOfServiceModal } from './components/TermsOfServiceModal';
 import { HalfAndHalfModal } from './components/HalfAndHalfModal';
 import { PixQrCodeModal } from './components/PixQrCodeModal';
-// FIX: Added import for ProductDetailModal to support the compact menu view.
 import { ProductDetailModal } from './components/ProductDetailModal';
 import { uploadImagem } from './src/utils/uploadImagem';
 
@@ -105,7 +103,7 @@ const defaultSiteSettings: SiteSettings = {
     ]
 };
 
-const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, orderNumber: number | null, isPaid: boolean) => {
+const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[], total: number, orderNumber: number | null) => {
     const paymentMethodMap = { credit: 'Cartão de Crédito', debit: 'Cartão de Débito', pix: 'PIX', cash: 'Dinheiro' };
     const orderNumStr = orderNumber ? ` #${orderNumber}` : '';
 
@@ -123,10 +121,6 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
         message += `*Pedido para Entrega 🛵💨*\n\n`;
     } else if (details.orderType === 'pickup') {
         message += `*Pedido para Retirada 🏪🚶*\n\n`;
-    }
-
-    if (isPaid) {
-        message += `*✅ JÁ PAGO VIA PIX PELO SITE*\n\n`;
     }
     
     message += `*👤 DADOS DO CLIENTE:*\n`;
@@ -146,6 +140,9 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     message += `\n*🛒 ITENS DO PEDIDO:*\n`;
     currentCart.forEach(item => {
         message += `• ${item.quantity}x ${item.name} (${item.size}) - R$ ${(item.price * item.quantity).toFixed(2).replace('.', ',')}\n`;
+        if (item.notes) {
+            message += `  *Obs:* ${item.notes}\n`;
+        }
     });
 
     const subtotal = currentCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -165,7 +162,7 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
         message += `👆 Use o *CNPJ* acima para pagar seu pedido via *PIX*. 💰📱\n`;
     }
     
-    if (!isPaid && details.paymentMethod === 'cash') {
+    if (details.paymentMethod === 'cash') {
         if (details.changeNeeded && details.changeAmount) {
             const amountForChange = parseFloat(details.changeAmount.replace(',', '.'));
             if (!isNaN(amountForChange) && amountForChange >= total) {
@@ -187,6 +184,7 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     message += `\nEste *pedido* foi gerado pelo nosso site: *santasensacao.me* 🥇`;
     return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
 };
+
 
 const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNumber: number | null) => {
     const orderNumStr = orderNumber ? ` #${orderNumber}` : '';
@@ -273,20 +271,56 @@ const App: React.FC = () => {
     ]);
     const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
     
-    // FIX: Added state for menu view mode and product detail modal to implement compact view.
     const [menuViewMode, setMenuViewMode] = useState<'grid' | 'compact'>('grid');
     const [isProductDetailModalOpen, setIsProductDetailModalOpen] = useState(false);
     const [productForDetailModal, setProductForDetailModal] = useState<Product | null>(null);
 
-
-    const scrollToTop = () => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-
-    // FIX: Added handler to show product details from the compact menu view.
     const handleShowProductDetails = (product: Product) => {
         setProductForDetailModal(product);
         setIsProductDetailModalOpen(true);
+    };
+    
+    const handleMenuViewChange = (mode: 'grid' | 'compact') => {
+        setMenuViewMode(mode);
+    };
+
+    // Load menu view preference on initial load
+    useEffect(() => {
+        const savedView = localStorage.getItem('santaSensacaoMenuView');
+        if (savedView === 'grid' || savedView === 'compact') {
+            setMenuViewMode(savedView);
+        }
+    }, []);
+
+    // Effect to save preference when it changes or when user logs in/out
+    useEffect(() => {
+        // For guests, save to localStorage
+        if (!currentUser) {
+            localStorage.setItem('santaSensacaoMenuView', menuViewMode);
+        } else if (userProfile) {
+            // For logged-in users, save to Firebase profile if it's different
+            if (userProfile?.preferences?.menuView !== menuViewMode) {
+                firebaseService.updateUserPreferences(currentUser.uid, { menuView: menuViewMode });
+            }
+        }
+    }, [menuViewMode, currentUser, userProfile]);
+
+    // Effect to load preference from user profile when they log in
+    useEffect(() => {
+        if (currentUser && userProfile?.preferences?.menuView) {
+            setMenuViewMode(userProfile.preferences.menuView);
+        } else if (!currentUser) {
+            // Fallback to localStorage for guests
+            const savedView = localStorage.getItem('santaSensacaoMenuView');
+            if (savedView === 'grid' || savedView === 'compact') {
+                setMenuViewMode(savedView);
+            }
+        }
+    }, [currentUser, userProfile]);
+
+
+    const scrollToTop = () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     // Service Worker Registration for Image Caching
@@ -318,7 +352,6 @@ const App: React.FC = () => {
                                isTermsModalOpen ||
                                isHalfAndHalfModalOpen ||
                                isPixQrCodeModalOpen ||
-                               // FIX: Included the new Product Detail Modal in the scroll lock logic.
                                isProductDetailModalOpen;
     
         const handleScrollLock = () => {
@@ -355,7 +388,6 @@ const App: React.FC = () => {
         isCartOpen, isCheckoutModalOpen, isReservationModalOpen, isChatbotOpen, 
         isLoginModalOpen, isUserAreaModalOpen, confirmedOrderData, confirmedReservationData, 
         isPrivacyPolicyOpen, isTermsModalOpen, isHalfAndHalfModalOpen, isPixQrCodeModalOpen,
-        // FIX: Added the new Product Detail Modal to the dependency array.
         isProductDetailModalOpen
     ]);
     
@@ -376,8 +408,6 @@ const App: React.FC = () => {
         }
     }, []);
 
-    // FIX: Added an effect to parse URL parameters for Firebase email action links (e.g., password reset).
-    // This allows the app to open the LoginModal in the correct state when a user clicks a password reset link.
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const mode = urlParams.get('mode');
@@ -571,9 +601,6 @@ const App: React.FC = () => {
     }, [isLoading]);
     
 
-    // FIX: This effect now correctly handles data fetching based on user authentication status.
-    // Public data is fetched for all users, while admin-only data (orders) is fetched
-    // only when an admin is logged in. This prevents permission errors on logout.
     useEffect(() => {
         if (!db) { setError("Falha na conexão com o banco de dados."); setIsLoading(false); return; }
         
@@ -740,9 +767,6 @@ const App: React.FC = () => {
         setIsHalfAndHalfModalOpen(true);
     };
 
-    // FIX: The dependency array for this `useCallback` was empty, but the function uses `addToast`.
-    // The `addToast` function has been added to the dependency array to ensure the callback
-    // always has access to the latest version of `addToast` and to satisfy the `exhaustive-deps` rule.
     const handleAddHalfAndHalfToCart = useCallback((product1: Product, product2: Product, size: string) => {
         const price1 = product1.prices[size] || 0;
         const price2 = product2.prices[size] || 0;
@@ -800,19 +824,18 @@ const App: React.FC = () => {
 
 
     // Centralized Order Creation Logic
-    const initiateOrderCreation = async (details: OrderDetails, cartItems: CartItem[], total: number) => {
+    const initiateOrderCreation = async (details: OrderDetails, cartItems: CartItem[]) => {
         if (!db) return;
         setIsProcessingOrder(true);
-        
+        const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0) + (details.deliveryFee || 0);
+
         const pendingOrderId = db.collection('orders').doc().id;
         localStorage.setItem('pendingOrderId', pendingOrderId);
         
-        const whatsappUrl = generateWhatsAppMessage(details, cartItems, total, null, false);
+        const whatsappUrl = generateWhatsAppMessage(details, cartItems, total, null);
         window.open(whatsappUrl, '_blank');
         
         try {
-            // FIX: Replaced the non-existent `createOrder` with the correct `createOrderInFirestore` function.
-            // Also added logic to pass the user's ID token for authentication and corrected the response handling, as the function returns a number directly.
             const idToken = currentUser ? await currentUser.getIdToken() : null;
             const orderNumber = await firebaseService.createOrderInFirestore(details, cartItems, total, pendingOrderId, idToken);
             addToast(`Pedido #${orderNumber} criado!`, 'success');
@@ -874,14 +897,12 @@ const App: React.FC = () => {
         }
     };
 
-    // FIX: Updated handleAddToCart to accept an optional 'notes' parameter and handle it correctly,
-    // ensuring items with notes are added separately to the cart.
     const handleAddToCart = useCallback((product: Product, size: string, price: number, notes?: string) => {
         setCart(prevCart => {
-            // If there are notes, we always add it as a new unique item in the cart.
-            if (notes) {
+            // Se houver observações, sempre adiciona como um novo item único.
+            if (notes && notes.trim() !== '') {
                  const newItem: CartItem = {
-                    id: `${product.id}-${size}-${Date.now()}`, // Unique ID for items with notes
+                    id: `${product.id}-${size}-${Date.now()}`, // ID único
                     productId: product.id,
                     name: product.name,
                     size,
@@ -893,14 +914,14 @@ const App: React.FC = () => {
                 return [...prevCart, newItem];
             }
 
-            // If no notes, check if an item without notes already exists to increment its quantity.
+            // Se não houver observações, verifica se já existe um item para incrementar.
             const existingItemIndex = prevCart.findIndex(item => item.productId === product.id && item.size === size && !item.notes);
             if (existingItemIndex > -1) {
                 const updatedCart = [...prevCart];
                 updatedCart[existingItemIndex].quantity += 1;
                 return updatedCart;
             } else {
-                // Otherwise, add as a new item.
+                // Senão, adiciona como novo.
                 const newItem: CartItem = {
                     id: `${product.id}-${size}`,
                     productId: product.id,
@@ -924,10 +945,8 @@ const App: React.FC = () => {
     
     const handleCheckout = async (details: OrderDetails) => {
         setIsCheckoutModalOpen(false);
-        const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        const total = subtotal + (details.deliveryFee || 0);
         
-        const success = await initiateOrderCreation(details, cart, total);
+        const success = await initiateOrderCreation(details, cart);
         if (success) {
             // Salva as informações do cliente sem conta no navegador para preenchimento automático futuro.
             if (!currentUser) {
@@ -952,10 +971,7 @@ const App: React.FC = () => {
     };
 
     const handleCreateOrderFromChat = async (details: OrderDetails, cartItems: CartItem[]) => {
-        const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        const total = subtotal + (details.deliveryFee || 0);
-        
-        await initiateOrderCreation(details, cartItems, total);
+        await initiateOrderCreation(details, cartItems);
 
         // Send a final confirmation message to the chat
         const finalBotMessage: ChatMessage = {
@@ -977,8 +993,6 @@ const App: React.FC = () => {
         window.open(whatsappUrl, '_blank');
 
         try {
-            // FIX: Replaced the non-existent `createReservation` with the correct `createReservationInFirestore` function.
-            // Also added logic to pass the user's ID token for authentication.
             const idToken = currentUser ? await currentUser.getIdToken() : null;
             const { orderId, orderNumber } = await firebaseService.createReservationInFirestore(details, idToken);
             addToast(`Reserva #${orderNumber} registrada com sucesso!`, 'success');
@@ -997,7 +1011,6 @@ const App: React.FC = () => {
     };
 
     const handleSendOrderToWhatsApp = (order: Order) => {
-        const isPaid = false;
         const details: OrderDetails = {
             name: order.customer.name, phone: order.customer.phone, orderType: order.customer.orderType,
             paymentMethod: order.paymentMethod || 'pix', changeNeeded: order.changeNeeded || false,
@@ -1006,7 +1019,7 @@ const App: React.FC = () => {
             number: order.customer.number || '', complement: order.customer.complement || '',
             deliveryFee: order.deliveryFee || 0,
         };
-        const whatsappUrl = generateWhatsAppMessage(details, order.items || [], order.total || 0, order.orderNumber, isPaid);
+        const whatsappUrl = generateWhatsAppMessage(details, order.items || [], order.total || 0, order.orderNumber);
         window.open(whatsappUrl, '_blank');
     };
 
@@ -1020,234 +1033,28 @@ const App: React.FC = () => {
         window.open(whatsappUrl, '_blank');
     };
 
-    const handleSaveProduct = useCallback(async (product: Product) => {
-        try {
-            const { id, ...dataToSave } = product;
-    
-            if (id) {
-                const originalProduct = products.find(p => p.id === id);
-                if (originalProduct && originalProduct.categoryId !== product.categoryId) {
-                    const oldCategoryId = originalProduct.categoryId;
-                    const remainingProductsInOldCategory = products.filter(p => p.id !== id && p.categoryId === oldCategoryId && !p.deleted);
-                    const shouldDeactivateOldCategory = remainingProductsInOldCategory.length === 0 || remainingProductsInOldCategory.every(p => !p.active);
-                    
-                    if (shouldDeactivateOldCategory) {
-                        await firebaseService.updateCategoryStatus(oldCategoryId, false);
-                        const category = categories.find(c => c.id === oldCategoryId);
-                        addToast(`Categoria "${category?.name || 'Anterior'}" desativada por estar vazia ou ter apenas produtos inativos.`, 'success');
-                    }
-                }
-                await firebaseService.updateProduct(id, dataToSave);
-            } else {
-                await firebaseService.addProduct({ ...dataToSave, orderIndex: products.length, stockStatus: 'available' });
-            }
-            addToast(id ? "Produto atualizado!" : "Produto adicionado!", 'success');
-        } catch (error) {
-            console.error("Failed to save product:", error);
-            addToast("Erro ao salvar produto.", 'error');
-        }
-    }, [products, categories, addToast]);
-    
-    const handleDeleteProduct = useCallback(async (productId: string) => {
-        try {
-            const productToDelete = products.find(p => p.id === productId);
-            if (productToDelete) {
-                const { categoryId } = productToDelete;
-                const remainingProductsInCategory = products.filter(p => !p.deleted && p.id !== productId && p.categoryId === categoryId);
-                const shouldDeactivate = remainingProductsInCategory.length === 0 || remainingProductsInCategory.every(p => !p.active);
-    
-                if (shouldDeactivate) {
-                     await firebaseService.updateCategoryStatus(categoryId, false);
-                     const category = categories.find(c => c.id === categoryId);
-                     addToast(`Categoria "${category?.name || 'desconhecida'}" desativada por estar vazia ou ter apenas produtos inativos.`, 'success');
-                }
-            }
-            
-            await firebaseService.deleteProduct(productId);
-            addToast("Produto movido para a lixeira!", 'success');
-        } catch (error) {
-            console.error("Failed to delete product:", error);
-            addToast("Erro ao mover para a lixeira.", 'error');
-        }
-    }, [products, categories, addToast]);
-
-    const handleProductStatusChange = useCallback(async (productId: string, active: boolean) => {
-        try {
-            await firebaseService.updateProductStatus(productId, active);
-            addToast(`Produto ${active ? 'ativado' : 'desativado'}.`, 'success');
-    
-            if (!active) {
-                const changedProduct = products.find(p => p.id === productId);
-                if (changedProduct) {
-                    const { categoryId } = changedProduct;
-                    const hasOtherActiveProducts = products.some(p => p.categoryId === categoryId && p.id !== productId && p.active && !p.deleted);
-    
-                    if (!hasOtherActiveProducts) {
-                        await firebaseService.updateCategoryStatus(categoryId, false);
-                        const category = categories.find(c => c.id === categoryId);
-                        addToast(`Categoria "${category?.name || 'desconhecida'}" desativada pois todos os seus produtos estão inativos.`, 'success');
-                    }
-                }
-            }
-        } catch (error) {
-            console.error("Failed to update product status:", error);
-            addToast("Erro ao atualizar status.", 'error');
-        }
-    }, [addToast, products, categories]);
-    
+    const handleSaveProduct = useCallback(async (product: Product) => { try { const { id, ...dataToSave } = product; if (id) { const originalProduct = products.find(p => p.id === id); if (originalProduct && originalProduct.categoryId !== product.categoryId) { const oldCategoryId = originalProduct.categoryId; const remainingProductsInOldCategory = products.filter(p => p.id !== id && p.categoryId === oldCategoryId && !p.deleted); const shouldDeactivateOldCategory = remainingProductsInOldCategory.length === 0 || remainingProductsInOldCategory.every(p => !p.active); if (shouldDeactivateOldCategory) { await firebaseService.updateCategoryStatus(oldCategoryId, false); const category = categories.find(c => c.id === oldCategoryId); addToast(`Categoria "${category?.name || 'Anterior'}" desativada por estar vazia ou ter apenas produtos inativos.`, 'success'); } } await firebaseService.updateProduct(id, dataToSave); } else { await firebaseService.addProduct({ ...dataToSave, orderIndex: products.length, stockStatus: 'available' }); } addToast(id ? "Produto atualizado!" : "Produto adicionado!", 'success'); } catch (error) { console.error("Failed to save product:", error); addToast("Erro ao salvar produto.", 'error'); } }, [products, categories, addToast]);
+    const handleDeleteProduct = useCallback(async (productId: string) => { try { const productToDelete = products.find(p => p.id === productId); if (productToDelete) { const { categoryId } = productToDelete; const remainingProductsInCategory = products.filter(p => !p.deleted && p.id !== productId && p.categoryId === categoryId); const shouldDeactivate = remainingProductsInCategory.length === 0 || remainingProductsInCategory.every(p => !p.active); if (shouldDeactivate) { await firebaseService.updateCategoryStatus(categoryId, false); const category = categories.find(c => c.id === categoryId); addToast(`Categoria "${category?.name || 'desconhecida'}" desativada por estar vazia ou ter apenas produtos inativos.`, 'success'); } } await firebaseService.deleteProduct(productId); addToast("Produto movido para a lixeira!", 'success'); } catch (error) { console.error("Failed to delete product:", error); addToast("Erro ao mover para a lixeira.", 'error'); } }, [products, categories, addToast]);
+    const handleProductStatusChange = useCallback(async (productId: string, active: boolean) => { try { await firebaseService.updateProductStatus(productId, active); addToast(`Produto ${active ? 'ativado' : 'desativado'}.`, 'success'); if (!active) { const changedProduct = products.find(p => p.id === productId); if (changedProduct) { const { categoryId } = changedProduct; const hasOtherActiveProducts = products.some(p => p.categoryId === categoryId && p.id !== productId && p.active && !p.deleted); if (!hasOtherActiveProducts) { await firebaseService.updateCategoryStatus(categoryId, false); const category = categories.find(c => c.id === categoryId); addToast(`Categoria "${category?.name || 'desconhecida'}" desativada pois todos os seus produtos estão inativos.`, 'success'); } } } } catch (error) { console.error("Failed to update product status:", error); addToast("Erro ao atualizar status.", 'error'); } }, [addToast, products, categories]);
     const handleProductStockStatusChange = useCallback(async (productId: string, stockStatus: 'available' | 'out_of_stock') => { try { await firebaseService.updateProductStockStatus(productId, stockStatus); addToast(`Estoque atualizado.`, 'success'); } catch (error) { console.error("Failed to update product stock status:", error); addToast("Erro ao atualizar estoque.", 'error'); } }, [addToast]);
     const handleStoreStatusChange = useCallback(async (isOnline: boolean) => { try { await firebaseService.updateStoreStatus(isOnline); addToast("Status da loja atualizado.", 'success'); } catch (error) { console.error("Failed to update store status:", error); addToast("Erro ao atualizar status da loja.", 'error'); } }, [addToast]);
     const handleSaveCategory = useCallback(async (category: Category) => { try { const { id, ...dataToSave } = category; if (id) await firebaseService.updateCategory(id, dataToSave); else await firebaseService.addCategory({ ...dataToSave, order: categories.length }); addToast(id ? "Categoria atualizada!" : "Categoria adicionada!", 'success'); } catch (error) { console.error("Failed to save category:", error); addToast("Erro ao salvar categoria.", 'error'); } }, [categories.length, addToast]);
     const handleDeleteCategory = useCallback(async (categoryId: string) => { try { await firebaseService.deleteCategory(categoryId, products); addToast("Categoria deletada!", 'success'); } catch (error: any) { console.error("Failed to delete category:", error); addToast(`Erro: ${error.message}`, 'error'); } }, [products, addToast]);
     const handleCategoryStatusChange = useCallback(async (categoryId: string, active: boolean) => { try { await firebaseService.updateCategoryStatus(categoryId, active); addToast(`Categoria ${active ? 'ativada' : 'desativada'}.`, 'success'); } catch (error) { console.error("Failed to update category status:", error); addToast("Erro ao atualizar status.", 'error'); } }, [addToast]);
     const handleReorderProducts = useCallback(async (productsToUpdate: { id: string; orderIndex: number }[]) => { try { await firebaseService.updateProductsOrder(productsToUpdate); addToast("Ordem dos produtos atualizada.", 'success'); } catch (error) { console.error("Failed to reorder products:", error); addToast("Erro ao reordenar produtos.", 'error'); } }, [addToast]);
-    // FIX: Removed the explicit `: Promise<void>` return type from the async function inside `useCallback`.
-    // While technically correct, it can sometimes cause subtle type inference issues with the compiler that may be misreported.
-    // Removing it makes the function's return type fully inferred, resolving the "Expected 1 arguments, but got 2" error and making it consistent with other similar handlers in the file.
     const handleReorderCategories = useCallback(async (categoriesToUpdate: { id: string; order: number }[]) => { try { await firebaseService.updateCategoriesOrder(categoriesToUpdate); addToast("Ordem das categorias atualizada.", 'success'); } catch (error) { console.error("Failed to reorder categories:", error); addToast("Erro ao reordenar categorias.", 'error'); } }, [addToast]);
-    
-    const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => {
-        try {
-            const settingsToUpdate = JSON.parse(JSON.stringify(settings));
-    
-            // Handle file uploads (which implies replacement of the old image)
-            for (const key in files) {
-                const file = files[key];
-                if (file) {
-                    const newUrl = await uploadImagem(file);
-    
-                    if (key === 'logo') settingsToUpdate.logoUrl = newUrl;
-                    else if (key === 'heroBg') settingsToUpdate.heroBgUrl = newUrl;
-                    else if (key === 'facade') settingsToUpdate.facadeImageUrl = newUrl;
-                    else {
-                        const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key);
-                        if (sectionIndex > -1) settingsToUpdate.contentSections[sectionIndex].imageUrl = newUrl;
-                    }
-                }
-            }
-    
-            // Handle explicit removals marked by the UI
-            if (settingsToUpdate.logoUrl === 'DELETE_AND_RESET') {
-                settingsToUpdate.logoUrl = defaultLogo;
-            }
-            if (settingsToUpdate.heroBgUrl === 'DELETE_AND_RESET') {
-                settingsToUpdate.heroBgUrl = defaultHeroBg;
-            }
-            if (settingsToUpdate.facadeImageUrl === 'DELETE_AND_RESET') {
-                settingsToUpdate.facadeImageUrl = defaultSiteSettings.facadeImageUrl;
-            }
-            if (settingsToUpdate.contentSections) {
-                for (let i = 0; i < settingsToUpdate.contentSections.length; i++) {
-                    const section = settingsToUpdate.contentSections[i];
-                    if (section.imageUrl === 'DELETE_AND_RESET') {
-                        section.imageUrl = defaultAboutImg; // Use a consistent default for all sections
-                    }
-                }
-            }
-    
-            await firebaseService.updateSiteSettings(settingsToUpdate);
-            addToast("Personalização salva!", 'success');
-        } catch (error) {
-            console.error("Failed to save site settings:", error);
-            addToast("Erro ao salvar configurações.", 'error');
-        }
-    }, [addToast]);
-    
-    const handleUpdateSiteSettingsField = useCallback(async (updates: Partial<SiteSettings>) => {
-        try {
-            await firebaseService.updateSiteSettings(updates);
-            addToast('Configuração salva com sucesso!', 'success');
-        } catch (error) {
-            console.error('Failed to update site settings field:', error);
-            addToast('Erro ao salvar a configuração.', 'error');
-            throw error; // Re-throw to allow UI to handle failure states if needed
-        }
-    }, [addToast]);
+    const handleSaveSiteSettings = useCallback(async (settings: SiteSettings, files: { [key: string]: File | null }) => { try { const settingsToUpdate = JSON.parse(JSON.stringify(settings)); for (const key in files) { const file = files[key]; if (file) { const newUrl = await uploadImagem(file); if (key === 'logo') settingsToUpdate.logoUrl = newUrl; else if (key === 'heroBg') settingsToUpdate.heroBgUrl = newUrl; else if (key === 'facade') settingsToUpdate.facadeImageUrl = newUrl; else { const sectionIndex = settingsToUpdate.contentSections.findIndex((s: any) => s.id === key); if (sectionIndex > -1) settingsToUpdate.contentSections[sectionIndex].imageUrl = newUrl; } } } if (settingsToUpdate.logoUrl === 'DELETE_AND_RESET') { settingsToUpdate.logoUrl = defaultLogo; } if (settingsToUpdate.heroBgUrl === 'DELETE_AND_RESET') { settingsToUpdate.heroBgUrl = defaultHeroBg; } if (settingsToUpdate.facadeImageUrl === 'DELETE_AND_RESET') { settingsToUpdate.facadeImageUrl = defaultSiteSettings.facadeImageUrl; } if (settingsToUpdate.contentSections) { for (let i = 0; i < settingsToUpdate.contentSections.length; i++) { const section = settingsToUpdate.contentSections[i]; if (section.imageUrl === 'DELETE_AND_RESET') { section.imageUrl = defaultAboutImg; } } } await firebaseService.updateSiteSettings(settingsToUpdate); addToast("Personalização salva!", 'success'); } catch (error) { console.error("Failed to save site settings:", error); addToast("Erro ao salvar configurações.", 'error'); } }, [addToast]);
+    const handleUpdateSiteSettingsField = useCallback(async (updates: Partial<SiteSettings>) => { try { await firebaseService.updateSiteSettings(updates); addToast('Configuração salva com sucesso!', 'success'); } catch (error) { console.error('Failed to update site settings field:', error); addToast('Erro ao salvar a configuração.', 'error'); throw error; } }, [addToast]);
     const handleUpdateOrderStatus = useCallback(async (orderId: string, status: OrderStatus, payload?: Partial<Pick<Order, 'pickupTimeEstimate'>>) => { try { let finalStatus = status; const order = orders.find(o => o.id === orderId); if (status === 'accepted' && order?.customer.orderType === 'local') finalStatus = 'reserved'; await firebaseService.updateOrderStatus(orderId, finalStatus, payload); addToast("Status do pedido atualizado!", 'success'); } catch (error) { console.error("Failed to update order status:", error); addToast("Erro ao atualizar status.", 'error'); } }, [orders, addToast]);
     const handleUpdateOrderPaymentStatus = useCallback(async (orderId: string, paymentStatus: PaymentStatus) => { try { await firebaseService.updateOrderPaymentStatus(orderId, paymentStatus); addToast("Status de pagamento atualizado!", 'success'); } catch (error) { console.error("Failed to update order payment status:", error); addToast("Erro ao atualizar pagamento.", 'error'); } }, [addToast]);
     const handleUpdateOrderReservationTime = useCallback(async (orderId: string, reservationTime: string) => { try { await firebaseService.updateOrderReservationTime(orderId, reservationTime); addToast("Horário da reserva atualizado!", 'success'); } catch (error) { console.error("Failed to update reservation time:", error); addToast("Erro ao atualizar horário.", 'error'); } }, [addToast]);
     const handleDeleteOrder = useCallback(async (orderId: string) => { if (window.confirm("Mover este pedido para a lixeira? 🗑️")) { try { await firebaseService.updateOrderStatus(orderId, 'deleted'); addToast("Pedido movido para a lixeira.", 'success'); } catch (error) { console.error("Failed to move order to trash:", error); addToast("Erro ao mover para lixeira.", 'error'); } } }, [addToast]);
     const handlePermanentDeleteOrder = useCallback(async (orderId: string) => { if (window.confirm("Apagar PERMANENTEMENTE? Esta ação não pode ser desfeita.")) { try { await firebaseService.deleteOrder(orderId); addToast("Pedido apagado permanentemente.", 'success'); } catch (error) { console.error("Failed to permanently delete order:", error); addToast("Erro ao apagar permanentemente.", 'error'); } } }, [addToast]);
-    
-    const handlePermanentDeleteMultipleOrders = useCallback(async (orderIds: string[]) => {
-        if (orderIds.length === 0) return;
-        if (window.confirm(`Apagar PERMANENTEMENTE ${orderIds.length} pedido(s)? Esta ação não pode ser desfeita.`)) {
-            addToast(`Apagando ${orderIds.length} pedido(s)...`, 'success');
-            try {
-                await firebaseService.permanentDeleteMultipleOrders(orderIds);
-                addToast(`${orderIds.length} pedido(s) apagado(s) permanentemente.`, 'success');
-            } catch (error) {
-                console.error("Failed to permanently delete multiple orders:", error);
-                addToast("Erro ao apagar os pedidos.", 'error');
-            }
-        }
-    }, [addToast]);
-
-    const handleBulkDeleteProducts = useCallback(async (productIds: string[]) => {
-        try {
-            const categoriesToUpdate = new Set<string>();
-            const productsToDelete = products.filter(p => productIds.includes(p.id));
-            productsToDelete.forEach(p => categoriesToUpdate.add(p.categoryId));
-    
-            await firebaseService.bulkDeleteProducts(productIds);
-            addToast(`${productIds.length} produto(s) movido(s) para a lixeira.`, 'success');
-    
-            // Check categories AFTER the products are marked as deleted in the state
-            for (const categoryId of categoriesToUpdate) {
-                const remainingProducts = products.filter(p => 
-                    p.categoryId === categoryId &&
-                    !productIds.includes(p.id) &&
-                    !p.deleted
-                );
-    
-                const shouldDeactivate = remainingProducts.length === 0 || remainingProducts.every(p => !p.active);
-    
-                if (shouldDeactivate) {
-                    await firebaseService.updateCategoryStatus(categoryId, false);
-                    const category = categories.find(c => c.id === categoryId);
-                    addToast(`Categoria "${category?.name || 'desconhecida'}" desativada por estar vazia ou ter apenas produtos inativos.`, 'success');
-                }
-            }
-        } catch (error) {
-            console.error("Failed to bulk delete products:", error);
-            addToast("Erro ao mover produtos para a lixeira.", 'error');
-        }
-    }, [products, categories, addToast]);
-
-    const handleRestoreProduct = useCallback(async (productId: string) => {
-        try {
-            await firebaseService.restoreProduct(productId);
-            addToast('Produto restaurado com sucesso!', 'success');
-        } catch (error) {
-            console.error("Failed to restore product:", error);
-            addToast("Erro ao restaurar produto.", 'error');
-        }
-    }, [addToast]);
-
-    const handlePermanentDeleteProduct = useCallback(async (productId: string) => {
-        if (window.confirm('APAGAR PERMANENTEMENTE? Esta ação não pode ser desfeita.')) {
-            try {
-                await firebaseService.permanentDeleteProduct(productId);
-                addToast('Produto apagado permanentemente.', 'success');
-            } catch (error) {
-                console.error("Failed to permanently delete product:", error);
-                addToast("Erro ao apagar produto.", 'error');
-            }
-        }
-    }, [addToast]);
-
-    const handleBulkPermanentDeleteProducts = useCallback(async (productIds: string[]) => {
-        if (productIds.length === 0) return;
-        if (window.confirm(`APAGAR PERMANENTEMENTE ${productIds.length} produto(s)? Esta ação não pode ser desfeita.`)) {
-            try {
-                await firebaseService.bulkPermanentDeleteProducts(productIds);
-                addToast(`${productIds.length} produto(s) apagados permanentemente.`, 'success');
-            } catch (error) {
-                console.error("Failed to bulk delete products:", error);
-                addToast("Erro ao apagar produtos.", 'error');
-            }
-        }
-    }, [addToast]);
+    const handlePermanentDeleteMultipleOrders = useCallback(async (orderIds: string[]) => { if (orderIds.length === 0) return; if (window.confirm(`Apagar PERMANENTEMENTE ${orderIds.length} pedido(s)? Esta ação não pode ser desfeita.`)) { addToast(`Apagando ${orderIds.length} pedido(s)...`, 'success'); try { await firebaseService.permanentDeleteMultipleOrders(orderIds); addToast(`${orderIds.length} pedido(s) apagado(s) permanentemente.`, 'success'); } catch (error) { console.error("Failed to permanently delete multiple orders:", error); addToast("Erro ao apagar os pedidos.", 'error'); } } }, [addToast]);
+    const handleBulkDeleteProducts = useCallback(async (productIds: string[]) => { try { const categoriesToUpdate = new Set<string>(); const productsToDelete = products.filter(p => productIds.includes(p.id)); productsToDelete.forEach(p => categoriesToUpdate.add(p.categoryId)); await firebaseService.bulkDeleteProducts(productIds); addToast(`${productIds.length} produto(s) movido(s) para a lixeira.`, 'success'); for (const categoryId of categoriesToUpdate) { const remainingProducts = products.filter(p => p.categoryId === categoryId && !productIds.includes(p.id) && !p.deleted); const shouldDeactivate = remainingProducts.length === 0 || remainingProducts.every(p => !p.active); if (shouldDeactivate) { await firebaseService.updateCategoryStatus(categoryId, false); const category = categories.find(c => c.id === categoryId); addToast(`Categoria "${category?.name || 'desconhecida'}" desativada por estar vazia ou ter apenas produtos inativos.`, 'success'); } } } catch (error) { console.error("Failed to bulk delete products:", error); addToast("Erro ao mover produtos para a lixeira.", 'error'); } }, [products, categories, addToast]);
+    const handleRestoreProduct = useCallback(async (productId: string) => { try { await firebaseService.restoreProduct(productId); addToast('Produto restaurado com sucesso!', 'success'); } catch (error) { console.error("Failed to restore product:", error); addToast("Erro ao restaurar produto.", 'error'); } }, [addToast]);
+    const handlePermanentDeleteProduct = useCallback(async (productId: string) => { if (window.confirm('APAGAR PERMANENTEMENTE? Esta ação não pode ser desfeita.')) { try { await firebaseService.permanentDeleteProduct(productId); addToast('Produto apagado permanentemente.', 'success'); } catch (error) { console.error("Failed to permanently delete product:", error); addToast("Erro ao apagar produto.", 'error'); } } }, [addToast]);
+    const handleBulkPermanentDeleteProducts = useCallback(async (productIds: string[]) => { if (productIds.length === 0) return; if (window.confirm(`APAGAR PERMANENTEMENTE ${productIds.length} produto(s)? Esta ação não pode ser desfeita.`)) { try { await firebaseService.bulkPermanentDeleteProducts(productIds); addToast(`${productIds.length} produto(s) apagados permanentemente.`, 'success'); } catch (error) { console.error("Failed to bulk delete products:", error); addToast("Erro ao apagar produtos.", 'error'); } } }, [addToast]);
 
 
     const cartTotalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
@@ -1273,19 +1080,6 @@ const App: React.FC = () => {
               top: offsetPosition,
               behavior: 'smooth'
             });
-        }
-    };
-    
-    const handleProfileUpdate = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsProcessingOrder(true);
-        try {
-            await firebaseService.updateUserProfile(currentUser!.uid, { name, phone });
-            addToast('Seu perfil foi salvo!', 'success');
-        } catch (error) {
-            addToast('Erro ao salvar seu perfil.', 'error');
-        } finally {
-            setIsProcessingOrder(false);
         }
     };
 
@@ -1315,7 +1109,7 @@ const App: React.FC = () => {
                 />
                 
                 {error && <div className="container mx-auto px-4 py-8"><div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-6 rounded-lg shadow-md" role="alert"><p className="font-bold text-lg mb-2">Falha na Conexão</p><p className="mb-4">{error}</p></div></div>}
-                {isLoading ? <div className="text-center py-20"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p></div> : !error && <MenuSection categories={categories} products={products.filter(p => !p.deleted)} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} activeCategoryId={activeMenuCategory} setActiveCategoryId={setActiveMenuCategory} cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} cartItems={cart} onSelectHalfAndHalf={handleSelectHalfAndHalf} menuViewMode={menuViewMode} onMenuViewChange={setMenuViewMode} onShowProductDetails={handleShowProductDetails} />}
+                {isLoading ? <div className="text-center py-20"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p></div> : !error && <MenuSection categories={categories} products={products.filter(p => !p.deleted)} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} activeCategoryId={activeMenuCategory} setActiveCategoryId={setActiveMenuCategory} cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} cartItems={cart} onSelectHalfAndHalf={handleSelectHalfAndHalf} menuViewMode={menuViewMode} onMenuViewChange={handleMenuViewChange} onShowProductDetails={handleShowProductDetails} />}
                 <div id="sobre">{siteSettings.contentSections?.filter(section => section.isVisible).sort((a, b) => a.order - b.order).map((section, index) => <DynamicContentSection key={section.id} section={section} order={index} />)}</div>
                 <ContactSection settings={siteSettings} />
                 <AdminSection 
@@ -1465,7 +1259,6 @@ const App: React.FC = () => {
                 onAddToCart={handleAddHalfAndHalfToCart}
             />
             <PixQrCodeModal isOpen={isPixQrCodeModalOpen} onClose={() => setIsPixQrCodeModalOpen(false)} />
-            {/* FIX: Added the ProductDetailModal to be rendered, supporting the compact menu view. */}
             <ProductDetailModal
                 isOpen={isProductDetailModalOpen}
                 onClose={() => setIsProductDetailModalOpen(false)}

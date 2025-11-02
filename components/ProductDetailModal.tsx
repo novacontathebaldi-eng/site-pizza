@@ -19,6 +19,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ isOpen, 
     const [wasAdded, setWasAdded] = useState(false);
     const timerRef = useRef<number | null>(null);
 
+    // Todos os hooks devem ser chamados no topo, incondicionalmente.
     const prices = product?.prices ?? {};
     const hasPrices = Object.keys(prices).length > 0;
     const isPromo = product?.isPromotion && product.promotionalPrices && Object.values(product.promotionalPrices).some(p => typeof p === 'number' && p > 0);
@@ -38,21 +39,30 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ isOpen, 
 
     useEffect(() => {
         if (isOpen && product) {
-            // Reset state when a new product is shown
             setSelectedSize(sortedSizes.length === 1 ? sortedSizes[0] : '');
             setNotes('');
             setShowSizeError(false);
             setWasAdded(false);
         }
-        
+
         return () => {
             if (timerRef.current) {
                 clearTimeout(timerRef.current);
             }
         };
     }, [isOpen, product, sortedSizes]);
+    
+    const currentPrice = useMemo(() => {
+        if (!selectedSize || !product) return null;
+        const promoPrice = isPromo ? product.promotionalPrices?.[selectedSize] : undefined;
+        if (promoPrice && promoPrice > 0) return promoPrice;
+        return prices[selectedSize];
+    }, [selectedSize, isPromo, product, prices]);
 
-    if (!isOpen || !product) return null;
+    // A verificação de saída antecipada agora está depois de todos os hooks.
+    if (!isOpen || !product) {
+        return null;
+    }
     
     const handleAddToCartClick = () => {
         if (hasPrices && sortedSizes.length > 1 && !selectedSize) {
@@ -76,21 +86,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ isOpen, 
         setWasAdded(true);
 
         timerRef.current = window.setTimeout(() => {
-            onClose(); // Close modal after adding
-        }, 1000); // 1 sec delay to show "Adicionado!"
+            onClose();
+        }, 1000);
     };
 
     const handleSelectHalfAndHalf = () => {
         onSelectHalfAndHalf(product);
         onClose();
     };
-
-    const currentPrice = useMemo(() => {
-        if (!selectedSize) return null;
-        const promoPrice = isPromo ? product.promotionalPrices?.[selectedSize] : undefined;
-        if (promoPrice && promoPrice > 0) return promoPrice;
-        return prices[selectedSize];
-    }, [selectedSize, isPromo, product, prices]);
 
     const formatPrice = (price: number) => price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     
