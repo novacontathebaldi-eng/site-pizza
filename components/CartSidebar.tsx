@@ -133,6 +133,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ isOpen, onClose, cartI
                                 <div className="flex-grow">
                                     <p className="font-bold text-text-on-light">{item.name}</p>
                                     <p className="text-sm text-gray-500">{item.size}</p>
+                                    {item.notes && <p className="text-xs text-brand-olive-600 mt-1 italic">Obs: {item.notes}</p>}
                                     <div className="flex items-center gap-2 mt-2">
                                         {item.quantity > 1 ? (
                                             <button onClick={() => onUpdateQuantity(item.id, item.quantity - 1)} className="w-7 h-7 bg-gray-200 rounded-md font-bold">-</button>

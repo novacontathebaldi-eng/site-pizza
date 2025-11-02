@@ -1,11 +1,12 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import { Product, Category, CartItem } from '../types';
 import { MenuItemCard } from './MenuItemCard';
+import { CompactMenuItemCard } from './CompactMenuItemCard';
 
 interface MenuSectionProps {
     categories: Category[];
     products: Product[];
-    onAddToCart: (product: Product, size: string, price: number) => void;
+    onAddToCart: (product: Product, size: string, price: number, notes?: string) => void;
     isStoreOnline: boolean;
     activeCategoryId: string;
     setActiveCategoryId: (id: string) => void;
@@ -13,6 +14,9 @@ interface MenuSectionProps {
     onCartClick: () => void;
     cartItems: CartItem[];
     onSelectHalfAndHalf: (product: Product) => void;
+    menuViewMode: 'grid' | 'compact';
+    onMenuViewChange: (mode: 'grid' | 'compact') => void;
+    onShowProductDetails: (product: Product) => void;
 }
 
 const categoryIcons: { [key: string]: string } = {
@@ -26,7 +30,8 @@ const categoryIcons: { [key: string]: string } = {
 export const MenuSection: React.FC<MenuSectionProps> = ({ 
     categories, products, onAddToCart, isStoreOnline, 
     activeCategoryId, setActiveCategoryId, 
-    cartItemCount, onCartClick, cartItems, onSelectHalfAndHalf
+    cartItemCount, onCartClick, cartItems, onSelectHalfAndHalf,
+    menuViewMode, onMenuViewChange, onShowProductDetails
 }) => {
     const categoryRefs = useRef<Map<string, HTMLElement | null>>(new Map());
     const tabRefs = useRef<Map<string, HTMLAnchorElement | null>>(new Map());
@@ -122,26 +127,32 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                 
                 <div id="sticky-menu-header" className={`sticky ${isStoreOnline ? 'top-20' : 'top-[7.5rem]'} bg-white/95 backdrop-blur-sm z-30 -mx-4 shadow-sm`}>
                     <div className="border-b border-gray-200">
-                        <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide px-2 sm:px-4 lg:flex-wrap lg:justify-center lg:overflow-x-visible">
-                            {sortedActiveCategories.map(category => (
-                                <a 
-                                    key={category.id} 
-                                    // FIX: The ref callback was incorrectly returning a Map object.
-                                    // It has been wrapped in a block body `{}` to ensure it returns `void`,
-                                    // which is the expected return type for a ref callback.
-                                    ref={(el) => { tabRefs.current.set(category.id, el); }}
-                                    href={`#category-section-${category.id}`}
-                                    onClick={(e) => handleTabClick(e, category.id)}
-                                    className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors
-                                        ${activeCategoryId === category.id 
-                                            ? 'border-b-2 border-accent text-accent' 
-                                            : 'text-gray-500 hover:text-gray-700'
-                                        }`}
-                                >
-                                    <i className={`${categoryIcons[category.id] || 'fas fa-utensils'} w-5 text-center`}></i>
-                                    <span>{category.name}</span>
-                                </a>
-                            ))}
+                        <div className="flex items-center overflow-x-auto whitespace-nowrap scrollbar-hide px-2 sm:px-4">
+                            <div className="flex-grow flex lg:justify-center">
+                                {sortedActiveCategories.map(category => (
+                                    <a 
+                                        key={category.id} 
+                                        ref={(el) => { tabRefs.current.set(category.id, el); }}
+                                        href={`#category-section-${category.id}`}
+                                        onClick={(e) => handleTabClick(e, category.id)}
+                                        className={`flex-shrink-0 inline-flex items-center gap-2 py-3 px-4 font-semibold text-sm transition-colors
+                                            ${activeCategoryId === category.id 
+                                                ? 'border-b-2 border-accent text-accent' 
+                                                : 'text-gray-500 hover:text-gray-700'
+                                            }`}
+                                    >
+                                        <i className={`${categoryIcons[category.id] || 'fas fa-utensils'} w-5 text-center`}></i>
+                                        <span>{category.name}</span>
+                                    </a>
+                                ))}
+                            </div>
+                            <button
+                                onClick={() => onMenuViewChange(menuViewMode === 'grid' ? 'compact' : 'grid')}
+                                className="ml-2 flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-colors"
+                                title={menuViewMode === 'grid' ? 'Alternar para visualização compacta' : 'Alternar para visualização em grade'}
+                            >
+                                <i className={`fas ${menuViewMode === 'grid' ? 'fa-list' : 'fa-th-large'}`}></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -158,19 +169,33 @@ export const MenuSection: React.FC<MenuSectionProps> = ({
                                 ref={(el) => { categoryRefs.current.set(category.id, el); }}
                             >
                                 <h3 className="text-3xl font-bold text-brand-olive-600 mb-6 border-l-4 border-accent pl-4">{category.name}</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                    {categoryProducts.map(product => (
-                                        <MenuItemCard 
-                                            key={product.id} 
-                                            product={product} 
-                                            categoryName={category.name}
-                                            onAddToCart={onAddToCart}
-                                            isStoreOnline={isStoreOnline}
-                                            isInCart={cartItems.some(item => item.productId === product.id)}
-                                            onSelectHalfAndHalf={onSelectHalfAndHalf}
-                                        />
-                                    ))}
-                                </div>
+                                {menuViewMode === 'grid' ? (
+                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                        {categoryProducts.map(product => (
+                                            <MenuItemCard 
+                                                key={product.id} 
+                                                product={product} 
+                                                categoryName={category.name}
+                                                onAddToCart={onAddToCart}
+                                                isStoreOnline={isStoreOnline}
+                                                isInCart={cartItems.some(item => item.productId === product.id)}
+                                                onSelectHalfAndHalf={onSelectHalfAndHalf}
+                                            />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {categoryProducts.map(product => (
+                                            <CompactMenuItemCard
+                                                key={product.id}
+                                                product={product}
+                                                onShowDetails={onShowProductDetails}
+                                                isStoreOnline={isStoreOnline}
+                                                isInCart={cartItems.some(item => item.productId === product.id)}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         );
                     })}

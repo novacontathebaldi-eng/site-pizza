@@ -26,6 +26,8 @@ import { CookieConsentBanner } from './components/CookieConsentBanner';
 import { TermsOfServiceModal } from './components/TermsOfServiceModal';
 import { HalfAndHalfModal } from './components/HalfAndHalfModal';
 import { PixQrCodeModal } from './components/PixQrCodeModal';
+// FIX: Added import for ProductDetailModal to support the compact menu view.
+import { ProductDetailModal } from './components/ProductDetailModal';
 import { uploadImagem } from './src/utils/uploadImagem';
 
 // Type declarations for Google GAPI library to avoid TypeScript errors
@@ -271,9 +273,20 @@ const App: React.FC = () => {
     ]);
     const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
     
+    // FIX: Added state for menu view mode and product detail modal to implement compact view.
+    const [menuViewMode, setMenuViewMode] = useState<'grid' | 'compact'>('grid');
+    const [isProductDetailModalOpen, setIsProductDetailModalOpen] = useState(false);
+    const [productForDetailModal, setProductForDetailModal] = useState<Product | null>(null);
+
 
     const scrollToTop = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // FIX: Added handler to show product details from the compact menu view.
+    const handleShowProductDetails = (product: Product) => {
+        setProductForDetailModal(product);
+        setIsProductDetailModalOpen(true);
     };
 
     // Service Worker Registration for Image Caching
@@ -304,7 +317,9 @@ const App: React.FC = () => {
                                isPrivacyPolicyOpen ||
                                isTermsModalOpen ||
                                isHalfAndHalfModalOpen ||
-                               isPixQrCodeModalOpen;
+                               isPixQrCodeModalOpen ||
+                               // FIX: Included the new Product Detail Modal in the scroll lock logic.
+                               isProductDetailModalOpen;
     
         const handleScrollLock = () => {
             let shouldLock = false;
@@ -339,7 +354,9 @@ const App: React.FC = () => {
     }, [
         isCartOpen, isCheckoutModalOpen, isReservationModalOpen, isChatbotOpen, 
         isLoginModalOpen, isUserAreaModalOpen, confirmedOrderData, confirmedReservationData, 
-        isPrivacyPolicyOpen, isTermsModalOpen, isHalfAndHalfModalOpen, isPixQrCodeModalOpen
+        isPrivacyPolicyOpen, isTermsModalOpen, isHalfAndHalfModalOpen, isPixQrCodeModalOpen,
+        // FIX: Added the new Product Detail Modal to the dependency array.
+        isProductDetailModalOpen
     ]);
     
 
@@ -857,15 +874,42 @@ const App: React.FC = () => {
         }
     };
 
-    const handleAddToCart = useCallback((product: Product, size: string, price: number) => {
+    // FIX: Updated handleAddToCart to accept an optional 'notes' parameter and handle it correctly,
+    // ensuring items with notes are added separately to the cart.
+    const handleAddToCart = useCallback((product: Product, size: string, price: number, notes?: string) => {
         setCart(prevCart => {
-            const existingItemIndex = prevCart.findIndex(item => item.productId === product.id && item.size === size);
+            // If there are notes, we always add it as a new unique item in the cart.
+            if (notes) {
+                 const newItem: CartItem = {
+                    id: `${product.id}-${size}-${Date.now()}`, // Unique ID for items with notes
+                    productId: product.id,
+                    name: product.name,
+                    size,
+                    price,
+                    quantity: 1,
+                    imageUrl: product.imageUrl,
+                    notes
+                };
+                return [...prevCart, newItem];
+            }
+
+            // If no notes, check if an item without notes already exists to increment its quantity.
+            const existingItemIndex = prevCart.findIndex(item => item.productId === product.id && item.size === size && !item.notes);
             if (existingItemIndex > -1) {
                 const updatedCart = [...prevCart];
                 updatedCart[existingItemIndex].quantity += 1;
                 return updatedCart;
             } else {
-                const newItem: CartItem = { id: `${product.id}-${size}`, productId: product.id, name: product.name, size, price, quantity: 1, imageUrl: product.imageUrl };
+                // Otherwise, add as a new item.
+                const newItem: CartItem = {
+                    id: `${product.id}-${size}`,
+                    productId: product.id,
+                    name: product.name,
+                    size,
+                    price,
+                    quantity: 1,
+                    imageUrl: product.imageUrl
+                };
                 return [...prevCart, newItem];
             }
         });
@@ -1271,7 +1315,7 @@ const App: React.FC = () => {
                 />
                 
                 {error && <div className="container mx-auto px-4 py-8"><div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-6 rounded-lg shadow-md" role="alert"><p className="font-bold text-lg mb-2">Falha na Conexão</p><p className="mb-4">{error}</p></div></div>}
-                {isLoading ? <div className="text-center py-20"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p></div> : !error && <MenuSection categories={categories} products={products.filter(p => !p.deleted)} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} activeCategoryId={activeMenuCategory} setActiveCategoryId={setActiveMenuCategory} cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} cartItems={cart} onSelectHalfAndHalf={handleSelectHalfAndHalf} />}
+                {isLoading ? <div className="text-center py-20"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-4 text-xl font-semibold text-gray-600">Carregando cardápio...</p></div> : !error && <MenuSection categories={categories} products={products.filter(p => !p.deleted)} onAddToCart={handleAddToCart} isStoreOnline={isStoreOnline} activeCategoryId={activeMenuCategory} setActiveCategoryId={setActiveMenuCategory} cartItemCount={cartTotalItems} onCartClick={() => setIsCartOpen(true)} cartItems={cart} onSelectHalfAndHalf={handleSelectHalfAndHalf} menuViewMode={menuViewMode} onMenuViewChange={setMenuViewMode} onShowProductDetails={handleShowProductDetails} />}
                 <div id="sobre">{siteSettings.contentSections?.filter(section => section.isVisible).sort((a, b) => a.order - b.order).map((section, index) => <DynamicContentSection key={section.id} section={section} order={index} />)}</div>
                 <ContactSection settings={siteSettings} />
                 <AdminSection 
@@ -1421,6 +1465,15 @@ const App: React.FC = () => {
                 onAddToCart={handleAddHalfAndHalfToCart}
             />
             <PixQrCodeModal isOpen={isPixQrCodeModalOpen} onClose={() => setIsPixQrCodeModalOpen(false)} />
+            {/* FIX: Added the ProductDetailModal to be rendered, supporting the compact menu view. */}
+            <ProductDetailModal
+                isOpen={isProductDetailModalOpen}
+                onClose={() => setIsProductDetailModalOpen(false)}
+                product={productForDetailModal}
+                onAddToCart={handleAddToCart}
+                onSelectHalfAndHalf={handleSelectHalfAndHalf}
+                isStoreOnline={isStoreOnline}
+            />
 
             {(isProcessingOrder) && <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-6 font-semibold text-lg text-gray-700">Processando seu pedido...</p><p className="mt-2 text-sm text-gray-500">Por favor, aguarde um instante.</p></div></div>}
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]"><div className="w-full flex flex-col items-center space-y-4 sm:items-end">{toasts.map((toast) => (<div key={toast.id} className="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden animate-fade-in-up"><div className="p-4"><div className="flex items-start"><div className="flex-shrink-0">{toast.type === 'success' ? <i className="fas fa-check-circle h-6 w-6 text-green-500"></i> : <i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>}</div><div className="ml-3 w-0 flex-1 pt-0.5"><p className="text-sm font-medium text-gray-900">{toast.message}</p></div></div></div></div>))}</div></div>

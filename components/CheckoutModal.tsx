@@ -500,12 +500,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                                 <h3 className="font-bold mb-2">Resumo do Pedido</h3>
                                 <div className="space-y-1">
                                     {cartItems.map(item => (
-                                        <div key={item.id} className="flex justify-between text-sm">
-                                            <span>
-                                                {item.quantity}x {item.name} ({item.size})
-                                                {item.quantity > 1 && <span className="text-gray-500 ml-2">({(item.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/un)</span>}
-                                            </span>
-                                            <span className="font-semibold">{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                        <div key={item.id}>
+                                            <div className="flex justify-between text-sm">
+                                                <span>
+                                                    {item.quantity}x {item.name} ({item.size})
+                                                    {item.quantity > 1 && <span className="text-gray-500 ml-2">({(item.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/un)</span>}
+                                                </span>
+                                                <span className="font-semibold">{(item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                            </div>
+                                            {item.notes && <p className="text-xs text-brand-olive-600 pl-4 italic">- Obs: {item.notes}</p>}
                                         </div>
                                     ))}
                                 </div>

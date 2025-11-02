@@ -302,6 +302,11 @@ export const updateUserProfile = async (uid: string, data: Partial<Pick<UserProf
     await db.collection('users').doc(uid).update(data);
 };
 
+export const updateUserPreferences = async (uid: string, preferences: { menuView: 'grid' | 'compact' }): Promise<void> => {
+    if (!db) throw new Error("Firestore is not initialized.");
+    await db.collection('users').doc(uid).set({ preferences }, { merge: true });
+};
+
 export const addAddress = async (uid: string, address: Omit<Address, 'id'>): Promise<void> => {
     if (!db) throw new Error("Firestore is not initialized.");
     const userRef = db.collection('users').doc(uid);

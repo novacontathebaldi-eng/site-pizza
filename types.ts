@@ -26,6 +26,9 @@ export interface UserProfile {
     // User-provided info
     phone?: string;
     addresses?: Address[];
+    preferences?: {
+        menuView?: 'grid' | 'compact';
+    };
 }
 
 export interface Product {
@@ -59,6 +62,7 @@ export interface CartItem {
     price: number;
     quantity: number;
     imageUrl: string;
+    notes?: string;
     isHalfAndHalf?: boolean;
     secondHalf?: {
         productId: string;
