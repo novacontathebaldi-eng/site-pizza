@@ -393,8 +393,23 @@ const App: React.FC = () => {
                 setIsCurrentUserAdmin(idTokenResult.claims.admin === true);
             } else {
                 setUserProfile(null);
-                setName('');
-                setPhone('');
+                // Para usuários não logados, tenta carregar as informações salvas do navegador.
+                try {
+                    const savedGuestInfo = localStorage.getItem('santaSensacaoGuestInfo');
+                    if (savedGuestInfo) {
+                        const { name: savedName, phone: savedPhone } = JSON.parse(savedGuestInfo);
+                        setName(savedName || '');
+                        setPhone(savedPhone || '');
+                    } else {
+                        // Se não houver dados salvos, limpa os campos.
+                        setName('');
+                        setPhone('');
+                    }
+                } catch (e) {
+                    console.error("Falha ao carregar informações de convidado.", e);
+                    setName('');
+                    setPhone('');
+                }
                 setIsCurrentUserAdmin(false);
             }
             setIsAuthLoading(false);
@@ -842,6 +857,15 @@ const App: React.FC = () => {
         
         const success = await initiateOrderCreation(details, cart, total);
         if (success) {
+            // Salva as informações do cliente sem conta no navegador para preenchimento automático futuro.
+            if (!currentUser) {
+                try {
+                    const guestInfo = { name: details.name, phone: details.phone };
+                    localStorage.setItem('santaSensacaoGuestInfo', JSON.stringify(guestInfo));
+                } catch (e) {
+                    console.error("Falha ao salvar informações de convidado:", e);
+                }
+            }
             setCart([]);
             setIsCartOpen(false);
         }
