@@ -15,6 +15,7 @@ interface ChatbotProps {
     onShowPixQRCode: () => void;
     userProfile: UserProfile | null;
     myOrders: Order[];
+    onOpenSalesModal: () => void;
 }
 
 interface ParsedMessage {
@@ -30,6 +31,8 @@ interface ParsedMessage {
         payload: {
             details: ReservationDetails;
         };
+    } | {
+        type: 'OPEN_SALES_MODAL';
     };
 }
 
@@ -38,13 +41,15 @@ const parseMessage = (content: string): ParsedMessage => {
     // Regex para os blocos de ação
     const orderActionRegex = /<ACTION_CREATE_ORDER>([\s\S]*?)<\/ACTION_CREATE_ORDER>/;
     const reservationActionRegex = /<ACTION_CREATE_RESERVATION>([\s\S]*?)<\/ACTION_CREATE_RESERVATION>/;
+    const salesModalActionRegex = /<ACTION_OPEN_SALES_MODAL\s*\/?>/;
     const orderMatch = content.match(orderActionRegex);
     const reservationMatch = content.match(reservationActionRegex);
+    const salesModalMatch = content.match(salesModalActionRegex);
 
     let action: ParsedMessage['action'] = undefined;
     
     // Remove os blocos de ação do conteúdo principal
-    const cleanContent = content.replace(orderActionRegex, '').replace(reservationActionRegex, '').trim();
+    const cleanContent = content.replace(orderActionRegex, '').replace(reservationActionRegex, '').replace(salesModalActionRegex, '').trim();
 
     if (orderMatch && orderMatch[1]) {
         try {
@@ -71,6 +76,8 @@ const parseMessage = (content: string): ParsedMessage => {
         } catch (e) {
             console.error("Falha ao analisar o JSON da ação de reserva do chatbot:", e);
         }
+    } else if (salesModalMatch) {
+        action = { type: 'OPEN_SALES_MODAL' };
     }
 
 
@@ -111,7 +118,7 @@ const parseMessage = (content: string): ParsedMessage => {
 };
 
 
-export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onSendMessage, isSending, onCreateOrder, onCreateReservation, onShowPixQRCode, userProfile, myOrders }) => {
+export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onSendMessage, isSending, onCreateOrder, onCreateReservation, onShowPixQRCode, userProfile, onOpenSalesModal, myOrders }) => {
     const [input, setInput] = useState('');
     const lastElementRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -264,6 +271,18 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                                             >
                                                 <i className="fab fa-whatsapp mr-2"></i>
                                                 <span>Confirmar Reserva</span>
+                                            </button>
+                                        )}
+                                        {action.type === 'OPEN_SALES_MODAL' && (
+                                            <button
+                                                onClick={() => {
+                                                    onOpenSalesModal();
+                                                    setCompletedActions(prev => new Set(prev).add(index));
+                                                }}
+                                                className="w-full bg-brand-olive-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all flex items-center justify-center text-center"
+                                            >
+                                                <i className="fas fa-rocket mr-2"></i>
+                                                <span>Abrir Formulário de Contato</span>
                                             </button>
                                         )}
                                     </div>

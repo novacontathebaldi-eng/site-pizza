@@ -228,7 +228,7 @@ const ForSaleOverlay: React.FC<ForSaleOverlayProps> = ({ onContinue, onContact, 
     return (
         <div className="fixed inset-0 bg-brand-green-700/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 text-white animate-fade-in-up">
             <div className="text-center max-w-2xl bg-brand-olive-600/50 p-8 rounded-2xl shadow-2xl border border-white/20">
-                <img src={logoUrl} alt="Logo THEBALDI" className="w-48 mx-auto mb-6" />
+                <img src={logoUrl} alt="Logo THEBALDI" className="w-48 mx-auto mb-6 border-4 border-black rounded-full bg-white p-1" />
                 <h1 className="text-4xl md:text-5xl font-extrabold text-brand-gold-600 mb-4">
                     Este Site Está à Venda!
                 </h1>
@@ -1354,6 +1354,7 @@ const App: React.FC = () => {
                 onShowPixQRCode={() => setIsPixQrCodeModalOpen(true)}
                 userProfile={userProfile}
                 myOrders={myOrders}
+                onOpenSalesModal={() => setIsSupportModalOpen(true)}
             />
             
             <LoginModal 
