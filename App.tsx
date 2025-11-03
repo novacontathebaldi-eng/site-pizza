@@ -236,9 +236,9 @@ const ForSaleOverlay: React.FC<ForSaleOverlayProps> = ({ onContinue, onContact, 
                     Este site de pizzaria é um projeto de demonstração totalmente funcional, construído com as mais modernas tecnologias.
                 </p>
                 <div className="bg-white/10 p-4 rounded-lg border border-white/20 mb-8">
-                    <p className="font-bold text-xl mb-2">Desenvolvido pelo THEBALDI</p>
+                    <p className="font-bold text-xl mb-2">Desenvolvido por THEBALDI</p>
                     <p className="text-brand-green-300">
-                        O THEBALDI é especialista em criar soluções web de alta performance. De sites institucionais a e-commerces complexos, transformamos sua ideia em realidade digital.
+                        THEBALDI é especialista em criar soluções web de alta performance. De sites institucionais a e-commerces complexos, transformamos sua ideia em realidade digital.
                     </p>
                 </div>
                 <p className="text-lg text-brand-ivory-50/90 mb-8">
@@ -257,7 +257,7 @@ const ForSaleOverlay: React.FC<ForSaleOverlayProps> = ({ onContinue, onContact, 
                         className="bg-transparent border-2 border-brand-gold-600 text-brand-gold-600 font-bold py-3 px-8 rounded-xl text-lg hover:bg-brand-gold-600 hover:text-text-on-dark transition-all transform hover:scale-105 flex items-center justify-center"
                     >
                         <i className="fas fa-pizza-slice mr-2"></i>
-                        <span>Navegar pela Pizzaria</span>
+                        <span>Acessar à Pizzaria</span>
                     </button>
                 </div>
             </div>
