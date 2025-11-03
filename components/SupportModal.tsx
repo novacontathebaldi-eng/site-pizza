@@ -11,7 +11,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState(''); // Novo campo de telefone
-    const [subject, setSubject] = useState('Purchase This Site');
+    const [subject, setSubject] = useState('Quero comprar este site');
     const [customSubject, setCustomSubject] = useState('');
     const [message, setMessage] = useState('');
 
@@ -27,7 +27,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
             setName('');
             setEmail('');
             setPhone('');
-            setSubject('Purchase This Site');
+            setSubject('Quero comprar este site');
             setCustomSubject('');
             setMessage('');
             setResponseMessage({ type: '', text: '' });
@@ -55,14 +55,19 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
 
         const finalSubject = subject === 'Other' ? customSubject : subject;
 
+        // **ALTERAÇÃO:** Combina o assunto e a mensagem para garantir que ambos apareçam no corpo do e-mail.
+        const finalMessage = `Assunto Escolhido: ${finalSubject}\n\nMensagem:\n${message}`;
+
         // Monta o objeto de dados que será enviado para a API.
         const formData = {
             access_key: "51bd2086-744f-4eb0-961f-c6ff1d490fed", // Sua chave de acesso Web3Forms.
             name: name,
             email: email,
-            phone: phone || "Não informado", // Adiciona o telefone ou um valor padrão se estiver vazio.
-            subject: finalSubject,
-            message: message,
+            phone: phone || "Não informado",
+            // O campo 'subject' da API define a linha de assunto do e-mail.
+            subject: `Contato do Site-Portfólio: ${name}`,
+            // O campo 'message' é o corpo do e-mail que você recebe.
+            message: finalMessage,
             botcheck: "" // Campo "honeypot" para proteção contra spam.
         };
 
@@ -86,7 +91,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
                 setName('');
                 setEmail('');
                 setPhone('');
-                setSubject('Access Difficulty');
+                setSubject('Quero comprar este site');
                 setMessage('');
                 setCustomSubject('');
             } else {
@@ -136,9 +141,9 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
                         <div>
                             <label className="block text-sm font-semibold mb-1" htmlFor="support-subject">Assunto *</label>
                             <select id="support-subject" name="subject" value={subject} onChange={e => setSubject(e.target.value)} className="w-full px-3 py-2 border rounded-md bg-white" required>
-                                <option value="Purchase This Site">Quero comprar este site</option>
-                                <option value="Custom Project Inquiry">Quero um site personalizado</option>
-                                <option value="Project Questions">Dúvidas sobre o projeto</option>
+                                <option value="Quero comprar este site">Quero comprar este site</option>
+                                <option value="Quero um site personalizado">Quero um site personalizado</option>
+                                <option value="Dúvidas sobre o projeto">Dúvidas sobre o projeto</option>
                                 <option value="Other">Outro</option>
                             </select>
                         </div>
