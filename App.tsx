@@ -47,7 +47,7 @@ interface Toast {
 const defaultSiteSettings: SiteSettings = {
     logoUrl: defaultLogo,
     heroSlogan: "A pizza nº 1 do ES",
-    heroTitle: "Pizzaria Santa Sensação",
+    heroTitle: "Pizzaria THEBALDI",
     heroSubtitle: "A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.",
     heroBgUrl: defaultHeroBg,
     facadeImageUrl: "https://firebasestorage.googleapis.com/v0/b/site-pizza-a2930.firebasestorage.app/o/fachada%2FFACHADA.png?alt=media&token=8010021e-a157-475e-8734-4ba56a3e967f",
@@ -71,7 +71,7 @@ const defaultSiteSettings: SiteSettings = {
             imageUrl: defaultAboutImg,
             tag: "Nossa Conquista",
             title: "A Melhor Pizza do Estado, Assinada por um Mestre",
-            description: "Em parceria com o renomado mestre pizzaiolo Luca Lonardi, a Santa Sensação eleva a pizza a um novo patamar. Fomos os grandes vencedores do concurso Panshow 2025, um reconhecimento que celebra nossa dedicação aos ingredientes frescos, massa de fermentação natural e, acima de tudo, a paixão por criar sabores inesquecíveis. Cada pizza que sai do nosso forno a lenha carrega a assinatura de um campeão e a promessa de uma experiência única.",
+            description: "Em parceria com o renomado mestre pizzaiolo Lucas da Silvassauro, o THEBALDI eleva a pizza a um novo patamar. Fomos os grandes vencedores do concurso Panshow 2025, um reconhecimento que celebra nossa dedicação aos ingredientes frescos, massa de fermentação natural e, acima de tudo, a paixão por criar sabores inesquecíveis. Cada pizza que sai do nosso forno a lenha carrega a assinatura de um campeão e a promessa de uma experiência única.",
             list: [
                 { id: 'item-1-1', icon: "fas fa-award", text: "Vencedora do Panshow 2025" },
                 { id: 'item-1-2', icon: "fas fa-user-check", text: "Assinada pelo Mestre Luca Lonardi" },
@@ -98,8 +98,8 @@ const defaultSiteSettings: SiteSettings = {
         }
     ],
     footerLinks: [
-        { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996500341', isVisible: true },
-        { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/santasensacao.sl', isVisible: true },
+        { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996670426', isVisible: true },
+        { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/othebaldi', isVisible: true },
         { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin', isVisible: true }
     ]
 };
@@ -112,7 +112,7 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     const formattedDate = now.toLocaleDateString('pt-BR');
     const formattedTime = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-    let message = `*🍕 NOVO PEDIDO - SANTA SENSAÇÃO*\n`;
+    let message = `*🍕 NOVO PEDIDO - THEBALDI*\n`;
     message += `${orderNumStr}\n\n`;
     
     message += `🗓️ *Data:* ${formattedDate}\n`;
@@ -183,13 +183,13 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     message += `\n🍕 *Obrigado* por escolher nossa pizzaria! 🤩 Sua preferência nos motiva a oferecer sempre o melhor. Estamos à disposição! 🧑🏻‍🍳👍🏼`;
     
     message += `\nEste *pedido* foi gerado pelo nosso site: *santasensacao.me* 🥇`;
-    return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
+    return `https://wa.me/5527996670426?text=${encodeURIComponent(message)}`;
 };
 
 
 const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNumber: number | null) => {
     const orderNumStr = orderNumber ? ` #${orderNumber}` : '';
-    let message = `*📅 NOVA RESERVA${orderNumStr} - SANTA SENSAÇÃO 📅*\n\n`;
+    let message = `*📅 NOVA RESERVA${orderNumStr} - THEBALDI 📅*\n\n`;
     message += `Uma nova reserva foi feita pelo site.\n\n`;
     message += `*👤 DADOS DO CLIENTE:*\n`;
     message += `*Nome:* ${details.name}\n`;
@@ -206,7 +206,7 @@ const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNu
     message += `\n🍕 *Obrigado* por escolher nossa pizzaria! 🤩 Será um prazer recebê-lo em nossa casa. Se precisar, estamos sempre à disposição! 🧑🏻‍🍳👍🏼`;
     
     message += `\nEsta *Reserva* foi gerada pelo nosso site: *santasensacao.me* 🥇`;
-    return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
+    return `https://wa.me/5527996670426?text=${encodeURIComponent(message)}`;
 };
 
 const getInitialMenuView = (): 'grid' | 'compact' => {
@@ -355,7 +355,7 @@ const App: React.FC = () => {
     
     // Chatbot State
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-        { role: 'bot', content: `🍕 Olá! Bem-vindo(a) à Pizzaria Santa Sensação!\n\nEu sou o Sensação, seu assistente virtual. Estou aqui para te ajudar a fazer pedidos, tirar dúvidas sobre nosso cardápio, acompanhar entregas e muito mais.\n\nComo posso te ajudar hoje?` }
+        { role: 'bot', content: `🍕 Olá! Bem-vindo(a) à Pizzaria THEBALDI!\n\nEu sou o Thebaldin, seu assistente virtual. Estou aqui para te ajudar a fazer pedidos, tirar dúvidas sobre nosso cardápio, acompanhar entregas e muito mais.\n\nComo posso te ajudar hoje?` }
     ]);
     const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
     
