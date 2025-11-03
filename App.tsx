@@ -378,32 +378,31 @@ const App: React.FC = () => {
         setIsProductDetailModalOpen(true);
     };
     
+    // FIX: Refactored menu view logic to prevent infinite loop on login.
+    // The "write" operation is now only in the user action handler.
     const handleMenuViewChange = (mode: 'grid' | 'compact') => {
-        setMenuViewMode(mode);
+        setMenuViewMode(mode); // Optimistic UI update
+        if (currentUser) {
+            firebaseService.updateUserPreferences(currentUser.uid, { menuView: mode });
+        } else {
+            localStorage.setItem('santaSensacaoMenuView', mode);
+        }
     };
 
-    // Effect to save preference when it changes or when user logs in/out
+    // FIX: This effect now only "reads" from the source of truth (Firestore or localStorage)
+    // to sync the state, preventing loops caused by conflicting state updates.
     useEffect(() => {
-        // For guests, save to localStorage
-        if (!currentUser) {
-            localStorage.setItem('santaSensacaoMenuView', menuViewMode);
-        } else if (userProfile) {
-            // For logged-in users, save to Firebase profile if it's different
-            if (userProfile?.preferences?.menuView !== menuViewMode) {
-                firebaseService.updateUserPreferences(currentUser.uid, { menuView: menuViewMode });
+        if (currentUser && userProfile) {
+            // User is logged in, profile is loaded. Firestore is the source of truth.
+            const profilePreference = userProfile.preferences?.menuView;
+            if (profilePreference && menuViewMode !== profilePreference) {
+                setMenuViewMode(profilePreference);
             }
-        }
-    }, [menuViewMode, currentUser, userProfile]);
-
-    // Effect to load preference from user profile when they log in
-    useEffect(() => {
-        if (currentUser && userProfile?.preferences?.menuView) {
-            setMenuViewMode(userProfile.preferences.menuView);
         } else if (!currentUser) {
-            // Fallback to localStorage for guests
-            const savedView = localStorage.getItem('santaSensacaoMenuView');
-            if (savedView === 'grid' || savedView === 'compact') {
-                setMenuViewMode(savedView);
+            // User is a guest. LocalStorage is the source of truth.
+            const guestPreference = localStorage.getItem('santaSensacaoMenuView');
+            if ((guestPreference === 'grid' || guestPreference === 'compact') && menuViewMode !== guestPreference) {
+                setMenuViewMode(guestPreference);
             }
         }
     }, [currentUser, userProfile]);
