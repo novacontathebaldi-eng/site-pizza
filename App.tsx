@@ -46,9 +46,9 @@ interface Toast {
 
 const defaultSiteSettings: SiteSettings = {
     logoUrl: defaultLogo,
-    heroSlogan: "A pizza nº 1 do ES",
-    heroTitle: "Pizzaria Santa Sensação",
-    heroSubtitle: "A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.",
+    heroSlogan: "A Tradição Italiana em Cada Fatia",
+    heroTitle: "Pizzaria THEBALDI",
+    heroSubtitle: "Ingredientes selecionados, massa de fermentação natural e a paixão pela autêntica pizza italiana.",
     heroBgUrl: defaultHeroBg,
     facadeImageUrl: "https://firebasestorage.googleapis.com/v0/b/site-pizza-a2930.firebasestorage.app/o/fachada%2FFACHADA.png?alt=media&token=8010021e-a157-475e-8734-4ba56a3e967f",
     automaticSchedulingEnabled: true,
@@ -67,14 +67,14 @@ const defaultSiteSettings: SiteSettings = {
             order: 0,
             isVisible: true,
             isTagVisible: true,
-            tagIcon: "fas fa-award",
+            tagIcon: "fas fa-heart",
             imageUrl: defaultAboutImg,
-            tag: "Nossa Conquista",
-            title: "A Melhor Pizza do Estado, Assinada por um Mestre",
-            description: "Em parceria com o renomado mestre pizzaiolo Luca Lonardi, a Santa Sensação eleva a pizza a um novo patamar. Fomos os grandes vencedores do concurso Panshow 2025, um reconhecimento que celebra nossa dedicação aos ingredientes frescos, massa de fermentação natural e, acima de tudo, a paixão por criar sabores inesquecíveis. Cada pizza que sai do nosso forno a lenha carrega a assinatura de um campeão e a promessa de uma experiência única.",
+            tag: "Nossa Tradição",
+            title: "Uma História de Família e Sabor",
+            description: "A Pizzaria THEBALDI nasceu da paixão pela culinária italiana, passada de geração em geração. Nosso compromisso é com a qualidade e o sabor autêntico, utilizando ingredientes frescos e uma massa de fermentação natural que faz toda a diferença. Cada pizza é uma celebração da nossa história.",
             list: [
-                { id: 'item-1-1', icon: "fas fa-award", text: "Vencedora do Panshow 2025" },
-                { id: 'item-1-2', icon: "fas fa-user-check", text: "Assinada pelo Mestre Luca Lonardi" },
+                { id: 'item-1-1', icon: "fas fa-users", text: "Receitas de família com um toque moderno" },
+                { id: 'item-1-2', icon: "fas fa-bread-slice", text: "Massa de fermentação natural de 48h" },
                 { id: 'item-1-3', icon: "fas fa-leaf", text: "Ingredientes frescos e selecionados" },
                 { id: 'item-1-4', icon: "fas fa-fire-alt", text: "Forno a lenha tradicional" }
             ]
@@ -98,8 +98,8 @@ const defaultSiteSettings: SiteSettings = {
         }
     ],
     footerLinks: [
-        { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996500341', isVisible: true },
-        { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/santasensacao.sl', isVisible: true },
+        { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996670426', isVisible: true },
+        { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'http://instagram.com/othebaldi', isVisible: true },
         { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin', isVisible: true }
     ]
 };
@@ -112,7 +112,7 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     const formattedDate = now.toLocaleDateString('pt-BR');
     const formattedTime = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-    let message = `*🍕 NOVO PEDIDO - SANTA SENSAÇÃO*\n`;
+    let message = `*🍕 NOVO PEDIDO - PIZZARIA THEBALDI*\n`;
     message += `${orderNumStr}\n\n`;
     
     message += `🗓️ *Data:* ${formattedDate}\n`;
@@ -183,13 +183,13 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     message += `\n🍕 *Obrigado* por escolher nossa pizzaria! 🤩 Sua preferência nos motiva a oferecer sempre o melhor. Estamos à disposição! 🧑🏻‍🍳👍🏼`;
     
     message += `\nEste *pedido* foi gerado pelo nosso site: *santasensacao.me* 🥇`;
-    return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
+    return `https://wa.me/5527996670426?text=${encodeURIComponent(message)}`;
 };
 
 
 const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNumber: number | null) => {
     const orderNumStr = orderNumber ? ` #${orderNumber}` : '';
-    let message = `*📅 NOVA RESERVA${orderNumStr} - SANTA SENSAÇÃO 📅*\n\n`;
+    let message = `*📅 NOVA RESERVA${orderNumStr} - PIZZARIA THEBALDI 📅*\n\n`;
     message += `Uma nova reserva foi feita pelo site.\n\n`;
     message += `*👤 DADOS DO CLIENTE:*\n`;
     message += `*Nome:* ${details.name}\n`;
@@ -206,7 +206,7 @@ const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNu
     message += `\n🍕 *Obrigado* por escolher nossa pizzaria! 🤩 Será um prazer recebê-lo em nossa casa. Se precisar, estamos sempre à disposição! 🧑🏻‍🍳👍🏼`;
     
     message += `\nEsta *Reserva* foi gerada pelo nosso site: *santasensacao.me* 🥇`;
-    return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
+    return `https://wa.me/5527996670426?text=${encodeURIComponent(message)}`;
 };
 
 const getInitialMenuView = (): 'grid' | 'compact' => {
@@ -257,7 +257,7 @@ const ForSaleOverlay: React.FC<ForSaleOverlayProps> = ({ onContinue, onContact, 
                         className="bg-transparent border-2 border-brand-gold-600 text-brand-gold-600 font-bold py-3 px-8 rounded-xl text-lg hover:bg-brand-gold-600 hover:text-text-on-dark transition-all transform hover:scale-105 flex items-center justify-center"
                     >
                         <i className="fas fa-pizza-slice mr-2"></i>
-                        <span>Acessar a Pizzaria</span>
+                        <span>Acessar à Pizzaria</span>
                     </button>
                 </div>
             </div>
@@ -355,7 +355,7 @@ const App: React.FC = () => {
     
     // Chatbot State
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-        { role: 'bot', content: `🍕 Olá! Bem-vindo(a) à Pizzaria Santa Sensação!\n\nEu sou o Sensação, seu assistente virtual. Estou aqui para te ajudar a fazer pedidos, tirar dúvidas sobre nosso cardápio, acompanhar entregas e muito mais.\n\nComo posso te ajudar hoje?` }
+        { role: 'bot', content: `🍕 Olá! Bem-vindo(a) à Pizzaria THEBALDI!\n\nSou o assistente virtual e estou aqui para te ajudar a fazer pedidos, tirar dúvidas sobre nosso cardápio e muito mais.\n\nComo posso te ajudar hoje?` }
     ]);
     const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
     

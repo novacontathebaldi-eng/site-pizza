@@ -77,7 +77,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ settings, isLoading, o
                 </div>
                 <h1 className="text-4xl md:text-6xl font-extrabold mb-4 leading-tight">
                     {heroTitle.split(' ').map((word, index, arr) => 
-                        word.toLowerCase() === 'santa' || word.toLowerCase() === 'sensação' 
+                        word.toLowerCase() === 'pizzaria' || word.toLowerCase() === 'thebaldi' 
                         ? <span key={index} className="text-brand-gold-600">{word} </span> 
                         : <span key={index}>{word} </span>
                     )}

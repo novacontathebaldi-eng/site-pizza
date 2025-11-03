@@ -107,10 +107,10 @@ export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot, onOpenP
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center md:text-left">
                     <div className="flex flex-col items-center md:items-start md:col-span-1">
                         <div className="flex items-center gap-3 text-2xl font-bold mb-4">
-                           <img src={settings.logoUrl} alt="Santa Sensação Logo" className="h-12" />
-                            <span>Santa Sensação</span>
+                           <img src={settings.logoUrl} alt="Pizzaria THEBALDI Logo" className="h-12" />
+                            <span>Pizzaria THEBALDI</span>
                         </div>
-                        <p className="text-brand-green-300 mb-4">{settings.heroSlogan} 🏅</p>
+                        <p className="text-brand-green-300 mb-4">{settings.heroSlogan}</p>
                         <div className="flex gap-4">
                             {socialLinks.map(link => {
                                 let bgColor = 'bg-gray-500';
@@ -131,7 +131,7 @@ export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot, onOpenP
                         <ul className="space-y-2 text-brand-green-300">
                             <li><i className="fas fa-map-marker-alt mr-2 text-accent"></i>Porfilio Furtado, 178 - Centro</li>
                             <li>Santa Leopoldina, ES</li>
-                            <li><i className="fas fa-phone mr-2 text-accent"></i>(27) 99650-0341</li>
+                            <li><i className="fas fa-phone mr-2 text-accent"></i>(27) 99667-0426</li>
                         </ul>
                     </div>
                     <div>

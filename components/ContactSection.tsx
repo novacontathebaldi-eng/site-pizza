@@ -152,7 +152,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
                             allowFullScreen={true}
                             loading="lazy"
                             referrerPolicy="no-referrer-when-downgrade"
-                            title="Mapa da localização da Pizzaria Santa Sensação"
+                            title="Mapa da localização da Pizzaria THEBALDI"
                         ></iframe>
                     </div>
                 </div>

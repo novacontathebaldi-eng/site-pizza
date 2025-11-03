@@ -187,7 +187,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
             <header className="flex justify-between items-center p-4 bg-brand-green-700 text-text-on-dark rounded-t-2xl flex-shrink-0">
                 <h2 className="text-lg font-bold flex items-center gap-2">
                     <i className="fas fa-robot"></i>
-                    Sensação - Assistente Virtual
+                    Pizzaria THEBALDI - Assistente
                 </h2>
                 <button onClick={onClose} className="text-text-on-dark/70 hover:text-white text-2xl" aria-label="Fechar chat">&times;</button>
             </header>
@@ -221,7 +221,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                             {msg.role === 'bot' && (
                                 <img 
                                     src={botProfilePic} 
-                                    alt="Sensação Bot" 
+                                    alt="THEBALDI Bot" 
                                     className="w-8 h-8 rounded-full border-2 border-accent object-cover flex-shrink-0" 
                                 />
                             )}
@@ -302,12 +302,12 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                     <div ref={lastElementRef} className="flex items-end gap-2 justify-start">
                         <img 
                             src={botProfilePic} 
-                            alt="Sensação Bot" 
+                            alt="THEBALDI Bot" 
                             className="w-8 h-8 rounded-full border-2 border-accent object-cover flex-shrink-0" 
                         />
                         <div className="bg-gray-200 text-gray-800 rounded-2xl rounded-bl-none px-4 py-2">
                             <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-gray-600">Sensação está digitando</span>
+                                <span className="text-sm font-medium text-gray-600">Assistente está digitando</span>
                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
