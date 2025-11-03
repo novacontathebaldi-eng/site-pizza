@@ -276,7 +276,7 @@ interface ForSalePopupProps {
 }
 const ForSalePopup: React.FC<ForSalePopupProps> = ({ onClose, onContact }) => {
     return (
-        <div className="fixed bottom-5 right-5 z-40 w-full max-w-sm bg-white rounded-xl shadow-2xl border border-brand-gold-600/50 animate-fade-in-up">
+        <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-5 sm:bottom-5 z-40 sm:w-full max-w-sm bg-white rounded-xl shadow-2xl border border-brand-gold-600/50 animate-fade-in-up">
             <div className="p-4">
                 <div className="flex items-start gap-4">
                     <div className="flex-shrink-0 w-12 h-12 bg-accent text-white rounded-full flex items-center justify-center text-2xl">
@@ -405,7 +405,7 @@ const App: React.FC = () => {
                 setMenuViewMode(guestPreference);
             }
         }
-    }, [currentUser, userProfile]);
+    }, [currentUser, userProfile, menuViewMode]);
 
 
     const scrollToTop = () => {
