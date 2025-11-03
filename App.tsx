@@ -257,7 +257,7 @@ const ForSaleOverlay: React.FC<ForSaleOverlayProps> = ({ onContinue, onContact, 
                         className="bg-transparent border-2 border-brand-gold-600 text-brand-gold-600 font-bold py-3 px-8 rounded-xl text-lg hover:bg-brand-gold-600 hover:text-text-on-dark transition-all transform hover:scale-105 flex items-center justify-center"
                     >
                         <i className="fas fa-pizza-slice mr-2"></i>
-                        <span>Acessar à Pizzaria</span>
+                        <span>Acessar a Pizzaria</span>
                     </button>
                 </div>
             </div>
