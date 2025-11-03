@@ -226,35 +226,39 @@ interface ForSaleOverlayProps {
 }
 const ForSaleOverlay: React.FC<ForSaleOverlayProps> = ({ onContinue, onContact, logoUrl }) => {
     return (
-        <div className="fixed inset-0 bg-brand-green-700/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 text-white animate-fade-in-up">
-            <div className="text-center max-w-2xl bg-brand-olive-600/50 p-8 rounded-2xl shadow-2xl border border-white/20">
-                <img src={logoUrl} alt="Logo THEBALDI" className="w-48 mx-auto mb-6 border-4 border-black rounded-full bg-white p-1" />
-                <h1 className="text-4xl md:text-5xl font-extrabold text-brand-gold-600 mb-4">
+        // Adiciona overflow-y-auto para permitir rolagem em telas pequenas.
+        // Usa items-start para alinhar o conteúdo ao topo no celular e sm:items-center para telas maiores.
+        <div className="fixed inset-0 bg-brand-green-700/90 backdrop-blur-md z-[100] flex items-start sm:items-center justify-center p-4 text-white animate-fade-in-up overflow-y-auto">
+            {/* Reduz padding e tamanhos de fonte em telas móveis usando prefixos responsivos. */}
+            <div className="text-center max-w-2xl bg-brand-olive-600/50 p-6 sm:p-8 rounded-2xl shadow-2xl border border-white/20 w-full my-8 sm:my-auto">
+                <img src={logoUrl} alt="Logo THEBALDI" className="w-32 sm:w-48 mx-auto mb-4 sm:mb-6 border-4 border-black rounded-full bg-white p-1" />
+                <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-brand-gold-600 mb-4">
                     Este Site Está à Venda!
                 </h1>
-                <p className="text-lg text-brand-ivory-50/90 mb-4">
+                <p className="text-base sm:text-lg text-brand-ivory-50/90 mb-4">
                     Este site de pizzaria é um projeto de demonstração totalmente funcional, construído com as mais modernas tecnologias.
                 </p>
-                <div className="bg-white/10 p-4 rounded-lg border border-white/20 mb-8">
-                    <p className="font-bold text-xl mb-2">Desenvolvido por THEBALDI</p>
-                    <p className="text-brand-green-300">
+                <div className="bg-white/10 p-4 rounded-lg border border-white/20 mb-6 sm:mb-8">
+                    <p className="font-bold text-lg sm:text-xl mb-2">Desenvolvido por THEBALDI</p>
+                    <p className="text-sm sm:text-base text-brand-green-300">
                         THEBALDI é especialista em criar soluções web de alta performance. De sites institucionais a e-commerces complexos, transformamos sua ideia em realidade digital.
                     </p>
                 </div>
-                <p className="text-lg text-brand-ivory-50/90 mb-8">
+                <p className="text-base sm:text-lg text-brand-ivory-50/90 mb-6 sm:mb-8">
                     Interessado em adquirir este projeto ou em criar um site exclusivo para o seu negócio?
                 </p>
+                {/* Garante que os botões fiquem empilhados verticalmente em telas pequenas para melhor usabilidade. */}
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <button 
                         onClick={onContact} 
-                        className="bg-brand-gold-600 text-text-on-dark font-bold py-3 px-8 rounded-xl text-lg hover:bg-opacity-90 transition-all transform hover:scale-105 flex items-center justify-center"
+                        className="bg-brand-gold-600 text-text-on-dark font-bold py-3 px-6 rounded-xl text-base sm:text-lg hover:bg-opacity-90 transition-all transform hover:scale-105 flex items-center justify-center"
                     >
                         <i className="fas fa-envelope mr-2"></i>
                         <span>Entrar em Contato</span>
                     </button>
                     <button 
                         onClick={onContinue} 
-                        className="bg-transparent border-2 border-brand-gold-600 text-brand-gold-600 font-bold py-3 px-8 rounded-xl text-lg hover:bg-brand-gold-600 hover:text-text-on-dark transition-all transform hover:scale-105 flex items-center justify-center"
+                        className="bg-transparent border-2 border-brand-gold-600 text-brand-gold-600 font-bold py-3 px-6 rounded-xl text-base sm:text-lg hover:bg-brand-gold-600 hover:text-text-on-dark transition-all transform hover:scale-105 flex items-center justify-center"
                     >
                         <i className="fas fa-pizza-slice mr-2"></i>
                         <span>Acessar à Pizzaria</span>
@@ -264,6 +268,7 @@ const ForSaleOverlay: React.FC<ForSaleOverlayProps> = ({ onContinue, onContact, 
         </div>
     );
 };
+
 
 interface ForSalePopupProps {
     onClose: () => void;
