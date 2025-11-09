@@ -129,7 +129,7 @@ export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot, onOpenP
                     <div>
                         <h4 className="font-bold text-lg mb-4">Contato</h4>
                         <ul className="space-y-2 text-brand-green-300">
-                            <li><i className="fas fa-map-marker-alt mr-2 text-accent"></i>AV. Vitória, 221</li>
+                            <li><i className="fas fa-map-marker-alt mr-2 text-accent"></i>AV. Vitória, 211</li>
                             <li>Vitória, ES</li>
                             <li><i className="fas fa-phone mr-2 text-accent"></i>(27) 99667-0426</li>
                         </ul>
