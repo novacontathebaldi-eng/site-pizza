@@ -325,7 +325,7 @@ export default async (req, res) => {
 
     // --- Chamada para a API do Gemini (Método Novo e Correto) ---
     const response = await ai.models.generateContent({
-      model: 'gemini-flash-lite-latest', // MODELO ALTERADO: Usando o Flash-Lite, que é mais rápido e econômico.
+      model: 'gemini-2.5-flash', // MODELO ALTERADO: Usando o Flash-Lite, que é mais rápido e econômico.
       contents: contents, // Passa o histórico completo da conversa
       config: {
         systemInstruction: systemInstruction, // Usa o campo dedicado para instruções de sistema
