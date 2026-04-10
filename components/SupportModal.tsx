@@ -11,7 +11,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState(''); // Novo campo de telefone
-    const [subject, setSubject] = useState('Quero comprar este site');
+    const [subject, setSubject] = useState('Access Difficulty');
     const [customSubject, setCustomSubject] = useState('');
     const [message, setMessage] = useState('');
 
@@ -27,7 +27,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
             setName('');
             setEmail('');
             setPhone('');
-            setSubject('Quero comprar este site');
+            setSubject('Access Difficulty');
             setCustomSubject('');
             setMessage('');
             setResponseMessage({ type: '', text: '' });
@@ -55,19 +55,14 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
 
         const finalSubject = subject === 'Other' ? customSubject : subject;
 
-        // **ALTERAÇÃO:** Combina o assunto e a mensagem para garantir que ambos apareçam no corpo do e-mail.
-        const finalMessage = `Assunto Escolhido: ${finalSubject}\n\nMensagem:\n${message}`;
-
         // Monta o objeto de dados que será enviado para a API.
         const formData = {
             access_key: "51bd2086-744f-4eb0-961f-c6ff1d490fed", // Sua chave de acesso Web3Forms.
             name: name,
             email: email,
-            phone: phone || "Não informado",
-            // O campo 'subject' da API define a linha de assunto do e-mail.
-            subject: `Contato do Site-Portfólio: ${name}`,
-            // O campo 'message' é o corpo do e-mail que você recebe.
-            message: finalMessage,
+            phone: phone || "Não informado", // Adiciona o telefone ou um valor padrão se estiver vazio.
+            subject: finalSubject,
+            message: message,
             botcheck: "" // Campo "honeypot" para proteção contra spam.
         };
 
@@ -91,7 +86,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
                 setName('');
                 setEmail('');
                 setPhone('');
-                setSubject('Quero comprar este site');
+                setSubject('Access Difficulty');
                 setMessage('');
                 setCustomSubject('');
             } else {
@@ -115,14 +110,13 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
         : 'bg-red-100 text-red-700';
 
     return (
-        <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
                 <div className="flex justify-between items-center p-5 border-b border-gray-200">
-                    <h2 className="text-2xl font-bold text-text-on-light"><i className="fas fa-rocket mr-2"></i>Interessado no Projeto?</h2>
+                    <h2 className="text-2xl font-bold text-text-on-light"><i className="fas fa-envelope-open-text mr-2"></i>Contato com Suporte</h2>
                     <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl" disabled={isSubmitting}>&times;</button>
                 </div>
                 <div className="overflow-y-auto p-6">
-                    <p className="text-center text-gray-600 mb-6">Que legal que você se interessou! Este site é um exemplo do que posso construir. Preencha o formulário abaixo para conversarmos sobre este projeto ou uma solução personalizada para o seu negócio.</p>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -141,9 +135,9 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
                         <div>
                             <label className="block text-sm font-semibold mb-1" htmlFor="support-subject">Assunto *</label>
                             <select id="support-subject" name="subject" value={subject} onChange={e => setSubject(e.target.value)} className="w-full px-3 py-2 border rounded-md bg-white" required>
-                                <option value="Quero comprar este site">Quero comprar este site</option>
-                                <option value="Quero um site personalizado">Quero um site personalizado</option>
-                                <option value="Dúvidas sobre o projeto">Dúvidas sobre o projeto</option>
+                                <option value="Access Difficulty">Dificuldade de Acesso</option>
+                                <option value="Order Inquiry">Dúvida sobre Pedido</option>
+                                <option value="Feature Suggestion">Sugestão de Funcionalidade</option>
                                 <option value="Other">Outro</option>
                             </select>
                         </div>
@@ -186,7 +180,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
                                     ) : (
                                         <>
                                             <i className="fas fa-paper-plane mr-2"></i>
-                                            Solicitar Contato
+                                            Enviar Mensagem
                                         </>
                                     )}
                                 </button>

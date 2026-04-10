@@ -27,7 +27,6 @@ import { HalfAndHalfModal } from './components/HalfAndHalfModal';
 import { PixQrCodeModal } from './components/PixQrCodeModal';
 import { ProductDetailModal } from './components/ProductDetailModal';
 import { uploadImagem } from './src/utils/uploadImagem';
-import { SupportModal } from './components/SupportModal';
 
 // Type declarations for Google GAPI library to avoid TypeScript errors
 declare global {
@@ -46,9 +45,9 @@ interface Toast {
 
 const defaultSiteSettings: SiteSettings = {
     logoUrl: defaultLogo,
-    heroSlogan: "A Tradição Italiana em Cada Fatia",
-    heroTitle: "Pizzaria THEBALDI",
-    heroSubtitle: "Ingredientes selecionados, massa de fermentação natural e a paixão pela autêntica pizza italiana.",
+    heroSlogan: "A pizza nº 1 do ES",
+    heroTitle: "Pizzaria Santa Sensação",
+    heroSubtitle: "A pizza premiada do Espírito Santo, com ingredientes frescos, massa artesanal e a assinatura de um mestre.",
     heroBgUrl: defaultHeroBg,
     facadeImageUrl: "https://firebasestorage.googleapis.com/v0/b/site-pizza-a2930.firebasestorage.app/o/fachada%2FFACHADA.png?alt=media&token=8010021e-a157-475e-8734-4ba56a3e967f",
     automaticSchedulingEnabled: true,
@@ -67,14 +66,14 @@ const defaultSiteSettings: SiteSettings = {
             order: 0,
             isVisible: true,
             isTagVisible: true,
-            tagIcon: "fas fa-heart",
+            tagIcon: "fas fa-award",
             imageUrl: defaultAboutImg,
-            tag: "Nossa Tradição",
-            title: "Uma História de Família e Sabor",
-            description: "A Pizzaria THEBALDI nasceu da paixão pela culinária italiana, passada de geração em geração. Nosso compromisso é com a qualidade e o sabor autêntico, utilizando ingredientes frescos e uma massa de fermentação natural que faz toda a diferença. Cada pizza é uma celebração da nossa história.",
+            tag: "Nossa Conquista",
+            title: "A Melhor Pizza do Estado, Assinada por um Mestre",
+            description: "Em parceria com o renomado mestre pizzaiolo Luca Lonardi, a Santa Sensação eleva a pizza a um novo patamar. Fomos os grandes vencedores do concurso Panshow 2025, um reconhecimento que celebra nossa dedicação aos ingredientes frescos, massa de fermentação natural e, acima de tudo, a paixão por criar sabores inesquecíveis. Cada pizza que sai do nosso forno a lenha carrega a assinatura de um campeão e a promessa de uma experiência única.",
             list: [
-                { id: 'item-1-1', icon: "fas fa-users", text: "Receitas de família com um toque moderno" },
-                { id: 'item-1-2', icon: "fas fa-bread-slice", text: "Massa de fermentação natural de 48h" },
+                { id: 'item-1-1', icon: "fas fa-award", text: "Vencedora do Panshow 2025" },
+                { id: 'item-1-2', icon: "fas fa-user-check", text: "Assinada pelo Mestre Luca Lonardi" },
                 { id: 'item-1-3', icon: "fas fa-leaf", text: "Ingredientes frescos e selecionados" },
                 { id: 'item-1-4', icon: "fas fa-fire-alt", text: "Forno a lenha tradicional" }
             ]
@@ -98,8 +97,8 @@ const defaultSiteSettings: SiteSettings = {
         }
     ],
     footerLinks: [
-        { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996670426', isVisible: true },
-        { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'http://instagram.com/othebaldi', isVisible: true },
+        { id: 'footer-whatsapp', icon: 'fab fa-whatsapp', text: 'WhatsApp', url: 'https://wa.me/5527996500341', isVisible: true },
+        { id: 'footer-instagram', icon: 'fab fa-instagram', text: 'Instagram', url: 'https://www.instagram.com/santasensacao.sl', isVisible: true },
         { id: 'footer-admin', icon: 'fas fa-key', text: 'Painel Administrativo', url: '#admin', isVisible: true }
     ]
 };
@@ -112,7 +111,7 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     const formattedDate = now.toLocaleDateString('pt-BR');
     const formattedTime = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-    let message = `*🍕 NOVO PEDIDO - PIZZARIA THEBALDI*\n`;
+    let message = `*🍕 NOVO PEDIDO - SANTA SENSAÇÃO*\n`;
     message += `${orderNumStr}\n\n`;
     
     message += `🗓️ *Data:* ${formattedDate}\n`;
@@ -183,13 +182,13 @@ const generateWhatsAppMessage = (details: OrderDetails, currentCart: CartItem[],
     message += `\n🍕 *Obrigado* por escolher nossa pizzaria! 🤩 Sua preferência nos motiva a oferecer sempre o melhor. Estamos à disposição! 🧑🏻‍🍳👍🏼`;
     
     message += `\nEste *pedido* foi gerado pelo nosso site: *santasensacao.me* 🥇`;
-    return `https://wa.me/5527996670426?text=${encodeURIComponent(message)}`;
+    return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
 };
 
 
 const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNumber: number | null) => {
     const orderNumStr = orderNumber ? ` #${orderNumber}` : '';
-    let message = `*📅 NOVA RESERVA${orderNumStr} - PIZZARIA THEBALDI 📅*\n\n`;
+    let message = `*📅 NOVA RESERVA${orderNumStr} - SANTA SENSAÇÃO 📅*\n\n`;
     message += `Uma nova reserva foi feita pelo site.\n\n`;
     message += `*👤 DADOS DO CLIENTE:*\n`;
     message += `*Nome:* ${details.name}\n`;
@@ -206,7 +205,7 @@ const generateReservationWhatsAppMessage = (details: ReservationDetails, orderNu
     message += `\n🍕 *Obrigado* por escolher nossa pizzaria! 🤩 Será um prazer recebê-lo em nossa casa. Se precisar, estamos sempre à disposição! 🧑🏻‍🍳👍🏼`;
     
     message += `\nEsta *Reserva* foi gerada pelo nosso site: *santasensacao.me* 🥇`;
-    return `https://wa.me/5527996670426?text=${encodeURIComponent(message)}`;
+    return `https://wa.me/5527996500341?text=${encodeURIComponent(message)}`;
 };
 
 const getInitialMenuView = (): 'grid' | 'compact' => {
@@ -215,89 +214,6 @@ const getInitialMenuView = (): 'grid' | 'compact' => {
     return savedView;
   }
   return 'grid'; // Default
-};
-
-const thebaldiLogoUrl = 'https://lwkfyvprbhkphoxkorjq.supabase.co/storage/v1/object/public/sitepizza/thebaldi.jpg';
-
-interface ForSaleOverlayProps {
-    onContinue: () => void;
-    onContact: () => void;
-    logoUrl: string;
-}
-const ForSaleOverlay: React.FC<ForSaleOverlayProps> = ({ onContinue, onContact, logoUrl }) => {
-    return (
-        // Adiciona overflow-y-auto para permitir rolagem em telas pequenas.
-        // Usa items-start para alinhar o conteúdo ao topo no celular e sm:items-center para telas maiores.
-        <div className="fixed inset-0 bg-brand-green-700/90 backdrop-blur-md z-[100] flex items-start sm:items-center justify-center p-4 text-white animate-fade-in-up overflow-y-auto">
-            {/* Reduz padding e tamanhos de fonte em telas móveis usando prefixos responsivos. */}
-            <div className="text-center max-w-2xl bg-brand-olive-600/50 p-6 sm:p-8 rounded-2xl shadow-2xl border border-white/20 w-full my-8 sm:my-auto">
-                <img src={logoUrl} alt="Logo THEBALDI" className="w-32 sm:w-48 mx-auto mb-4 sm:mb-6 border-4 border-black rounded-full bg-white p-1" />
-                <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-brand-gold-600 mb-4">
-                    Este Site Está à Venda!
-                </h1>
-                <p className="text-base sm:text-lg text-brand-ivory-50/90 mb-4">
-                    Este site de pizzaria é um projeto de demonstração totalmente funcional, construído com as mais modernas tecnologias.
-                </p>
-                <div className="bg-white/10 p-4 rounded-lg border border-white/20 mb-6 sm:mb-8">
-                    <p className="font-bold text-lg sm:text-xl mb-2">Desenvolvido por THEBALDI</p>
-                    <p className="text-sm sm:text-base text-brand-green-300">
-                        THEBALDI é especialista em criar soluções web de alta performance. De sites institucionais a e-commerces complexos, transformamos sua ideia em realidade digital.
-                    </p>
-                </div>
-                <p className="text-base sm:text-lg text-brand-ivory-50/90 mb-6 sm:mb-8">
-                    Interessado em adquirir este projeto ou em criar um site exclusivo para o seu negócio?
-                </p>
-                {/* Garante que os botões fiquem empilhados verticalmente em telas pequenas para melhor usabilidade. */}
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <button 
-                        onClick={onContact} 
-                        className="bg-brand-gold-600 text-text-on-dark font-bold py-3 px-6 rounded-xl text-base sm:text-lg hover:bg-opacity-90 transition-all transform hover:scale-105 flex items-center justify-center"
-                    >
-                        <i className="fas fa-envelope mr-2"></i>
-                        <span>Entrar em Contato</span>
-                    </button>
-                    <button 
-                        onClick={onContinue} 
-                        className="bg-transparent border-2 border-brand-gold-600 text-brand-gold-600 font-bold py-3 px-6 rounded-xl text-base sm:text-lg hover:bg-brand-gold-600 hover:text-text-on-dark transition-all transform hover:scale-105 flex items-center justify-center"
-                    >
-                        <i className="fas fa-pizza-slice mr-2"></i>
-                        <span>Acessar à Pizzaria</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-
-interface ForSalePopupProps {
-    onClose: () => void;
-    onContact: () => void;
-}
-const ForSalePopup: React.FC<ForSalePopupProps> = ({ onClose, onContact }) => {
-    return (
-        <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-5 sm:bottom-5 z-40 sm:w-full max-w-sm bg-white rounded-xl shadow-2xl border border-brand-gold-600/50 animate-fade-in-up">
-            <div className="p-4">
-                <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-12 h-12 bg-accent text-white rounded-full flex items-center justify-center text-2xl">
-                        <i className="fas fa-tags"></i>
-                    </div>
-                    <div className="flex-grow">
-                        <h3 className="font-bold text-lg text-text-on-light">Este site está à venda!</h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                            Gostou do que viu? Este projeto pode ser seu, ou podemos criar um do zero para o seu negócio.
-                        </p>
-                        <button onClick={onContact} className="mt-3 bg-brand-olive-600 text-white font-semibold py-1.5 px-4 rounded-lg text-sm hover:bg-opacity-90">
-                            <i className="fas fa-envelope mr-2"></i> Fale Conosco
-                        </button>
-                    </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-700 flex-shrink-0 -mt-2 -mr-2 w-8 h-8 text-2xl">
-                        &times;
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
 };
 
 
@@ -360,7 +276,7 @@ const App: React.FC = () => {
     
     // Chatbot State
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-        { role: 'bot', content: `🍕 Olá! Bem-vindo(a) à Pizzaria THEBALDI!\n\nSou o assistente virtual e estou aqui para te ajudar a fazer pedidos, tirar dúvidas sobre nosso cardápio e muito mais.\n\nComo posso te ajudar hoje?` }
+        { role: 'bot', content: `🍕 Olá! Bem-vindo(a) à Pizzaria Santa Sensação!\n\nEu sou o Sensação, seu assistente virtual. Estou aqui para te ajudar a fazer pedidos, tirar dúvidas sobre nosso cardápio, acompanhar entregas e muito mais.\n\nComo posso te ajudar hoje?` }
     ]);
     const [isBotReplying, setIsBotReplying] = useState<boolean>(false);
     
@@ -368,44 +284,40 @@ const App: React.FC = () => {
     const [isProductDetailModalOpen, setIsProductDetailModalOpen] = useState(false);
     const [productForDetailModal, setProductForDetailModal] = useState<Product | null>(null);
 
-    // "For Sale" states
-    const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
-    const [showForSaleOverlay, setShowForSaleOverlay] = useState(() => !sessionStorage.getItem('forSaleOverlayDismissed'));
-    const [showForSalePopup, setShowForSalePopup] = useState(false);
-
     const handleShowProductDetails = (product: Product) => {
         setProductForDetailModal(product);
         setIsProductDetailModalOpen(true);
     };
     
-    // FIX: Refactored menu view logic to prevent infinite loop on login.
-    // The "write" operation is now only in the user action handler.
     const handleMenuViewChange = (mode: 'grid' | 'compact') => {
-        setMenuViewMode(mode); // Optimistic UI update
-        if (currentUser) {
-            firebaseService.updateUserPreferences(currentUser.uid, { menuView: mode });
-        } else {
-            localStorage.setItem('santaSensacaoMenuView', mode);
-        }
+        setMenuViewMode(mode);
     };
 
-    // FIX: This effect now only "reads" from the source of truth (Firestore or localStorage)
-    // to sync the state, preventing loops caused by conflicting state updates.
+    // Effect to save preference when it changes or when user logs in/out
     useEffect(() => {
-        if (currentUser && userProfile) {
-            // User is logged in, profile is loaded. Firestore is the source of truth.
-            const profilePreference = userProfile.preferences?.menuView;
-            if (profilePreference && menuViewMode !== profilePreference) {
-                setMenuViewMode(profilePreference);
-            }
-        } else if (!currentUser) {
-            // User is a guest. LocalStorage is the source of truth.
-            const guestPreference = localStorage.getItem('santaSensacaoMenuView');
-            if ((guestPreference === 'grid' || guestPreference === 'compact') && menuViewMode !== guestPreference) {
-                setMenuViewMode(guestPreference);
+        // For guests, save to localStorage
+        if (!currentUser) {
+            localStorage.setItem('santaSensacaoMenuView', menuViewMode);
+        } else if (userProfile) {
+            // For logged-in users, save to Firebase profile if it's different
+            if (userProfile?.preferences?.menuView !== menuViewMode) {
+                firebaseService.updateUserPreferences(currentUser.uid, { menuView: menuViewMode });
             }
         }
-    }, [currentUser, userProfile, menuViewMode]);
+    }, [menuViewMode, currentUser, userProfile]);
+
+    // Effect to load preference from user profile when they log in
+    useEffect(() => {
+        if (currentUser && userProfile?.preferences?.menuView) {
+            setMenuViewMode(userProfile.preferences.menuView);
+        } else if (!currentUser) {
+            // Fallback to localStorage for guests
+            const savedView = localStorage.getItem('santaSensacaoMenuView');
+            if (savedView === 'grid' || savedView === 'compact') {
+                setMenuViewMode(savedView);
+            }
+        }
+    }, [currentUser, userProfile]);
 
 
     const scrollToTop = () => {
@@ -441,9 +353,7 @@ const App: React.FC = () => {
                                isTermsModalOpen ||
                                isHalfAndHalfModalOpen ||
                                isPixQrCodeModalOpen ||
-                               isProductDetailModalOpen ||
-                               isSupportModalOpen ||
-                               showForSaleOverlay;
+                               isProductDetailModalOpen;
     
         const handleScrollLock = () => {
             let shouldLock = false;
@@ -479,9 +389,10 @@ const App: React.FC = () => {
         isCartOpen, isCheckoutModalOpen, isReservationModalOpen, isChatbotOpen, 
         isLoginModalOpen, isUserAreaModalOpen, confirmedOrderData, confirmedReservationData, 
         isPrivacyPolicyOpen, isTermsModalOpen, isHalfAndHalfModalOpen, isPixQrCodeModalOpen,
-        isProductDetailModalOpen, isSupportModalOpen, showForSaleOverlay
+        isProductDetailModalOpen
     ]);
     
+
     const addToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
         const id = Date.now();
         setToasts(prevToasts => [...prevToasts, { id, message, type }]);
@@ -489,33 +400,6 @@ const App: React.FC = () => {
             setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
         }, 4000);
     }, []);
-
-    // "For Sale" Logic
-    const handleContinueToSite = () => {
-        sessionStorage.setItem('forSaleOverlayDismissed', 'true');
-        setShowForSaleOverlay(false);
-    };
-    
-    // Timer for recurring pop-up
-    useEffect(() => {
-        let timer: number;
-        
-        const isAnyModalOpen = isCartOpen || isCheckoutModalOpen || isReservationModalOpen || isLoginModalOpen || isUserAreaModalOpen || !!confirmedOrderData || !!confirmedReservationData || isSupportModalOpen || isChatbotOpen || isPrivacyPolicyOpen || isTermsModalOpen || isHalfAndHalfModalOpen || isPixQrCodeModalOpen || isProductDetailModalOpen;
-
-        if (!showForSaleOverlay && !showForSalePopup && !isAnyModalOpen) {
-            timer = window.setTimeout(() => {
-                setShowForSalePopup(true);
-            }, 45000); // 45 seconds
-        }
-
-        return () => window.clearTimeout(timer);
-    }, [
-        showForSaleOverlay, showForSalePopup,
-        isCartOpen, isCheckoutModalOpen, isReservationModalOpen, isLoginModalOpen, isUserAreaModalOpen,
-        confirmedOrderData, confirmedReservationData, isSupportModalOpen, isChatbotOpen,
-        isPrivacyPolicyOpen, isTermsModalOpen, isHalfAndHalfModalOpen, isPixQrCodeModalOpen, isProductDetailModalOpen
-    ]);
-
 
     // Effect to check for cookie consent on initial load
     useEffect(() => {
@@ -1259,7 +1143,6 @@ const App: React.FC = () => {
                     onRestoreProduct={handleRestoreProduct}
                     onPermanentDeleteProduct={handlePermanentDeleteProduct}
                     onBulkPermanentDeleteProducts={handleBulkPermanentDeleteProducts}
-                    onOpenSupportModal={() => setIsSupportModalOpen(true)}
                 />
             </main>
             
@@ -1358,7 +1241,6 @@ const App: React.FC = () => {
                 onShowPixQRCode={() => setIsPixQrCodeModalOpen(true)}
                 userProfile={userProfile}
                 myOrders={myOrders}
-                onOpenSalesModal={() => setIsSupportModalOpen(true)}
             />
             
             <LoginModal 
@@ -1403,25 +1285,6 @@ const App: React.FC = () => {
                 onSelectHalfAndHalf={handleSelectHalfAndHalf}
                 isStoreOnline={isStoreOnline}
             />
-            <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
-
-            {showForSaleOverlay && (
-                <ForSaleOverlay 
-                    onContinue={handleContinueToSite}
-                    onContact={() => setIsSupportModalOpen(true)}
-                    logoUrl={thebaldiLogoUrl}
-                />
-            )}
-            
-            {showForSalePopup && (
-                <ForSalePopup
-                    onClose={() => setShowForSalePopup(false)}
-                    onContact={() => {
-                        setShowForSalePopup(false);
-                        setIsSupportModalOpen(true);
-                    }}
-                />
-            )}
 
             {(isProcessingOrder) && <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8"><i className="fas fa-spinner fa-spin text-5xl text-accent"></i><p className="mt-6 font-semibold text-lg text-gray-700">Processando seu pedido...</p><p className="mt-2 text-sm text-gray-500">Por favor, aguarde um instante.</p></div></div>}
             <div aria-live="assertive" className="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start z-[100]"><div className="w-full flex flex-col items-center space-y-4 sm:items-end">{toasts.map((toast) => (<div key={toast.id} className="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden animate-fade-in-up"><div className="p-4"><div className="flex items-start"><div className="flex-shrink-0">{toast.type === 'success' ? <i className="fas fa-check-circle h-6 w-6 text-green-500"></i> : <i className="fas fa-exclamation-circle h-6 w-6 text-red-500"></i>}</div><div className="ml-3 w-0 flex-1 pt-0.5"><p className="text-sm font-medium text-gray-900">{toast.message}</p></div></div></div></div>))}</div></div>

@@ -15,7 +15,6 @@ interface ChatbotProps {
     onShowPixQRCode: () => void;
     userProfile: UserProfile | null;
     myOrders: Order[];
-    onOpenSalesModal: () => void;
 }
 
 interface ParsedMessage {
@@ -31,8 +30,6 @@ interface ParsedMessage {
         payload: {
             details: ReservationDetails;
         };
-    } | {
-        type: 'OPEN_SALES_MODAL';
     };
 }
 
@@ -41,15 +38,13 @@ const parseMessage = (content: string): ParsedMessage => {
     // Regex para os blocos de ação
     const orderActionRegex = /<ACTION_CREATE_ORDER>([\s\S]*?)<\/ACTION_CREATE_ORDER>/;
     const reservationActionRegex = /<ACTION_CREATE_RESERVATION>([\s\S]*?)<\/ACTION_CREATE_RESERVATION>/;
-    const salesModalActionRegex = /<ACTION_OPEN_SALES_MODAL\s*\/?>/;
     const orderMatch = content.match(orderActionRegex);
     const reservationMatch = content.match(reservationActionRegex);
-    const salesModalMatch = content.match(salesModalActionRegex);
 
     let action: ParsedMessage['action'] = undefined;
     
     // Remove os blocos de ação do conteúdo principal
-    const cleanContent = content.replace(orderActionRegex, '').replace(reservationActionRegex, '').replace(salesModalActionRegex, '').trim();
+    const cleanContent = content.replace(orderActionRegex, '').replace(reservationActionRegex, '').trim();
 
     if (orderMatch && orderMatch[1]) {
         try {
@@ -76,8 +71,6 @@ const parseMessage = (content: string): ParsedMessage => {
         } catch (e) {
             console.error("Falha ao analisar o JSON da ação de reserva do chatbot:", e);
         }
-    } else if (salesModalMatch) {
-        action = { type: 'OPEN_SALES_MODAL' };
     }
 
 
@@ -118,7 +111,7 @@ const parseMessage = (content: string): ParsedMessage => {
 };
 
 
-export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onSendMessage, isSending, onCreateOrder, onCreateReservation, onShowPixQRCode, userProfile, onOpenSalesModal, myOrders }) => {
+export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onSendMessage, isSending, onCreateOrder, onCreateReservation, onShowPixQRCode, userProfile, myOrders }) => {
     const [input, setInput] = useState('');
     const lastElementRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -187,7 +180,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
             <header className="flex justify-between items-center p-4 bg-brand-green-700 text-text-on-dark rounded-t-2xl flex-shrink-0">
                 <h2 className="text-lg font-bold flex items-center gap-2">
                     <i className="fas fa-robot"></i>
-                    Pizzaria THEBALDI - Assistente
+                    Sensação - Assistente Virtual
                 </h2>
                 <button onClick={onClose} className="text-text-on-dark/70 hover:text-white text-2xl" aria-label="Fechar chat">&times;</button>
             </header>
@@ -221,7 +214,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                             {msg.role === 'bot' && (
                                 <img 
                                     src={botProfilePic} 
-                                    alt="THEBALDI Bot" 
+                                    alt="Sensação Bot" 
                                     className="w-8 h-8 rounded-full border-2 border-accent object-cover flex-shrink-0" 
                                 />
                             )}
@@ -273,18 +266,6 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                                                 <span>Confirmar Reserva</span>
                                             </button>
                                         )}
-                                        {action.type === 'OPEN_SALES_MODAL' && (
-                                            <button
-                                                onClick={() => {
-                                                    onOpenSalesModal();
-                                                    setCompletedActions(prev => new Set(prev).add(index));
-                                                }}
-                                                className="w-full bg-brand-olive-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-opacity-90 transition-all flex items-center justify-center text-center"
-                                            >
-                                                <i className="fas fa-rocket mr-2"></i>
-                                                <span>Abrir Formulário de Contato</span>
-                                            </button>
-                                        )}
                                     </div>
                                 )}
                             </div>
@@ -302,12 +283,12 @@ export const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, messages, onS
                     <div ref={lastElementRef} className="flex items-end gap-2 justify-start">
                         <img 
                             src={botProfilePic} 
-                            alt="THEBALDI Bot" 
+                            alt="Sensação Bot" 
                             className="w-8 h-8 rounded-full border-2 border-accent object-cover flex-shrink-0" 
                         />
                         <div className="bg-gray-200 text-gray-800 rounded-2xl rounded-bl-none px-4 py-2">
                             <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-gray-600">Assistente está digitando</span>
+                                <span className="text-sm font-medium text-gray-600">Sensação está digitando</span>
                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
