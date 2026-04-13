@@ -18,6 +18,10 @@ jspm_packages
 dist
 dist-ssr
 *.local
+.vscode
+.agent
+.agents
+skills-lock.json
 
 # Editor directories and files
 .vscode/*
