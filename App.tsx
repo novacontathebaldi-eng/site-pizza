@@ -436,18 +436,24 @@ const App: React.FC = () => {
             const user = session?.user || null;
             setCurrentUser(user);
             if (user) {
-                const profile = await supabaseService.getUserProfile(user.id);
-                setUserProfile(profile);
-                if (profile?.name) setName(profile.name);
-                if (profile?.phone) setPhone(profile.phone);
-                // When user logs in, clear any guest address/notes data from state.
-                setNeighborhood('');
-                setStreet('');
-                setNumber('');
-                setComplement('');
-                setNotes('');
-                const isAdmin = profile?.isAdmin === true;
-                setIsCurrentUserAdmin(isAdmin);
+                try {
+                    const profile = await supabaseService.getUserProfile(user.id);
+                    setUserProfile(profile);
+                    if (profile?.name) setName(profile.name);
+                    if (profile?.phone) setPhone(profile.phone);
+                    // When user logs in, clear any guest address/notes data from state.
+                    setNeighborhood('');
+                    setStreet('');
+                    setNumber('');
+                    setComplement('');
+                    setNotes('');
+                    const isAdmin = profile?.isAdmin === true;
+                    setIsCurrentUserAdmin(isAdmin);
+                } catch (error) {
+                    console.error("Failed to load user profile", error);
+                    setUserProfile(null);
+                    setIsCurrentUserAdmin(false);
+                }
             } else {
                 setUserProfile(null);
                 // For non-logged-in users, try to load saved info from the browser.
