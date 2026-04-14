@@ -21,6 +21,7 @@ export interface UserProfile {
     name: string;
     email: string;
     photoURL: string;
+    isAdmin?: boolean;
     // User-provided info
     phone?: string;
     addresses?: Address[];

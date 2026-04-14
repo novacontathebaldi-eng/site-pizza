@@ -322,11 +322,11 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
 
     // Effect for sound notification using HTML <audio> element
     useEffect(() => {
-        if (isSoundEnabled && user && pendingOrdersCount > prevPendingOrdersCount.current) {
+        if (isSoundEnabled && isCurrentUserAdmin && pendingOrdersCount > prevPendingOrdersCount.current) {
             audioRef.current?.play().catch(error => console.error("Audio play failed:", error));
         }
         prevPendingOrdersCount.current = pendingOrdersCount;
-    }, [pendingOrdersCount, isSoundEnabled, user]);
+    }, [pendingOrdersCount, isSoundEnabled, isCurrentUserAdmin]);
 
 
     const toggleSound = () => {

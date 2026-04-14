@@ -302,7 +302,7 @@ const App: React.FC = () => {
         } else if (userProfile) {
             // For logged-in users, save to Supabase profile if it's different
             if (userProfile?.preferences?.menuView !== menuViewMode) {
-                supabaseService.updateUserPreferences(currentUser.uid, { menuView: menuViewMode });
+                supabaseService.updateUserPreferences(currentUser.id, { menuView: menuViewMode });
             }
         }
     }, [menuViewMode, currentUser, userProfile]);
@@ -447,7 +447,7 @@ const App: React.FC = () => {
                 setNumber('');
                 setComplement('');
                 setNotes('');
-                const isAdmin = session?.user?.app_metadata?.claims_admin === true || session?.user?.email === 'suporte@thebaldi.com';
+                const isAdmin = profile?.isAdmin === true;
                 setIsCurrentUserAdmin(isAdmin);
             } else {
                 setUserProfile(null);

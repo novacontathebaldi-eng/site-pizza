@@ -52,7 +52,7 @@ export const updateProduct = async (productId: string, productData: Partial<Prod
 export const updateProductStatus = async (productId: string, active: boolean): Promise<void> => {
     const { error } = await supabase
         .from('products')
-        .update({ active })
+        .update({ is_active: active })
         .eq('id', productId);
     if (error) throw new Error(error.message);
 };
@@ -68,7 +68,7 @@ export const updateProductStockStatus = async (productId: string, stockStatus: '
 export const deleteProduct = async (productId: string): Promise<void> => {
     const { error } = await supabase
         .from('products')
-        .update({ deleted: true })
+        .update({ is_deleted: true })
         .eq('id', productId);
     if (error) throw new Error(error.message);
 };
@@ -76,7 +76,7 @@ export const deleteProduct = async (productId: string): Promise<void> => {
 export const restoreProduct = async (productId: string): Promise<void> => {
     const { error } = await supabase
         .from('products')
-        .update({ deleted: false })
+        .update({ is_deleted: false })
         .eq('id', productId);
     if (error) throw new Error(error.message);
 };
@@ -92,7 +92,7 @@ export const permanentDeleteProduct = async (productId: string): Promise<void> =
 export const bulkDeleteProducts = async (productIds: string[]): Promise<void> => {
     const { error } = await supabase
         .from('products')
-        .update({ deleted: true })
+        .update({ is_deleted: true })
         .in('id', productIds);
     if (error) throw new Error(error.message);
 };
@@ -136,7 +136,7 @@ export const updateCategory = async (categoryId: string, categoryData: Partial<C
 export const updateCategoryStatus = async (categoryId: string, active: boolean): Promise<void> => {
     const { error } = await supabase
         .from('categories')
-        .update({ active })
+        .update({ is_active: active })
         .eq('id', categoryId);
     if (error) throw new Error(error.message);
 };
@@ -310,7 +310,7 @@ export const verifyGoogleTokenAndSignIn = async (idToken: string): Promise<void>
 
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
     const { data, error } = await supabase
-        .from('users')
+        .from('profiles')
         .select('*')
         .eq('id', uid)
         .single();
@@ -321,21 +321,21 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
 export const createUserProfile = async (user: any, name: string, phone: string): Promise<void> => {
     const profile = {
         id: user.id,
-        name: name || user.user_metadata?.full_name || 'Usuário',
+        name: name || user.user_metadata?.display_name || user.user_metadata?.full_name || 'Usuário',
         email: user.email || '',
         photo_url: user.user_metadata?.avatar_url || '',
         phone: phone || '',
         addresses: [],
     };
     const { error } = await supabase
-        .from('users')
-        .upsert(profile);
+        .from('profiles')
+        .upsert(profile, { onConflict: 'id' });
     if (error) throw new Error(error.message);
 };
 
 export const updateUserProfile = async (uid: string, data: Partial<Pick<UserProfile, 'name' | 'phone'>>): Promise<void> => {
     const { error } = await supabase
-        .from('users')
+        .from('profiles')
         .update(toSnake(data))
         .eq('id', uid);
     if (error) throw new Error(error.message);
@@ -343,7 +343,7 @@ export const updateUserProfile = async (uid: string, data: Partial<Pick<UserProf
 
 export const updateUserPreferences = async (uid: string, preferences: { menuView: 'grid' | 'compact' }): Promise<void> => {
     const { error } = await supabase
-        .from('users')
+        .from('profiles')
         .update({ preferences: toSnake(preferences) })
         .eq('id', uid);
     if (error) throw new Error(error.message);
@@ -351,7 +351,7 @@ export const updateUserPreferences = async (uid: string, preferences: { menuView
 
 export const addAddress = async (uid: string, address: Omit<Address, 'id'>): Promise<void> => {
     const newAddress = { ...address, id: crypto.randomUUID() };
-    const { data } = await supabase.from('users').select('addresses').eq('id', uid).single();
+    const { data } = await supabase.from('profiles').select('addresses').eq('id', uid).single();
     let addresses = data?.addresses || [];
     
     if (newAddress.isFavorite) {
@@ -361,14 +361,14 @@ export const addAddress = async (uid: string, address: Omit<Address, 'id'>): Pro
     addresses.push(newAddress);
     
     const { error } = await supabase
-        .from('users')
+        .from('profiles')
         .update({ addresses })
         .eq('id', uid);
     if (error) throw new Error(error.message);
 };
 
 export const updateAddress = async (uid: string, address: Address): Promise<void> => {
-    const { data } = await supabase.from('users').select('addresses').eq('id', uid).single();
+    const { data } = await supabase.from('profiles').select('addresses').eq('id', uid).single();
     if (data) {
         let addresses = data.addresses || [];
         if (address.isFavorite) {
@@ -380,18 +380,18 @@ export const updateAddress = async (uid: string, address: Address): Promise<void
         } else {
             addresses.push(address);
         }
-        await supabase.from('users').update({ addresses }).eq('id', uid);
+        await supabase.from('profiles').update({ addresses }).eq('id', uid);
     }
 };
 
 export const deleteAddress = async (uid: string, addressId: string): Promise<void> => {
-    const { data } = await supabase.from('users').select('addresses').eq('id', uid).single();
+    const { data } = await supabase.from('profiles').select('addresses').eq('id', uid).single();
     if (data) {
         let addresses = (data.addresses || []).filter((a: any) => a.id !== addressId);
         if (addresses.length > 0 && !addresses.some((a: any) => a.isFavorite)) {
             addresses[0].isFavorite = true;
         }
-        await supabase.from('users').update({ addresses }).eq('id', uid);
+        await supabase.from('profiles').update({ addresses }).eq('id', uid);
     }
 };
 
@@ -452,12 +452,12 @@ export const subscribeCategories = (onData: (cats: Category[]) => void, onError:
 };
 
 export const subscribeProducts = (onData: (prods: Product[]) => void, onError: (err: any) => void) => {
-    supabase.from('products').select('*').order('sort_order').then(({ data, error }) => {
+    supabase.from('products').select('*').eq('is_deleted', false).order('sort_order').then(({ data, error }) => {
         if (error) onError(error); else if (data) onData(toCamel(data));
     });
     const channel = supabase.channel('products_chan')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
-            supabase.from('products').select('*').order('sort_order').then(({ data, error }) => {
+            supabase.from('products').select('*').eq('is_deleted', false).order('sort_order').then(({ data, error }) => {
                 if (!error && data) onData(toCamel(data));
             });
         }).subscribe();
@@ -487,12 +487,12 @@ export const subscribeOrders = (isAdmin: boolean, uid: string | undefined, onDat
 };
 
 export const subscribeUser = (uid: string, onData: (profile: UserProfile | null) => void) => {
-    supabase.from('users').select('*').eq('id', uid).single().then(({ data, error }) => {
+    supabase.from('profiles').select('*').eq('id', uid).single().then(({ data, error }) => {
         onData(error || !data ? null : toCamel(data));
     });
-    const channel = supabase.channel('users_chan_' + uid)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `id=eq.${uid}` }, () => {
-            supabase.from('users').select('*').eq('id', uid).single().then(({ data, error }) => {
+    const channel = supabase.channel('profiles_chan_' + uid)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${uid}` }, () => {
+            supabase.from('profiles').select('*').eq('id', uid).single().then(({ data, error }) => {
                 onData(error || !data ? null : toCamel(data));
             });
         }).subscribe();
