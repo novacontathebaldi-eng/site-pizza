@@ -5,9 +5,10 @@ import { supabase } from '@/services/supabase';
 /**
  * Função para fazer upload de imagem diretamente para o Supabase Storage.
  * @param {File} arquivo - Arquivo de imagem selecionado pelo input.
+ * @param {string} bucket - Opcional. Nome do bucket (padrão: 'site').
  * @returns {Promise<string>} - A URL pública da imagem após o upload.
  */
-export async function uploadImagem(arquivo) {
+export async function uploadImagem(arquivo, bucketName = 'site') {
   try {
     // Validação 1: Arquivo existe?
     if (!arquivo) {
@@ -30,11 +31,11 @@ export async function uploadImagem(arquivo) {
     const nomeOriginal = arquivo.name.replace(/[^a-zA-Z0-9.-]/g, '_').toLowerCase();
     const nomeArquivo = `${timestamp}_${nomeOriginal}`;
 
-    console.log('⏳ Enviando para o Supabase Storage...', nomeArquivo);
+    console.log(`⏳ Enviando para o Supabase Storage (Bucket: ${bucketName})...`, nomeArquivo);
 
-    // Faz o upload do arquivo diretamente para o bucket 'sitepizza' no Supabase.
+    // Faz o upload do arquivo diretamente para o bucket no Supabase.
     const { data, error } = await supabase.storage
-      .from('sitepizza') // Nome do seu bucket no Supabase
+      .from(bucketName)
       .upload(nomeArquivo, arquivo, {
         cacheControl: '3600', // Cache de 1 hora
         upsert: false, // Não sobrescreve se o arquivo já existir
@@ -47,7 +48,7 @@ export async function uploadImagem(arquivo) {
 
     // Se o upload foi bem-sucedido, pega a URL pública do arquivo.
     const { data: { publicUrl } } = supabase.storage
-      .from('sitepizza')
+      .from(bucketName)
       .getPublicUrl(nomeArquivo);
 
     console.log('✅ Upload bem-sucedido!');
@@ -58,7 +59,7 @@ export async function uploadImagem(arquivo) {
 
   } catch (erro) {
     // Em caso de qualquer erro no processo, exibe no console e lança para a UI.
-    console.error('❌ Erro no upload:', erro.message);
+    console.error(`❌ Erro no upload (Bucket: ${bucketName}):`, erro.message);
     throw erro;
   }
 }

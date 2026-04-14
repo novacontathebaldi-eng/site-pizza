@@ -38,10 +38,10 @@ export interface Product {
     prices: { [key: string]: number };
     imageUrl: string;
     badge?: string;
-    active: boolean;
-    orderIndex: number;
+    isActive: boolean;
+    sortOrder: number;
     stockStatus?: 'available' | 'out_of_stock';
-    deleted?: boolean;
+    isDeleted?: boolean;
     isPromotion?: boolean;
     promotionalPrices?: { [key: string]: number };
 }
@@ -49,8 +49,8 @@ export interface Product {
 export interface Category {
     id: string;
     name: string;
-    order: number;
-    active: boolean;
+    sortOrder: number;
+    isActive: boolean;
 }
 
 export interface CartItem {

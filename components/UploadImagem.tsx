@@ -1,7 +1,12 @@
 import React, { useState, ChangeEvent } from 'react';
 import { uploadImagem } from '../src/utils/uploadImagem';
 
-export function UploadImagem() {
+interface UploadImagemProps {
+    bucket?: string;
+    onUploadComplete?: (url: string) => void;
+}
+
+export function UploadImagem({ bucket = 'site', onUploadComplete }: UploadImagemProps) {
     const [status, setStatus] = useState('');
     const [url, setUrl] = useState('');
     const [preview, setPreview] = useState('');
@@ -23,13 +28,14 @@ export function UploadImagem() {
             const objectUrl = URL.createObjectURL(arquivo);
             setPreview(objectUrl);
 
-            const novaUrl = await uploadImagem(arquivo);
+            const novaUrl = await uploadImagem(arquivo, bucket);
 
             // It's good practice to revoke the object URL after use
             URL.revokeObjectURL(objectUrl);
             setUrl(novaUrl);
             setPreview(novaUrl); // Now set the permanent URL as preview
             setStatus('✅ Upload concluído com sucesso!');
+            onUploadComplete?.(novaUrl);
         } catch (erro: any) {
             setStatus(`❌ Erro: ${erro.message}`);
             setPreview(''); // Clear preview on error

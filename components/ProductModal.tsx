@@ -13,14 +13,14 @@ interface ProductModalProps {
 }
 
 export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, product, categories }) => {
-    const getInitialFormData = (): Omit<Product, 'id' | 'active'> => ({
+    const getInitialFormData = (): Omit<Product, 'id' | 'isActive'> => ({
         name: '',
         description: '',
         categoryId: categories.length > 0 ? categories[0].id : '',
         prices: {},
         imageUrl: '',
         badge: '',
-        orderIndex: 0,
+        sortOrder: 0,
         stockStatus: 'available',
         isPromotion: false,
         promotionalPrices: {},

@@ -9,7 +9,7 @@ interface CategoryModalProps {
 }
 
 export const CategoryModal: React.FC<CategoryModalProps> = ({ isOpen, onClose, onSave, category }) => {
-    const getInitialFormData = (): Omit<Category, 'id' | 'active' | 'order'> => ({
+    const getInitialFormData = (): Omit<Category, 'id' | 'isActive' | 'sortOrder'> => ({
         name: '',
     });
     
@@ -32,8 +32,8 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({ isOpen, onClose, o
         const finalCategory: Category = {
             id: category?.id || '',
             name: name,
-            active: category?.active ?? true,
-            order: category?.order ?? 0, // A ordem será definida pelo serviço
+            isActive: category?.isActive ?? true,
+            sortOrder: category?.sortOrder ?? 0, // A ordem será definida pelo serviço
         };
         onSave(finalCategory);
         onClose();
