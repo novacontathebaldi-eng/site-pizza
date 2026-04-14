@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { SiteSettings } from '../types';
-import firebase from 'firebase/compat/app';
+import { User } from '@supabase/supabase-js';
 import defaultProfilePic from '../assets/perfil.png';
 
 interface HeaderProps {
@@ -9,13 +10,13 @@ interface HeaderProps {
     onOpenChatbot: () => void;
     activeSection: string;
     settings: SiteSettings;
-    user: firebase.User | null;
+    user: User | null;
     onUserIconClick: () => void;
-    // FIX: Added isAuthLoading to the component's props to handle the loading state of authentication.
     isAuthLoading: boolean;
+    isAdmin: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOpenChatbot, activeSection, settings, user, onUserIconClick, isAuthLoading }) => {
+export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOpenChatbot, activeSection, settings, user, onUserIconClick, isAuthLoading, isAdmin }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
 
@@ -67,12 +68,16 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOp
                     </nav>
 
                     <div className="flex items-center gap-2 sm:gap-3">
-                        {/* FIX: The user icon button now displays a loading spinner when isAuthLoading is true. */}
+                        {isAdmin && (
+                            <Link to="/admin" className="w-12 h-12 flex items-center justify-center rounded-full bg-brand-gold-600 hover:bg-brand-gold-700 transition-colors" aria-label="Painel Administrativo" title="Painel Admin">
+                                <i className="fas fa-shield-alt text-xl text-white"></i>
+                            </Link>
+                        )}
                         <button onClick={onUserIconClick} className="relative w-12 h-12 flex items-center justify-center rounded-full bg-brand-olive-600 hover:bg-opacity-80 transition-colors" aria-label="Minha Conta" disabled={isAuthLoading}>
                             {isAuthLoading ? (
                                 <i className="fas fa-spinner fa-spin text-2xl"></i>
                             ) : user ? (
-                                <img src={user.photoURL || defaultProfilePic} alt="Foto de perfil" className="w-full h-full rounded-full object-cover border-2 border-brand-gold-600" />
+                                <img src={defaultProfilePic} alt="Foto de perfil" className="w-full h-full rounded-full object-cover border-2 border-brand-gold-600" />
                             ) : (
                                 <i className="fas fa-user-circle text-2xl"></i>
                             )}

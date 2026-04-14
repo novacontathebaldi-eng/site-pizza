@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Order } from '../types';
-import { db } from '../services/firebase';
+import { supabase } from '../services/supabase';
 
 interface PixPaymentModalProps {
     order: Order | null;
@@ -60,19 +60,24 @@ export const PixPaymentModal: React.FC<PixPaymentModalProps> = ({ order, onClose
 
     // Effect to listen for payment confirmation in real-time
     useEffect(() => {
-        if (!order || !db || !onPaymentSuccess) return;
+        if (!order || !onPaymentSuccess) return;
 
-        const unsubscribe = db.collection('orders').doc(order.id)
-            .onSnapshot(doc => {
-                const updatedOrderData = doc.data();
-                if (updatedOrderData && updatedOrderData.paymentStatus === 'paid_online') {
-                    const fullOrder: Order = { id: doc.id, ...updatedOrderData } as Order;
-                    onPaymentSuccess(fullOrder);
-                    if (timerRef.current) clearInterval(timerRef.current);
+        const unsubscribe = supabase
+            .channel(`order-payment-${order.id}`)
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${order.id}` },
+                (payload) => {
+                    const updatedOrderData = payload.new as Order;
+                    if (updatedOrderData && updatedOrderData.paymentStatus === 'paid') {
+                        onPaymentSuccess(updatedOrderData);
+                        if (timerRef.current) clearInterval(timerRef.current);
+                    }
                 }
-            });
+            )
+            .subscribe();
 
-        return () => unsubscribe();
+        return () => { supabase.removeChannel(unsubscribe); };
     }, [order, onPaymentSuccess]);
     
     const handleCopyToClipboard = () => {

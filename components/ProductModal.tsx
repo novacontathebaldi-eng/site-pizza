@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Product, Category } from '../types';
-import * as firebaseService from '../services/firebaseService';
+import * as supabaseService from '../services/supabaseService';
 import { CameraModal } from './CameraModal';
-import firebase from 'firebase/compat/app';
 import { uploadImagem } from '../src/utils/uploadImagem';
-
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -159,13 +157,13 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 if (isNewProduct) {
                     delete dataToSave.promotionalPrices;
                 } else {
-                    dataToSave.promotionalPrices = firebase.firestore.FieldValue.delete();
+                    dataToSave.promotionalPrices = null;
                 }
             }
             
             // Garante a remoção do campo `promotionalPrice` antigo em atualizações
             if (!isNewProduct) {
-                dataToSave.promotionalPrice = firebase.firestore.FieldValue.delete();
+                dataToSave.promotionalPrice = null;
             } else {
                 delete dataToSave.promotionalPrice;
             }

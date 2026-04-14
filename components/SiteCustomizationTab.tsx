@@ -60,7 +60,7 @@ const ImageUploader: React.FC<{
 }> = ({ label, imageUrl, onUrlChange, onFileChange, onRemove }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState(imageUrl);
-    const isCustomUpload = imageUrl && imageUrl.includes('firebasestorage.googleapis.com');
+    const isCustomUpload = imageUrl && (imageUrl.includes('supabase.co/storage') || imageUrl.includes('supabase.in/storage'));
 
     useEffect(() => {
         // If imageUrl is a blob url, don't update preview from props
@@ -207,7 +207,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
             const oldIndex = formData.contentSections.findIndex(s => s.id === active.id);
             const newIndex = formData.contentSections.findIndex(s => s.id === over.id);
             const reorderedSections = arrayMove(formData.contentSections, oldIndex, newIndex);
-            setFormData({ ...formData, contentSections: reorderedSections.map((s, i) => ({...s, order: i})) });
+            setFormData({ ...formData, contentSections: reorderedSections.map((s: any, i) => ({...s, order: i})) });
         }
     };
 

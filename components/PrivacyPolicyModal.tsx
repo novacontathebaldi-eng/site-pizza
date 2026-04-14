@@ -49,7 +49,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, 
                     </ul>
 
                     <h3 className="text-lg font-bold text-text-on-light pt-2">5. Armazenamento e Segurança</h3>
-                    <p>Suas informações são armazenadas de forma segura em servidores do Google Firebase. Implementamos medidas de segurança técnicas e organizacionais para proteger seus dados contra acesso não autorizado, alteração ou destruição.</p>
+                    <p>Suas informações são armazenadas de forma segura em servidores protegidos com criptografia. Implementamos medidas de segurança técnicas e organizacionais para proteger seus dados contra acesso não autorizado, alteração ou destruição.</p>
                     
                     <h3 className="text-lg font-bold text-text-on-light pt-2">6. Uso de Cookies</h3>
                     <p>Nosso site utiliza cookies essenciais para o seu funcionamento. Cookies são pequenos arquivos de texto armazenados em seu dispositivo que nos ajudam a:</p>

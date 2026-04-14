@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-// FIX: The 'Partial' type is a built-in TypeScript utility and does not need to be imported.
+import { useNavigate } from 'react-router-dom';
 import { Product, Category, SiteSettings, Order, OrderStatus, PaymentStatus, DaySchedule } from '../types';
 import { ProductModal } from './ProductModal';
 import { CategoryModal } from './CategoryModal';
@@ -8,8 +8,7 @@ import { OrderCard } from './OrderCard';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import firebase from 'firebase/compat/app';
-import { auth } from '../services/firebase';
+import { supabase } from '../services/supabase';
 import { SupportModal } from './SupportModal';
 import notificationSound from '../assets/notf1.mp3';
 import { UploadImagem } from './UploadImagem';
@@ -197,14 +196,8 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         isCurrentUserAdmin
     } = props;
     
-    const [user, setUser] = useState<firebase.User | null>(null);
-    const [authLoading, setAuthLoading] = useState(true);
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('status');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState<string | React.ReactNode>('');
-    const [showAdminPanel, setShowAdminPanel] = useState(window.location.hash === '#admin');
-    const [isLoggingIn, setIsLoggingIn] = useState(false);
     
     const [localProducts, setLocalProducts] = useState<Product[]>(allProducts);
     const [localCategories, setLocalCategories] = useState<Category[]>(allCategories);
@@ -267,21 +260,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     useEffect(() => setLocalProducts(allProducts), [allProducts]);
     useEffect(() => setLocalCategories([...allCategories].sort((a, b) => a.order - b.order)), [allCategories]);
 
-    useEffect(() => {
-        if (!auth) {
-            setError("Falha na conexão com o serviço de autenticação.");
-            setAuthLoading(false);
-            return;
-        }
-        const unsubscribe = auth.onAuthStateChanged(user => { setUser(user); setAuthLoading(false); });
-        return () => unsubscribe();
-    }, []);
 
-    useEffect(() => {
-        const handleHashChange = () => setShowAdminPanel(window.location.hash === '#admin');
-        window.addEventListener('hashchange', handleHashChange, false);
-        return () => window.removeEventListener('hashchange', handleHashChange, false);
-    }, []);
     
     // Clear selection when leaving trash view
     useEffect(() => {
@@ -398,39 +377,8 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         onReorderCategories(reordered.map((c: Category, index) => ({ id: c.id, order: index })));
     };
     
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-        setIsLoggingIn(true);
-        if (!auth) {
-            setError('Serviço de autenticação não disponível.');
-            setIsLoggingIn(false);
-            return;
-        }
-        try {
-            await auth.signInWithEmailAndPassword(email, password);
-        } catch (err: any) {
-             let friendlyMessage: string | React.ReactNode = 'Ocorreu um erro inesperado.';
-            switch (err.code) {
-                case 'auth/user-not-found':
-                case 'auth/wrong-password':
-                case 'auth/invalid-credential':
-                     friendlyMessage = (
-                        <div className="text-center text-sm"><p className="font-bold">Acesso negado.</p><p className="mt-2">Se você é um administrador e está com problemas, entre em contato com o suporte.</p><button type="button" onClick={() => setIsSupportModalOpen(true)} className="mt-4 w-full bg-brand-olive-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-opacity-90"><i className="fas fa-envelope mr-2"></i>Entrar em Contato</button></div>
-                    );
-                    break;
-                case 'auth/invalid-email': friendlyMessage = 'O formato do e-mail é inválido.'; break;
-                case 'auth/network-request-failed': friendlyMessage = 'Erro de rede. Verifique sua conexão.'; break;
-            }
-            setError(friendlyMessage);
-        } finally {
-            setIsLoggingIn(false);
-        }
-    };
-    
     const handleLogout = async () => {
-        if (!auth) return;
-        try { await auth.signOut(); setEmail(''); setPassword(''); window.location.hash = ''; }
+        try { await supabase.auth.signOut(); navigate('/'); }
         catch (error) { console.error("Error signing out: ", error); }
     };
 
@@ -669,11 +617,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
     };
 
 
-    if (!showAdminPanel) return null;
-    if (authLoading) return <section id="admin" className="py-20 bg-brand-ivory-50"><div className="text-center"><i className="fas fa-spinner fa-spin text-4xl text-accent"></i></div></section>;
-    if (!user) return (<> <section id="admin" className="py-20 bg-brand-ivory-50"> <div className="container mx-auto px-4 max-w-md"> <div className="bg-white p-8 rounded-2xl shadow-lg border"> <h2 className="text-3xl font-bold text-center mb-6"><i className="fas fa-shield-alt mr-2"></i>Painel</h2> <form onSubmit={handleLogin}> <div className="mb-4"> <label className="block font-semibold mb-2" htmlFor="admin-email">Email</label> <input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> <div className="mb-6"> <label className="block font-semibold mb-2" htmlFor="admin-password">Senha</label> <input id="admin-password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent" required disabled={isLoggingIn} /> </div> {error && <div className="text-red-600 mb-4 bg-red-50 p-3 rounded-lg border border-red-200">{error}</div>} <button type="submit" className="w-full bg-accent text-white font-bold py-3 rounded-lg hover:bg-opacity-90 disabled:bg-opacity-70 flex justify-center" disabled={isLoggingIn}>{isLoggingIn ? <i className="fas fa-spinner fa-spin"></i> : 'Entrar'}</button> </form> </div> </div> </section> <SupportModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} /> </>);
-    
-    if (!isCurrentUserAdmin) return null;
+
 
     const OrderStatusTabs: OrderTabKey[] = ['accepted', 'reserved', 'pronto', 'emRota', 'completed', 'cancelled'];
 

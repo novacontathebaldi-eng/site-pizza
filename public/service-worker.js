@@ -2,9 +2,9 @@
 
 const CACHE_NAME = 'image-cache-v1';
 
-// We will cache images from Firebase Storage and the placeholder service.
+// We will cache images from Supabase Storage and the placeholder service.
 const IMAGE_URL_PATTERNS = [
-  /^https:\/\/firebasestorage\.googleapis\.com/,
+  /^https:\/\/.*\.supabase\.co\/storage/,
   /^https:\/\/picsum\.photos/,
 ];
 

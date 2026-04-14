@@ -1,5 +1,3 @@
-import firebase from 'firebase/compat/app';
-
 // FIX: The type `Partial` is a built-in TypeScript utility type and does not need to be imported or exported.
 // The incorrect export from 'react' has been removed.
 
@@ -132,7 +130,7 @@ export interface Order {
     notes?: string;
     status: OrderStatus;
     paymentStatus: PaymentStatus;
-    createdAt: firebase.firestore.Timestamp | any; // Firestore Timestamp
+    createdAt: string | null; // ISO string for timestamp
     pickupTimeEstimate?: string;
     numberOfPeople?: number;
     // FIX: Added optional mercadoPagoDetails to support the PIX payment flow, resolving type errors in PixPaymentModal.tsx.

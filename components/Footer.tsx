@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { SiteSettings, DaySchedule } from '../types';
 
 interface FooterProps {
@@ -6,6 +7,7 @@ interface FooterProps {
     onOpenChatbot: () => void;
     onOpenPrivacyPolicy: () => void;
     onUserAreaClick: () => void;
+    isAdmin: boolean;
 }
 
 // Helper function to process operating hours into structured groups
@@ -94,11 +96,11 @@ const formatOperatingHours = (operatingHours?: DaySchedule[]): string[] => {
 };
 
 
-export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot, onOpenPrivacyPolicy, onUserAreaClick }) => {
+export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot, onOpenPrivacyPolicy, onUserAreaClick, isAdmin }) => {
     
     const visibleLinks = settings.footerLinks?.filter(link => link.isVisible !== false) ?? [];
     const socialLinks = visibleLinks.filter(link => link.icon.startsWith('fab'));
-    const otherLinks = visibleLinks.filter(link => !link.icon.startsWith('fab') && link.url !== '#admin');
+    const otherLinks = visibleLinks.filter(link => !link.icon.startsWith('fab') && link.url !== '/admin');
     const operatingHoursParts = formatOperatingHours(settings.operatingHours);
 
     return (
@@ -172,6 +174,14 @@ export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot, onOpenP
                                     <span>Política de Privacidade</span>
                                 </button>
                             </li>
+                            {isAdmin && (
+                                <li>
+                                    <Link to="/admin" className="inline-flex items-center gap-2 hover:text-white transition-colors">
+                                        <i className="fas fa-shield-alt mr-1 text-accent"></i>
+                                        <span>Painel Administrativo</span>
+                                    </Link>
+                                </li>
+                            )}
                         </ul>
                     </div>
                 </div>

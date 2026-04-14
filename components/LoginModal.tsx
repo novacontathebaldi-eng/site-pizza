@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from '../services/firebase';
-import * as firebaseService from '../services/firebaseService';
-import firebase from 'firebase/compat/app';
+import { supabase } from '../services/supabase';
+import * as supabaseService from '../services/supabaseService';
 
 interface LoginModalProps {
     isOpen: boolean;
@@ -66,66 +65,59 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
         setError('');
         setIsLoading(true);
 
-        if (!auth) {
-            setError('Serviço de autenticação indisponível.');
-            setIsLoading(false);
-            return;
-        }
-
         try {
-            await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-
             if (view === 'register') {
                 if (name.trim().length < 2) throw { code: 'auth/invalid-name' };
                 
-                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-                const user = userCredential.user;
-                if (user) {
-                    await user.updateProfile({ displayName: name });
-                    await firebaseService.createUserProfile(user, name, phone);
-                    await user.sendEmailVerification();
+                const { data, error: signUpError } = await supabase.auth.signUp({ 
+                    email, 
+                    password, 
+                    options: { data: { display_name: name, phone } } 
+                });
+                if (signUpError) throw signUpError;
+                
+                if (data?.user) {
+                    // Update user profile in Supabase table
+                    await supabaseService.createUserProfile(data.user, name, phone);
                     addToast('Conta criada! Um e-mail de verificação foi enviado.', 'success');
                     onRegisterSuccess();
                 }
             } else { // Login
-                await auth.signInWithEmailAndPassword(email, password);
+                const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+                if (signInError) throw signInError;
                 addToast('Login efetuado com sucesso!', 'success');
                 onClose();
             }
         } catch (err: any) {
             let friendlyMessage = 'Ocorreu um erro inesperado.';
-            switch (err.code) {
+            switch (err.code || err.message) {
                 case 'auth/invalid-name': friendlyMessage = 'Por favor, insira um nome válido.'; break;
                 case 'auth/invalid-cpf': friendlyMessage = 'O CPF inserido não é válido.'; break;
-                case 'auth/email-already-in-use': friendlyMessage = 'Este e-mail já está em uso.'; break;
-                case 'auth/invalid-email': friendlyMessage = 'O formato do e-mail é inválido.'; break;
-                case 'auth/weak-password': friendlyMessage = 'A senha deve ter pelo menos 6 caracteres.'; break;
-                case 'auth/user-not-found':
-                case 'auth/wrong-password':
-                case 'auth/invalid-credential': friendlyMessage = 'E-mail ou senha incorretos.'; break;
+                case 'User already registered': friendlyMessage = 'Este e-mail já está em uso.'; break;
+                case 'invalid_credentials':
+                case 'Invalid login credentials': friendlyMessage = 'E-mail ou senha incorretos.'; break;
             }
             setError(friendlyMessage);
         } finally {
             setIsLoading(false);
         }
     };
+
     
     const handlePasswordResetRequest = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setFeedback({ message: '', type: 'info' });
         setIsLoading(true);
-        if (!auth) {
-            setError('Serviço de autenticação indisponível.');
-            setIsLoading(false);
-            return;
-        }
         try {
-            await auth.sendPasswordResetEmail(email);
+            const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: `${window.location.origin}${window.location.pathname}?reset=true`,
+            });
+            if (resetError) throw resetError;
             setFeedback({ message: 'Link enviado! Verifique sua caixa de entrada e spam.', type: 'success' });
         } catch (err: any) {
             let friendlyMessage = 'Ocorreu um erro.';
-            if (err.code === 'auth/user-not-found') {
+            if (err.message?.includes('User not found') || err.code === 'user_not_found') {
                 friendlyMessage = 'E-mail não encontrado em nosso sistema.';
             }
             setError(friendlyMessage);
@@ -135,18 +127,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
     };
 
     const verifyResetCode = async (code: string) => {
-        if (!auth) {
-            setResetStatus('error');
-            setError('Serviço de autenticação indisponível.');
-            return;
-        }
-        try {
-            await auth.verifyPasswordResetCode(code);
-            setResetStatus('form');
-        } catch (error) {
-            setResetStatus('error');
-            setError('Link inválido ou expirado. Por favor, solicite um novo link de redefinição.');
-        }
+        // Obsolete in Supabase flow (handled by URL hash) 
+        // We'll just transition to the form.
+        setResetStatus('form');
     };
 
     const handleConfirmPasswordReset = async (e: React.FormEvent) => {
@@ -156,17 +139,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
             setError('As senhas não coincidem.');
             return;
         }
-        if (!passwordResetCode) {
-            setError('Código de redefinição inválido. Tente novamente.');
-            return;
-        }
         setIsLoading(true);
         try {
-            await auth.confirmPasswordReset(passwordResetCode, newPassword);
+            const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+            if (updateError) throw updateError;
             setResetStatus('success');
         } catch (err: any) {
             let friendlyMessage = 'Não foi possível redefinir a senha.';
-            if (err.code === 'auth/weak-password') {
+            if (err.message?.includes('weak_password')) {
                 friendlyMessage = 'A senha é muito fraca. Use pelo menos 6 caracteres.';
             }
             setError(friendlyMessage);

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import firebase from 'firebase/compat/app';
+import { User } from '@supabase/supabase-js';
 import { UserProfile, Order, OrderStatus, Address } from '../types';
-import { db } from '../services/firebase';
-import * as firebaseService from '../services/firebaseService';
+import { supabase } from '../services/supabase';
+import * as supabaseService from '../services/supabaseService';
 import defaultProfilePic from '../assets/perfil.png';
 import userAreaBackground from '../assets/fundocliente.png';
 import { OrderDetailsModal } from './OrderDetailsModal';
@@ -12,7 +12,7 @@ const LOCALIDADES = ['Centro', 'Olaria', 'Vila Nova', 'Moxafongo', 'Cocal', 'Fun
 
 const formatTimestamp = (timestamp: any, includeTime: boolean = false): string => {
     if (!timestamp) return 'N/A';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const date = new Date(timestamp);
     const options: Intl.DateTimeFormatOptions = {
         day: '2-digit',
         month: '2-digit',
@@ -257,7 +257,7 @@ const AddressForm: React.FC<{
 
 interface UserProfileTabProps {
     profile: UserProfile;
-    user: firebase.User;
+    user: User;
     onLogout: () => void;
     handleResendVerification: () => Promise<void>;
     handleProfileUpdate: (e: React.FormEvent) => Promise<void>;
@@ -310,7 +310,7 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
         setImageToCrop(null);
         setIsPhotoUploading(true);
         try {
-            await firebaseService.manageProfilePicture(croppedImageBase64);
+            await supabaseService.manageProfilePicture(croppedImageBase64);
             addToast('Foto de perfil atualizada!', 'success');
         } catch (error) {
             console.error(error);
@@ -327,7 +327,7 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
         }
         setIsPhotoUploading(true);
         try {
-            await firebaseService.manageProfilePicture(null);
+            await supabaseService.manageProfilePicture(null);
             addToast('Foto de perfil removida.', 'success');
         } catch (error) {
             console.error(error);
@@ -367,7 +367,7 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
                <i className="fas fa-sign-out-alt mr-2"></i>Sair
             </button>
         </div>
-         {!user.emailVerified && (
+         {user.email && !user.email_confirmed_at && (
             <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 text-sm" role="alert">
                 <p className="font-bold">Verifique seu e-mail!</p>
                 <p>Enviamos um link de confirmação para você. Verifique sua caixa de entrada ou spam.</p>
@@ -425,7 +425,7 @@ const MyOrdersTab: React.FC<MyOrdersTabProps> = ({ myOrders, isLoadingOrders, on
         const CompletedStatusBanner = () => {
             if (order.status !== 'completed') return null;
 
-            const orderDate = order.createdAt?.toDate ? order.createdAt.toDate() : new Date();
+            const orderDate = order.createdAt ? new Date(order.createdAt) : new Date();
             const today = new Date();
             
             orderDate.setHours(0, 0, 0, 0);
@@ -588,7 +588,7 @@ const MyAddressesTab: React.FC<MyAddressesTabProps> = ({
 interface UserAreaModalProps {
     isOpen: boolean;
     onClose: () => void;
-    user: firebase.User | null;
+    user: User | null;
     profile: UserProfile | null;
     onLogout: () => void;
     addToast: (message: string, type: 'success' | 'error') => void;
@@ -636,30 +636,34 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
 
 
     useEffect(() => {
-        if (!isOpen || !user || !db) {
+        if (!isOpen || !user) {
             setMyOrders([]);
             return;
         }
 
         if (activeTab === 'orders') {
             setIsLoadingOrders(true);
-            const query = db.collection('orders').where('userId', '==', user.uid).limit(25);
-            const unsubscribe = query.onSnapshot(snapshot => {
-                const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-                
-                fetchedOrders.sort((a, b) => {
-                    const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
-                    const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
-                    return dateB - dateA;
-                });
+            const unsubscribe = supabaseService.subscribeOrders(
+                false,
+                user.id,
+                (orders) => {
+                    const fetchedOrders = [...orders];
 
-                setMyOrders(fetchedOrders);
-                setIsLoadingOrders(false);
-            }, error => {
-                console.error("Error fetching user orders:", error);
-                addToast("Erro ao buscar seus pedidos.", 'error');
-                setIsLoadingOrders(false);
-            });
+                    fetchedOrders.sort((a, b) => {
+                        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                    return dateB - dateA;
+                    });
+
+                    setMyOrders(fetchedOrders);
+                    setIsLoadingOrders(false);
+                }, 
+                (error) => {
+                    console.error("Error fetching user orders:", error);
+                    addToast("Erro ao buscar seus pedidos.", 'error');
+                    setIsLoadingOrders(false);
+                }
+            );
             return () => unsubscribe();
         } else {
             setIsLoadingOrders(false);
@@ -670,7 +674,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
 
     const handleResendVerification = async () => {
         try {
-            await user.sendEmailVerification();
+            await supabase.auth.resend({ type: 'signup', email: user.email || '' });
             addToast('E-mail de verificação reenviado! Verifique sua caixa de entrada e spam.', 'success');
         } catch (error: any) {
             console.error("Erro ao reenviar email de verificação:", error);
@@ -686,7 +690,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
         e.preventDefault();
         setIsSaving(true);
         try {
-            await firebaseService.updateUserProfile(user.uid, { name, phone });
+            await supabaseService.updateUserProfile(user.id, { name, phone });
             addToast('Seu perfil foi salvo!', 'success');
         } catch (error) {
             addToast('Erro ao salvar seu perfil.', 'error');
@@ -699,10 +703,10 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
         setIsSaving(true);
         try {
             if (address.id) {
-                await firebaseService.updateAddress(user.uid, address);
+                await supabaseService.updateAddress(user.id, address);
                 addToast('Endereço atualizado!', 'success');
             } else {
-                await firebaseService.addAddress(user.uid, address);
+                await supabaseService.addAddress(user.id, address);
                 addToast('Endereço adicionado!', 'success');
             }
             setIsAddressFormVisible(false);
@@ -717,7 +721,7 @@ export const UserAreaModal: React.FC<UserAreaModalProps> = ({ isOpen, onClose, u
     const handleDeleteAddress = async (addressId: string) => {
         if (window.confirm('Tem certeza que deseja excluir este endereço?')) {
             try {
-                await firebaseService.deleteAddress(user.uid, addressId);
+                await supabaseService.deleteAddress(user.id, addressId);
                 addToast('Endereço excluído.', 'success');
             } catch (error) {
                 addToast('Erro ao excluir endereço.', 'error');

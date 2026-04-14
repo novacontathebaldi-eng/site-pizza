@@ -21,7 +21,9 @@ export const CompactMenuItemCard: React.FC<CompactMenuItemCardProps> = ({ produc
             ? product.promotionalPrices
             : product.prices;
             
-        const prices = Object.values(effectivePrices).filter(p => typeof p === 'number' && p > 0);
+        const prices = Object.values(effectivePrices)
+            .filter(p => p !== '' && typeof p === 'number' && !isNaN(p as number))
+            .map(p => Number(p));
         
         if (prices.length === 0) return 'Indisponível';
 
