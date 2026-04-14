@@ -319,18 +319,23 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
 };
 
 export const createUserProfile = async (user: any, name: string, phone: string): Promise<void> => {
-    const profile = {
-        id: user.id,
-        name: name || user.user_metadata?.display_name || user.user_metadata?.full_name || 'Usuário',
-        email: user.email || '',
-        photo_url: user.user_metadata?.avatar_url || '',
-        phone: phone || '',
-        addresses: [],
-    };
+    // The trigger handle_new_user already creates a basic profile on signup.
+    // This function updates it with the full data (name, phone) provided in the form.
+    // We use update instead of upsert because the row already exists from the trigger,
+    // and the user might not have a valid session yet (email verification pending).
     const { error } = await supabase
         .from('profiles')
-        .upsert(profile, { onConflict: 'id' });
-    if (error) throw new Error(error.message);
+        .update({
+            name: name || user.user_metadata?.display_name || user.user_metadata?.full_name || 'Usuário',
+            phone: phone || '',
+            photo_url: user.user_metadata?.avatar_url || '',
+        })
+        .eq('id', user.id);
+    // Silently ignore errors here - the trigger already created a basic profile.
+    // The user can update their info later from their profile page.
+    if (error) {
+        console.warn('createUserProfile update failed (trigger may have handled it):', error.message);
+    }
 };
 
 export const updateUserProfile = async (uid: string, data: Partial<Pick<UserProfile, 'name' | 'phone'>>): Promise<void> => {

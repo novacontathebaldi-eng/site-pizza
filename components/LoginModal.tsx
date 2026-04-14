@@ -90,12 +90,20 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onGoogl
             }
         } catch (err: any) {
             let friendlyMessage = 'Ocorreu um erro inesperado.';
-            switch (err.code || err.message) {
+            const errCode = err.code || err.message || err.status?.toString() || '';
+            switch (errCode) {
                 case 'auth/invalid-name': friendlyMessage = 'Por favor, insira um nome válido.'; break;
                 case 'auth/invalid-cpf': friendlyMessage = 'O CPF inserido não é válido.'; break;
-                case 'User already registered': friendlyMessage = 'Este e-mail já está em uso.'; break;
+                case 'User already registered':
+                case 'user_already_exists': friendlyMessage = 'Este e-mail já está em uso.'; break;
                 case 'invalid_credentials':
                 case 'Invalid login credentials': friendlyMessage = 'E-mail ou senha incorretos.'; break;
+                case 'over_request_rate_limit':
+                case 'over_email_send_rate_limit': friendlyMessage = 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'; break;
+                default:
+                    if (err.status === 429) friendlyMessage = 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+                    else if (err.message?.includes('rate')) friendlyMessage = 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+                    break;
             }
             setError(friendlyMessage);
         } finally {
