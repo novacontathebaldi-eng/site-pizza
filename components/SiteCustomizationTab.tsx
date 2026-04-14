@@ -3,6 +3,7 @@ import { SiteSettings, ContentSection, FooterLink } from '../types';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { defaultSiteSettings } from '../App';
 
 // PROPS
 interface SiteCustomizationTabProps {
@@ -249,6 +250,29 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
         setIsSaving(false);
     };
 
+    // --- RESTORE DEFAULTS ---
+    const handleRestoreDefaults = () => {
+        if(window.confirm('Tem certeza que deseja restaurar as configurações gerais padrão? (Isso não altera a listagem de seções)')) {
+            setFormData(prev => ({
+                ...prev,
+                logoUrl: 'DELETE_AND_RESET',
+                heroSlogan: defaultSiteSettings.heroSlogan,
+                heroTitle: defaultSiteSettings.heroTitle,
+                heroSubtitle: defaultSiteSettings.heroSubtitle,
+                heroBgUrl: 'DELETE_AND_RESET',
+                facadeImageUrl: 'DELETE_AND_RESET'
+            }));
+            // Clear any pending files for these base fields
+            setFiles(prev => {
+                const newFiles = { ...prev };
+                delete newFiles['logo'];
+                delete newFiles['heroBg'];
+                delete newFiles['facade'];
+                return newFiles;
+            });
+        }
+    };
+
     return (
         <form onSubmit={handleSubmit}>
             <div className="mb-6 flex border-b border-gray-200">
@@ -263,8 +287,13 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
             <div className="space-y-6">
 
                 {activeInnerTab === 'config' && (
-                    <div className="border rounded-lg bg-gray-50/50 p-6 space-y-4">
-                        <h3 className="text-xl font-bold mb-4 pb-2 border-b">Configurações Gerais</h3>
+                    <div className="border rounded-lg bg-gray-50/50 p-6 space-y-4 relative">
+                        <div className="flex justify-between items-center mb-4 pb-2 border-b">
+                            <h3 className="text-xl font-bold">Configurações Gerais</h3>
+                            <button type="button" onClick={handleRestoreDefaults} className="text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 py-1 px-3 rounded-md transition-colors flex items-center">
+                                <i className="fas fa-undo mr-2"></i> Restaurar Padrões
+                            </button>
+                        </div>
                         <ImageUploader label="Logo da Pizzaria" imageUrl={formData.logoUrl} onUrlChange={(url) => handleUrlChange('logoUrl', url)} onFileChange={(file) => handleFileChange('logo', file)} onRemove={() => handleUrlChange('logoUrl', 'DELETE_AND_RESET')} />
                             <div>
                                 <label className="block text-sm font-semibold mb-1">Slogan (Hero)</label>
