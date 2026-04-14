@@ -118,6 +118,7 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
     const [files, setFiles] = useState<{ [key: string]: File | null }>({});
     const [isSaving, setIsSaving] = useState(false);
     const [activeAccordion, setActiveAccordion] = useState<string | null>(null);
+    const [activeInnerTab, setActiveInnerTab] = useState<'customization' | 'config'>('customization');
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -250,17 +251,21 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
 
     return (
         <form onSubmit={handleSubmit}>
+            <div className="mb-6 flex border-b border-gray-200">
+                <button type="button" onClick={() => setActiveInnerTab('customization')} className={`py-2 px-4 font-semibold text-sm transition-colors ${activeInnerTab === 'customization' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-800'}`}>
+                    Listagem Geral (Seções)
+                </button>
+                <button type="button" onClick={() => setActiveInnerTab('config')} className={`py-2 px-4 font-semibold text-sm transition-colors ${activeInnerTab === 'config' ? 'border-b-2 border-accent text-accent' : 'text-gray-500 hover:text-gray-800'}`}>
+                    Configuração da Loja
+                </button>
+            </div>
+
             <div className="space-y-6">
 
-                {/* --- Static Sections Accordion --- */}
-                <div className="border rounded-lg bg-gray-50/50">
-                    <button type="button" onClick={() => setActiveAccordion(activeAccordion === 'static' ? null : 'static')} className="w-full p-4 text-left font-bold flex justify-between items-center">
-                        Configurações Gerais
-                        <i className={`fas fa-chevron-down transition-transform ${activeAccordion === 'static' ? 'rotate-180' : ''}`}></i>
-                    </button>
-                    {activeAccordion === 'static' && (
-                        <div className="p-4 border-t space-y-4">
-                            <ImageUploader label="Logo da Pizzaria" imageUrl={formData.logoUrl} onUrlChange={(url) => handleUrlChange('logoUrl', url)} onFileChange={(file) => handleFileChange('logo', file)} onRemove={() => handleUrlChange('logoUrl', 'DELETE_AND_RESET')} />
+                {activeInnerTab === 'config' && (
+                    <div className="border rounded-lg bg-gray-50/50 p-6 space-y-4">
+                        <h3 className="text-xl font-bold mb-4 pb-2 border-b">Configurações Gerais</h3>
+                        <ImageUploader label="Logo da Pizzaria" imageUrl={formData.logoUrl} onUrlChange={(url) => handleUrlChange('logoUrl', url)} onFileChange={(file) => handleFileChange('logo', file)} onRemove={() => handleUrlChange('logoUrl', 'DELETE_AND_RESET')} />
                             <div>
                                 <label className="block text-sm font-semibold mb-1">Slogan (Hero)</label>
                                 <input name="heroSlogan" value={formData.heroSlogan} onChange={handleChange} className="w-full px-3 py-2 border rounded-md" />
@@ -282,11 +287,10 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                                 onRemove={() => handleUrlChange('facadeImageUrl', 'DELETE_AND_RESET')} 
                             />
                         </div>
-                    )}
-                </div>
-
-                {/* --- Dynamic Content Sections --- */}
-                <div className="p-4 border rounded-lg bg-gray-50/50">
+                )}                {/* --- Dynamic Content Sections --- */}
+                {activeInnerTab === 'customization' && (
+                    <>
+                    <div className="p-4 border rounded-lg bg-gray-50/50">
                     <h3 className="text-lg font-bold mb-4 pb-2 border-b">Seções de Conteúdo da Página</h3>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
                         {/* FIX: The SortableContext component requires a single valid React node as its child. Wrapping the list of SortableContentSectionItem components in a <div> resolves the 'children' prop type error. */}
@@ -337,6 +341,8 @@ export const SiteCustomizationTab: React.FC<SiteCustomizationTabProps> = ({ sett
                     </button>
                 </div>
 
+                    </>
+                )}
 
             </div>
 
