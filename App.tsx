@@ -325,18 +325,21 @@ const App: React.FC = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    // Service Worker Unregistration to clear buggy caches
+    // Service Worker Unregistration to clear buggy caches (Deferred to avoid interrupting startup fetches on Chromium)
     useEffect(() => {
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then((registrations) => {
-                for (let registration of registrations) {
-                    registration.unregister();
-                    console.log('Service Worker removido (Limpando Cache)');
-                }
-            }).catch(error => {
-                console.error('Falha ao remover Service Worker:', error);
-            });
-        }
+        const timer = setTimeout(() => {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then((registrations) => {
+                    for (let registration of registrations) {
+                        registration.unregister();
+                        console.log('Service Worker removido de forma segura (Limpando Cache antigo)');
+                    }
+                }).catch(error => {
+                    console.error('Falha ao remover Service Worker:', error);
+                });
+            }
+        }, 5000); // 5 seconds delay
+        return () => clearTimeout(timer);
     }, []);
     
     // Effect to lock body scroll when a modal is open, with special handling for the chatbot on desktop.
@@ -606,22 +609,32 @@ const App: React.FC = () => {
             setError("Não foi possível conectar ao banco de dados."); 
             setIsLoading(false); 
         };
-        
-        const handleAuthConnectionError = (err: any, context: string) => {
-            console.error(`Error fetching ${context}:`, err);
-            if (err.code !== 'permission-denied' && err.code !== 'PGRST301') {
-                setError("Não foi possível conectar ao banco de dados.");
-                setIsLoading(false);
-            }
-        };
 
-        // Load dynamic settings from Supabase
+        // Load dynamic settings from Supabase (Global Data)
         setIsLoading(true);
         const unsubSettings = supabaseService.subscribeSettings(data => { setSiteSettings(prev => ({ ...defaultSiteSettings, ...prev, ...data })); }, err => handleConnectionError(err, "site settings"));
         const unsubStatus = supabaseService.subscribeStoreStatus(isOpen => { setIsStoreOnline(isOpen); }, err => handleConnectionError(err, "store status"));
         const unsubCategories = supabaseService.subscribeCategories(cats => setCategories(cats), err => handleConnectionError(err, "categories"));
         const unsubProducts = supabaseService.subscribeProducts(prods => { setProducts(prods); setIsLoading(false); setError(null); }, err => handleConnectionError(err, "products"));
-        
+
+        return () => { 
+            unsubSettings(); 
+            unsubStatus(); 
+            unsubCategories(); 
+            unsubProducts(); 
+        };
+    }, []); // Run ONLY once on mount for global data
+    
+    // Separate effect for orders, dependent on user authentication
+    useEffect(() => {
+        const handleAuthConnectionError = (err: any, context: string) => {
+            console.error(`Error fetching ${context}:`, err);
+            if (err.code !== 'permission-denied' && err.code !== 'PGRST301') {
+                // Do not block the whole app if just orders fail
+                console.warn("Could not fetch orders, but continuing.");
+            }
+        };
+
         let unsubOrders = () => {};
         if (isCurrentUserAdmin) {
             unsubOrders = supabaseService.subscribeOrders(
@@ -635,13 +648,9 @@ const App: React.FC = () => {
         }
 
         return () => { 
-            unsubSettings(); 
-            unsubStatus(); 
-            unsubCategories(); 
-            unsubProducts(); 
             unsubOrders(); 
         };
-    }, [isCurrentUserAdmin]); // Re-run this effect when admin status changes.
+    }, [isCurrentUserAdmin, currentUser]); // Properly dependency-tracked
     
     useEffect(() => {
         if (categories.length > 0 && !activeMenuCategory) {
