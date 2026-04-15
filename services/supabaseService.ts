@@ -472,10 +472,7 @@ export const subscribeCategories = (onData: (cats: Category[]) => void, onError:
 };
 
 export const subscribeProducts = (onData: (prods: Product[]) => void, onError: (err: any) => void) => {
-    console.log("FETCH PRODUCTS START");
-    const result = supabase.from('products').select('*').eq('is_deleted', false).order('sort_order');
-    result.then(({ data, error }) => {
-        console.log("FETCH PRODUCTS END", { data, error });
+    supabase.from('products').select('*').eq('is_deleted', false).order('sort_order').then(({ data, error }) => {
         if (error) onError(error); else if (data) onData(toCamel(data));
     });
     const channel = supabase.channel('products_chan')

@@ -435,15 +435,7 @@ const App: React.FC = () => {
 
     // Effect for Supabase Auth state changes
     useEffect(() => {
-        console.log("GET SESSION START");
-        supabase.auth.getSession().then(sessionResult => {
-            console.log("GET SESSION END", sessionResult);
-        }).catch(err => {
-            console.error("GET SESSION ERROR", err);
-        });
-
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log("AUTH EVENT:", event, session);
             const user = session?.user || null;
             setCurrentUser(user);
             if (user) {
@@ -612,6 +604,8 @@ const App: React.FC = () => {
     
 
     useEffect(() => {
+        if (isAuthLoading) return; // FIX: Defer fetching until Auth session is fully restored to prevent Web Lock deadlocks!
+
         const handleConnectionError = (err: Error, context: string) => { 
             console.error(`Error fetching ${context}:`, err); 
             setError("Não foi possível conectar ao banco de dados."); 
@@ -631,7 +625,7 @@ const App: React.FC = () => {
             unsubCategories(); 
             unsubProducts(); 
         };
-    }, []); // Run ONLY once on mount for global data
+    }, [isAuthLoading]); // Runs after Auth is resolved
     
     // Separate effect for orders, dependent on user authentication
     useEffect(() => {
