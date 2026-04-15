@@ -832,13 +832,11 @@ const App: React.FC = () => {
         window.open(whatsappUrl, '_blank');
         
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const idToken = session?.access_token || null;
-            const orderNumber = await supabaseService.createOrderInFirestore(details, cartItems, total, pendingOrderId, idToken);
+            const { orderId, orderNumber } = await supabaseService.createOrder(details, cartItems, total);
             addToast(`Pedido #${orderNumber} criado!`, 'success');
             
             const confirmedOrder: Order = {
-                id: pendingOrderId, orderNumber,
+                id: orderId, orderNumber,
                 customer: { name: details.name, phone: details.phone, orderType: details.orderType, ...details },
                 items: cartItems, total, paymentMethod: details.paymentMethod, paymentStatus: 'pending', status: 'pending',
                 createdAt: new Date().toISOString(), notes: details.notes, deliveryFee: details.deliveryFee,
@@ -849,8 +847,8 @@ const App: React.FC = () => {
 
             if (!currentUser) {
                 const guestOrders = JSON.parse(localStorage.getItem('santaSensacaoGuestOrders') || '[]');
-                if (!guestOrders.includes(pendingOrderId)) {
-                    guestOrders.push(pendingOrderId);
+                if (!guestOrders.includes(orderId)) {
+                    guestOrders.push(orderId);
                     localStorage.setItem('santaSensacaoGuestOrders', JSON.stringify(guestOrders));
                 }
             }
@@ -990,9 +988,7 @@ const App: React.FC = () => {
         window.open(whatsappUrl, '_blank');
 
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const idToken = session?.access_token || null;
-            const { orderId, orderNumber } = await supabaseService.createReservationInFirestore(details, idToken);
+            const { orderId, orderNumber } = await supabaseService.createReservation(details);
             addToast(`Reserva #${orderNumber} registrada com sucesso!`, 'success');
             const confirmedReservation: Order = {
                 id: orderId, orderNumber,

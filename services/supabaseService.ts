@@ -171,50 +171,66 @@ export const updateSiteSettings = async (settings: Partial<SiteSettings>): Promi
     if (error) throw new Error(error.message);
 };
 
-// Order Functions (Vercel API)
-export const createOrderInFirestore = async (
+// Order Functions (Supabase RPC — atomic with SECURITY DEFINER)
+export const createOrder = async (
     details: OrderDetails,
     cart: CartItem[],
-    total: number,
-    orderId: string,
-    idToken: string | null
-): Promise<number> => {
-    const response = await fetch('/api/create-order', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': idToken ? `Bearer ${idToken}` : ''
+    total: number
+): Promise<{ orderId: string; orderNumber: number }> => {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const orderData = {
+        user_id: user?.id || '',
+        customer: {
+            name: details.name,
+            phone: details.phone,
+            orderType: details.orderType,
+            neighborhood: details.neighborhood || '',
+            street: details.street || '',
+            number: details.number || '',
+            complement: details.complement || '',
         },
-        body: JSON.stringify({ details, cart, total, orderId })
+        items: cart,
+        total,
+        delivery_fee: details.deliveryFee || 0,
+        payment_method: details.paymentMethod,
+        change_needed: details.changeNeeded || false,
+        change_amount: details.changeAmount || '',
+        notes: details.notes || '',
+    };
+
+    const { data, error } = await supabase.rpc('create_order_atomic', {
+        order_data: orderData,
     });
 
-    if (!response.ok) {
-        throw new Error(`Failed to create order: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.orderNumber;
+    if (error) throw new Error(error.message);
+    return { orderId: data.order_id, orderNumber: data.order_number };
 };
 
-export const createReservationInFirestore = async (
-    details: ReservationDetails,
-    idToken: string | null
-): Promise<{orderId: string, orderNumber: number}> => {
-    const response = await fetch('/api/create-reservation', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': idToken ? `Bearer ${idToken}` : ''
+export const createReservation = async (
+    details: ReservationDetails
+): Promise<{ orderId: string; orderNumber: number }> => {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const reservationData = {
+        user_id: user?.id || '',
+        customer: {
+            name: details.name,
+            phone: details.phone,
+            orderType: 'local',
+            reservationDate: details.reservationDate,
+            reservationTime: details.reservationTime,
         },
-        body: JSON.stringify({ details })
+        number_of_people: details.numberOfPeople || 2,
+        notes: details.notes || '',
+    };
+
+    const { data, error } = await supabase.rpc('create_reservation_atomic', {
+        reservation_data: reservationData,
     });
 
-    if (!response.ok) {
-        throw new Error(`Failed to create reservation: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
+    if (error) throw new Error(error.message);
+    return { orderId: data.order_id, orderNumber: data.order_number };
 };
 
 // Order Updates (Admin)
@@ -302,11 +318,6 @@ export const askChatbot = async (
 };
 
 // User Profile & Auth
-export const verifyGoogleTokenAndSignIn = async (idToken: string): Promise<void> => {
-    // Supabase handles OAuth directly, this was for Firebase Custom Tokens.
-    // If the frontend triggers OAuth natively via Supabase, we might not need this.
-    console.warn("verifyGoogleTokenAndSignIn is stubbed for Supabase, use supabase.auth.signInWithOAuth instead");
-};
 
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
     const { data, error } = await supabase
@@ -404,14 +415,18 @@ export const manageProfilePicture = async (imageBase64: string | null): Promise<
     throw new Error("Pendente refatoração para Supabase Storage");
 };
 
-export const syncGuestOrders = async (uid: string, orderIds: string[]): Promise<{ success: boolean; message: string; }> => {
-    // Calling via REST or translating logic to RPC
-    const response = await fetch('/api/sync-orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid, orderIds })
-    });
-    return await response.json();
+export const syncGuestOrders = async (uid: string, orderIds: string[]): Promise<{ success: boolean; message: string }> => {
+    const { error } = await supabase
+        .from('orders')
+        .update({ user_id: uid })
+        .in('id', orderIds)
+        .is('user_id', null);
+
+    if (error) {
+        console.error('Failed to sync guest orders:', error);
+        return { success: false, message: error.message };
+    }
+    return { success: true, message: 'Orders synced successfully' };
 };
 
 // --- Data Subscriptions (Adapters Replacing onSnapshot) ---
