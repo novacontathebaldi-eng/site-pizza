@@ -433,6 +433,16 @@ const App: React.FC = () => {
         setShowCookieBanner(false);
     };
 
+    // DEBUG: TRACK EVERY RENDER CYCLE
+    useEffect(() => {
+        console.log("RENDER TRACE:", {
+            isLoading,
+            isAuthLoading,
+            productsLength: products.length,
+            sessionUser: currentUser?.id || null
+        });
+    });
+
     // Effect for Supabase Auth state changes
     useEffect(() => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -614,12 +624,20 @@ const App: React.FC = () => {
 
         // Load dynamic settings from Supabase (Global Data)
         setIsLoading(true);
+        console.log("DATA PIPELINE: Global fetch started, isLoading set to true");
         const unsubSettings = supabaseService.subscribeSettings(data => { setSiteSettings(prev => ({ ...defaultSiteSettings, ...prev, ...data })); }, err => handleConnectionError(err, "site settings"));
         const unsubStatus = supabaseService.subscribeStoreStatus(isOpen => { setIsStoreOnline(isOpen); }, err => handleConnectionError(err, "store status"));
         const unsubCategories = supabaseService.subscribeCategories(cats => setCategories(cats), err => handleConnectionError(err, "categories"));
-        const unsubProducts = supabaseService.subscribeProducts(prods => { setProducts(prods); setIsLoading(false); setError(null); }, err => handleConnectionError(err, "products"));
+        const unsubProducts = supabaseService.subscribeProducts(prods => { 
+            console.log("DATA PIPELINE: subscribeProducts callback invoked!", prods.length);
+            setProducts(prods); 
+            console.log("DATA PIPELINE: Calling setIsLoading(false)...");
+            setIsLoading(false); 
+            setError(null); 
+        }, err => handleConnectionError(err, "products"));
 
         return () => { 
+            console.log("DATA PIPELINE: Unsubscribing global data");
             unsubSettings(); 
             unsubStatus(); 
             unsubCategories(); 
