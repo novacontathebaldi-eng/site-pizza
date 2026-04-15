@@ -435,7 +435,15 @@ const App: React.FC = () => {
 
     // Effect for Supabase Auth state changes
     useEffect(() => {
+        console.log("GET SESSION START");
+        supabase.auth.getSession().then(sessionResult => {
+            console.log("GET SESSION END", sessionResult);
+        }).catch(err => {
+            console.error("GET SESSION ERROR", err);
+        });
+
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log("AUTH EVENT:", event, session);
             const user = session?.user || null;
             setCurrentUser(user);
             if (user) {
