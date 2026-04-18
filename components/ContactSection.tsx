@@ -62,7 +62,12 @@ function formatOperatingHoursGroups(operatingHours?: DaySchedule[]): { days: str
                 if (seq.length === 2) return `${seq[0].dayName} e ${seq[1].dayName}`;
                 return `De ${seq[0].dayName} a ${seq[seq.length - 1].dayName}`;
             });
-            dayString = formattedSequences.join(' e ');
+            
+            if (formattedSequences.length > 1) {
+                dayString = formattedSequences.slice(0, -1).join(', ') + ' e ' + formattedSequences[formattedSequences.length - 1];
+            } else {
+                dayString = formattedSequences[0];
+            }
         }
 
         const [openTime, closeTime] = timeKey.split('-');
@@ -75,23 +80,7 @@ function formatOperatingHoursGroups(operatingHours?: DaySchedule[]): { days: str
 }
 
 
-const formatOperatingHours = (operatingHours?: DaySchedule[]): string => {
-    if (!operatingHours?.length) {
-        return 'Funcionamento não informado.';
-    }
 
-    const openSchedules = operatingHours.filter(h => h.isOpen);
-    if (openSchedules.length === 0) {
-        return 'Fechado todos os dias.';
-    }
-
-    const groups = formatOperatingHoursGroups(operatingHours);
-    if (groups.length === 0) {
-        return 'Fechado todos os dias.';
-    }
-
-    return groups.map(group => `${group.days}, ${group.time}`).join(' | ');
-};
 
 
 export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
@@ -99,7 +88,6 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
     const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
     // A URL agora vem das configurações do site, tornando-a personalizável.
     const facadeImageUrl = settings.facadeImageUrl;
-    const operatingHoursText = formatOperatingHours(settings.operatingHours);
 
 
     return (
@@ -135,7 +123,20 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
                                 <i className="fas fa-clock text-accent text-xl mt-1 w-6 text-center flex-shrink-0"></i>
                                 <div>
                                     <h3 className="text-lg font-bold text-text-on-light">Funcionamento</h3>
-                                    <p className="text-gray-700">{operatingHoursText}</p>
+                                    <div className="text-gray-700 space-y-3 mt-2">
+                                        {!settings.operatingHours?.length ? (
+                                            <p>Funcionamento não informado.</p>
+                                        ) : formatOperatingHoursGroups(settings.operatingHours).length === 0 ? (
+                                            <p>Fechado todos os dias.</p>
+                                        ) : (
+                                            formatOperatingHoursGroups(settings.operatingHours).map((group, idx) => (
+                                                <div key={idx} className="flex flex-col">
+                                                    <span className="font-medium text-text-on-light">{group.days}</span>
+                                                    <span className="opacity-80 text-sm">{group.time}</span>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

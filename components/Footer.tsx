@@ -67,7 +67,12 @@ function formatOperatingHoursGroups(operatingHours?: DaySchedule[]): { days: str
                 if (seq.length === 2) return `${seq[0].dayName} e ${seq[1].dayName}`;
                 return `De ${seq[0].dayName} a ${seq[seq.length - 1].dayName}`;
             });
-            dayString = formattedSequences.join(' e ');
+            
+            if (formattedSequences.length > 1) {
+                dayString = formattedSequences.slice(0, -1).join(', ') + ' e ' + formattedSequences[formattedSequences.length - 1];
+            } else {
+                dayString = formattedSequences[0];
+            }
         }
 
         const [openTime, closeTime] = timeKey.split('-');
@@ -80,28 +85,7 @@ function formatOperatingHoursGroups(operatingHours?: DaySchedule[]): { days: str
 }
 
 
-const formatOperatingHours = (operatingHours?: DaySchedule[]): string[] => {
-    if (!operatingHours?.length) {
-        return ['Funcionamento não informado.'];
-    }
-    const openSchedules = operatingHours.filter(h => h.isOpen);
-    if (openSchedules.length === 0) {
-        return ['Fechado todos os dias.'];
-    }
 
-    const groups = formatOperatingHoursGroups(operatingHours);
-    if (groups.length === 0) {
-        return ['Fechado todos os dias.'];
-    }
-
-    const finalStrings: string[] = [];
-    groups.forEach(group => {
-        finalStrings.push(group.days);
-        finalStrings.push(group.time);
-    });
-
-    return finalStrings;
-};
 
 
 export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot, onOpenPrivacyPolicy, onUserAreaClick, isAdmin }) => {
@@ -109,7 +93,6 @@ export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot, onOpenP
     const visibleLinks = settings.footerLinks?.filter(link => link.isVisible !== false) ?? [];
     const socialLinks = visibleLinks.filter(link => link.icon.startsWith('fab'));
     const otherLinks = visibleLinks.filter(link => !link.icon.startsWith('fab') && link.url !== '/admin');
-    const operatingHoursParts = formatOperatingHours(settings.operatingHours);
 
     return (
         <footer className="bg-brand-green-700 text-text-on-dark pt-16 pb-8">
@@ -146,11 +129,28 @@ export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot, onOpenP
                     </div>
                     <div>
                         <h4 className="font-bold text-lg mb-4">Funcionamento</h4>
-                         <ul className="space-y-2 text-brand-green-300">
-                            {operatingHoursParts.map((part, index) => (
-                                <li key={index}><i className={`fas ${index % 2 === 0 ? 'fa-clock' : 'fa-none'} mr-2 text-accent`}></i>{part}</li>
-                            ))}
-                            <li><i className="fas fa-truck mr-2 text-accent"></i>Delivery disponível</li>
+                         <ul className="space-y-4 text-brand-green-300">
+                            {!settings.operatingHours?.length ? (
+                                <li>Funcionamento não informado.</li>
+                            ) : formatOperatingHoursGroups(settings.operatingHours).length === 0 ? (
+                                <li>Fechado todos os dias.</li>
+                            ) : (
+                                formatOperatingHoursGroups(settings.operatingHours).map((group, idx) => (
+                                    <li key={idx}>
+                                        <div className="flex items-start">
+                                            <i className="fas fa-clock mr-2 mt-1 text-accent flex-shrink-0"></i>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium text-white">{group.days}</span>
+                                                <span className="text-sm opacity-80">{group.time}</span>
+                                            </div>
+                                        </div>
+                                    </li>
+                                ))
+                            )}
+                            <li className="pt-1 flex items-center border-t border-brand-green-600/50 mt-2">
+                                <i className="fas fa-truck mr-2 text-accent flex-shrink-0"></i>
+                                <span>Delivery disponível</span>
+                            </li>
                         </ul>
                     </div>
                      <div>
