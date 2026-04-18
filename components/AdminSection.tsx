@@ -706,9 +706,12 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                     <div className="mt-8">
                                         <h3 className="text-xl font-bold mb-4">Editar Horário de Funcionamento</h3>
                                         <div className="space-y-3 bg-white p-4 rounded-lg border">
-                                            {(localSettings.operatingHours || []).map((schedule, index) => (
+                                            {(localSettings.operatingHours || []).map((schedule, index) => {
+                                                const defaultDayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+                                                const displayName = schedule.dayName || defaultDayNames[index];
+                                                return (
                                                 <div key={`schedule-${index}`} className="grid grid-cols-1 md:grid-cols-[120px_1fr_2fr] items-center gap-4 p-3 rounded-md border bg-gray-50/50">
-                                                    <div className="font-semibold">{schedule.dayName}</div>
+                                                    <div className="font-semibold">{displayName}</div>
                                                     <div className="flex items-center gap-3">
                                                         <label className="relative inline-flex items-center cursor-pointer">
                                                             <input
@@ -739,7 +742,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                         />
                                                     </div>
                                                 </div>
-                                            ))}
+                                            )})}
                                         </div>
                                     </div>
 
