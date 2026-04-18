@@ -754,7 +754,22 @@ const App: React.FC = () => {
 
     // --- Auth Handlers ---
     const handleGoogleSignIn = async () => {
-        addToast('Login com Google está temporariamente desativado.', 'error');
+        try {
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    queryParams: {
+                        access_type: 'offline',
+                        prompt: 'consent',
+                    },
+                    redirectTo: window.location.origin
+                }
+            });
+            if (error) throw error;
+        } catch (error: any) {
+            console.error("Google login error:", error);
+            addToast('Erro ao iniciar login com Google.', 'error');
+        }
     };
     
     const handleRegisterSuccess = () => {
