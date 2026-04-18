@@ -40,7 +40,7 @@ export const AboutSection: React.FC<AboutSectionProps> = ({ settings }) => {
                         </div>
                     </div>
                     <div className="relative">
-                        <img src={aboutSection.imageUrl} alt="Mestre Pizzaiolo Luca Lonardi segurando a pizza premiada" className="rounded-2xl shadow-xl w-full h-auto object-cover" />
+                        <img src={aboutSection.imageUrl || undefined} alt="Mestre Pizzaiolo Luca Lonardi segurando a pizza premiada" className="rounded-2xl shadow-xl w-full h-auto object-cover" />
                     </div>
                 </div>
             </div>

@@ -433,15 +433,7 @@ const App: React.FC = () => {
         setShowCookieBanner(false);
     };
 
-    // DEBUG: TRACK EVERY RENDER CYCLE
-    useEffect(() => {
-        console.log("RENDER TRACE:", {
-            isLoading,
-            isAuthLoading,
-            productsLength: products.length,
-            sessionUser: currentUser?.id || null
-        });
-    });
+
 
     // Effect for Supabase Auth state changes
     useEffect(() => {

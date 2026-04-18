@@ -9,7 +9,15 @@ interface ContactSectionProps {
 function formatOperatingHoursGroups(operatingHours?: DaySchedule[]): { days: string, time: string }[] {
     if (!operatingHours?.length) return [];
     
-    const openSchedules = operatingHours.filter(h => h.isOpen);
+    // Data normalization to guarantee valid day names and indices even if database payload is corrupted
+    const defaultDayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    const normalizedHours = operatingHours.map((h, i) => ({
+        ...h,
+        dayOfWeek: h.dayOfWeek ?? i,
+        dayName: h.dayName || defaultDayNames[h.dayOfWeek ?? i]
+    }));
+
+    const openSchedules = normalizedHours.filter(h => h.isOpen);
     if (openSchedules.length === 0) return [];
     
     const schedulesByTime = openSchedules.reduce((acc, schedule) => {
@@ -109,7 +117,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
                     {/* Left Column: Info & Image */}
                     <div className="flex flex-col space-y-6">
                         <img 
-                            src={facadeImageUrl}
+                            src={facadeImageUrl || undefined}
                             alt="Ambiente aconchegante da pizzaria" 
                             className="rounded-xl shadow-lg w-full h-64 object-cover" 
                         />

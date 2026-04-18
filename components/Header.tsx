@@ -51,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({ cartItemCount, onCartClick, onOp
             <div className="container mx-auto px-2 sm:px-4">
                 <div className="flex justify-between items-center h-20 relative">
                     <a href="#inicio" onClick={(e) => { e.preventDefault(); scrollToSection('inicio');}} className="flex items-center gap-3 text-xl font-bold">
-                        <img src={settings.logoUrl} alt="Santa Sensação Logo" className="h-14" />
+                        <img src={settings.logoUrl || undefined} alt="Santa Sensação Logo" className="h-14" />
                         <span className="hidden sm:inline">Santa Sensação</span>
                     </a>
                     

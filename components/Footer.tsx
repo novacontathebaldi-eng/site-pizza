@@ -14,7 +14,15 @@ interface FooterProps {
 function formatOperatingHoursGroups(operatingHours?: DaySchedule[]): { days: string, time: string }[] {
     if (!operatingHours?.length) return [];
     
-    const openSchedules = operatingHours.filter(h => h.isOpen);
+    // Data normalization to guarantee valid day names and indices even if database payload is corrupted
+    const defaultDayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    const normalizedHours = operatingHours.map((h, i) => ({
+        ...h,
+        dayOfWeek: h.dayOfWeek ?? i,
+        dayName: h.dayName || defaultDayNames[h.dayOfWeek ?? i]
+    }));
+
+    const openSchedules = normalizedHours.filter(h => h.isOpen);
     if (openSchedules.length === 0) return [];
     
     const schedulesByTime = openSchedules.reduce((acc, schedule) => {
@@ -109,7 +117,7 @@ export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot, onOpenP
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center md:text-left">
                     <div className="flex flex-col items-center md:items-start md:col-span-1">
                         <div className="flex items-center gap-3 text-2xl font-bold mb-4">
-                           <img src={settings.logoUrl} alt="Santa Sensação Logo" className="h-12" />
+                           <img src={settings.logoUrl || undefined} alt="Santa Sensação Logo" className="h-12" />
                             <span>Santa Sensação</span>
                         </div>
                         <p className="text-brand-green-300 mb-4">{settings.heroSlogan} 🏅</p>
