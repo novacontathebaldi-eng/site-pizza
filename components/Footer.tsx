@@ -129,27 +129,24 @@ export const Footer: React.FC<FooterProps> = ({ settings, onOpenChatbot, onOpenP
                     </div>
                     <div>
                         <h4 className="font-bold text-lg mb-4">Funcionamento</h4>
-                         <ul className="space-y-4 text-brand-green-300">
+                         <ul className="space-y-3 text-brand-green-300">
                             {!settings.operatingHours?.length ? (
                                 <li>Funcionamento não informado.</li>
                             ) : formatOperatingHoursGroups(settings.operatingHours).length === 0 ? (
                                 <li>Fechado todos os dias.</li>
                             ) : (
                                 formatOperatingHoursGroups(settings.operatingHours).map((group, idx) => (
-                                    <li key={idx}>
-                                        <div className="flex items-start">
-                                            <i className="fas fa-clock mr-2 mt-1 text-accent flex-shrink-0"></i>
-                                            <div className="flex flex-col">
-                                                <span className="font-medium text-white">{group.days}</span>
-                                                <span className="text-sm opacity-80">{group.time}</span>
-                                            </div>
-                                        </div>
+                                    <li key={idx} className="flex items-start">
+                                        <i className="fas fa-clock mr-3 mt-1 text-accent flex-shrink-0"></i>
+                                        <span className="leading-relaxed">
+                                            <span className="font-medium text-white">{group.days}</span>, {group.time}
+                                        </span>
                                     </li>
                                 ))
                             )}
-                            <li className="pt-1 flex items-center border-t border-brand-green-600/50 mt-2">
-                                <i className="fas fa-truck mr-2 text-accent flex-shrink-0"></i>
-                                <span>Delivery disponível</span>
+                            <li className="flex items-start">
+                                <i className="fas fa-truck mr-3 mt-1 text-accent flex-shrink-0"></i>
+                                <span className="leading-relaxed">Delivery disponível</span>
                             </li>
                         </ul>
                     </div>

@@ -123,17 +123,16 @@ export const ContactSection: React.FC<ContactSectionProps> = ({ settings }) => {
                                 <i className="fas fa-clock text-accent text-xl mt-1 w-6 text-center flex-shrink-0"></i>
                                 <div>
                                     <h3 className="text-lg font-bold text-text-on-light">Funcionamento</h3>
-                                    <div className="text-gray-700 space-y-3 mt-2">
+                                    <div className="text-gray-700 space-y-2 mt-1">
                                         {!settings.operatingHours?.length ? (
                                             <p>Funcionamento não informado.</p>
                                         ) : formatOperatingHoursGroups(settings.operatingHours).length === 0 ? (
                                             <p>Fechado todos os dias.</p>
                                         ) : (
                                             formatOperatingHoursGroups(settings.operatingHours).map((group, idx) => (
-                                                <div key={idx} className="flex flex-col">
-                                                    <span className="font-medium text-text-on-light">{group.days}</span>
-                                                    <span className="opacity-80 text-sm">{group.time}</span>
-                                                </div>
+                                                <p key={idx} className="leading-relaxed">
+                                                    <span className="font-medium text-text-on-light">{group.days}</span>, {group.time}
+                                                </p>
                                             ))
                                         )}
                                     </div>
