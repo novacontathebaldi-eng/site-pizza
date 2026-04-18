@@ -522,15 +522,13 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
         }
     };
 
-    const handleOperatingHoursChange = (dayOfWeek: number, field: keyof DaySchedule, value: any) => {
-        const newHours = (localSettings.operatingHours || []).map(schedule => {
-            if (schedule.dayOfWeek === dayOfWeek) {
-                const updatedSchedule = { ...schedule };
-                (updatedSchedule as any)[field] = value;
-                return updatedSchedule;
-            }
-            return schedule;
-        });
+    const handleOperatingHoursChange = (index: number, field: keyof DaySchedule, value: any) => {
+        const newHours = [...(localSettings.operatingHours || [])];
+        if (newHours[index]) {
+            const updatedSchedule = { ...newHours[index] };
+            (updatedSchedule as any)[field] = value;
+            newHours[index] = updatedSchedule;
+        }
 
         setLocalSettings(prev => ({
             ...prev,
@@ -708,8 +706,8 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                     <div className="mt-8">
                                         <h3 className="text-xl font-bold mb-4">Editar Horário de Funcionamento</h3>
                                         <div className="space-y-3 bg-white p-4 rounded-lg border">
-                                            {(localSettings.operatingHours || []).map((schedule) => (
-                                                <div key={schedule.dayOfWeek} className="grid grid-cols-1 md:grid-cols-[120px_1fr_2fr] items-center gap-4 p-3 rounded-md border bg-gray-50/50">
+                                            {(localSettings.operatingHours || []).map((schedule, index) => (
+                                                <div key={`schedule-${index}`} className="grid grid-cols-1 md:grid-cols-[120px_1fr_2fr] items-center gap-4 p-3 rounded-md border bg-gray-50/50">
                                                     <div className="font-semibold">{schedule.dayName}</div>
                                                     <div className="flex items-center gap-3">
                                                         <label className="relative inline-flex items-center cursor-pointer">
@@ -717,7 +715,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                                 type="checkbox"
                                                                 className="sr-only peer"
                                                                 checked={schedule.isOpen}
-                                                                onChange={e => handleOperatingHoursChange(schedule.dayOfWeek, 'isOpen', e.target.checked)}
+                                                                onChange={e => handleOperatingHoursChange(index, 'isOpen', e.target.checked)}
                                                             />
                                                             <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
                                                         </label>
@@ -727,7 +725,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                         <input
                                                             type="time"
                                                             value={schedule.openTime}
-                                                            onChange={e => handleOperatingHoursChange(schedule.dayOfWeek, 'openTime', e.target.value)}
+                                                            onChange={e => handleOperatingHoursChange(index, 'openTime', e.target.value)}
                                                             disabled={!schedule.isOpen}
                                                             className="w-full px-2 py-1 border rounded-md bg-white disabled:bg-gray-200 disabled:cursor-not-allowed"
                                                         />
@@ -735,7 +733,7 @@ export const AdminSection: React.FC<AdminSectionProps> = (props) => {
                                                         <input
                                                             type="time"
                                                             value={schedule.closeTime}
-                                                            onChange={e => handleOperatingHoursChange(schedule.dayOfWeek, 'closeTime', e.target.value)}
+                                                            onChange={e => handleOperatingHoursChange(index, 'closeTime', e.target.value)}
                                                             disabled={!schedule.isOpen}
                                                             className="w-full px-2 py-1 border rounded-md bg-white disabled:bg-gray-200 disabled:cursor-not-allowed"
                                                         />
